@@ -213,12 +213,12 @@ export function localizeInterfaceText(value: string, locale: Locale) {
     ([source, pair]) => source === trimmed || pair[0] === trimmed || pair[1] === trimmed,
   );
   const exact = exactEntry?.[1];
-  let translated = exact
+  let translated: string = exact
     ? (exact[locale === "ar" ? 1 : 0] ?? trimmed)
     : translateKnownValue(locale, trimmed);
   if (!exact) {
     for (const [pattern, pair] of substitutions) {
-      translated = translated.replace(pattern, pair[locale === "ar" ? 1 : 0]);
+      translated = translated.replace(pattern, pair[locale === "ar" ? 1 : 0] ?? "");
     }
   }
   return value.replace(trimmed, translated);
