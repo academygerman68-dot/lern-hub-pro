@@ -93,7 +93,7 @@ const copy: Record<string, Pair> = {
   "Open schedule": ["Voir le planning", "عرض الجدول"],
   "Room 3": ["Salle 3", "القاعة 3"],
   "Room 2": ["Salle 2", "القاعة 2"],
-  "Online": ["En ligne", "عن بُعد"],
+  "Online": ["En ligne", "متصل"],
   "Assignments": ["Devoirs", "الواجبات"],
   "waiting for review": ["à corriger", "بانتظار المراجعة"],
   "Students": ["Étudiants", "الطلاب"],
@@ -183,7 +183,6 @@ const copy: Record<string, Pair> = {
   "Messages": ["Messages", "الرسائل"],
   "Stay connected with teachers and administration.": ["Restez en contact avec les professeurs et l’administration.", "ابقَ على تواصل مع الأساتذة والإدارة."],
   "Administration": ["Administration", "الإدارة"],
-  "Online": ["En ligne", "متصل"],
   "Write a message…": ["Écrire un message…", "اكتب رسالة…"],
 };
 

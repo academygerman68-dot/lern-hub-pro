@@ -16,4 +16,4 @@
 - [x] Realistic demo data and mock service interfaces
 - [x] Desktop and mobile browser verification
 - [x] Traduire toute l’interface en français et arabe avec prise en charge RTL
-- [ ] Corriger le contraste des surfaces sombres et valider les deux langues
+- [x] Corriger le contraste des surfaces sombres et valider les deux langues

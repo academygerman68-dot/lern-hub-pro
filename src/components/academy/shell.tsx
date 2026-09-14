@@ -109,7 +109,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Button
           size="icon"
           variant="ghost"
-          className="lg:hidden"
+          className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:hidden"
           onClick={() => setMobile(false)}
            aria-label={locale === "ar" ? "إغلاق القائمة" : "Fermer la navigation"}
         >

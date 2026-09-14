@@ -46,24 +46,24 @@ export function Login() {
   return (
     <main className="min-h-screen bg-background lg:grid lg:grid-cols-[0.92fr_1.08fr]">
       <section className="relative hidden overflow-hidden bg-brand lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <div className="flex items-center gap-3 text-primary-foreground">
+        <div className="flex items-center gap-3 text-brand-foreground">
           <span className="grid size-10 place-items-center rounded-lg bg-primary-foreground/10">
             <GraduationCap />
           </span>
           <span className="font-display text-xl font-semibold">Deutsch Academy</span>
         </div>
         <div className="max-w-xl">
-          <p className="mb-5 text-sm font-semibold uppercase tracking-widest text-primary-foreground/60">
+          <p className="mb-5 text-sm font-semibold uppercase tracking-widest text-brand-foreground/70">
             {t("brand.tagline")}
           </p>
-          <h1 className="font-display text-5xl font-semibold leading-tight text-primary-foreground">
+          <h1 className="font-display text-5xl font-semibold leading-tight text-brand-foreground">
             {l("Votre expérience complète d’apprentissage de l’allemand.", "تجربتك المتكاملة لتعلّم اللغة الألمانية.")}
           </h1>
-          <p className="mt-6 max-w-lg text-lg leading-relaxed text-primary-foreground/70">
+          <p className="mt-6 max-w-lg text-lg leading-relaxed text-brand-foreground/75">
             {l("Cours, classes en direct, examens et progression — un espace unique du niveau A1 au B2.", "الدورات والدروس المباشرة والامتحانات والتقدّم — في مساحة واحدة من A1 إلى B2.")}
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-4 border-t border-primary-foreground/15 pt-6 text-primary-foreground">
+        <div className="grid grid-cols-3 gap-4 border-t border-brand-foreground/15 pt-6 text-brand-foreground">
           <div>
             <strong className="block text-2xl">243</strong>
             <span className="text-xs text-brand-foreground/60">{l("apprenants actifs", "متعلماً نشطاً")}</span>

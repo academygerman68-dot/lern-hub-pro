@@ -79,8 +79,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Deutsch Academy" },
-      { name: "description", content: "Digital platform for a modern German learning center." },
+      { title: "Deutsch Academy — Apprendre l’allemand" },
+      { name: "description", content: "Plateforme moderne d’apprentissage de l’allemand en français et en arabe." },
       { name: "author", content: "Deutsch Academy" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

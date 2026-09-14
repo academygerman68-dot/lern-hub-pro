@@ -70,7 +70,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = loadSession();
     setSession(stored);
-    setLocaleState(stored?.locale ?? readLocale());
+    setLocaleState(stored?.locale === "ar" || stored?.locale === "fr" ? stored.locale : readLocale());
     setReady(true);
   }, []);
 
