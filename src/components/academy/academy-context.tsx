@@ -25,6 +25,7 @@ import type {
   SessionUser,
   SubscriptionStatus,
 } from "@/types/academy";
+import { InterfaceLocalizer } from "./interface-localizer";
 
 const LOCALE_KEY = "da-locale";
 
@@ -184,7 +185,12 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
     [ready, session, lastScore, locale, setRole, signIn, navigate, persist],
   );
 
-  return <AcademyContext.Provider value={value}>{children}</AcademyContext.Provider>;
+  return (
+    <AcademyContext.Provider value={value}>
+      <InterfaceLocalizer locale={locale} />
+      {children}
+    </AcademyContext.Provider>
+  );
 }
 
 export function useAcademy() {

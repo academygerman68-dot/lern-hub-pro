@@ -15,5 +15,5 @@
 - [x] Director dashboard, Student 360, classes, courses, exams and finance
 - [x] Realistic demo data and mock service interfaces
 - [x] Desktop and mobile browser verification
-- [ ] Traduire toute l’interface en français et arabe avec prise en charge RTL
+- [x] Traduire toute l’interface en français et arabe avec prise en charge RTL
 - [ ] Corriger le contraste des surfaces sombres et valider les deux langues
