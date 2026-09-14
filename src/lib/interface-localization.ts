@@ -1,11 +1,14 @@
 import type { Locale } from "@/types/academy";
+import { translateKnownValue } from "@/lib/i18n";
 
 type Pair = readonly [fr: string, ar: string];
 
 const copy: Record<string, Pair> = {
+  "Hallo, Ahmed.": ["Bonjour, Ahmed.", "مرحباً، أحمد."],
   "Your German journey continues.": ["Votre parcours en allemand continue.", "تستمر رحلتك في تعلّم الألمانية."],
   "Current level": ["Niveau actuel", "المستوى الحالي"],
   "Intermediate German": ["Allemand intermédiaire", "الألمانية المتوسطة"],
+  "complete": ["terminé", "مكتمل"],
   "You have built a strong everyday foundation. Your next chapter is confident workplace conversation.": ["Vous avez acquis de solides bases au quotidien. Votre prochaine étape : communiquer avec assurance au travail.", "لقد بنيت أساساً قوياً للاستخدام اليومي. خطوتك التالية هي التواصل بثقة في العمل."],
   "Continue learning": ["Continuer à apprendre", "متابعة التعلّم"],
   "View progress": ["Voir la progression", "عرض التقدّم"],
@@ -20,6 +23,8 @@ const copy: Record<string, Pair> = {
   "Homework": ["Devoir", "واجب"],
   "Write a professional email": ["Rédiger un e-mail professionnel", "كتابة بريد إلكتروني مهني"],
   "Next milestone": ["Prochaine étape", "المحطة القادمة"],
+  "A2 Mock Exam": ["Examen blanc A2", "امتحان A2 التجريبي"],
+  "You are ready in Lesen and Hören. Focus next on written expression.": ["Vous êtes prêt en lecture et en compréhension orale. Concentrez-vous maintenant sur l’expression écrite.", "أنت مستعد في القراءة والاستماع. ركّز الآن على التعبير الكتابي."],
   "Prepare for exam": ["Préparer l’examen", "الاستعداد للامتحان"],
   "Learning momentum": ["Dynamique d’apprentissage", "وتيرة التعلّم"],
   "A steady week of practice.": ["Une semaine de pratique régulière.", "أسبوع منتظم من التدريب."],
@@ -204,8 +209,13 @@ const substitutions: Array<readonly [RegExp, Pair]> = [
 export function localizeInterfaceText(value: string, locale: Locale) {
   const trimmed = value.trim();
   if (!trimmed) return value;
-  const exact = copy[trimmed];
-  let translated = exact ? exact[locale === "ar" ? 1 : 0] : trimmed;
+  const exactEntry = Object.entries(copy).find(
+    ([source, pair]) => source === trimmed || pair[0] === trimmed || pair[1] === trimmed,
+  );
+  const exact = exactEntry?.[1];
+  let translated = exact
+    ? exact[locale === "ar" ? 1 : 0]
+    : translateKnownValue(locale, trimmed);
   if (!exact) {
     for (const [pattern, pair] of substitutions) {
       translated = translated.replace(pattern, pair[locale === "ar" ? 1 : 0]);

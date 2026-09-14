@@ -102,4 +102,14 @@ export function translate(locale: Locale, key: string) {
   return dictionaries[locale][key] ?? dictionaries.fr[key] ?? key;
 }
 
+export function translateKnownValue(locale: Locale, value: string) {
+  for (const dictionaryKey of Object.keys(dictionaries.fr)) {
+    const key = dictionaryKey as keyof typeof fr;
+    if (dictionaries.fr[key] === value || dictionaries.ar[key] === value) {
+      return dictionaries[locale][key];
+    }
+  }
+  return value;
+}
+
 export const localeLabels: Record<Locale, string> = { fr: "FR", ar: "العربية" };
