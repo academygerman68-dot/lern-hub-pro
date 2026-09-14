@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { ArrowRight, BookOpen, Building2, Eye, EyeOff, GraduationCap } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { localeLabels } from "@/lib/i18n";
@@ -8,19 +9,15 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { AuthService } from "@/services/academy-services";
 import type { Locale, Role } from "@/types/academy";
 import { useAcademy } from "./academy-context";
-
-const demos: { role: Role; name: string; icon: typeof GraduationCap }[] = [
-  { role: "student", name: "Ahmed Benali", icon: GraduationCap },
-  { role: "teacher", name: "Anna Schneider", icon: BookOpen },
-  { role: "director", name: "Samira El Mansouri", icon: Building2 },
-];
+import { useBranding } from "@/components/brand/branding-provider";
 
 export function Login() {
+  const brand = useBranding();
   const { signIn, t, l, locale, setLocale } = useAcademy();
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState<Role | "form" | null>(null);
-  const [email, setEmail] = useState("ahmed@demo.ma");
-  const [password, setPassword] = useState("password");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const enterRole = async (role: Role) => {
     if (isSupabaseConfigured) {
@@ -49,63 +46,57 @@ export function Login() {
   };
 
   return (
-    <main className="min-h-screen bg-background lg:grid lg:grid-cols-[0.92fr_1.08fr]">
+    <main className="min-h-screen bg-background lg:grid lg:grid-cols-[1fr_1.05fr]">
       <section className="relative hidden overflow-hidden bg-brand lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <div className="flex items-center gap-3 text-brand-foreground">
-          <span className="grid size-10 place-items-center rounded-lg bg-primary-foreground/10">
-            <GraduationCap />
-          </span>
-          <span className="font-display text-xl font-semibold">Deutsch Academy</span>
-        </div>
+        <BrandLogo variant="full" inverted showWordmark />
         <div className="max-w-xl">
-          <p className="mb-5 text-sm font-semibold uppercase tracking-widest text-brand-foreground/70">
+          <p className="mb-4 text-xs font-semibold tracking-[0.16em] text-brand-foreground/60 uppercase">
             {t("brand.tagline")}
           </p>
-          <h1 className="font-display text-5xl font-semibold leading-tight text-brand-foreground">
-            {l("Votre expérience complète d’apprentissage de l’allemand.", "تجربتك المتكاملة لتعلّم اللغة الألمانية.")}
+          <h1 className="font-display text-4xl leading-tight font-medium text-brand-foreground xl:text-5xl">
+            {l(
+              "Une académie d’allemand précise, calme et exigeante.",
+              "أكاديمية ألمانية دقيقة وهادئة وطموحة.",
+            )}
           </h1>
-          <p className="mt-6 max-w-lg text-lg leading-relaxed text-brand-foreground/75">
-            {l("Cours, classes en direct, examens et progression — un espace unique du niveau A1 au B2.", "الدورات والدروس المباشرة والامتحانات والتقدّم — في مساحة واحدة من A1 إلى B2.")}
+          <p className="mt-5 max-w-md text-base leading-relaxed text-brand-foreground/70">
+            {l(
+              "Cours, live, examens et progression — une plateforme unique du A1 au B2.",
+              "الدورات والدروس المباشرة والامتحانات والتقدّم — من A1 إلى B2.",
+            )}
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-4 border-t border-brand-foreground/15 pt-6 text-brand-foreground">
-          <div>
-            <strong className="block text-2xl">243</strong>
-            <span className="text-xs text-brand-foreground/60">{l("apprenants actifs", "متعلماً نشطاً")}</span>
-          </div>
-          <div>
-            <strong className="block text-2xl">91%</strong>
-            <span className="text-xs text-brand-foreground/60">{l("de présence", "نسبة الحضور")}</span>
-          </div>
-          <div>
-            <strong className="block text-2xl">4.8/5</strong>
-            <span className="text-xs text-brand-foreground/60">{l("de satisfaction", "معدل الرضا")}</span>
-          </div>
-        </div>
+        <p className="text-sm text-brand-foreground/50">{brand.name}</p>
       </section>
+
       <section className="flex min-h-screen items-center justify-center px-5 py-10">
         <div className="w-full max-w-md">
-          <div className="mb-6 flex justify-end gap-1">
-            {(["fr", "ar"] as Locale[]).map((code) => (
-              <button
-                key={code}
-                type="button"
-                onClick={() => setLocale(code)}
-                className={`rounded-md px-2 py-1 text-xs font-medium ${locale === code ? "bg-secondary text-primary" : "text-muted-foreground"}`}
-              >
-                {localeLabels[code]}
-              </button>
-            ))}
+          <div className="mb-8 flex items-center justify-between gap-3">
+            <div className="lg:hidden">
+              <BrandLogo variant="compact" />
+            </div>
+            <div className="ml-auto flex gap-1" role="group" aria-label="Language">
+              {(["fr", "ar"] as Locale[]).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setLocale(code)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+                    locale === code ? "bg-soft-blue text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  {localeLabels[code]}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="mb-10 flex items-center gap-3 lg:hidden">
-            <span className="grid size-10 place-items-center rounded-lg bg-primary text-primary-foreground">
-              <GraduationCap />
-            </span>
-            <span className="font-display text-xl font-semibold">Deutsch Academy</span>
-          </div>
-          <p className="text-sm font-semibold text-primary">{t("login.welcome")}</p>
-          <h2 className="mt-2 font-display text-3xl font-semibold">{t("login.title")}</h2>
+
+          <p className="text-sm font-medium text-primary">{t("login.welcome")}</p>
+          <h2 className="mt-2 font-display text-3xl font-medium tracking-tight">
+            {t("login.title")}
+          </h2>
           <p className="mt-2 text-sm text-muted-foreground">{t("login.subtitle")}</p>
+
           <form
             className="mt-8 space-y-4"
             onSubmit={(event) => {
@@ -118,74 +109,69 @@ export function Login() {
               <Input
                 className="mt-2 h-11"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
+                placeholder="admin@gla.academy"
               />
             </label>
             <label className="block text-sm font-medium">
-              {t("login.password")}
+              <span className="flex items-center justify-between">
+                {t("login.password")}
+                <button
+                  type="button"
+                  className="text-xs font-medium text-primary"
+                  onClick={() => toast.message(t("login.reset"))}
+                >
+                  {t("login.forgot")}
+                </button>
+              </span>
               <div className="relative mt-2">
                 <Input
                   className="h-11 pr-11"
                   type={show ? "text" : "password"}
+                  autoComplete="current-password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                 />
                 <button
                   type="button"
-                  aria-label={l("Afficher le mot de passe", "إظهار كلمة المرور")}
-                  className="absolute right-3 top-3 text-muted-foreground"
-                  onClick={() => setShow(!show)}
+                  className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
+                  onClick={() => setShow((value) => !value)}
+                  aria-label={show ? "Hide password" : "Show password"}
                 >
                   {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
             </label>
-            <div className="text-right">
-              <button
-                type="button"
-                className="text-sm font-medium text-primary"
-                onClick={() => {
-                  void AuthService.requestReset(email).then(() => toast.success(t("login.reset")));
-                }}
-              >
-                {t("login.forgot")}
-              </button>
-            </div>
-            <Button className="h-11 w-full" disabled={loading !== null}>
-              {loading ? t("login.signing") : t("login.submit")}
-              <ArrowRight />
+            <Button className="h-11 w-full" disabled={loading === "form"}>
+              {loading === "form" ? t("login.signing") : t("login.submit")}
+              <ArrowRight className="size-4" />
             </Button>
           </form>
-          {!isSupabaseConfigured ? (
-            <>
-              <div className="my-7 flex items-center gap-4 text-xs text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+
+          {!isSupabaseConfigured && (
+            <div className="mt-8 border-t border-border pt-6">
+              <p className="mb-3 text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
                 {t("login.demo")}
-              </div>
-              <div className="space-y-2">
-                {demos.map(({ role, name, icon: Icon }) => (
-                  <button
+              </p>
+              <div className="grid gap-2">
+                {(["student", "teacher", "director"] as Role[]).map((role) => (
+                  <Button
                     key={role}
+                    variant="outline"
+                    className="justify-between"
+                    disabled={loading !== null}
                     onClick={() => void enterRole(role)}
-                    className="flex w-full items-center gap-3 rounded-lg border bg-card p-3 text-left transition hover:border-primary/40 hover:bg-accent"
                   >
-                    <span className="grid size-9 place-items-center rounded-md bg-secondary text-primary">
-                      <Icon className="size-4" />
-                    </span>
-                    <span className="flex-1">
-                      <strong className="block text-sm">{t(`role.${role}`)}</strong>
-                      <span className="text-xs text-muted-foreground">{name}</span>
-                    </span>
-                    <ArrowRight className="size-4 text-muted-foreground" />
-                  </button>
+                    {t(`role.${role}`)}
+                    <ArrowRight className="size-4 opacity-50" />
+                  </Button>
                 ))}
               </div>
-            </>
-          ) : (
-            <p className="mt-7 text-center text-xs text-muted-foreground">
-              Connected to Supabase Auth · create users in the dashboard or via signup
-            </p>
+            </div>
           )}
+
           <p className="mt-8 text-center text-xs text-muted-foreground">{t("login.footer")}</p>
         </div>
       </section>

@@ -37,6 +37,12 @@ function readLocale(): Locale {
   return stored === "fr" || stored === "ar" ? stored : "fr";
 }
 
+/** UI is FR/AR; Supabase profiles use app_locale en|fr|de. */
+function toUiLocale(value?: string | null): Locale {
+  if (value === "ar" || value === "fr") return value;
+  return readLocale();
+}
+
 export function AcademyProvider({ children }: { children: ReactNode }) {
   const routerNavigate = useNavigate();
   const [ready, setReady] = useState(false);
@@ -47,20 +53,16 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    const resolveLocale = (value?: Locale) =>
-      value === "ar" || value === "fr" ? value : readLocale();
-
     const bootstrap = async () => {
       if (isSupabaseConfigured) {
         try {
           const auth = await SupabaseAuthService.getSession();
           if (cancelled) return;
           if (auth) {
-            const next = startSession(auth.sessionUser, {
-              locale: auth.profile.language,
-            });
+            const locale = toUiLocale(auth.profile.language);
+            const next = startSession(auth.sessionUser, { locale });
             setSession(next);
-            setLocaleState(resolveLocale(auth.profile.language));
+            setLocaleState(locale);
           } else {
             clearSession();
             setSession(null);
@@ -81,7 +83,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
       const stored = loadSession();
       if (!cancelled) {
         setSession(stored);
-        setLocaleState(resolveLocale(stored?.locale));
+        setLocaleState(toUiLocale(stored?.locale));
         setReady(true);
       }
     };
@@ -101,17 +103,22 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
         void routerNavigate({ to: "/" });
         return;
       }
+      const locale = toUiLocale(payload.profile.language);
       setSession((prev) =>
         startSession(payload.sessionUser, {
-          locale: payload.profile.language,
-          page: prev?.page,
-          invoices: prev?.invoices,
-          subscription: prev?.subscription,
-          examPublished: prev?.examPublished,
-          selectedStudentId: prev?.selectedStudentId,
+          locale,
+          ...(prev
+            ? {
+                page: prev.page,
+                invoices: prev.invoices,
+                subscription: prev.subscription,
+                examPublished: prev.examPublished,
+                selectedStudentId: prev.selectedStudentId,
+              }
+            : {}),
         }),
       );
-      setLocaleState(payload.profile.language);
+      setLocaleState(locale);
     });
   }, [routerNavigate]);
 

@@ -5,13 +5,13 @@ import { useAcademy } from "@/components/academy/academy-context";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Deutsch Academy — Centre d’apprentissage de l’allemand" },
+      { title: "German Language Academy" },
       {
         name: "description",
         content:
           "Une expérience numérique complète pour apprendre et enseigner l’allemand.",
       },
-      { property: "og:title", content: "Deutsch Academy — Centre d’apprentissage" },
+      { property: "og:title", content: "German Language Academy" },
       {
         property: "og:description",
         content: "Cours, classes, examens, progression et gestion de l’académie du niveau A1 au B2.",

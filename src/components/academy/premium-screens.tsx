@@ -30,12 +30,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LEAD_TEACHER } from "@/data/demo-accounts";
-import { modules, questions, students } from "@/data/mock-data";
+import { modules, questions } from "@/data/mock-data";
 import { initials } from "@/lib/academy-logic";
+import { useStudent } from "@/hooks/use-academy-data";
 import { ExamService, PaymentService } from "@/services/academy-services";
 import { recordPayment } from "@/services/academy-store";
 import { toast } from "sonner";
 import { useAcademy } from "./academy-context";
+import { QueryState } from "./query-state";
 import { Eyebrow, PremiumHeader, Ring, SkillBars, Status } from "./premium-kit";
 
 const momentum = [
@@ -56,7 +58,7 @@ const revenue = [
   { m: "Sep", v: 184.5 },
 ];
 
-export function PremiumStudentDashboard() {
+export function LegacyPremiumStudentDashboard() {
   const { navigate } = useAcademy();
   return (
     <div className="animate-fade-in">
@@ -657,7 +659,7 @@ export function PremiumExams({ mode }: { mode: string }) {
   );
 }
 
-export function PremiumTeacherDashboard() {
+export function LegacyPremiumTeacherDashboard() {
   const { navigate } = useAcademy();
   return (
     <div className="animate-fade-in">
@@ -769,7 +771,7 @@ export function PremiumTeacherDashboard() {
   );
 }
 
-export function PremiumDirectorDashboard() {
+export function LegacyPremiumDirectorDashboard() {
   return (
     <div className="animate-fade-in">
       <PremiumHeader
@@ -916,14 +918,38 @@ export function PremiumDirectorDashboard() {
 export function PremiumStudent360() {
   const { navigate, selectedStudentId } = useAcademy();
   const [tab, setTab] = useState("Overview");
-  const student = students.find((item) => item.id === selectedStudentId) ?? students[0];
-  if (!student) return null;
+  const studentQuery = useStudent(selectedStudentId);
+  const student = studentQuery.data ?? null;
   const tone =
-    student.subscription === "ACTIVE"
+    student?.subscription === "ACTIVE"
       ? "green"
-      : student.subscription === "PAST_DUE"
+      : student?.subscription === "PAST_DUE"
         ? "amber"
         : "red";
+
+  if (studentQuery.isLoading || studentQuery.isError || !student) {
+    return (
+      <div className="animate-fade-in">
+        <button
+          onClick={() => navigate("students")}
+          className="mb-8 inline-flex items-center gap-2 text-sm text-muted-foreground"
+        >
+          <ArrowLeft className="size-4" />
+          Students
+        </button>
+        <QueryState
+          isLoading={studentQuery.isLoading}
+          isError={studentQuery.isError || (!studentQuery.isLoading && !student)}
+          error={studentQuery.error}
+          isEmpty={!student}
+          emptyMessage="Student not found."
+        >
+          {null}
+        </QueryState>
+      </div>
+    );
+  }
+
   return (
     <div className="animate-fade-in">
       <button

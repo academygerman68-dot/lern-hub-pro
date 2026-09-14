@@ -25,6 +25,7 @@ export const STUDENT_PAGES = [
 export const TEACHER_PAGES = [
   "dashboard",
   "classes",
+  "students",
   "calendar",
   "lessons",
   "materials",
@@ -47,6 +48,7 @@ export const DIRECTOR_PAGES = [
   "assignments",
   "exams",
   "payments",
+  "payroll",
   "subscriptions",
   "invoices",
   "calendar",

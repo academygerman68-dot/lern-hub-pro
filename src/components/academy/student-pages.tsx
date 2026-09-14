@@ -1,14 +1,14 @@
-import type { AcademyPage } from "@/types/academy";
 import {
   PremiumExams,
   PremiumLearning,
   PremiumLesson,
   PremiumPayments,
   PremiumProfile,
-  PremiumStudentDashboard,
 } from "./premium-screens";
+import { PremiumStudentDashboard } from "./dashboards";
 import { Assignments, CalendarPage, Live, Materials, Messages, Progress } from "./student-extra";
 import { useAcademy } from "./academy-context";
+import type { AcademyPage } from "@/types/academy";
 
 export function StudentPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   const { page: contextPage } = useAcademy();

@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import { Toaster } from "@/components/ui/sonner";
 import { AcademyProvider } from "@/components/academy/academy-context";
+import { BrandingProvider } from "@/components/brand/branding-provider";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
@@ -79,12 +80,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Deutsch Academy — Apprendre l’allemand" },
-      { name: "description", content: "Plateforme moderne d’apprentissage de l’allemand en français et en arabe." },
-      { name: "author", content: "Deutsch Academy" },
+      { title: "German Language Academy" },
+      { name: "description", content: "Plateforme moderne d’apprentissage de l’allemand." },
+      { name: "author", content: "German Language Academy" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
@@ -95,9 +95,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Libre+Baskerville:wght@400;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap",
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/branding/gla-logo.png", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/branding/gla-logo.png" },
     ],
   }),
   shellComponent: RootShell,
@@ -125,10 +126,12 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AcademyProvider>
-        <Outlet />
-        <Toaster richColors position="top-right" />
-      </AcademyProvider>
+      <BrandingProvider>
+        <AcademyProvider>
+          <Outlet />
+          <Toaster richColors position="top-right" />
+        </AcademyProvider>
+      </BrandingProvider>
     </QueryClientProvider>
   );
 }

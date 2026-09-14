@@ -154,7 +154,7 @@ export function Live({ meeting }: { meeting: boolean }) {
       <div className="grid gap-4 xl:grid-cols-[1fr_20rem]">
         <div className="min-h-[55vh] overflow-hidden rounded-lg bg-meeting-panel">
           <iframe
-            title="Deutsch Academy live class"
+            title="GLA live class"
             src={LIVE_ROOM_URL}
             allow="camera; microphone; fullscreen; display-capture; autoplay"
             className="h-[55vh] w-full border-0"
