@@ -1,13 +1,80 @@
-import { modules, students } from "@/data/mock-data";
-import type { Role, SubscriptionStatus } from "@/types/academy";
+import { assignments, exams, modules, resources, students } from "@/data/mock-data";
+import { authenticate, scoreExam } from "@/lib/academy-logic";
+import type { ExamScore, Role, SessionUser, SubscriptionStatus } from "@/types/academy";
 
 const wait = (ms = 450) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const AuthService = {
-  async demoLogin(role: Role) { await wait(); return { role, name: role === "student" ? "Ahmed Benali" : role === "teacher" ? "Anna Schneider" : "Samira El Mansouri" }; },
+  async login(email: string, password: string): Promise<SessionUser> {
+    await wait(350);
+    const user = authenticate(email, password);
+    if (!user) throw new Error("INVALID_CREDENTIALS");
+    return user;
+  },
+  async demoLogin(role: Role): Promise<SessionUser> {
+    await wait();
+    const email =
+      role === "student" ? "ahmed@demo.ma" : role === "teacher" ? "anna@demo.ma" : "samira@demo.ma";
+    const user = authenticate(email, "password");
+    if (!user) throw new Error("INVALID_CREDENTIALS");
+    return user;
+  },
+  async requestReset(email: string) {
+    await wait(250);
+    return { sent: email.trim().length > 0 };
+  },
 };
-export const StudentService = { async list() { await wait(200); return students; } };
-export const CourseService = { async listModules() { await wait(200); return modules; } };
-export const ExamService = { async submit() { await wait(600); return { overall: 75 }; } };
-export const PaymentService = { async pay(): Promise<SubscriptionStatus> { await wait(700); return "ACTIVE"; } };
-export const NotificationService = { async markAllRead() { await wait(150); return true; } };
+
+export const StudentService = {
+  async list() {
+    await wait(200);
+    return students;
+  },
+  async get(id: string) {
+    await wait(120);
+    return students.find((student) => student.id === id) ?? students[0];
+  },
+};
+
+export const CourseService = {
+  async listModules() {
+    await wait(200);
+    return modules;
+  },
+  async listResources() {
+    await wait(160);
+    return resources;
+  },
+};
+
+export const AssignmentService = {
+  async list() {
+    await wait(180);
+    return assignments;
+  },
+};
+
+export const ExamService = {
+  async list() {
+    await wait(160);
+    return exams;
+  },
+  async submit(answers: Record<number, number>): Promise<ExamScore> {
+    await wait(600);
+    return scoreExam(answers);
+  },
+};
+
+export const PaymentService = {
+  async pay(): Promise<SubscriptionStatus> {
+    await wait(700);
+    return "ACTIVE";
+  },
+};
+
+export const NotificationService = {
+  async markAllRead() {
+    await wait(150);
+    return true;
+  },
+};

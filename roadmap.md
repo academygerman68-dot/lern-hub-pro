@@ -4,7 +4,7 @@
 - [x] Rebuild design system, typography and navigation
 - [x] Redesign Student Dashboard, Learning, Lesson, Exams and Mock Exam
 - [x] Redesign Teacher Dashboard, Director Overview and Student 360
-- [ ] Validate priority screens on desktop and mobile
+- [x] Validate priority screens on desktop and mobile
 
 - [x] Premium responsive design system and login
 - [x] Student dashboard and connected learning workflows
