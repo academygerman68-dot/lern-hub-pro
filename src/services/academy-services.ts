@@ -4,7 +4,7 @@ import type { Role, SubscriptionStatus } from "@/types/academy";
 const wait = (ms = 450) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const AuthService = {
-  async demoLogin(role: Role) { await wait(); return { role, name: role === "student" ? "Ahmed Benali" : role === "teacher" ? "Anna Müller" : "Samira El Mansouri" }; },
+  async demoLogin(role: Role) { await wait(); return { role, name: role === "student" ? "Ahmed Benali" : role === "teacher" ? "Anna Schneider" : "Samira El Mansouri" }; },
 };
 export const StudentService = { async list() { await wait(200); return students; } };
 export const CourseService = { async listModules() { await wait(200); return modules; } };

@@ -8,7 +8,7 @@ import { useAcademy } from "./academy-context";
 
 const demos = [
   { role: "student" as Role, label: "Student", name: "Ahmed Benali", icon: GraduationCap },
-  { role: "teacher" as Role, label: "Teacher", name: "Anna Müller", icon: BookOpen },
+  { role: "teacher" as Role, label: "Teacher", name: "Anna Schneider", icon: BookOpen },
   { role: "director" as Role, label: "Director", name: "Samira El Mansouri", icon: Building2 },
 ];
 
