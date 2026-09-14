@@ -9,6 +9,8 @@ import {
 } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { translate } from "@/lib/i18n";
+import { isSupabaseConfigured } from "@/lib/supabase";
+import { AuthService } from "@/services/academy-services";
 import {
   clearSession,
   loadSession,
@@ -16,6 +18,7 @@ import {
   startSession,
   type PersistedSession,
 } from "@/services/academy-store";
+import { SupabaseAuthService } from "@/services/supabase/auth-service";
 import type {
   AcademyPage,
   ExamScore,
@@ -66,11 +69,72 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>("en");
 
   useEffect(() => {
-    const stored = loadSession();
-    setSession(stored);
-    setLocaleState(stored?.locale ?? readLocale());
-    setReady(true);
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      if (isSupabaseConfigured) {
+        try {
+          const auth = await SupabaseAuthService.getSession();
+          if (cancelled) return;
+          if (auth) {
+            const next = startSession(auth.sessionUser, {
+              locale: auth.profile.language,
+            });
+            setSession(next);
+            setLocaleState(auth.profile.language);
+          } else {
+            clearSession();
+            setSession(null);
+            setLocaleState(readLocale());
+          }
+        } catch {
+          if (!cancelled) {
+            clearSession();
+            setSession(null);
+            setLocaleState(readLocale());
+          }
+        } finally {
+          if (!cancelled) setReady(true);
+        }
+        return;
+      }
+
+      const stored = loadSession();
+      if (!cancelled) {
+        setSession(stored);
+        setLocaleState(stored?.locale ?? readLocale());
+        setReady(true);
+      }
+    };
+
+    void bootstrap();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    return SupabaseAuthService.onAuthStateChange((payload) => {
+      if (!payload) {
+        clearSession();
+        setSession(null);
+        void routerNavigate({ to: "/" });
+        return;
+      }
+      setSession((prev) =>
+        startSession(payload.sessionUser, {
+          locale: payload.profile.language,
+          page: prev?.page,
+          invoices: prev?.invoices,
+          subscription: prev?.subscription,
+          examPublished: prev?.examPublished,
+          selectedStudentId: prev?.selectedStudentId,
+        }),
+      );
+      setLocaleState(payload.profile.language);
+    });
+  }, [routerNavigate]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -114,8 +178,14 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
   const setRole = useCallback(
     (role: Role | null) => {
       if (!role) {
-        persist(null);
-        void routerNavigate({ to: "/" });
+        void AuthService.logout().finally(() => {
+          persist(null);
+          void routerNavigate({ to: "/" });
+        });
+        return;
+      }
+      if (isSupabaseConfigured) {
+        // Role switching without credentials is not allowed with real Auth.
         return;
       }
       const name =

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { localeLabels } from "@/lib/i18n";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { AuthService } from "@/services/academy-services";
 import type { Locale, Role } from "@/types/academy";
 import { useAcademy } from "./academy-context";
@@ -22,6 +23,10 @@ export function Login() {
   const [password, setPassword] = useState("password");
 
   const enterRole = async (role: Role) => {
+    if (isSupabaseConfigured) {
+      toast.error("Demo login is disabled. Use a real Supabase account.");
+      return;
+    }
     setLoading(role);
     try {
       const user = await AuthService.demoLogin(role);
@@ -152,27 +157,35 @@ export function Login() {
               <ArrowRight />
             </Button>
           </form>
-          <div className="my-7 flex items-center gap-4 text-xs text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
-            {t("login.demo")}
-          </div>
-          <div className="space-y-2">
-            {demos.map(({ role, name, icon: Icon }) => (
-              <button
-                key={role}
-                onClick={() => void enterRole(role)}
-                className="flex w-full items-center gap-3 rounded-lg border bg-card p-3 text-left transition hover:border-primary/40 hover:bg-accent"
-              >
-                <span className="grid size-9 place-items-center rounded-md bg-secondary text-primary">
-                  <Icon className="size-4" />
-                </span>
-                <span className="flex-1">
-                  <strong className="block text-sm">{t(`role.${role}`)}</strong>
-                  <span className="text-xs text-muted-foreground">{name}</span>
-                </span>
-                <ArrowRight className="size-4 text-muted-foreground" />
-              </button>
-            ))}
-          </div>
+          {!isSupabaseConfigured ? (
+            <>
+              <div className="my-7 flex items-center gap-4 text-xs text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+                {t("login.demo")}
+              </div>
+              <div className="space-y-2">
+                {demos.map(({ role, name, icon: Icon }) => (
+                  <button
+                    key={role}
+                    onClick={() => void enterRole(role)}
+                    className="flex w-full items-center gap-3 rounded-lg border bg-card p-3 text-left transition hover:border-primary/40 hover:bg-accent"
+                  >
+                    <span className="grid size-9 place-items-center rounded-md bg-secondary text-primary">
+                      <Icon className="size-4" />
+                    </span>
+                    <span className="flex-1">
+                      <strong className="block text-sm">{t(`role.${role}`)}</strong>
+                      <span className="text-xs text-muted-foreground">{name}</span>
+                    </span>
+                    <ArrowRight className="size-4 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="mt-7 text-center text-xs text-muted-foreground">
+              Connected to Supabase Auth · create users in the dashboard or via signup
+            </p>
+          )}
           <p className="mt-8 text-center text-xs text-muted-foreground">{t("login.footer")}</p>
         </div>
       </section>

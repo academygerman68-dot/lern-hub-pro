@@ -1,3 +1,7 @@
+/**
+ * DEVELOPMENT ONLY — static mock LMS content for UI prototyping.
+ * Not a source of truth. Replace progressively with Supabase domain services.
+ */
 import { LEAD_TEACHER } from "@/data/demo-accounts";
 import type {
   AcademyClass,

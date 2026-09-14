@@ -1,0 +1,14 @@
+# Supabase project link (optional local CLI)
+project_id = "omxemusaqgzkogqvcdfw"
+
+[api]
+enabled = true
+
+[db]
+major_version = 17
+
+[auth]
+enabled = true
+
+[storage]
+enabled = true
