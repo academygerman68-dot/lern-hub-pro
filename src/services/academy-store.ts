@@ -27,7 +27,7 @@ const defaultSession = (user: SessionUser): PersistedSession => ({
   subscription: "ACTIVE",
   examPublished: false,
   selectedStudentId: "ST-001",
-  locale: "en",
+  locale: "fr",
   invoices: seedInvoices,
   lastScore: null,
 });

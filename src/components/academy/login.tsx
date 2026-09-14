@@ -15,7 +15,7 @@ const demos: { role: Role; name: string; icon: typeof GraduationCap }[] = [
 ];
 
 export function Login() {
-  const { signIn, t, locale, setLocale } = useAcademy();
+  const { signIn, t, l, locale, setLocale } = useAcademy();
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState<Role | "form" | null>(null);
   const [email, setEmail] = useState("ahmed@demo.ma");
@@ -57,31 +57,31 @@ export function Login() {
             {t("brand.tagline")}
           </p>
           <h1 className="font-display text-5xl font-semibold leading-tight text-primary-foreground">
-            Your complete German learning experience.
+            {l("Votre expérience complète d’apprentissage de l’allemand.", "تجربتك المتكاملة لتعلّم اللغة الألمانية.")}
           </h1>
           <p className="mt-6 max-w-lg text-lg leading-relaxed text-primary-foreground/70">
-            Courses, live classes, exams and progress — one focused place from A1 to B2.
+            {l("Cours, classes en direct, examens et progression — un espace unique du niveau A1 au B2.", "الدورات والدروس المباشرة والامتحانات والتقدّم — في مساحة واحدة من A1 إلى B2.")}
           </p>
         </div>
         <div className="grid grid-cols-3 gap-4 border-t border-primary-foreground/15 pt-6 text-primary-foreground">
           <div>
             <strong className="block text-2xl">243</strong>
-            <span className="text-xs text-primary-foreground/60">active learners</span>
+            <span className="text-xs text-brand-foreground/60">{l("apprenants actifs", "متعلماً نشطاً")}</span>
           </div>
           <div>
             <strong className="block text-2xl">91%</strong>
-            <span className="text-xs text-primary-foreground/60">attendance</span>
+            <span className="text-xs text-brand-foreground/60">{l("de présence", "نسبة الحضور")}</span>
           </div>
           <div>
             <strong className="block text-2xl">4.8/5</strong>
-            <span className="text-xs text-primary-foreground/60">satisfaction</span>
+            <span className="text-xs text-brand-foreground/60">{l("de satisfaction", "معدل الرضا")}</span>
           </div>
         </div>
       </section>
       <section className="flex min-h-screen items-center justify-center px-5 py-10">
         <div className="w-full max-w-md">
           <div className="mb-6 flex justify-end gap-1">
-            {(["en", "fr", "de"] as Locale[]).map((code) => (
+            {(["fr", "ar"] as Locale[]).map((code) => (
               <button
                 key={code}
                 type="button"
@@ -128,7 +128,7 @@ export function Login() {
                 />
                 <button
                   type="button"
-                  aria-label="Show password"
+                  aria-label={l("Afficher le mot de passe", "إظهار كلمة المرور")}
                   className="absolute right-3 top-3 text-muted-foreground"
                   onClick={() => setShow(!show)}
                 >

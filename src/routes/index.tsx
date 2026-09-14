@@ -5,16 +5,16 @@ import { useAcademy } from "@/components/academy/academy-context";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Deutsch Academy — German Learning Center" },
+      { title: "Deutsch Academy — Centre d’apprentissage de l’allemand" },
       {
         name: "description",
         content:
-          "A complete digital learning experience for German students, teachers and academy directors.",
+          "Une expérience numérique complète pour apprendre et enseigner l’allemand.",
       },
-      { property: "og:title", content: "Deutsch Academy — German Learning Center" },
+      { property: "og:title", content: "Deutsch Academy — Centre d’apprentissage" },
       {
         property: "og:description",
-        content: "Courses, classes, exams, progress and academy management from A1 to B2.",
+        content: "Cours, classes, examens, progression et gestion de l’académie du niveau A1 au B2.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
