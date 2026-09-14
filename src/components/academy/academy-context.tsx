@@ -1,5 +1,4 @@
 import {
-  createContext,
   useCallback,
   useContext,
   useEffect,
@@ -23,36 +22,11 @@ import type {
   NavigateOptions,
   Role,
   SessionUser,
-  SubscriptionStatus,
 } from "@/types/academy";
 import { InterfaceLocalizer } from "./interface-localizer";
+import { AcademyContext, type AcademyState } from "./academy-context-state";
 
 const LOCALE_KEY = "da-locale";
-
-type AcademyState = {
-  ready: boolean;
-  user: SessionUser | null;
-  role: Role | null;
-  setRole: (role: Role | null) => void;
-  signIn: (user: SessionUser) => void;
-  page: AcademyPage;
-  navigate: (page: AcademyPage, extra?: NavigateOptions) => void;
-  subscription: SubscriptionStatus;
-  setSubscription: (status: SubscriptionStatus) => void;
-  examPublished: boolean;
-  setExamPublished: (value: boolean) => void;
-  selectedStudentId: string;
-  locale: Locale;
-  setLocale: (locale: Locale) => void;
-  t: (key: string) => string;
-  l: (fr: string, ar: string) => string;
-  lastScore: ExamScore | null;
-  setLastScore: (score: ExamScore | null) => void;
-  session: PersistedSession | null;
-  replaceSession: (next: PersistedSession | null) => void;
-};
-
-const AcademyContext = createContext<AcademyState | null>(null);
 
 function readLocale(): Locale {
   if (typeof window === "undefined") return "fr";
