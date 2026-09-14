@@ -465,7 +465,7 @@ export function PremiumExams({ mode }: { mode: string }) {
             <div>
               <Eyebrow>Performance by skill</Eyebrow>
               <div className="mt-6">
-                <SkillBars skills={lastScore?.skills} />
+                {lastScore?.skills ? <SkillBars skills={lastScore.skills} /> : <SkillBars />}
               </div>
             </div>
             <div className="space-y-7">

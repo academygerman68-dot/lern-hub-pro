@@ -361,7 +361,7 @@ Today's classes
 
 A2 Group 2
 18:00 – 19:30
-Teacher: Anna Müller
+Teacher: Anna Schneider
 
 Status :
 
@@ -672,7 +672,7 @@ Créer une messagerie interne.
 
 Conversations :
 
-Anna Müller — Teacher
+Anna Schneider — Teacher
 Administration
 A2 Group
 

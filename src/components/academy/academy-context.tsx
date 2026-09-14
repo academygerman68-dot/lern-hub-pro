@@ -9,7 +9,6 @@ import {
 } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { translate } from "@/lib/i18n";
-import { defaultPageForRole, isPageForRole, isRole } from "@/lib/academy-logic";
 import {
   clearSession,
   loadSession,
@@ -189,10 +188,4 @@ export function useAcademy() {
   const value = useContext(AcademyContext);
   if (!value) throw new Error("AcademyProvider is missing");
   return value;
-}
-
-export function resolveRoutePage(role: string, page: string) {
-  if (!isRole(role)) return { role: null as Role | null, page: defaultPageForRole("student") };
-  if (!isPageForRole(role, page)) return { role, page: defaultPageForRole(role) };
-  return { role, page };
 }
