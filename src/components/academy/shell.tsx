@@ -89,18 +89,29 @@ export function AppShell({ children }: { children: ReactNode }) {
   const sidebar = (
     <>
       <div className="grid h-28 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-sidebar-border px-7">
-        <div className="min-w-0">
-          <strong className="block font-display text-lg font-normal leading-none">DEUTSCH</strong>
-          <span className="mt-1 block text-[10px] font-medium tracking-[0.22em] text-sidebar-foreground/45">
-            ACADEMY
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className="grid h-[18px] w-7 shrink-0 overflow-hidden rounded-[2px] border border-sidebar-foreground/15 shadow-soft"
+            role="img"
+            aria-label={locale === "ar" ? "علم ألمانيا" : "Drapeau allemand"}
+          >
+            <span className="bg-foreground" />
+            <span className="bg-alert" />
+            <span className="bg-primary" />
           </span>
+          <div className="min-w-0">
+            <strong className="block font-display text-lg font-normal leading-none">DEUTSCH</strong>
+            <span className="mt-1 block text-[10px] font-medium tracking-[0.22em] text-sidebar-foreground/50">
+              ACADEMY
+            </span>
+          </div>
         </div>
         <Button
           size="icon"
           variant="ghost"
-          className="lg:hidden"
+          className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:hidden"
           onClick={() => setMobile(false)}
-          aria-label="Close navigation"
+           aria-label={locale === "ar" ? "إغلاق القائمة" : "Fermer la navigation"}
         >
           <X className="size-5" />
         </Button>
@@ -137,7 +148,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
+      <aside className="academy-sidebar fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
         {sidebar}
       </aside>
       {mobile && (
@@ -153,14 +164,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           </aside>
         </div>
       )}
-      <div className="lg:pl-60">
+       <div className="academy-content lg:pl-60">
         <header className="sticky top-0 z-30 grid h-20 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur-xl sm:px-8">
           <Button
             size="icon"
             variant="ghost"
             className="lg:hidden"
             onClick={() => setMobile(true)}
-            aria-label="Open navigation"
+             aria-label={locale === "ar" ? "فتح القائمة" : "Ouvrir la navigation"}
           >
             <Menu className="size-5" />
           </Button>
@@ -173,7 +184,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <div className="col-start-3 flex items-center gap-2">
             <div className="hidden gap-1 sm:flex">
-              {(["en", "fr", "de"] as Locale[]).map((code) => (
+               {(["fr", "ar"] as Locale[]).map((code) => (
                 <button
                   key={code}
                   type="button"

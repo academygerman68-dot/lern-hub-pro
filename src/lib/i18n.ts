@@ -1,55 +1,6 @@
 import type { Locale } from "@/types/academy";
 
-const en = {
-  "brand.tagline": "Deutsch lernen. Zukunft gestalten.",
-  "login.welcome": "Willkommen zurück",
-  "login.title": "Sign in to your academy",
-  "login.subtitle": "Continue your German learning journey.",
-  "login.email": "Email",
-  "login.password": "Password",
-  "login.forgot": "Forgot password?",
-  "login.submit": "Sign in",
-  "login.signing": "Signing in…",
-  "login.demo": "QUICK DEMO ACCESS",
-  "login.footer": "Prototype environment · Demo data only",
-  "login.invalid": "Invalid email or password.",
-  "login.reset": "If this email exists, a reset link is on its way.",
-  "nav.home": "Home",
-  "nav.overview": "Overview",
-  "nav.learning": "Learning",
-  "nav.live": "Live",
-  "nav.assignments": "Assignments",
-  "nav.exams": "Exams",
-  "nav.progress": "Progress",
-  "nav.payments": "Payments",
-  "nav.messages": "Messages",
-  "nav.profile": "Profile",
-  "nav.materials": "Materials",
-  "nav.calendar": "Calendar",
-  "nav.classes": "My Classes",
-  "nav.lessons": "Lessons",
-  "nav.attendance": "Attendance",
-  "nav.students": "Students",
-  "nav.teachers": "Teachers",
-  "nav.courses": "Courses",
-  "nav.levels": "Levels",
-  "nav.subscriptions": "Subscriptions",
-  "nav.invoices": "Invoices",
-  "nav.reports": "Reports",
-  "nav.settings": "Settings",
-  "nav.audit": "Audit Logs",
-  "nav.signout": "Sign out",
-  "shell.admin": "Academy administration",
-  "shell.teacher": "Teaching studio",
-  "shell.student": "Monday · 14 September",
-  "shell.notifications": "Notifications",
-  "role.student": "Student",
-  "role.teacher": "Teacher",
-  "role.director": "Director",
-};
-
-const fr: typeof en = {
-  ...en,
+const fr = {
   "brand.tagline": "Apprendre l’allemand. Construire l’avenir.",
   "login.welcome": "Bon retour",
   "login.title": "Connexion à l’académie",
@@ -97,59 +48,68 @@ const fr: typeof en = {
   "role.director": "Direction",
 };
 
-const de: typeof en = {
-  ...en,
-  "brand.tagline": "Deutsch lernen. Zukunft gestalten.",
-  "login.welcome": "Willkommen zurück",
-  "login.title": "Bei der Akademie anmelden",
-  "login.subtitle": "Setzen Sie Ihre Deutschreise fort.",
-  "login.email": "E-Mail",
-  "login.password": "Passwort",
-  "login.forgot": "Passwort vergessen?",
-  "login.submit": "Anmelden",
-  "login.signing": "Anmeldung…",
-  "login.demo": "SCHNELLER DEMOZUGANG",
-  "login.footer": "Prototyp · Nur Demodaten",
-  "login.invalid": "E-Mail oder Passwort ungültig.",
-  "login.reset": "Falls dieses Konto existiert, wurde ein Link gesendet.",
-  "nav.home": "Start",
-  "nav.overview": "Überblick",
-  "nav.learning": "Lernen",
-  "nav.live": "Live",
-  "nav.assignments": "Aufgaben",
-  "nav.exams": "Prüfungen",
-  "nav.progress": "Fortschritt",
-  "nav.payments": "Zahlungen",
-  "nav.messages": "Nachrichten",
-  "nav.profile": "Profil",
-  "nav.materials": "Materialien",
-  "nav.calendar": "Kalender",
-  "nav.classes": "Meine Klassen",
-  "nav.lessons": "Lektionen",
-  "nav.attendance": "Anwesenheit",
-  "nav.students": "Studierende",
-  "nav.teachers": "Lehrkräfte",
-  "nav.courses": "Kurse",
-  "nav.levels": "Niveaus",
-  "nav.subscriptions": "Abos",
-  "nav.invoices": "Rechnungen",
-  "nav.reports": "Berichte",
-  "nav.settings": "Einstellungen",
-  "nav.audit": "Audit-Protokoll",
-  "nav.signout": "Abmelden",
-  "shell.admin": "Akademie-Verwaltung",
-  "shell.teacher": "Lehrerstudio",
-  "shell.student": "Montag · 14. September",
-  "shell.notifications": "Benachrichtigungen",
-  "role.student": "Student",
-  "role.teacher": "Lehrkraft",
-  "role.director": "Leitung",
+const ar: typeof fr = {
+  "brand.tagline": "تعلّم الألمانية. وابنِ مستقبلك.",
+  "login.welcome": "مرحباً بعودتك",
+  "login.title": "تسجيل الدخول إلى الأكاديمية",
+  "login.subtitle": "واصل رحلتك في تعلّم اللغة الألمانية.",
+  "login.email": "البريد الإلكتروني",
+  "login.password": "كلمة المرور",
+  "login.forgot": "نسيت كلمة المرور؟",
+  "login.submit": "تسجيل الدخول",
+  "login.signing": "جارٍ تسجيل الدخول…",
+  "login.demo": "دخول سريع للعرض التجريبي",
+  "login.footer": "بيئة تجريبية · بيانات توضيحية فقط",
+  "login.invalid": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+  "login.reset": "إذا كان الحساب موجوداً، فسيتم إرسال رابط الاستعادة.",
+  "nav.home": "الرئيسية",
+  "nav.overview": "نظرة عامة",
+  "nav.learning": "التعلّم",
+  "nav.live": "الدروس المباشرة",
+  "nav.assignments": "الواجبات",
+  "nav.exams": "الامتحانات",
+  "nav.progress": "التقدّم",
+  "nav.payments": "المدفوعات",
+  "nav.messages": "الرسائل",
+  "nav.profile": "الملف الشخصي",
+  "nav.materials": "الموارد",
+  "nav.calendar": "التقويم",
+  "nav.classes": "صفوفي",
+  "nav.lessons": "الدروس",
+  "nav.attendance": "الحضور",
+  "nav.students": "الطلاب",
+  "nav.teachers": "الأساتذة",
+  "nav.courses": "الدورات",
+  "nav.levels": "المستويات",
+  "nav.subscriptions": "الاشتراكات",
+  "nav.invoices": "الفواتير",
+  "nav.reports": "التقارير",
+  "nav.settings": "الإعدادات",
+  "nav.audit": "سجل النشاط",
+  "nav.signout": "تسجيل الخروج",
+  "shell.admin": "إدارة الأكاديمية",
+  "shell.teacher": "مساحة التدريس",
+  "shell.student": "الاثنين · 14 سبتمبر",
+  "shell.notifications": "الإشعارات",
+  "role.student": "طالب",
+  "role.teacher": "أستاذ",
+  "role.director": "الإدارة",
 };
 
-const dictionaries: Record<Locale, Record<string, string>> = { en, fr, de };
+const dictionaries: Record<Locale, Record<string, string>> = { fr, ar };
 
 export function translate(locale: Locale, key: string) {
-  return dictionaries[locale][key] ?? dictionaries.en[key] ?? key;
+  return dictionaries[locale][key] ?? dictionaries.fr[key] ?? key;
 }
 
-export const localeLabels: Record<Locale, string> = { en: "EN", fr: "FR", de: "DE" };
+export function translateKnownValue(locale: Locale, value: string) {
+  for (const dictionaryKey of Object.keys(dictionaries.fr)) {
+    const key = dictionaryKey as keyof typeof fr;
+    if (dictionaries.fr[key] === value || dictionaries.ar[key] === value) {
+      return dictionaries[locale][key] ?? value;
+    }
+  }
+  return value;
+}
+
+export const localeLabels: Record<Locale, string> = { fr: "FR", ar: "العربية" };

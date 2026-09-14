@@ -1,5 +1,4 @@
 import {
-  createContext,
   useCallback,
   useContext,
   useEffect,
@@ -26,39 +25,16 @@ import type {
   NavigateOptions,
   Role,
   SessionUser,
-  SubscriptionStatus,
 } from "@/types/academy";
+import { InterfaceLocalizer } from "./interface-localizer";
+import { AcademyContext, type AcademyState } from "./academy-context-state";
 
 const LOCALE_KEY = "da-locale";
 
-type AcademyState = {
-  ready: boolean;
-  user: SessionUser | null;
-  role: Role | null;
-  setRole: (role: Role | null) => void;
-  signIn: (user: SessionUser) => void;
-  page: AcademyPage;
-  navigate: (page: AcademyPage, extra?: NavigateOptions) => void;
-  subscription: SubscriptionStatus;
-  setSubscription: (status: SubscriptionStatus) => void;
-  examPublished: boolean;
-  setExamPublished: (value: boolean) => void;
-  selectedStudentId: string;
-  locale: Locale;
-  setLocale: (locale: Locale) => void;
-  t: (key: string) => string;
-  lastScore: ExamScore | null;
-  setLastScore: (score: ExamScore | null) => void;
-  session: PersistedSession | null;
-  replaceSession: (next: PersistedSession | null) => void;
-};
-
-const AcademyContext = createContext<AcademyState | null>(null);
-
 function readLocale(): Locale {
-  if (typeof window === "undefined") return "en";
+  if (typeof window === "undefined") return "fr";
   const stored = window.localStorage.getItem(LOCALE_KEY);
-  return stored === "fr" || stored === "de" || stored === "en" ? stored : "en";
+  return stored === "fr" || stored === "ar" ? stored : "fr";
 }
 
 export function AcademyProvider({ children }: { children: ReactNode }) {
@@ -66,10 +42,13 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<PersistedSession | null>(null);
   const [lastScore, setLastScore] = useState<ExamScore | null>(null);
-  const [locale, setLocaleState] = useState<Locale>("en");
+  const [locale, setLocaleState] = useState<Locale>("fr");
 
   useEffect(() => {
     let cancelled = false;
+
+    const resolveLocale = (value?: Locale) =>
+      value === "ar" || value === "fr" ? value : readLocale();
 
     const bootstrap = async () => {
       if (isSupabaseConfigured) {
@@ -81,7 +60,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
               locale: auth.profile.language,
             });
             setSession(next);
-            setLocaleState(auth.profile.language);
+            setLocaleState(resolveLocale(auth.profile.language));
           } else {
             clearSession();
             setSession(null);
@@ -102,7 +81,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
       const stored = loadSession();
       if (!cancelled) {
         setSession(stored);
-        setLocaleState(stored?.locale ?? readLocale());
+        setLocaleState(resolveLocale(stored?.locale));
         setReady(true);
       }
     };
@@ -139,6 +118,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof document === "undefined") return;
     document.documentElement.lang = locale;
+    document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
     window.localStorage.setItem(LOCALE_KEY, locale);
   }, [locale]);
 
@@ -243,6 +223,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
         if (session) persist({ ...session, locale: nextLocale });
       },
       t: (key) => translate(locale, key),
+      l: (fr, ar) => (locale === "ar" ? ar : fr),
       lastScore,
       setLastScore,
       session,
@@ -251,7 +232,12 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
     [ready, session, lastScore, locale, setRole, signIn, navigate, persist],
   );
 
-  return <AcademyContext.Provider value={value}>{children}</AcademyContext.Provider>;
+  return (
+    <AcademyContext.Provider value={value}>
+      <InterfaceLocalizer locale={locale} />
+      {children}
+    </AcademyContext.Provider>
+  );
 }
 
 export function useAcademy() {

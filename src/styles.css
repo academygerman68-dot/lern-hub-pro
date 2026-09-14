@@ -62,6 +62,7 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
   --color-meeting: var(--meeting);
   --color-meeting-panel: var(--meeting-panel);
   --color-success: var(--success);
@@ -82,33 +83,34 @@
   --card-foreground: oklch(0.18 0.012 70);
   --popover: oklch(0.998 0.002 80);
   --popover-foreground: oklch(0.18 0.012 70);
-  --primary: oklch(0.68 0.17 65);
-  --primary-foreground: oklch(0.17 0.012 70);
-  --secondary: oklch(0.955 0.045 80);
+  --primary: oklch(0.58 0.16 58);
+  --primary-foreground: oklch(0.99 0.003 80);
+  --secondary: oklch(0.955 0.038 78);
   --secondary-foreground: oklch(0.21 0.018 70);
   --muted: oklch(0.955 0.008 80);
   --muted-foreground: oklch(0.5 0.018 70);
-  --accent: oklch(0.94 0.055 78);
+  --accent: oklch(0.945 0.045 76);
   --accent-foreground: oklch(0.2 0.018 70);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.984 0.003 247.858);
   --border: oklch(0.89 0.014 78);
   --input: oklch(0.92 0.018 78);
-  --ring: oklch(0.68 0.17 65);
-  --chart-1: oklch(0.68 0.17 65);
+  --ring: oklch(0.73 0.16 72);
+  --chart-1: oklch(0.73 0.16 72);
   --chart-2: oklch(0.25 0.018 70);
   --chart-3: oklch(0.58 0.205 30);
   --chart-4: oklch(0.82 0.15 88);
   --chart-5: oklch(0.53 0.11 145);
-  --sidebar: oklch(0.965 0.012 80);
-  --sidebar-foreground: oklch(0.18 0.012 70);
-  --sidebar-primary: oklch(0.68 0.17 65);
+  --sidebar: oklch(0.18 0.012 70);
+  --sidebar-foreground: oklch(0.965 0.008 80);
+  --sidebar-primary: oklch(0.73 0.16 72);
   --sidebar-primary-foreground: oklch(0.17 0.012 70);
-  --sidebar-accent: oklch(0.93 0.04 78);
-  --sidebar-accent-foreground: oklch(0.2 0.018 70);
-  --sidebar-border: oklch(0.89 0.018 78);
-  --sidebar-ring: oklch(0.68 0.17 65);
+  --sidebar-accent: oklch(0.25 0.022 72);
+  --sidebar-accent-foreground: oklch(0.97 0.008 80);
+  --sidebar-border: oklch(1 0 0 / 0.1);
+  --sidebar-ring: oklch(0.73 0.16 72);
   --brand: oklch(0.19 0.015 70);
+  --brand-foreground: oklch(0.97 0.008 80);
   --meeting: oklch(0.145 0.012 70);
   --meeting-panel: oklch(0.215 0.015 70);
   --success: oklch(0.55 0.14 155);
@@ -130,7 +132,7 @@
   --popover: oklch(0.208 0.042 265.755);
   --popover-foreground: oklch(0.984 0.003 247.858);
   --primary: oklch(0.76 0.16 74);
-  --primary-foreground: oklch(0.16 0.012 70);
+  --primary-foreground: oklch(0.12 0.01 70);
   --secondary: oklch(0.28 0.035 72);
   --secondary-foreground: oklch(0.984 0.003 247.858);
   --muted: oklch(0.279 0.041 260.031);
@@ -155,7 +157,32 @@
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.76 0.16 74);
+  --brand-foreground: oklch(0.97 0.008 80);
 }
+
+[dir="rtl"] body { text-align: right; }
+[dir="rtl"] .academy-sidebar { left: auto; right: 0; border-left: 1px solid var(--sidebar-border); border-right: 0; }
+@media (min-width: 64rem) {
+  [dir="rtl"] .academy-content { padding-left: 0; padding-right: 15rem; }
+}
+[dir="rtl"] .nav-item-active::before { left: auto; right: -1rem; }
+[dir="rtl"] .text-left { text-align: right; }
+[dir="rtl"] .text-right { text-align: left; }
+[dir="rtl"] .ml-auto { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .ml-1 { margin-left: 0; margin-right: .25rem; }
+[dir="rtl"] .ml-2 { margin-left: 0; margin-right: .5rem; }
+[dir="rtl"] .border-l { border-left: 0; border-right-width: 1px; }
+[dir="rtl"] .pl-6 { padding-left: 0; padding-right: 1.5rem; }
+
+.bg-brand.text-primary-foreground,
+.bg-meeting.text-primary-foreground,
+.bg-meeting-panel.text-primary-foreground { color: var(--brand-foreground); }
+.bg-brand .text-primary-foreground\/45,
+.bg-brand .text-primary-foreground\/55,
+.bg-brand .text-primary-foreground\/60,
+.bg-brand .text-primary-foreground\/65,
+.bg-brand .text-primary-foreground\/70,
+.bg-meeting .text-primary-foreground\/60 { color: color-mix(in oklab, var(--brand-foreground) 72%, transparent); }
 
 @layer base {
   * {
@@ -192,18 +219,18 @@
   padding: 0.7rem 0.8rem;
   font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--muted-foreground);
+  color: color-mix(in oklab, var(--sidebar-foreground) 62%, transparent);
   position: relative;
   transition: 180ms ease;
-  &:hover { background: var(--accent); color: var(--foreground); }
+  &:hover { background: var(--sidebar-accent); color: var(--sidebar-accent-foreground); }
 }
 
 @utility nav-item-active {
-  background: var(--card);
-  color: var(--primary);
+  background: var(--sidebar-primary);
+  color: var(--sidebar-primary-foreground);
   font-weight: 600;
-  box-shadow: var(--shadow-soft);
-  &::before { content: ""; position: absolute; left: -1rem; top: 28%; bottom: 28%; width: 2px; border-radius: 2px; background: var(--primary); }
+  box-shadow: 0 8px 24px -14px oklch(0.73 0.16 72 / 0.65);
+  &::before { content: ""; position: absolute; left: -1rem; top: 28%; bottom: 28%; width: 2px; border-radius: 2px; background: var(--alert); }
 }
 
 @utility status {
