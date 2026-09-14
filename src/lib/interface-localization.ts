@@ -214,7 +214,7 @@ export function localizeInterfaceText(value: string, locale: Locale) {
   );
   const exact = exactEntry?.[1];
   let translated = exact
-    ? exact[locale === "ar" ? 1 : 0]
+    ? (exact[locale === "ar" ? 1 : 0] ?? trimmed)
     : translateKnownValue(locale, trimmed);
   if (!exact) {
     for (const [pattern, pair] of substitutions) {
