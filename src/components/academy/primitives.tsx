@@ -6,10 +6,10 @@ export function Surface({ children, className = "", onClick }: { children: React
   return <div onClick={onClick} className={cn("rounded-lg border border-border bg-card shadow-soft", onClick && "cursor-pointer transition hover:-translate-y-0.5 hover:shadow-card", className)}>{children}</div>;
 }
 export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
-  return <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="font-display text-2xl font-semibold text-foreground sm:text-3xl">{title}</h1>{subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}</div>{action}</div>;
+  return <div className="mb-10 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-5"><div className="min-w-0"><h1 className="font-display text-3xl font-normal leading-tight text-foreground sm:text-4xl">{title}</h1>{subtitle && <p className="mt-3 text-sm text-muted-foreground sm:text-base">{subtitle}</p>}</div>{action&&<div className="shrink-0">{action}</div>}</div>;
 }
 export function Metric({ label, value, note, icon }: { label: string; value: string; note?: string; icon?: ReactNode }) {
-  return <Surface className="p-5"><div className="flex items-start justify-between"><p className="text-sm font-medium text-muted-foreground">{label}</p><span className="text-primary">{icon}</span></div><p className="mt-3 text-2xl font-semibold text-foreground">{value}</p>{note && <p className="mt-1 text-xs text-muted-foreground">{note}</p>}</Surface>;
+  return <Surface className="p-6"><div className="flex items-start justify-between"><p className="text-sm text-muted-foreground">{label}</p><span className="text-primary">{icon}</span></div><p className="mt-4 font-display text-3xl font-normal text-foreground">{value}</p>{note && <p className="mt-2 text-xs text-muted-foreground">{note}</p>}</Surface>;
 }
 export function Status({ children, tone = "blue" }: { children: ReactNode; tone?: "blue" | "green" | "red" | "amber" | "gray" }) {
   return <span className={`status status-${tone}`}>{children}</span>;
