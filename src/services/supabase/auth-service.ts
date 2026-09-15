@@ -96,6 +96,17 @@ export const SupabaseAuthService = {
     };
   },
 
+  async signInWithGoogle(): Promise<void> {
+    const supabase = getSupabase();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: typeof window === "undefined" ? undefined : window.location.origin,
+      },
+    });
+    if (error) throw error;
+  },
+
   async logout(): Promise<void> {
     if (!isSupabaseConfigured) return;
     const { error } = await getSupabase().auth.signOut();
