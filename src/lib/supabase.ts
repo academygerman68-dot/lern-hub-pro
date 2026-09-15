@@ -1,8 +1,10 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
-const supabaseUrl = import.meta.env["VITE_SUPABASE_URL"] as string | undefined;
-const supabaseAnonKey = import.meta.env["VITE_SUPABASE_ANON_KEY"] as string | undefined;
+// Vite only inlines *static* `import.meta.env.VITE_*` access.
+// Bracket access (import.meta.env["VITE_…"]) breaks in production / Lovable builds.
+const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL ?? "").trim();
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
@@ -14,7 +16,7 @@ export function getSupabase(): SupabaseClient<Database> {
     throw new Error("Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
   }
   if (!client) {
-    client = createClient<Database>(supabaseUrl!, supabaseAnonKey!, {
+    client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,

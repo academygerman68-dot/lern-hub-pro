@@ -14,33 +14,42 @@ import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
 import { PageHeader, Status, Surface } from "./primitives";
 
+function errorCode(error: Error | null): string | null {
+  if (!error) return null;
+  if (error instanceof JaasServiceError) return error.code;
+  if ("code" in error && typeof (error as { code?: unknown }).code === "string") {
+    return (error as { code: string }).code;
+  }
+  return error.message || null;
+}
+
 function errorMessage(error: Error | null): string {
   if (!error) return "Unable to join the live class.";
-  if (error instanceof JaasServiceError) {
-    switch (error.code) {
-      case "UNAUTHORIZED":
-        return "Your session expired. Please sign in again.";
-      case "FORBIDDEN":
-      case "NOT_ENROLLED":
-      case "NOT_CLASS_TEACHER":
-      case "ACADEMIC_ACCESS_DENIED":
-        return "You are not allowed to join this class.";
-      case "CLASS_NOT_FOUND":
-      case "NOT_FOUND":
-        return "This class was not found.";
-      case "CLASS_NOT_LIVE_ELIGIBLE":
-        return "This class is not available for live sessions.";
-      case "CLASS_ID_REQUIRED":
-      case "INVALID_REQUEST":
-        return "Invalid class selection.";
-      case "SERVER_MISCONFIGURED":
-      case "SERVER_ERROR":
-        return "Live service is temporarily unavailable.";
-      default:
-        return error.message || "Unable to join the live class.";
-    }
+  const code = errorCode(error);
+  switch (code) {
+    case "UNAUTHORIZED":
+      return "Your session expired. Please sign in again.";
+    case "FORBIDDEN":
+    case "NOT_ENROLLED":
+    case "NOT_CLASS_TEACHER":
+    case "ACADEMIC_ACCESS_DENIED":
+      return "You are not allowed to join this class.";
+    case "CLASS_NOT_FOUND":
+    case "NOT_FOUND":
+      return "This class was not found.";
+    case "CLASS_NOT_LIVE_ELIGIBLE":
+      return "This class is not available for live sessions.";
+    case "CLASS_ID_REQUIRED":
+    case "INVALID_REQUEST":
+      return "Invalid class selection.";
+    case "SERVER_MISCONFIGURED":
+    case "SERVER_ERROR":
+      return "Live service is temporarily unavailable. Check JAAS secrets on the Edge Function.";
+    case "SUPABASE_REQUIRED":
+      return "Supabase is not configured in this app build. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then restart the app.";
+    default:
+      return error.message || "Unable to join the live class.";
   }
-  return error.message || "Unable to join the live class.";
 }
 
 export function LiveClassesPage({ meeting }: { meeting: boolean }) {
