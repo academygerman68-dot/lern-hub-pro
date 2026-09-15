@@ -53,6 +53,30 @@ export const AuthService = {
     if (!user) throw new Error("INVALID_CREDENTIALS");
     return user;
   },
+  /** Returns null when the account needs email confirmation before first sign-in. */
+  async signUp(input: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+  }): Promise<SessionUser | null> {
+    if (!isSupabaseConfigured) {
+      throw new Error("SIGNUP_UNAVAILABLE");
+    }
+    try {
+      const payload = await SupabaseAuthService.signUpStudent(input);
+      return payload.sessionUser;
+    } catch (error) {
+      if (error instanceof Error && error.message === "CONFIRM_EMAIL_REQUIRED") return null;
+      throw error;
+    }
+  },
+  async signInWithGoogle(): Promise<void> {
+    if (!isSupabaseConfigured) {
+      throw new Error("GOOGLE_AUTH_UNAVAILABLE");
+    }
+    await SupabaseAuthService.signInWithGoogle();
+  },
   async logout(): Promise<void> {
     if (isSupabaseConfigured) {
       await SupabaseAuthService.logout();
