@@ -35,9 +35,7 @@ function RealAccountRequired() {
       <span className="mx-auto grid size-12 place-items-center rounded-lg bg-secondary text-primary">
         <Lock className="size-5" />
       </span>
-      <h2 className="text-xl font-semibold">
-        {l("Compte réel requis", "مطلوب حساب حقيقي")}
-      </h2>
+      <h2 className="text-xl font-semibold">{l("Compte réel requis", "مطلوب حساب حقيقي")}</h2>
       <p className="text-sm text-muted-foreground">
         {l(
           "Les cours en direct sont réservés aux comptes réels de l’académie. Connectez-vous avec votre adresse e-mail et votre mot de passe pour rejoindre une salle.",
@@ -119,7 +117,10 @@ function LiveMeetingRoom() {
   const [cameraOn, setCameraOn] = useState(true);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([
-    l("Anna : Bonjour à tous, nous commençons dans un instant.", "آنا: مرحباً بالجميع، سنبدأ بعد لحظات."),
+    l(
+      "Anna : Bonjour à tous, nous commençons dans un instant.",
+      "آنا: مرحباً بالجميع، سنبدأ بعد لحظات.",
+    ),
     l("Youssef : Bonjour professeure !", "يوسف: مرحباً أستاذة!"),
   ]);
   const selectedClass = (classesQuery.data ?? []).find((item) => item.id === classId);
@@ -140,11 +141,18 @@ function LiveMeetingRoom() {
     return (
       <Surface className="mx-auto max-w-lg space-y-4 p-8 text-center">
         <Video className="mx-auto size-8 text-primary" />
-        <h2 className="text-lg font-semibold">{l("Aucun cours sélectionné", "لم يتم اختيار درس")}</h2>
+        <h2 className="text-lg font-semibold">
+          {l("Aucun cours sélectionné", "لم يتم اختيار درس")}
+        </h2>
         <p className="text-sm text-muted-foreground">
-          {l("Choisissez d’abord un cours dans l’espace Live.", "اختر درساً أولاً من مساحة البث المباشر.")}
+          {l(
+            "Choisissez d’abord un cours dans l’espace Live.",
+            "اختر درساً أولاً من مساحة البث المباشر.",
+          )}
         </p>
-        <Button onClick={() => navigate("live")}>{l("Retour aux cours", "العودة إلى الدروس")}</Button>
+        <Button onClick={() => navigate("live")}>
+          {l("Retour aux cours", "العودة إلى الدروس")}
+        </Button>
       </Surface>
     );
   }
@@ -173,31 +181,58 @@ function LiveMeetingRoom() {
         <section className="flex min-h-[34rem] flex-col bg-meeting p-4 sm:p-6">
           <div className="relative flex flex-1 items-center justify-center overflow-hidden rounded-md bg-meeting-panel">
             <div className="text-center">
-              <div className="mx-auto grid size-24 place-items-center rounded-full bg-primary text-3xl font-semibold text-primary-foreground shadow-lg">AS</div>
+              <div className="mx-auto grid size-24 place-items-center rounded-full bg-primary text-3xl font-semibold text-primary-foreground shadow-lg">
+                AS
+              </div>
               <h2 className="mt-5 text-xl font-semibold">Anna Schneider</h2>
               <p className="mt-1 text-sm text-primary-foreground/60">
                 {l("Professeure · Conversation au bureau", "الأستاذة · محادثة في المكتب")}
               </p>
             </div>
-            <span className="absolute top-4 left-4 rounded-sm bg-alert px-2 py-1 text-xs font-semibold text-primary-foreground">LIVE</span>
+            <span className="absolute top-4 left-4 rounded-sm bg-alert px-2 py-1 text-xs font-semibold text-primary-foreground">
+              LIVE
+            </span>
             <div className="absolute right-4 bottom-4 flex gap-2">
               {["AB", "YE", "SM"].map((initials) => (
-                <span key={initials} className="grid size-10 place-items-center rounded-md border border-primary-foreground/15 bg-meeting text-xs font-semibold">{initials}</span>
+                <span
+                  key={initials}
+                  className="grid size-10 place-items-center rounded-md border border-primary-foreground/15 bg-meeting text-xs font-semibold"
+                >
+                  {initials}
+                </span>
               ))}
             </div>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            <Button size="icon" variant={microphoneOn ? "secondary" : "destructive"} onClick={() => setMicrophoneOn((value) => !value)} aria-label={l("Activer ou couper le microphone", "تشغيل أو كتم الميكروفون")}>
+            <Button
+              size="icon"
+              variant={microphoneOn ? "secondary" : "destructive"}
+              onClick={() => setMicrophoneOn((value) => !value)}
+              aria-label={l("Activer ou couper le microphone", "تشغيل أو كتم الميكروفون")}
+            >
               {microphoneOn ? <Mic /> : <MicOff />}
             </Button>
-            <Button size="icon" variant={cameraOn ? "secondary" : "destructive"} onClick={() => setCameraOn((value) => !value)} aria-label={l("Activer ou couper la caméra", "تشغيل أو إيقاف الكاميرا")}>
+            <Button
+              size="icon"
+              variant={cameraOn ? "secondary" : "destructive"}
+              onClick={() => setCameraOn((value) => !value)}
+              aria-label={l("Activer ou couper la caméra", "تشغيل أو إيقاف الكاميرا")}
+            >
               {cameraOn ? <Camera /> : <CameraOff />}
             </Button>
-            <Button size="icon" variant="secondary" aria-label={l("Partager l’écran", "مشاركة الشاشة")}>
+            <Button
+              size="icon"
+              variant="secondary"
+              aria-label={l("Partager l’écran", "مشاركة الشاشة")}
+            >
               <MonitorUp />
             </Button>
-            <Button size="icon" variant="secondary" aria-label={l("Voir les participants", "عرض المشاركين")}>
+            <Button
+              size="icon"
+              variant="secondary"
+              aria-label={l("Voir les participants", "عرض المشاركين")}
+            >
               <Users />
             </Button>
           </div>
@@ -206,22 +241,39 @@ function LiveMeetingRoom() {
         <aside className="flex min-h-[22rem] flex-col bg-meeting-panel p-4">
           <div className="border-b border-primary-foreground/10 pb-3">
             <h2 className="font-semibold">{l("Discussion du cours", "محادثة الدرس")}</h2>
-            <p className="mt-1 text-xs text-primary-foreground/55">15 {l("participants", "مشاركاً")}</p>
+            <p className="mt-1 text-xs text-primary-foreground/55">
+              15 {l("participants", "مشاركاً")}
+            </p>
           </div>
           <div className="flex-1 space-y-3 overflow-y-auto py-4">
             {messages.map((item, index) => (
-              <div key={`${item}-${index}`} className="rounded-md bg-primary-foreground/8 p-3 text-sm leading-6">{item}</div>
+              <div
+                key={`${item}-${index}`}
+                className="rounded-md bg-primary-foreground/8 p-3 text-sm leading-6"
+              >
+                {item}
+              </div>
             ))}
           </div>
-          <form className="flex gap-2 border-t border-primary-foreground/10 pt-3" onSubmit={(event) => {
-            event.preventDefault();
-            const value = message.trim();
-            if (!value) return;
-            setMessages((items) => [...items, value]);
-            setMessage("");
-          }}>
-            <input className="min-w-0 flex-1 rounded-md border border-primary-foreground/15 bg-meeting px-3 text-sm text-primary-foreground outline-none placeholder:text-primary-foreground/40" value={message} onChange={(event) => setMessage(event.target.value)} placeholder={l("Écrire un message…", "اكتب رسالة…")} />
-            <Button size="icon" type="submit" aria-label={l("Envoyer", "إرسال")}><Send /></Button>
+          <form
+            className="flex gap-2 border-t border-primary-foreground/10 pt-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const value = message.trim();
+              if (!value) return;
+              setMessages((items) => [...items, value]);
+              setMessage("");
+            }}
+          >
+            <input
+              className="min-w-0 flex-1 rounded-md border border-primary-foreground/15 bg-meeting px-3 text-sm text-primary-foreground outline-none placeholder:text-primary-foreground/40"
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              placeholder={l("Écrire un message…", "اكتب رسالة…")}
+            />
+            <Button size="icon" type="submit" aria-label={l("Envoyer", "إرسال")}>
+              <Send />
+            </Button>
           </form>
         </aside>
       </div>

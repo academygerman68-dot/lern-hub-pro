@@ -1,0 +1,8 @@
+# Normalize text files to LF so Prettier/ESLint stay green on Linux CI.
+* text=auto eol=lf
+
+# Windows scripts keep CRLF.
+*.{cmd,bat,ps1} text eol=crlf
+
+# Treat binary assets as binary.
+*.{png,jpg,jpeg,gif,webp,ico,pdf,woff,woff2,ttf,eot} binary

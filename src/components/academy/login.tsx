@@ -148,9 +148,7 @@ export function Login() {
 
           <p className="text-sm font-medium text-primary">{t("login.welcome")}</p>
           <h2 className="mt-2 font-display text-3xl font-medium tracking-tight">
-            {mode === "signin"
-              ? t("login.title")
-              : l("Créer un compte", "إنشاء حساب")}
+            {mode === "signin" ? t("login.title") : l("Créer un compte", "إنشاء حساب")}
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
             {mode === "signin"
