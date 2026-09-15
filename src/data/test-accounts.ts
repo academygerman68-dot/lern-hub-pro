@@ -2,13 +2,15 @@ import type { Role } from "@/types/academy";
 
 /**
  * Seeded Supabase accounts for QA / test-phase one-click login.
- * Never use these as a production identity system — gate with isTestLoginAllowed().
+ * Gate with isTestLoginAllowed() — not a production identity system.
  */
 export type TestQuickAccount = {
   role: Role;
   email: string;
   labelFr: string;
   labelAr: string;
+  descriptionFr: string;
+  descriptionAr: string;
 };
 
 export const TEST_QUICK_ACCOUNTS: TestQuickAccount[] = [
@@ -17,18 +19,24 @@ export const TEST_QUICK_ACCOUNTS: TestQuickAccount[] = [
     email: "student@gla.academy",
     labelFr: "Étudiant",
     labelAr: "طالب",
+    descriptionFr: "Cours, devoirs, examens, live",
+    descriptionAr: "دروس، واجبات، امتحانات، بث مباشر",
   },
   {
     role: "teacher",
     email: "teacher@gla.academy",
     labelFr: "Professeur",
     labelAr: "أستاذ",
+    descriptionFr: "Classes, présence, corrections",
+    descriptionAr: "أقسام، حضور، تصحيح",
   },
   {
     role: "director",
     email: "admin@gla.academy",
-    labelFr: "Admin / Direction",
+    labelFr: "Admin",
     labelAr: "إدارة",
+    descriptionFr: "Direction, élèves, enseignants",
+    descriptionAr: "إدارة، طلاب، أساتذة",
   },
 ];
 
@@ -43,13 +51,9 @@ export function getTestAccountPassword(): string {
 }
 
 /**
- * One-click test login buttons.
- * - Always on in Vite DEV
- * - Or when VITE_ENABLE_TEST_LOGIN=true (Lovable / preview QA)
- * Set VITE_ENABLE_TEST_LOGIN=false to hide even in DEV.
+ * Show the 3 role sections on the login page during the test phase.
+ * Hidden only when VITE_ENABLE_TEST_LOGIN=false.
  */
 export function isTestLoginAllowed(): boolean {
-  if (import.meta.env.VITE_ENABLE_TEST_LOGIN === "false") return false;
-  if (import.meta.env.VITE_ENABLE_TEST_LOGIN === "true") return true;
-  return import.meta.env.DEV === true;
+  return import.meta.env.VITE_ENABLE_TEST_LOGIN !== "false";
 }

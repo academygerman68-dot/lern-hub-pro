@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, GraduationCap, Loader2, Shield, UserRound } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
   getTestAccountPassword,
   isTestLoginAllowed,
   TEST_QUICK_ACCOUNTS,
+  type TestQuickAccount,
 } from "@/data/test-accounts";
 import { AuthService } from "@/services/academy-services";
 import { AuthError } from "@/services/supabase/auth-service";
@@ -21,6 +22,12 @@ import { useAcademy } from "./academy-context";
 import { AuthShell, GoogleIcon } from "./auth-shell";
 
 const RESEND_COOLDOWN_SECONDS = 60;
+
+function RoleIcon({ role }: { role: Role }) {
+  if (role === "teacher") return <GraduationCap className="size-5" aria-hidden />;
+  if (role === "director") return <Shield className="size-5" aria-hidden />;
+  return <UserRound className="size-5" aria-hidden />;
+}
 
 function authErrorMessage(
   error: unknown,
@@ -56,12 +63,73 @@ function authErrorMessage(
   }
 }
 
+function QuickRoleSections({
+  loading,
+  activeEmail,
+  onEnter,
+  l,
+}: {
+  loading: boolean;
+  activeEmail: string | null;
+  onEnter: (account: TestQuickAccount) => void;
+  l: (fr: string, ar: string) => string;
+}) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+          {l("Choisir un profil", "اختر ملفًا")}
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {l(
+            "Accès rapide pour les tests — chaque bouton ouvre le tableau de bord du rôle.",
+            "دخول سريع للاختبار — كل زر يفتح لوحة الدور.",
+          )}
+        </p>
+      </div>
+      <div className="grid gap-3">
+        {TEST_QUICK_ACCOUNTS.map((account) => {
+          const busy = loading && activeEmail === account.email;
+          return (
+            <button
+              key={account.email}
+              type="button"
+              disabled={loading}
+              onClick={() => onEnter(account)}
+              className="flex w-full items-center gap-4 rounded-xl border border-border bg-card px-4 py-4 text-left transition-colors hover:border-primary/40 hover:bg-soft-blue/40 disabled:opacity-60"
+            >
+              <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-soft-blue text-primary">
+                {busy ? (
+                  <Loader2 className="size-5 animate-spin" />
+                ) : (
+                  <RoleIcon role={account.role} />
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-base font-semibold text-foreground">
+                  {l(account.labelFr, account.labelAr)}
+                </span>
+                <span className="mt-0.5 block text-sm text-muted-foreground">
+                  {l(account.descriptionFr, account.descriptionAr)}
+                </span>
+              </span>
+              <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function Login() {
   const { signIn, t, l } = useAcademy();
   const [mode, setMode] = useState<"signin" | "signup" | "check-email">("signin");
   const [pendingEmail, setPendingEmail] = useState("");
   const [show, setShow] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
   const [loading, setLoading] = useState<"form" | "google" | Role | "resend" | "test" | null>(null);
+  const [activeTestEmail, setActiveTestEmail] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
   const demoAllowed = useMemo(() => isDemoAuthAllowed(isSupabaseConfigured), []);
   const testLoginAllowed = useMemo(() => isTestLoginAllowed() && isSupabaseConfigured, []);
@@ -106,18 +174,20 @@ export function Login() {
     }
   };
 
-  const enterTestAccount = async (email: string) => {
+  const enterTestAccount = async (account: TestQuickAccount) => {
     if (!testLoginAllowed) {
       toast.error(l("Connexion rapide désactivée.", "تسجيل الدخول السريع معطّل."));
       return;
     }
     setLoading("test");
+    setActiveTestEmail(account.email);
     try {
-      const user = await AuthService.login(email, getTestAccountPassword());
+      const user = await AuthService.login(account.email, getTestAccountPassword());
       signIn(user);
     } catch (error) {
       toast.error(authErrorMessage(error, l, "signin"));
       setLoading(null);
+      setActiveTestEmail(null);
     }
   };
 
@@ -200,12 +270,6 @@ export function Login() {
               `يجب أن يفتح الرابط: ${confirmRedirect}. إذا فتح localhost، أضف هذا العنوان في Supabase → Authentication → URL Configuration.`,
             )}
           </p>
-          <p className="text-sm text-muted-foreground">
-            {l(
-              "Vérifiez aussi les spams. Supabase limite les renvois (environ 1 minute entre chaque envoi).",
-              "تحقق أيضًا من البريد غير المرغوب. سوباسبيس يحدّ إعادة الإرسال (حوالي دقيقة بين كل إرسال).",
-            )}
-          </p>
           <Button
             className="h-11 w-full"
             disabled={loading !== null || resendCooldown > 0}
@@ -236,7 +300,10 @@ export function Login() {
       title={mode === "signin" ? t("login.title") : l("Créer un compte", "إنشاء حساب")}
       subtitle={
         mode === "signin"
-          ? t("login.subtitle")
+          ? l(
+              "Choisissez un profil pour tester, ou connectez-vous avec votre compte.",
+              "اختر ملفًا للاختبار، أو سجّل الدخول بحسابك.",
+            )
           : l(
               "Inscription étudiant uniquement. Les comptes professeur / direction sont créés par l’administration.",
               "التسجيل للطلاب فقط. حسابات الأساتذة والإدارة تُنشأ عبر الإدارة.",
@@ -269,197 +336,282 @@ export function Login() {
         ))}
       </div>
 
-      {mode === "signin" ? (
-        <form className="space-y-4" onSubmit={onLogin} noValidate>
-          <label className="block text-sm font-medium">
-            {t("login.email")}
-            <Input
-              className="mt-2 h-11"
-              type="email"
-              autoComplete="email"
-              {...loginForm.register("email")}
-            />
-            {loginForm.formState.errors.email ? (
-              <p className="mt-1 text-xs text-alert">{loginForm.formState.errors.email.message}</p>
-            ) : null}
-          </label>
-          <label className="block text-sm font-medium">
-            <span className="flex items-center justify-between">
-              {t("login.password")}
-              <Link to="/auth/forgot-password" className="text-xs font-medium text-primary">
-                {t("login.forgot")}
-              </Link>
+      {mode === "signin" && testLoginAllowed ? (
+        <>
+          <QuickRoleSections
+            loading={loading === "test"}
+            activeEmail={activeTestEmail}
+            onEnter={(account) => void enterTestAccount(account)}
+            l={l}
+          />
+
+          <div className="my-6 flex items-center gap-3">
+            <span className="h-px flex-1 bg-border" />
+            <span className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+              {l("ou compte personnel", "أو حساب شخصي")}
             </span>
-            <div className="relative mt-2">
-              <Input
-                className="h-11 pr-11"
-                type={show ? "text" : "password"}
-                autoComplete="current-password"
-                {...loginForm.register("password")}
-              />
-              <button
-                type="button"
-                className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
-                onClick={() => setShow((value) => !value)}
-                aria-label={show ? "Hide password" : "Show password"}
-              >
-                {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
-            </div>
-            {loginForm.formState.errors.password ? (
-              <p className="mt-1 text-xs text-alert">
-                {loginForm.formState.errors.password.message}
-              </p>
-            ) : null}
-          </label>
-          <Button className="h-11 w-full" disabled={loading !== null}>
-            {loading === "form" ? t("login.signing") : t("login.submit")}
-            <ArrowRight className="size-4" />
-          </Button>
-        </form>
-      ) : (
-        <form className="space-y-4" onSubmit={onSignup} noValidate>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm font-medium">
-              {l("Prénom", "الاسم")}
-              <Input
-                className="mt-2 h-11"
-                autoComplete="given-name"
-                {...signupForm.register("firstName")}
-              />
-              {signupForm.formState.errors.firstName ? (
-                <p className="mt-1 text-xs text-alert">
-                  {signupForm.formState.errors.firstName.message}
-                </p>
-              ) : null}
-            </label>
-            <label className="block text-sm font-medium">
-              {l("Nom", "اللقب")}
-              <Input
-                className="mt-2 h-11"
-                autoComplete="family-name"
-                {...signupForm.register("lastName")}
-              />
-              {signupForm.formState.errors.lastName ? (
-                <p className="mt-1 text-xs text-alert">
-                  {signupForm.formState.errors.lastName.message}
-                </p>
-              ) : null}
-            </label>
+            <span className="h-px flex-1 bg-border" />
           </div>
-          <label className="block text-sm font-medium">
-            {t("login.email")}
-            <Input
-              className="mt-2 h-11"
-              type="email"
-              autoComplete="email"
-              {...signupForm.register("email")}
-            />
-            {signupForm.formState.errors.email ? (
-              <p className="mt-1 text-xs text-alert">{signupForm.formState.errors.email.message}</p>
-            ) : null}
-          </label>
-          <label className="block text-sm font-medium">
-            {t("login.password")}
-            <Input
-              className="mt-2 h-11"
-              type={show ? "text" : "password"}
-              autoComplete="new-password"
-              {...signupForm.register("password")}
-            />
-            {signupForm.formState.errors.password ? (
-              <p className="mt-1 text-xs text-alert">
-                {signupForm.formState.errors.password.message}
-              </p>
-            ) : null}
-          </label>
-          <label className="block text-sm font-medium">
-            {l("Confirmer le mot de passe", "تأكيد كلمة المرور")}
-            <Input
-              className="mt-2 h-11"
-              type={show ? "text" : "password"}
-              autoComplete="new-password"
-              {...signupForm.register("confirmPassword")}
-            />
-            {signupForm.formState.errors.confirmPassword ? (
-              <p className="mt-1 text-xs text-alert">
-                {signupForm.formState.errors.confirmPassword.message}
-              </p>
-            ) : null}
-          </label>
-          <p className="text-xs text-muted-foreground">
-            {l(
-              "En créant un compte, vous acceptez les conditions d’utilisation de l’académie.",
-              "بإنشاء حساب، فإنك توافق على شروط استخدام الأكاديمية.",
-            )}
-          </p>
-          <Button className="h-11 w-full" disabled={loading !== null}>
-            {loading === "form"
-              ? l("Création…", "جارٍ الإنشاء…")
-              : l("Créer mon compte", "إنشاء حسابي")}
-            <ArrowRight className="size-4" />
-          </Button>
-        </form>
-      )}
 
-      <div className="my-6 flex items-center gap-3">
-        <span className="h-px flex-1 bg-border" />
-        <span className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-          {l("ou", "أو")}
-        </span>
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <Button
-        type="button"
-        variant="outline"
-        className="h-11 w-full gap-2"
-        disabled={loading !== null || !isSupabaseConfigured}
-        onClick={() => void google()}
-      >
-        <GoogleIcon />
-        {loading === "google"
-          ? l("Redirection…", "جارٍ التحويل…")
-          : mode === "signup"
-            ? l("S’inscrire avec Google", "التسجيل بواسطة جوجل")
-            : l("Continuer avec Google", "المتابعة بواسطة جوجل")}
-      </Button>
-
-      {testLoginAllowed ? (
-        <div className="mt-8 border-t border-border pt-6">
-          <p className="mb-1 text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-            {l("Accès rapide (phase test)", "دخول سريع (مرحلة الاختبار)")}
-          </p>
-          <p className="mb-3 text-xs text-muted-foreground">
-            {l(
-              "Connexion Supabase réelle en un clic — comptes seed GLA.",
-              "تسجيل دخول سوباسبيس حقيقي بنقرة — حسابات الاختبار.",
-            )}
-          </p>
-          <div className="grid gap-2">
-            {TEST_QUICK_ACCOUNTS.map((account) => (
+          {!showEmailForm ? (
+            <div className="space-y-3">
               <Button
-                key={account.email}
+                type="button"
                 variant="outline"
-                className="justify-between"
+                className="h-11 w-full"
                 disabled={loading !== null}
-                onClick={() => void enterTestAccount(account.email)}
+                onClick={() => setShowEmailForm(true)}
               >
-                <span className="flex flex-col items-start gap-0.5 text-left">
-                  <span>{l(account.labelFr, account.labelAr)}</span>
-                  <span className="text-[11px] font-normal text-muted-foreground">
-                    {account.email}
-                  </span>
-                </span>
-                {loading === "test" ? (
-                  <Loader2 className="size-4 animate-spin opacity-50" />
-                ) : (
-                  <ArrowRight className="size-4 opacity-50" />
-                )}
+                {l("E-mail et mot de passe", "البريد وكلمة المرور")}
               </Button>
-            ))}
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 w-full gap-2"
+                disabled={loading !== null || !isSupabaseConfigured}
+                onClick={() => void google()}
+              >
+                <GoogleIcon />
+                {loading === "google"
+                  ? l("Redirection…", "جارٍ التحويل…")
+                  : l("Continuer avec Google", "المتابعة بواسطة جوجل")}
+              </Button>
+            </div>
+          ) : (
+            <form className="space-y-4" onSubmit={onLogin} noValidate>
+              <label className="block text-sm font-medium">
+                {t("login.email")}
+                <Input
+                  className="mt-2 h-11"
+                  type="email"
+                  autoComplete="email"
+                  {...loginForm.register("email")}
+                />
+                {loginForm.formState.errors.email ? (
+                  <p className="mt-1 text-xs text-alert">
+                    {loginForm.formState.errors.email.message}
+                  </p>
+                ) : null}
+              </label>
+              <label className="block text-sm font-medium">
+                <span className="flex items-center justify-between">
+                  {t("login.password")}
+                  <Link to="/auth/forgot-password" className="text-xs font-medium text-primary">
+                    {t("login.forgot")}
+                  </Link>
+                </span>
+                <div className="relative mt-2">
+                  <Input
+                    className="h-11 pr-11"
+                    type={show ? "text" : "password"}
+                    autoComplete="current-password"
+                    {...loginForm.register("password")}
+                  />
+                  <button
+                    type="button"
+                    className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
+                    onClick={() => setShow((value) => !value)}
+                    aria-label={show ? "Hide password" : "Show password"}
+                  >
+                    {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+                {loginForm.formState.errors.password ? (
+                  <p className="mt-1 text-xs text-alert">
+                    {loginForm.formState.errors.password.message}
+                  </p>
+                ) : null}
+              </label>
+              <Button className="h-11 w-full" disabled={loading !== null}>
+                {loading === "form" ? t("login.signing") : t("login.submit")}
+                <ArrowRight className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-10 w-full"
+                onClick={() => setShowEmailForm(false)}
+              >
+                {l("Retour aux profils", "العودة إلى الملفات")}
+              </Button>
+            </form>
+          )}
+        </>
+      ) : null}
+
+      {mode === "signin" && !testLoginAllowed ? (
+        <>
+          <form className="space-y-4" onSubmit={onLogin} noValidate>
+            <label className="block text-sm font-medium">
+              {t("login.email")}
+              <Input
+                className="mt-2 h-11"
+                type="email"
+                autoComplete="email"
+                {...loginForm.register("email")}
+              />
+              {loginForm.formState.errors.email ? (
+                <p className="mt-1 text-xs text-alert">
+                  {loginForm.formState.errors.email.message}
+                </p>
+              ) : null}
+            </label>
+            <label className="block text-sm font-medium">
+              <span className="flex items-center justify-between">
+                {t("login.password")}
+                <Link to="/auth/forgot-password" className="text-xs font-medium text-primary">
+                  {t("login.forgot")}
+                </Link>
+              </span>
+              <div className="relative mt-2">
+                <Input
+                  className="h-11 pr-11"
+                  type={show ? "text" : "password"}
+                  autoComplete="current-password"
+                  {...loginForm.register("password")}
+                />
+                <button
+                  type="button"
+                  className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
+                  onClick={() => setShow((value) => !value)}
+                  aria-label={show ? "Hide password" : "Show password"}
+                >
+                  {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+              {loginForm.formState.errors.password ? (
+                <p className="mt-1 text-xs text-alert">
+                  {loginForm.formState.errors.password.message}
+                </p>
+              ) : null}
+            </label>
+            <Button className="h-11 w-full" disabled={loading !== null}>
+              {loading === "form" ? t("login.signing") : t("login.submit")}
+              <ArrowRight className="size-4" />
+            </Button>
+          </form>
+          <div className="my-6 flex items-center gap-3">
+            <span className="h-px flex-1 bg-border" />
+            <span className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+              {l("ou", "أو")}
+            </span>
+            <span className="h-px flex-1 bg-border" />
           </div>
-        </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 w-full gap-2"
+            disabled={loading !== null || !isSupabaseConfigured}
+            onClick={() => void google()}
+          >
+            <GoogleIcon />
+            {loading === "google"
+              ? l("Redirection…", "جارٍ التحويل…")
+              : l("Continuer avec Google", "المتابعة بواسطة جوجل")}
+          </Button>
+        </>
+      ) : null}
+
+      {mode === "signup" ? (
+        <>
+          <form className="space-y-4" onSubmit={onSignup} noValidate>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block text-sm font-medium">
+                {l("Prénom", "الاسم")}
+                <Input
+                  className="mt-2 h-11"
+                  autoComplete="given-name"
+                  {...signupForm.register("firstName")}
+                />
+                {signupForm.formState.errors.firstName ? (
+                  <p className="mt-1 text-xs text-alert">
+                    {signupForm.formState.errors.firstName.message}
+                  </p>
+                ) : null}
+              </label>
+              <label className="block text-sm font-medium">
+                {l("Nom", "اللقب")}
+                <Input
+                  className="mt-2 h-11"
+                  autoComplete="family-name"
+                  {...signupForm.register("lastName")}
+                />
+                {signupForm.formState.errors.lastName ? (
+                  <p className="mt-1 text-xs text-alert">
+                    {signupForm.formState.errors.lastName.message}
+                  </p>
+                ) : null}
+              </label>
+            </div>
+            <label className="block text-sm font-medium">
+              {t("login.email")}
+              <Input
+                className="mt-2 h-11"
+                type="email"
+                autoComplete="email"
+                {...signupForm.register("email")}
+              />
+              {signupForm.formState.errors.email ? (
+                <p className="mt-1 text-xs text-alert">
+                  {signupForm.formState.errors.email.message}
+                </p>
+              ) : null}
+            </label>
+            <label className="block text-sm font-medium">
+              {t("login.password")}
+              <Input
+                className="mt-2 h-11"
+                type={show ? "text" : "password"}
+                autoComplete="new-password"
+                {...signupForm.register("password")}
+              />
+              {signupForm.formState.errors.password ? (
+                <p className="mt-1 text-xs text-alert">
+                  {signupForm.formState.errors.password.message}
+                </p>
+              ) : null}
+            </label>
+            <label className="block text-sm font-medium">
+              {l("Confirmer le mot de passe", "تأكيد كلمة المرور")}
+              <Input
+                className="mt-2 h-11"
+                type={show ? "text" : "password"}
+                autoComplete="new-password"
+                {...signupForm.register("confirmPassword")}
+              />
+              {signupForm.formState.errors.confirmPassword ? (
+                <p className="mt-1 text-xs text-alert">
+                  {signupForm.formState.errors.confirmPassword.message}
+                </p>
+              ) : null}
+            </label>
+            <Button className="h-11 w-full" disabled={loading !== null}>
+              {loading === "form"
+                ? l("Création…", "جارٍ الإنشاء…")
+                : l("Créer mon compte", "إنشاء حسابي")}
+              <ArrowRight className="size-4" />
+            </Button>
+          </form>
+          <div className="my-6 flex items-center gap-3">
+            <span className="h-px flex-1 bg-border" />
+            <span className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+              {l("ou", "أو")}
+            </span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 w-full gap-2"
+            disabled={loading !== null || !isSupabaseConfigured}
+            onClick={() => void google()}
+          >
+            <GoogleIcon />
+            {loading === "google"
+              ? l("Redirection…", "جارٍ التحويل…")
+              : l("S’inscrire avec Google", "التسجيل بواسطة جوجل")}
+          </Button>
+        </>
       ) : null}
 
       {demoAllowed ? (
