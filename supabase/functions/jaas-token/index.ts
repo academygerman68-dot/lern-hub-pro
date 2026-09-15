@@ -27,7 +27,7 @@ type ProfileRow = {
   email: string | null;
   first_name: string | null;
   last_name: string | null;
-  full_name: string | null;
+  
   role: AppRole;
   status: string;
   avatar_url: string | null;
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
 
     const { data: profile, error: profileError } = await adminClient
       .from("profiles")
-      .select("id, email, first_name, last_name, full_name, role, status, avatar_url")
+      .select("id, email, first_name, last_name, role, status, avatar_url")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -291,8 +291,6 @@ function deriveRoomName(classId: string): string {
 }
 
 function resolveDisplayName(profile: ProfileRow): string {
-  const full = (profile.full_name ?? "").trim();
-  if (full) return full;
   const parts = [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim();
   if (parts) return parts;
   return profile.email?.split("@")[0] || "Participant";
