@@ -1,282 +1,406 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  Camera,
-  CameraOff,
-  Mic,
-  MicOff,
-  MonitorUp,
-  PhoneOff,
-  Send,
-  Users,
-  Video,
-} from "lucide-react";
-import { Lock } from "lucide-react";
+import { Video } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { useClasses } from "@/hooks/use-academy-data";
-import { useRealAccount } from "@/hooks/use-real-account";
-import { clearLiveClassId, getLiveClassId, setLiveClassId } from "@/lib/live-class-session";
+import { Input } from "@/components/ui/input";
+import {
+  useAcademicAccess,
+  useClasses,
+  useCreateLiveSession,
+  useLiveSession,
+  useLiveSessions,
+  useUpdateLiveSessionStatus,
+} from "@/hooks/use-academy-data";
+import { getLiveSessionId, setLiveSessionId, clearLiveSessionId } from "@/lib/live-class-session";
+import { getJitsiConfig } from "@/lib/jitsi-config";
 import { useAcademy } from "./academy-context";
+import { JitsiMeetingEmbed } from "./jitsi-meeting";
 import { QueryState } from "./query-state";
 import { PageHeader, Status, Surface } from "./primitives";
 
 export function LiveClassesPage({ meeting }: { meeting: boolean }) {
-  const account = useRealAccount();
+  const accessQuery = useAcademicAccess();
+  const { role } = useAcademy();
 
-  if (account.checking) return <div className="min-h-[50vh] bg-background" />;
-  if (!account.authenticated) return <RealAccountRequired />;
+  if (accessQuery.isLoading) return <div className="min-h-[40vh]" />;
+  if (role === "student" && accessQuery.data === false) {
+    return (
+      <Surface className="mx-auto max-w-xl space-y-3 p-8 text-center">
+        <h2 className="text-xl font-semibold">Access restricted</h2>
+        <p className="text-sm text-muted-foreground">
+          Live classes require an active subscription. Open Payments to review your status.
+        </p>
+      </Surface>
+    );
+  }
+
   if (meeting) return <LiveMeetingRoom />;
-  return <LiveClassLobby />;
+  return <LiveSessionLobby />;
 }
 
-function RealAccountRequired() {
-  const { l, setRole } = useAcademy();
+function teacherLabel(item: {
+  teacher?: { profile: { first_name: string; last_name: string } | null } | null;
+}) {
+  const p = item.teacher?.profile;
+  if (!p) return "Teacher TBD";
+  return `${p.first_name} ${p.last_name}`.trim() || "Teacher TBD";
+}
+
+function SessionCard({
+  item,
+  onJoin,
+}: {
+  item: {
+    id: string;
+    title: string;
+    status: string;
+    starts_at: string;
+    ends_at: string | null;
+    meeting_room: string;
+    class?: { name: string } | null;
+    teacher?: { profile: { first_name: string; last_name: string } | null } | null;
+  };
+  onJoin: () => void;
+}) {
   return (
-    <Surface className="mx-auto max-w-xl space-y-4 p-8 text-center">
-      <span className="mx-auto grid size-12 place-items-center rounded-lg bg-secondary text-primary">
-        <Lock className="size-5" />
-      </span>
-      <h2 className="text-xl font-semibold">{l("Compte réel requis", "مطلوب حساب حقيقي")}</h2>
-      <p className="text-sm text-muted-foreground">
-        {l(
-          "Les cours en direct sont réservés aux comptes réels de l’académie. Connectez-vous avec votre adresse e-mail et votre mot de passe pour rejoindre une salle.",
-          "الدروس المباشرة مخصّصة لحسابات الأكاديمية الحقيقية. سجّل الدخول ببريدك الإلكتروني وكلمة المرور للانضمام إلى القاعة.",
+    <Surface className="p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <span className="grid size-12 place-items-center rounded-lg bg-secondary text-primary">
+          <Video className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-semibold">{item.title}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {item.class?.name ?? "Class"} · {teacherLabel(item)} ·{" "}
+            {new Date(item.starts_at).toLocaleString()}
+            {item.ends_at ? ` → ${new Date(item.ends_at).toLocaleTimeString()}` : ""}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">Room · {item.meeting_room}</p>
+        </div>
+        <Status
+          tone={item.status === "live" ? "green" : item.status === "scheduled" ? "amber" : "red"}
+        >
+          {item.status}
+        </Status>
+        {(item.status === "scheduled" || item.status === "live") && (
+          <Button onClick={onJoin}>
+            <Video className="size-4" />
+            Join meeting
+          </Button>
         )}
-      </p>
-      <Button onClick={() => setRole(null)}>
-        {l("Se connecter avec un compte réel", "تسجيل الدخول بحساب حقيقي")}
-      </Button>
+      </div>
     </Surface>
   );
 }
 
-function LiveClassLobby() {
-  const { navigate } = useAcademy();
+function LiveSessionLobby() {
+  const { navigate, role, user } = useAcademy();
+  const sessionsQuery = useLiveSessions();
   const classesQuery = useClasses();
-  const liveEligible = useMemo(
-    () =>
-      (classesQuery.data ?? []).filter(
-        (item) => item.status === "active" || item.status === "planned",
-      ),
-    [classesQuery.data],
-  );
+  const createSession = useCreateLiveSession();
+  const updateStatus = useUpdateLiveSessionStatus();
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [classId, setClassId] = useState("");
+  const [date, setDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const jitsi = getJitsiConfig();
+
+  const { liveNow, upcoming, past } = useMemo(() => {
+    const rows = sessionsQuery.data ?? [];
+    const now = Date.now();
+    const liveNowRows = rows.filter((s) => s.status === "live");
+    const upcomingRows = rows.filter((s) => {
+      if (s.status !== "scheduled") return false;
+      const end = s.ends_at
+        ? new Date(s.ends_at).getTime()
+        : new Date(s.starts_at).getTime() + 2 * 3600_000;
+      return end >= now - 15 * 60_000;
+    });
+    const pastRows = rows.filter(
+      (s) =>
+        s.status === "completed" ||
+        s.status === "cancelled" ||
+        (s.status === "scheduled" &&
+          (s.ends_at
+            ? new Date(s.ends_at).getTime() < now - 15 * 60_000
+            : new Date(s.starts_at).getTime() < now - 3 * 3600_000)),
+    );
+    return { liveNow: liveNowRows, upcoming: upcomingRows, past: pastRows };
+  }, [sessionsQuery.data]);
+
+  const join = (id: string) => {
+    setLiveSessionId(id);
+    updateStatus.mutate({ id, status: "live" });
+    navigate("meeting");
+  };
+
+  const resetForm = () => {
+    setOpen(false);
+    setTitle("");
+    setClassId("");
+    setDate("");
+    setStartTime("");
+    setEndTime("");
+  };
 
   return (
     <>
       <PageHeader
-        title="Live Classes"
-        subtitle="Join an authorized class room. Access is validated by the academy backend."
+        title="Live sessions"
+        subtitle="Create a class meeting and join the same Jitsi room from any authorized account."
+        action={
+          (role === "director" || role === "teacher") && (
+            <Button onClick={() => setOpen(true)}>+ Create session</Button>
+          )
+        }
       />
+
+      {jitsi.requiresJwt && (
+        <Surface className="mb-4 border-amber-500/30 bg-warning-soft p-4 text-sm">
+          JaaS JWT required. For a real meeting without JaaS, remove VITE_JAAS_APP_ID (defaults to
+          meet.jit.si).
+        </Surface>
+      )}
+
       <QueryState
-        isLoading={classesQuery.isLoading}
-        isError={classesQuery.isError}
-        error={classesQuery.error}
-        isEmpty={liveEligible.length === 0}
-        emptyTitle="No live classes available"
-        emptyMessage="When you are enrolled in (or assigned to) an active class, it will appear here."
-        onRetry={() => void classesQuery.refetch()}
+        isLoading={sessionsQuery.isLoading}
+        isError={sessionsQuery.isError}
+        error={sessionsQuery.error}
+        isEmpty={(sessionsQuery.data?.length ?? 0) === 0}
+        emptyTitle="No upcoming sessions"
+        emptyMessage="Teachers or directors can create a live session for a class."
+        onRetry={() => void sessionsQuery.refetch()}
       >
-        <div className="space-y-3">
-          {liveEligible.map((item) => (
-            <Surface className="p-5" key={item.id}>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                <span className="grid size-12 place-items-center rounded-lg bg-secondary text-primary">
-                  <Video className="size-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-lg font-semibold">{item.name}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {item.level} · {item.schedule || "Schedule TBD"} ·{" "}
-                    {item.teacher || "Teacher TBD"}
-                  </p>
-                </div>
-                <Status tone={item.status === "active" ? "green" : "amber"}>{item.status}</Status>
-                <Button
-                  onClick={() => {
-                    setLiveClassId(item.id);
-                    navigate("meeting");
-                  }}
-                >
-                  <Video className="size-4" />
-                  Rejoindre le cours
-                </Button>
-              </div>
-            </Surface>
-          ))}
+        <div className="space-y-8">
+          {liveNow.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                Live now
+              </h2>
+              {liveNow.map((item) => (
+                <SessionCard key={item.id} item={item} onJoin={() => join(item.id)} />
+              ))}
+            </section>
+          )}
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+              Upcoming
+            </h2>
+            {upcoming.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No scheduled sessions.</p>
+            ) : (
+              upcoming.map((item) => (
+                <SessionCard key={item.id} item={item} onJoin={() => join(item.id)} />
+              ))
+            )}
+          </section>
+          {past.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                Past
+              </h2>
+              {past.map((item) => (
+                <SessionCard key={item.id} item={item} onJoin={() => join(item.id)} />
+              ))}
+            </section>
+          )}
         </div>
       </QueryState>
+
+      {open && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4">
+          <Surface className="w-full max-w-lg space-y-4 p-6">
+            <h2 className="text-lg font-semibold">Create session</h2>
+            <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={classId}
+              onChange={(e) => setClassId(e.target.value)}
+            >
+              <option value="">Select class</option>
+              {(classesQuery.data ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                aria-label="Start time"
+              />
+              <Input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                aria-label="End time"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={resetForm}>
+                Cancel
+              </Button>
+              <Button
+                disabled={
+                  !title.trim() || !classId || !date || !startTime || createSession.isPending
+                }
+                onClick={() => {
+                  const startsAt = new Date(`${date}T${startTime}:00`);
+                  const endsAt = endTime ? new Date(`${date}T${endTime}:00`) : null;
+                  createSession.mutate(
+                    {
+                      title: title.trim(),
+                      classId,
+                      startsAt: startsAt.toISOString(),
+                      endsAt: endsAt ? endsAt.toISOString() : null,
+                      createdBy: user?.id ?? null,
+                    },
+                    {
+                      onSuccess: (session) => {
+                        toast.success("Meeting created");
+                        resetForm();
+                        setLiveSessionId(session.id);
+                        updateStatus.mutate({ id: session.id, status: "live" });
+                        navigate("meeting");
+                      },
+                      onError: (err) => toast.error(err.message),
+                    },
+                  );
+                }}
+              >
+                Create & join
+              </Button>
+            </div>
+          </Surface>
+        </div>
+      )}
     </>
   );
 }
 
 function LiveMeetingRoom() {
-  const { navigate, l } = useAcademy();
-  const classesQuery = useClasses();
-  const [classId, setClassId] = useState<string | null>(null);
-  const [clientReady, setClientReady] = useState(false);
-  const [microphoneOn, setMicrophoneOn] = useState(true);
-  const [cameraOn, setCameraOn] = useState(true);
-  const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState([
-    l(
-      "Anna : Bonjour à tous, nous commençons dans un instant.",
-      "آنا: مرحباً بالجميع، سنبدأ بعد لحظات.",
-    ),
-    l("Youssef : Bonjour professeure !", "يوسف: مرحباً أستاذة!"),
-  ]);
-  const selectedClass = (classesQuery.data ?? []).find((item) => item.id === classId);
+  const { navigate, user, role } = useAcademy();
+  const sessionId = getLiveSessionId();
+  const sessionQuery = useLiveSession(sessionId);
+  const updateStatus = useUpdateLiveSessionStatus();
+  const session = sessionQuery.data;
+  const jitsi = getJitsiConfig();
 
   useEffect(() => {
-    setClassId(getLiveClassId());
-    setClientReady(true);
-  }, []);
+    if (session && session.status === "scheduled") {
+      updateStatus.mutate({ id: session.id, status: "live" });
+    }
+    // Mark live once when opening the room; avoid re-firing on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id]);
 
-  const leave = () => {
-    clearLiveClassId();
+  const leaveMeeting = () => {
+    clearLiveSessionId();
     navigate("live");
   };
 
-  if (!clientReady) return <div className="min-h-[50vh] bg-background" />;
-
-  if (!classId) {
+  if (!sessionId) {
     return (
       <Surface className="mx-auto max-w-lg space-y-4 p-8 text-center">
-        <Video className="mx-auto size-8 text-primary" />
-        <h2 className="text-lg font-semibold">
-          {l("Aucun cours sélectionné", "لم يتم اختيار درس")}
-        </h2>
+        <h2 className="text-lg font-semibold">Session unavailable</h2>
+        <p className="text-sm text-muted-foreground">No meeting was selected.</p>
+        <Button onClick={() => navigate("live")}>Back to sessions</Button>
+      </Surface>
+    );
+  }
+
+  if (sessionQuery.isLoading) {
+    return (
+      <div className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground">
+        Loading session…
+      </div>
+    );
+  }
+
+  if (sessionQuery.isError || !session) {
+    return (
+      <Surface className="mx-auto max-w-lg space-y-4 p-8 text-center">
+        <h2 className="text-lg font-semibold">Unable to join the meeting</h2>
         <p className="text-sm text-muted-foreground">
-          {l(
-            "Choisissez d’abord un cours dans l’espace Live.",
-            "اختر درساً أولاً من مساحة البث المباشر.",
-          )}
+          {sessionQuery.error?.message ??
+            "Session not found or you are not authorized for this class."}
         </p>
-        <Button onClick={() => navigate("live")}>
-          {l("Retour aux cours", "العودة إلى الدروس")}
+        <div className="flex justify-center gap-2">
+          <Button onClick={() => void sessionQuery.refetch()}>Retry</Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              clearLiveSessionId();
+              navigate("live");
+            }}
+          >
+            Back to sessions
+          </Button>
+        </div>
+      </Surface>
+    );
+  }
+
+  if (session.status === "cancelled") {
+    return (
+      <Surface className="mx-auto max-w-lg space-y-4 p-8 text-center">
+        <h2 className="text-lg font-semibold">Session cancelled</h2>
+        <Button variant="outline" onClick={leaveMeeting}>
+          Back to sessions
         </Button>
       </Surface>
     );
   }
 
+  const displayName = user?.name?.trim() || user?.email || "Participant";
+
   return (
-    <div className="-m-4 flex min-h-[calc(100vh-4.25rem)] flex-col bg-meeting text-primary-foreground sm:-m-7">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-primary-foreground/10 px-4 py-3 sm:px-6">
-        <div className="min-w-0">
-          <p className="text-xs text-primary-foreground/60">
-            {l("Cours en direct · Salle de démonstration", "درس مباشر · قاعة تجريبية")}
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-medium">{session.title}</h1>
+          <p className="text-sm text-muted-foreground">
+            {session.class?.name} · {teacherLabel(session)} · room {session.meeting_room}
           </p>
-          <h1 className="truncate text-lg font-semibold">
-            {selectedClass?.name ?? l("A2 — Groupe 02", "A2 — المجموعة 02")}
-          </h1>
+          <p className="text-xs text-muted-foreground">
+            Domain {jitsi.domain} · You join as {displayName}
+            {role ? ` (${role})` : ""}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Status tone="green">{l("En direct", "مباشر")}</Status>
-          <Button variant="destructive" size="sm" onClick={leave}>
-            <PhoneOff className="size-4" />
-            {l("Quitter", "مغادرة")}
+        <div className="flex flex-wrap gap-2">
+          {(role === "director" || role === "teacher") && session.status === "live" && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                updateStatus.mutate(
+                  { id: session.id, status: "completed" },
+                  {
+                    onSuccess: () => toast.success("Session marked completed"),
+                    onError: (err) => toast.error(err.message),
+                  },
+                );
+              }}
+            >
+              End session
+            </Button>
+          )}
+          <Button variant="outline" onClick={leaveMeeting}>
+            Leave meeting
           </Button>
         </div>
-      </header>
-
-      <div className="grid min-h-0 flex-1 gap-px bg-primary-foreground/10 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <section className="flex min-h-[34rem] flex-col bg-meeting p-4 sm:p-6">
-          <div className="relative flex flex-1 items-center justify-center overflow-hidden rounded-md bg-meeting-panel">
-            <div className="text-center">
-              <div className="mx-auto grid size-24 place-items-center rounded-full bg-primary text-3xl font-semibold text-primary-foreground shadow-lg">
-                AS
-              </div>
-              <h2 className="mt-5 text-xl font-semibold">Anna Schneider</h2>
-              <p className="mt-1 text-sm text-primary-foreground/60">
-                {l("Professeure · Conversation au bureau", "الأستاذة · محادثة في المكتب")}
-              </p>
-            </div>
-            <span className="absolute top-4 left-4 rounded-sm bg-alert px-2 py-1 text-xs font-semibold text-primary-foreground">
-              LIVE
-            </span>
-            <div className="absolute right-4 bottom-4 flex gap-2">
-              {["AB", "YE", "SM"].map((initials) => (
-                <span
-                  key={initials}
-                  className="grid size-10 place-items-center rounded-md border border-primary-foreground/15 bg-meeting text-xs font-semibold"
-                >
-                  {initials}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            <Button
-              size="icon"
-              variant={microphoneOn ? "secondary" : "destructive"}
-              onClick={() => setMicrophoneOn((value) => !value)}
-              aria-label={l("Activer ou couper le microphone", "تشغيل أو كتم الميكروفون")}
-            >
-              {microphoneOn ? <Mic /> : <MicOff />}
-            </Button>
-            <Button
-              size="icon"
-              variant={cameraOn ? "secondary" : "destructive"}
-              onClick={() => setCameraOn((value) => !value)}
-              aria-label={l("Activer ou couper la caméra", "تشغيل أو إيقاف الكاميرا")}
-            >
-              {cameraOn ? <Camera /> : <CameraOff />}
-            </Button>
-            <Button
-              size="icon"
-              variant="secondary"
-              aria-label={l("Partager l’écran", "مشاركة الشاشة")}
-            >
-              <MonitorUp />
-            </Button>
-            <Button
-              size="icon"
-              variant="secondary"
-              aria-label={l("Voir les participants", "عرض المشاركين")}
-            >
-              <Users />
-            </Button>
-          </div>
-        </section>
-
-        <aside className="flex min-h-[22rem] flex-col bg-meeting-panel p-4">
-          <div className="border-b border-primary-foreground/10 pb-3">
-            <h2 className="font-semibold">{l("Discussion du cours", "محادثة الدرس")}</h2>
-            <p className="mt-1 text-xs text-primary-foreground/55">
-              15 {l("participants", "مشاركاً")}
-            </p>
-          </div>
-          <div className="flex-1 space-y-3 overflow-y-auto py-4">
-            {messages.map((item, index) => (
-              <div
-                key={`${item}-${index}`}
-                className="rounded-md bg-primary-foreground/8 p-3 text-sm leading-6"
-              >
-                {item}
-              </div>
-            ))}
-          </div>
-          <form
-            className="flex gap-2 border-t border-primary-foreground/10 pt-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const value = message.trim();
-              if (!value) return;
-              setMessages((items) => [...items, value]);
-              setMessage("");
-            }}
-          >
-            <input
-              className="min-w-0 flex-1 rounded-md border border-primary-foreground/15 bg-meeting px-3 text-sm text-primary-foreground outline-none placeholder:text-primary-foreground/40"
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              placeholder={l("Écrire un message…", "اكتب رسالة…")}
-            />
-            <Button size="icon" type="submit" aria-label={l("Envoyer", "إرسال")}>
-              <Send />
-            </Button>
-          </form>
-        </aside>
       </div>
+
+      <JitsiMeetingEmbed
+        roomName={session.meeting_room}
+        displayName={displayName}
+        {...(user?.email ? { email: user.email } : {})}
+        onLeave={leaveMeeting}
+      />
     </div>
   );
 }

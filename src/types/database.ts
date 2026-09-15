@@ -1134,6 +1134,76 @@ export type Database = {
           },
         ];
       };
+      live_sessions: {
+        Row: {
+          class_id: string;
+          created_at: string;
+          created_by: string | null;
+          ends_at: string | null;
+          id: string;
+          meeting_provider: Database["public"]["Enums"]["meeting_provider"];
+          meeting_room: string;
+          meeting_url: string | null;
+          starts_at: string;
+          status: Database["public"]["Enums"]["live_session_status"];
+          teacher_id: string | null;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          class_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          ends_at?: string | null;
+          id?: string;
+          meeting_provider?: Database["public"]["Enums"]["meeting_provider"];
+          meeting_room: string;
+          meeting_url?: string | null;
+          starts_at: string;
+          status?: Database["public"]["Enums"]["live_session_status"];
+          teacher_id?: string | null;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          class_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          ends_at?: string | null;
+          id?: string;
+          meeting_provider?: Database["public"]["Enums"]["meeting_provider"];
+          meeting_room?: string;
+          meeting_url?: string | null;
+          starts_at?: string;
+          status?: Database["public"]["Enums"]["live_session_status"];
+          teacher_id?: string | null;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "live_sessions_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "live_sessions_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "live_sessions_teacher_id_fkey";
+            columns: ["teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "teachers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       modules: {
         Row: {
           course_id: string;
@@ -1171,6 +1241,97 @@ export type Database = {
             columns: ["course_id"];
             isOneToOne: false;
             referencedRelation: "courses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      notification_preferences: {
+        Row: {
+          created_at: string;
+          email_enabled: boolean;
+          id: string;
+          in_app_enabled: boolean;
+          profile_id: string;
+          updated_at: string;
+          whatsapp_enabled: boolean;
+        };
+        Insert: {
+          created_at?: string;
+          email_enabled?: boolean;
+          id?: string;
+          in_app_enabled?: boolean;
+          profile_id: string;
+          updated_at?: string;
+          whatsapp_enabled?: boolean;
+        };
+        Update: {
+          created_at?: string;
+          email_enabled?: boolean;
+          id?: string;
+          in_app_enabled?: boolean;
+          profile_id?: string;
+          updated_at?: string;
+          whatsapp_enabled?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      notifications: {
+        Row: {
+          category: string;
+          channel: Database["public"]["Enums"]["notification_channel"];
+          created_at: string;
+          id: string;
+          link_id: string | null;
+          link_page: string | null;
+          message: string;
+          metadata: Json;
+          read_at: string | null;
+          recipient_id: string;
+          status: Database["public"]["Enums"]["notification_status"];
+          title: string;
+        };
+        Insert: {
+          category?: string;
+          channel?: Database["public"]["Enums"]["notification_channel"];
+          created_at?: string;
+          id?: string;
+          link_id?: string | null;
+          link_page?: string | null;
+          message: string;
+          metadata?: Json;
+          read_at?: string | null;
+          recipient_id: string;
+          status?: Database["public"]["Enums"]["notification_status"];
+          title: string;
+        };
+        Update: {
+          category?: string;
+          channel?: Database["public"]["Enums"]["notification_channel"];
+          created_at?: string;
+          id?: string;
+          link_id?: string | null;
+          link_page?: string | null;
+          message?: string;
+          metadata?: Json;
+          read_at?: string | null;
+          recipient_id?: string;
+          status?: Database["public"]["Enums"]["notification_status"];
+          title?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_recipient_id_fkey";
+            columns: ["recipient_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -1485,6 +1646,37 @@ export type Database = {
     };
     Functions: {
       _test_as: { Args: { uid: string }; Returns: undefined };
+      create_in_app_notification: {
+        Args: {
+          p_category?: string;
+          p_link_id?: string;
+          p_link_page?: string;
+          p_message: string;
+          p_metadata?: Json;
+          p_recipient_id: string;
+          p_title: string;
+        };
+        Returns: {
+          category: string;
+          channel: Database["public"]["Enums"]["notification_channel"];
+          created_at: string;
+          id: string;
+          link_id: string | null;
+          link_page: string | null;
+          message: string;
+          metadata: Json;
+          read_at: string | null;
+          recipient_id: string;
+          status: Database["public"]["Enums"]["notification_status"];
+          title: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "notifications";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       current_profile_role: {
         Args: never;
         Returns: Database["public"]["Enums"]["app_role"];
@@ -1495,6 +1687,28 @@ export type Database = {
       };
       current_student_id: { Args: never; Returns: string };
       current_teacher_id: { Args: never; Returns: string };
+      ensure_student_subscription: {
+        Args: { p_student_id: string };
+        Returns: {
+          created_at: string;
+          expires_at: string | null;
+          grace_until: string | null;
+          id: string;
+          manually_extended: boolean;
+          notes: string | null;
+          starts_at: string | null;
+          status: Database["public"]["Enums"]["subscription_status"];
+          student_id: string;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "student_subscriptions";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      has_academic_access: { Args: { p_student_id: string }; Returns: boolean };
       has_active_academic_access: {
         Args: { p_user_id?: string };
         Returns: boolean;
@@ -1505,6 +1719,56 @@ export type Database = {
       is_student: { Args: never; Returns: boolean };
       is_teacher: { Args: never; Returns: boolean };
       is_teacher_of_class: { Args: { p_class_id: string }; Returns: boolean };
+      mark_student_payment_overdue: {
+        Args: { p_payment_id: string };
+        Returns: {
+          amount: number;
+          created_at: string;
+          created_by: string | null;
+          currency: string;
+          due_date: string | null;
+          id: string;
+          invoice_id: string | null;
+          notes: string | null;
+          payment_date: string | null;
+          payment_method: string | null;
+          reference: string | null;
+          status: Database["public"]["Enums"]["payment_status"];
+          student_id: string;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "student_payments";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      mark_student_payment_paid: {
+        Args: { p_payment_id: string };
+        Returns: {
+          amount: number;
+          created_at: string;
+          created_by: string | null;
+          currency: string;
+          due_date: string | null;
+          id: string;
+          invoice_id: string | null;
+          notes: string | null;
+          payment_date: string | null;
+          payment_method: string | null;
+          reference: string | null;
+          status: Database["public"]["Enums"]["payment_status"];
+          student_id: string;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "student_payments";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       save_exam_answer: {
         Args: {
           p_answer: Json;
@@ -1632,6 +1896,10 @@ export type Database = {
         | "application"
         | "announcement";
       library_visibility: "private" | "staff" | "academy" | "published";
+      live_session_status: "scheduled" | "live" | "completed" | "cancelled";
+      meeting_provider: "jitsi" | "jaas" | "none";
+      notification_channel: "in_app" | "email" | "whatsapp";
+      notification_status: "unread" | "read" | "archived";
       payment_status: "pending" | "partial" | "paid" | "overdue" | "cancelled";
       profile_status: "active" | "suspended" | "archived";
       record_status: "active" | "inactive" | "archived";
@@ -1795,6 +2063,10 @@ export const Constants = {
         "announcement",
       ],
       library_visibility: ["private", "staff", "academy", "published"],
+      live_session_status: ["scheduled", "live", "completed", "cancelled"],
+      meeting_provider: ["jitsi", "jaas", "none"],
+      notification_channel: ["in_app", "email", "whatsapp"],
+      notification_status: ["unread", "read", "archived"],
       payment_status: ["pending", "partial", "paid", "overdue", "cancelled"],
       profile_status: ["active", "suspended", "archived"],
       record_status: ["active", "inactive", "archived"],

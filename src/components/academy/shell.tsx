@@ -24,10 +24,14 @@ import {
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
-import { notifications } from "@/data/mock-data";
 import { initials } from "@/lib/academy-logic";
 import { localeLabels } from "@/lib/i18n";
-import { NotificationService } from "@/services/academy-services";
+import {
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
+  useNotifications,
+  useUnreadNotificationCount,
+} from "@/hooks/use-academy-data";
 import type { AcademyPage, Locale } from "@/types/academy";
 import { useAcademy } from "./academy-context";
 
@@ -117,6 +121,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { role, page, navigate, setRole, user, t, locale, setLocale } = useAcademy();
   const [mobile, setMobile] = useState(false);
   const [notice, setNotice] = useState(false);
+  const notificationsQuery = useNotifications();
+  const unreadQuery = useUnreadNotificationCount();
+  const markAllRead = useMarkAllNotificationsRead();
+  const markRead = useMarkNotificationRead();
   if (!role || !user) return null;
   const sections = menus[role];
   const roleLabel =
@@ -125,6 +133,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       : role === "teacher"
         ? t("shell.teacher")
         : t("shell.student");
+  const unread = unreadQuery.data ?? 0;
+  const notificationRows = notificationsQuery.data ?? [];
 
   const sidebar = (
     <>
@@ -244,26 +254,46 @@ export function AppShell({ children }: { children: ReactNode }) {
                 variant="ghost"
                 aria-label={t("shell.notifications")}
                 onClick={() => {
-                  setNotice(!notice);
-                  if (!notice) void NotificationService.markAllRead();
+                  const next = !notice;
+                  setNotice(next);
+                  if (next && unread > 0) markAllRead.mutate();
                 }}
               >
                 <Bell className="size-4" />
-                <span className="absolute top-2 right-2 size-1.5 rounded-full bg-alert" />
+                {unread > 0 && (
+                  <span className="absolute top-2 right-2 size-1.5 rounded-full bg-alert" />
+                )}
               </Button>
               {notice && (
                 <div className="absolute top-12 right-0 w-[min(22rem,85vw)] rounded-xl border border-border bg-popover p-2 shadow-card animate-scale-in">
                   <div className="px-3 py-2 text-sm font-medium">{t("shell.notifications")}</div>
-                  {notifications.map((item) => (
-                    <div key={item.id} className="flex gap-3 rounded-lg px-3 py-3 hover:bg-muted">
+                  {notificationRows.length === 0 && (
+                    <p className="px-3 py-4 text-sm text-muted-foreground">No notifications yet.</p>
+                  )}
+                  {notificationRows.slice(0, 8).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="flex w-full gap-3 rounded-lg px-3 py-3 text-left hover:bg-muted"
+                      onClick={() => {
+                        if (item.status === "unread") markRead.mutate(item.id);
+                        if (item.link_page) navigate(item.link_page as AcademyPage);
+                        setNotice(false);
+                      }}
+                    >
                       <span
-                        className={`mt-1.5 size-1.5 shrink-0 rounded-full ${item.unread ? "bg-primary" : "bg-border"}`}
+                        className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
+                          item.status === "unread" ? "bg-primary" : "bg-border"
+                        }`}
                       />
                       <div>
                         <p className="text-sm">{item.title}</p>
-                        <p className="text-xs text-muted-foreground">{item.time}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-2">{item.message}</p>
+                        <p className="mt-1 text-[10px] text-muted-foreground">
+                          {new Date(item.created_at).toLocaleString()}
+                        </p>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}

@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useAssignments,
+  useAcademicAccess,
   useClasses,
   useClassRoster,
   useCourseModules,
@@ -21,6 +22,7 @@ import {
 } from "@/hooks/use-academy-data";
 import { LibraryService } from "@/services/academy-services";
 import { useAcademy } from "./academy-context";
+import { DocumentViewer } from "./document-viewer";
 import { QueryState } from "./query-state";
 import { PageHeader, Status, Surface } from "./primitives";
 
@@ -262,6 +264,13 @@ export function MaterialsLibraryPage() {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [levelCode, setLevelCode] = useState("");
+  const [preview, setPreview] = useState<{
+    title: string;
+    url: string | null;
+    mimeType: string | null;
+    loading: boolean;
+    error: string | null;
+  } | null>(null);
 
   return (
     <>
@@ -345,18 +354,43 @@ export function MaterialsLibraryPage() {
                 size="sm"
                 onClick={() => {
                   void (async () => {
+                    setPreview({
+                      title: item.title,
+                      url: null,
+                      mimeType: item.mime_type ?? null,
+                      loading: true,
+                      error: null,
+                    });
                     try {
                       if (!item.storage_path) {
-                        toast.error("File path missing");
+                        setPreview({
+                          title: item.title,
+                          url: null,
+                          mimeType: item.mime_type ?? null,
+                          loading: false,
+                          error: "File path missing",
+                        });
                         return;
                       }
                       const url = await LibraryService.getSignedUrl({
                         storage_bucket: item.storage_bucket ?? "library",
                         storage_path: item.storage_path,
                       });
-                      window.open(url, "_blank", "noopener,noreferrer");
+                      setPreview({
+                        title: item.title,
+                        url,
+                        mimeType: item.mime_type ?? null,
+                        loading: false,
+                        error: null,
+                      });
                     } catch (err) {
-                      toast.error(err instanceof Error ? err.message : "Open failed");
+                      setPreview({
+                        title: item.title,
+                        url: null,
+                        mimeType: item.mime_type ?? null,
+                        loading: false,
+                        error: err instanceof Error ? err.message : "Open failed",
+                      });
                     }
                   })();
                 }}
@@ -367,6 +401,15 @@ export function MaterialsLibraryPage() {
           ))}
         </div>
       </QueryState>
+      <DocumentViewer
+        open={Boolean(preview)}
+        onClose={() => setPreview(null)}
+        title={preview?.title ?? ""}
+        url={preview?.url ?? null}
+        mimeType={preview?.mimeType}
+        loading={preview?.loading}
+        error={preview?.error}
+      />
     </>
   );
 }
@@ -463,6 +506,22 @@ export function TeacherAttendancePage() {
 export function StudentLearningPage() {
   const { navigate } = useAcademy();
   const modulesQuery = useCourseModules();
+  const accessQuery = useAcademicAccess();
+
+  if (accessQuery.data === false) {
+    return (
+      <>
+        <PageHeader title="My Courses" subtitle="Published curriculum from your academy." />
+        <Surface className="space-y-3 p-6">
+          <h2 className="font-semibold">Access restricted</h2>
+          <p className="text-sm text-muted-foreground">
+            An active subscription is required to open courses. Review your payments to renew.
+          </p>
+          <Button onClick={() => navigate("payments")}>Open payments</Button>
+        </Surface>
+      </>
+    );
+  }
   return (
     <>
       <PageHeader title="My Courses" subtitle="Published curriculum from your academy." />

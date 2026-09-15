@@ -105,6 +105,7 @@ export interface Resource {
   size: string;
   storage_path?: string;
   storage_bucket?: string;
+  mime_type?: string | null;
 }
 
 export interface AssignmentListItem {
@@ -186,6 +187,7 @@ export interface DemoAccount {
 }
 
 export interface SessionUser {
+  id?: string;
   role: Role;
   name: string;
   email: string;

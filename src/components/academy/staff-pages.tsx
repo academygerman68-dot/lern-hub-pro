@@ -35,6 +35,7 @@ import {
 } from "./learning-pages";
 import { DirectorExamsPage, StaffExamsPage } from "./exam-pages";
 import { LiveClassesPage } from "./live-pages";
+import { FinancePages } from "./finance-pages";
 import { LEAD_TEACHER } from "@/data/demo-accounts";
 
 export function TeacherPages({ page: pageProp }: { page?: AcademyPage } = {}) {
@@ -195,7 +196,7 @@ export function DirectorPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "courses" || page === "levels") return <DirectorCoursesPage />;
   if (page === "exams") return <DirectorExamsPage />;
   if (page === "payments" || page === "subscriptions" || page === "invoices" || page === "payroll")
-    return <Finance mode={page === "payroll" ? "payments" : page} />;
+    return <FinancePages mode={page === "payroll" ? "payments" : page} />;
   if (page === "audit") return <Audit />;
   if (page === "materials") return <MaterialsLibraryPage />;
   if (page === "assignments") return <DirectorAssignmentsPage />;
@@ -491,131 +492,6 @@ function Teachers() {
   );
 }
 
-function Finance({ mode }: { mode: string }) {
-  const { session } = useAcademy();
-  const [status, setStatus] = useState("PAST DUE");
-  const title =
-    mode === "subscriptions"
-      ? "Subscription Management"
-      : mode === "invoices"
-        ? "Invoices"
-        : "Payment Management";
-  const rows = session?.invoices ?? [];
-  return (
-    <>
-      <PageHeader
-        title={title}
-        subtitle="Payments, subscriptions and invoices are tracked as distinct business records."
-      />
-      <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Revenue this month" value="184,500 MAD" />
-        <Metric label="Paid" value="231" />
-        <Metric label="Pending" value="7" />
-        <Metric label="Overdue" value="12" />
-      </div>
-      <Surface className="overflow-x-auto">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>{mode === "invoices" ? "Invoice" : "Student"}</th>
-              <th>{mode === "subscriptions" ? "Plan" : "Period"}</th>
-              <th>Amount</th>
-              <th>Date</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <td className="font-medium">{mode === "invoices" ? row.id : row.studentName}</td>
-                <td>{mode === "subscriptions" ? "A2 Monthly" : row.period}</td>
-                <td>{row.amount.toLocaleString("en-US")} MAD</td>
-                <td>{row.date}</td>
-                <td>
-                  <Status
-                    tone={
-                      row.status === "PAID" ? "green" : row.status === "PENDING" ? "amber" : "red"
-                    }
-                  >
-                    {row.status}
-                  </Status>
-                </td>
-                <td>
-                  {row.studentName === "Lina Idrissi" ? (
-                    <span className="space-x-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => toast.success("Reminder sent")}
-                      >
-                        Send reminder
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setStatus("ACTIVE");
-                          toast.success("Payment marked as paid · Access active");
-                        }}
-                      >
-                        Mark paid
-                      </Button>
-                    </span>
-                  ) : (
-                    <Button size="sm" variant="ghost">
-                      View
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            <tr>
-              <td className="font-medium">Lina Idrissi</td>
-              <td>A2 Monthly</td>
-              <td>1,200 MAD</td>
-              <td>01 Sep 2026</td>
-              <td>
-                <Status tone={status === "PAST DUE" ? "amber" : "green"}>{status}</Status>
-              </td>
-              <td className="space-x-1">
-                <Button size="sm" variant="outline" onClick={() => toast.success("Reminder sent")}>
-                  Send reminder
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setStatus("ACTIVE");
-                    toast.success("Payment marked as paid · Access active");
-                  }}
-                >
-                  Mark paid
-                </Button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </Surface>
-      <Surface className="mt-5 p-5">
-        <h2 className="font-semibold">Access policy</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-md bg-success-soft p-4">
-            <Status tone="green">ACTIVE</Status>
-            <p className="mt-2 text-sm font-medium">Full access</p>
-          </div>
-          <div className="rounded-md bg-warning-soft p-4">
-            <Status tone="amber">PAST DUE</Status>
-            <p className="mt-2 text-sm font-medium">Warning</p>
-          </div>
-          <div className="rounded-md bg-alert-soft p-4">
-            <Status tone="red">SUSPENDED</Status>
-            <p className="mt-2 text-sm font-medium">Restricted access</p>
-          </div>
-        </div>
-      </Surface>
-    </>
-  );
-}
-
 function Audit() {
   const logs = [
     ["Samira El Mansouri", "activated Ahmed's subscription"],
@@ -638,14 +514,12 @@ function Audit() {
             </tr>
           </thead>
           <tbody>
-            {logs.map((row, index) => (
-              <tr key={row[1]}>
-                <td className="font-medium">{row[0]}</td>
-                <td>{row[1]}</td>
-                <td>13 Sep 2026</td>
-                <td>
-                  {18 - index}:2{index}
-                </td>
+            {logs.map(([user, action]) => (
+              <tr key={`${user}-${action}`}>
+                <td className="font-medium">{user}</td>
+                <td>{action}</td>
+                <td>15 Sep 2026</td>
+                <td>09:40</td>
               </tr>
             ))}
           </tbody>

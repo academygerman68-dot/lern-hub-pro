@@ -18,6 +18,7 @@ export function uiRoleToAppRole(role: Role): AppRole {
 export function profileToSessionUser(profile: Profile): SessionUser {
   const name = [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim();
   return {
+    id: profile.id,
     role: appRoleToUiRole(profile.role),
     name: name || profile.email || "User",
     email: profile.email ?? "",

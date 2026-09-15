@@ -7,6 +7,13 @@ import { SupabaseEnrollmentService } from "@/services/supabase/enrollment-servic
 import { SupabaseStudentService } from "@/services/supabase/student-service";
 import { SupabaseTeacherService } from "@/services/supabase/teacher-service";
 import { SupabaseClassService } from "@/services/supabase/class-service";
+import {
+  SupabaseAccessService,
+  SupabasePaymentService,
+  SupabaseSubscriptionService,
+} from "@/services/supabase/payment-service";
+import { SupabaseNotificationService } from "@/services/supabase/notification-service";
+import { SupabaseLiveSessionService } from "@/services/supabase/live-session-service";
 import { AuthError, SupabaseAuthService } from "@/services/supabase/auth-service";
 import { isDemoAuthAllowed } from "@/lib/auth-config";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -425,6 +432,7 @@ export const CourseService = {
         size: item.file_size ? `${Math.max(1, Math.round(item.file_size / 1024))} KB` : "—",
         storage_path: item.storage_path,
         storage_bucket: item.storage_bucket,
+        mime_type: item.mime_type,
       }));
     }
     await wait(160);
@@ -577,15 +585,108 @@ export const ExamService = {
 };
 
 export const PaymentService = {
+  async list(filters?: Parameters<typeof SupabasePaymentService.list>[0]) {
+    if (!isSupabaseConfigured) return [];
+    return SupabasePaymentService.list(filters);
+  },
+  async listForStudent(studentId: string) {
+    if (!isSupabaseConfigured) return [];
+    return SupabasePaymentService.listForStudent(studentId);
+  },
+  async create(input: Parameters<typeof SupabasePaymentService.create>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabasePaymentService.create(input);
+  },
+  async markPaid(paymentId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabasePaymentService.markPaid(paymentId);
+  },
+  async markOverdue(paymentId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabasePaymentService.markOverdue(paymentId);
+  },
+  /** @deprecated Use markPaid with a real payment id. Kept for legacy student renew UI. */
   async pay(): Promise<SubscriptionStatus> {
-    await wait(700);
+    await wait(300);
     return "ACTIVE";
   },
 };
 
+export const SubscriptionService = {
+  async list() {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseSubscriptionService.list();
+  },
+  async getByStudent(studentId: string) {
+    if (!isSupabaseConfigured) return null;
+    return SupabaseSubscriptionService.getByStudent(studentId);
+  },
+  async ensure(studentId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseSubscriptionService.ensure(studentId);
+  },
+  async setStatus(
+    studentId: string,
+    status: Parameters<typeof SupabaseSubscriptionService.setStatus>[1],
+    extras?: Parameters<typeof SupabaseSubscriptionService.setStatus>[2],
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseSubscriptionService.setStatus(studentId, status, extras);
+  },
+};
+
+export const AccessService = {
+  async hasActiveAcademicAccess(userId?: string) {
+    if (!isSupabaseConfigured) return true;
+    return SupabaseAccessService.hasActiveAcademicAccess(userId);
+  },
+  async hasAcademicAccess(studentId: string) {
+    if (!isSupabaseConfigured) return true;
+    return SupabaseAccessService.hasAcademicAccess(studentId);
+  },
+};
+
 export const NotificationService = {
+  async listMine(limit?: number) {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseNotificationService.listMine(limit);
+  },
+  async unreadCount() {
+    if (!isSupabaseConfigured) return 0;
+    return SupabaseNotificationService.unreadCount();
+  },
+  async markRead(id: string) {
+    if (!isSupabaseConfigured) return null;
+    return SupabaseNotificationService.markRead(id);
+  },
   async markAllRead() {
-    await wait(150);
-    return true;
+    if (!isSupabaseConfigured) return true;
+    return SupabaseNotificationService.markAllRead();
+  },
+  async create(input: Parameters<typeof SupabaseNotificationService.create>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseNotificationService.create(input);
+  },
+};
+
+export const LiveSessionService = {
+  async list(filters?: Parameters<typeof SupabaseLiveSessionService.list>[0]) {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseLiveSessionService.list(filters);
+  },
+  async get(id: string) {
+    if (!isSupabaseConfigured) return null;
+    return SupabaseLiveSessionService.get(id);
+  },
+  async create(input: Parameters<typeof SupabaseLiveSessionService.create>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseLiveSessionService.create(input);
+  },
+  async updateStatus(
+    id: string,
+    status: Parameters<typeof SupabaseLiveSessionService.updateStatus>[1],
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseLiveSessionService.updateStatus(id, status);
   },
 };

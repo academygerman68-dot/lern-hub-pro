@@ -3,15 +3,24 @@ import { queryKeys } from "@/lib/query-keys";
 import {
   AssignmentService,
   AttendanceService,
+  AccessService,
   ClassService,
   CourseService,
   EnrollmentService,
   ExamService,
   LibraryService,
+  LiveSessionService,
+  NotificationService,
+  PaymentService,
   StudentService,
+  SubscriptionService,
   TeacherService,
 } from "@/services/academy-services";
 import type { Json } from "@/types/database";
+import type { Database } from "@/types/database";
+
+type PaymentStatus = Database["public"]["Enums"]["payment_status"];
+type LiveSessionStatus = Database["public"]["Enums"]["live_session_status"];
 
 export function useLevels() {
   return useQuery({
@@ -392,3 +401,160 @@ export function useCreateExam() {
     },
   });
 }
+
+export function usePayments(studentId?: string) {
+  return useQuery({
+    queryKey: studentId ? queryKeys.payments.byStudent(studentId) : queryKeys.payments.all,
+    queryFn: () => (studentId ? PaymentService.listForStudent(studentId) : PaymentService.list()),
+    enabled: studentId === undefined || Boolean(studentId),
+  });
+}
+
+export function useCreatePayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: PaymentService.create,
+    onSuccess: async (_data, vars) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.payments.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.payments.byStudent(vars.studentId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.subscriptions.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.students.all }),
+      ]);
+    },
+  });
+}
+
+export function useMarkPaymentPaid() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (paymentId: string) => PaymentService.markPaid(paymentId),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.payments.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.subscriptions.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.students.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.access.me }),
+      ]);
+    },
+  });
+}
+
+export function useMarkPaymentOverdue() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (paymentId: string) => PaymentService.markOverdue(paymentId),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.payments.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.subscriptions.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.students.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.access.me }),
+      ]);
+    },
+  });
+}
+
+export function useSubscriptions() {
+  return useQuery({
+    queryKey: queryKeys.subscriptions.all,
+    queryFn: () => SubscriptionService.list(),
+  });
+}
+
+export function useAcademicAccess() {
+  return useQuery({
+    queryKey: queryKeys.access.me,
+    queryFn: () => AccessService.hasActiveAcademicAccess(),
+  });
+}
+
+export function useNotifications() {
+  return useQuery({
+    queryKey: queryKeys.notifications.all,
+    queryFn: () => NotificationService.listMine(),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useUnreadNotificationCount() {
+  return useQuery({
+    queryKey: queryKeys.notifications.unread,
+    queryFn: () => NotificationService.unreadCount(),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useMarkNotificationRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => NotificationService.markRead(id),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.unread }),
+      ]);
+    },
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => NotificationService.markAllRead(),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.unread }),
+      ]);
+    },
+  });
+}
+
+export function useLiveSessions(classId?: string) {
+  return useQuery({
+    queryKey: classId
+      ? ([...queryKeys.liveSessions.all, classId] as const)
+      : queryKeys.liveSessions.all,
+    queryFn: () => LiveSessionService.list(classId ? { classId } : undefined),
+  });
+}
+
+export function useLiveSession(id: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.liveSessions.detail(id ?? ""),
+    queryFn: () => LiveSessionService.get(id!),
+    enabled: Boolean(id),
+  });
+}
+
+export function useCreateLiveSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: LiveSessionService.create,
+    onSuccess: async (session) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.liveSessions.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.liveSessions.detail(session.id) }),
+      ]);
+    },
+  });
+}
+
+export function useUpdateLiveSessionStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; status: LiveSessionStatus }) =>
+      LiveSessionService.updateStatus(input.id, input.status),
+    onSuccess: async (session) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.liveSessions.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.liveSessions.detail(session.id) }),
+      ]);
+    },
+  });
+}
+
+export type { PaymentStatus, LiveSessionStatus };

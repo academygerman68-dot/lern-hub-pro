@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useAllExams,
+  useAcademicAccess,
   useCreateExam,
   useExam,
   useExamAnswers,
@@ -76,6 +77,7 @@ function StudentExamCatalog() {
   const examsQuery = usePublishedExams();
   const attemptsQuery = useMyExamAttempts();
   const startExam = useStartExam();
+  const accessQuery = useAcademicAccess();
 
   const latestByExam = useMemo(() => {
     const map = new Map<string, NonNullable<typeof attemptsQuery.data>[number]>();
@@ -84,6 +86,21 @@ function StudentExamCatalog() {
     }
     return map;
   }, [attemptsQuery.data]);
+
+  if (accessQuery.data === false) {
+    return (
+      <>
+        <PageHeader title="Exams" subtitle="Published mock exams for your level." />
+        <Surface className="space-y-3 p-6">
+          <h2 className="font-semibold">Access restricted</h2>
+          <p className="text-sm text-muted-foreground">
+            An active subscription is required to take exams.
+          </p>
+          <Button onClick={() => navigate("payments")}>Open payments</Button>
+        </Surface>
+      </>
+    );
+  }
 
   return (
     <>

@@ -42,4 +42,22 @@ export const queryKeys = {
     result: (attemptId: string) => ["exams", "result", attemptId] as const,
     myAttempts: ["exams", "my-attempts"] as const,
   },
+  payments: {
+    all: ["payments"] as const,
+    byStudent: (studentId: string) => ["payments", "student", studentId] as const,
+  },
+  subscriptions: {
+    all: ["subscriptions"] as const,
+  },
+  notifications: {
+    all: ["notifications"] as const,
+    unread: ["notifications", "unread"] as const,
+  },
+  liveSessions: {
+    all: ["live-sessions"] as const,
+    detail: (id: string) => ["live-sessions", id] as const,
+  },
+  access: {
+    me: ["access", "me"] as const,
+  },
 };

@@ -1,4 +1,4 @@
-import { PremiumPayments, PremiumProfile, PremiumLesson } from "./premium-screens";
+import { PremiumProfile, PremiumLesson } from "./premium-screens";
 import { PremiumStudentDashboard } from "./dashboards";
 import { CalendarPage, Messages, Progress } from "./student-extra";
 import {
@@ -8,6 +8,7 @@ import {
 } from "./learning-pages";
 import { StudentExamsPage } from "./exam-pages";
 import { LiveClassesPage } from "./live-pages";
+import { StudentPaymentsPage } from "./finance-pages";
 import { useAcademy } from "./academy-context";
 import type { AcademyPage } from "@/types/academy";
 
@@ -25,7 +26,7 @@ export function StudentPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "exams" || page === "mock-exam" || page === "exam-result")
     return <StudentExamsPage mode={page} />;
   if (page === "progress") return <Progress />;
-  if (page === "payments") return <PremiumPayments />;
+  if (page === "payments") return <StudentPaymentsPage />;
   if (page === "messages") return <Messages />;
   if (page === "profile") return <PremiumProfile />;
   return <PremiumStudentDashboard />;
