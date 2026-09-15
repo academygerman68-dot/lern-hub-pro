@@ -67,8 +67,9 @@ export const SupabaseCurriculumService = {
             title: module.title,
             level: course.level?.code ?? "—",
             courseTitle: course.title,
-            lessons: (module.units ?? []).flatMap((u) => u.lessons ?? []).filter((l) => l.status === "published")
-              .length,
+            lessons: (module.units ?? [])
+              .flatMap((u) => u.lessons ?? [])
+              .filter((l) => l.status === "published").length,
             progress: 0,
             exercises: 0,
           })),
@@ -125,7 +126,12 @@ export const SupabaseCurriculumService = {
   },
 
   async updateCourse(id: string, patch: Database["public"]["Tables"]["courses"]["Update"]) {
-    const { data, error } = await requireClient().from("courses").update(patch).eq("id", id).select("*").single();
+    const { data, error } = await requireClient()
+      .from("courses")
+      .update(patch)
+      .eq("id", id)
+      .select("*")
+      .single();
     if (error) throw error;
     return data;
   },
@@ -184,7 +190,12 @@ export const SupabaseCurriculumService = {
   },
 
   async updateLesson(id: string, patch: Database["public"]["Tables"]["lessons"]["Update"]) {
-    const { data, error } = await requireClient().from("lessons").update(patch).eq("id", id).select("*").single();
+    const { data, error } = await requireClient()
+      .from("lessons")
+      .update(patch)
+      .eq("id", id)
+      .select("*")
+      .single();
     if (error) throw error;
     return data;
   },

@@ -363,7 +363,12 @@ export const CourseService = {
   },
   async updateLesson(
     id: string,
-    patch: { title?: string; description?: string | null; content_markdown?: string | null; status?: Database["public"]["Enums"]["content_status"] },
+    patch: {
+      title?: string;
+      description?: string | null;
+      content_markdown?: string | null;
+      status?: Database["public"]["Enums"]["content_status"];
+    },
   ) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseCurriculumService.updateLesson(id, patch);
@@ -462,7 +467,11 @@ export const AttendanceService = {
   },
   async saveRecords(
     sessionId: string,
-    records: Array<{ studentId: string; mark: Database["public"]["Enums"]["attendance_mark"]; note?: string }>,
+    records: Array<{
+      studentId: string;
+      mark: Database["public"]["Enums"]["attendance_mark"];
+      note?: string;
+    }>,
   ) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseAttendanceService.saveRecords(sessionId, records);

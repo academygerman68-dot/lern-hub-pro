@@ -3,7 +3,7 @@
 ## Role mapping
 
 | Backend (`profiles.role`) | Frontend UI (`Role`) |
-|---------------------------|----------------------|
+| ------------------------- | -------------------- |
 | `admin`                   | `director`           |
 | `teacher`                 | `teacher`            |
 | `student`                 | `student`            |

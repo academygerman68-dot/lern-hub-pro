@@ -149,7 +149,10 @@ export function CalendarPage() {
 
 export function Assignments({ detail }: { detail: boolean }) {
   const { navigate } = useAcademy();
-  const { data = [] } = useQuery({ queryKey: ["assignments"], queryFn: () => AssignmentService.list() });
+  const { data = [] } = useQuery({
+    queryKey: ["assignments"],
+    queryFn: () => AssignmentService.list(),
+  });
   if (detail) {
     return (
       <>
@@ -463,7 +466,10 @@ export function DirectorSettings() {
 }
 
 export function DirectorAssignments() {
-  const { data = [] } = useQuery({ queryKey: ["assignments"], queryFn: () => AssignmentService.list() });
+  const { data = [] } = useQuery({
+    queryKey: ["assignments"],
+    queryFn: () => AssignmentService.list(),
+  });
   return (
     <>
       <PageHeader title="Assignments" subtitle="Academy-wide homework pipeline." />

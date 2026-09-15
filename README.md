@@ -66,8 +66,7 @@ A1 → A2 → B1 → B2
 
 Elle doit être pensée comme le système numérique central d’un centre de langue allemande.
 
-==================================================
-2. STYLE UI/UX
+================================================== 2. STYLE UI/UX
 
 Créer une interface très professionnelle et moderne.
 
@@ -117,8 +116,7 @@ Sidebar desktop fixe.
 
 Navigation mobile avec menu adapté.
 
-==================================================
-3. AUTHENTIFICATION
+================================================== 3. AUTHENTIFICATION
 
 Créer un écran Login professionnel.
 
@@ -147,8 +145,7 @@ Director
 
 Ces comptes doivent permettre de présenter rapidement les différents dashboards.
 
-==================================================
-4. ROLES
+================================================== 4. ROLES
 
 Créer trois rôles principaux :
 
@@ -162,8 +159,7 @@ Les interfaces doivent être différentes selon le rôle.
 
 Ne pas afficher les fonctionnalités de direction à l’étudiant.
 
-==================================================
-5. STUDENT DASHBOARD
+================================================== 5. STUDENT DASHBOARD
 
 Créer un dashboard étudiant très propre.
 
@@ -217,8 +213,7 @@ prochain examen blanc ;
 
 dernières activités.
 
-==================================================
-6. STUDENT SIDEBAR
+================================================== 6. STUDENT SIDEBAR
 
 Créer cette navigation :
 
@@ -234,8 +229,7 @@ Payments
 Messages
 Profile
 
-==================================================
-7. MY COURSES
+================================================== 7. MY COURSES
 
 Créer une page permettant de visualiser les niveaux :
 
@@ -277,8 +271,7 @@ test.
 
 Les modules doivent être cliquables.
 
-==================================================
-8. LESSON PAGE
+================================================== 8. LESSON PAGE
 
 Créer une page de cours réaliste.
 
@@ -310,8 +303,7 @@ Afficher une barre :
 
 Lesson progress 75%
 
-==================================================
-9. MATERIALS
+================================================== 9. MATERIALS
 
 Créer une bibliothèque de documents.
 
@@ -350,8 +342,7 @@ Download
 
 Ne pas utiliser de faux liens externes. Les boutons doivent générer une interaction visuelle de prototype.
 
-==================================================
-10. LIVE CLASSES
+================================================== 10. LIVE CLASSES
 
 Créer une page "Live Classes".
 
@@ -395,8 +386,7 @@ Ne pas développer un système vidéo propriétaire.
 
 Prévoir dans l'architecture une future intégration Google Meet ou Jitsi.
 
-==================================================
-11. CALENDAR
+================================================== 11. CALENDAR
 
 Créer un calendrier semaine/mois.
 
@@ -426,8 +416,7 @@ Thursday
 Saturday
 10:00 — Mock Exam
 
-==================================================
-12. ASSIGNMENTS
+================================================== 12. ASSIGNMENTS
 
 Créer une page :
 
@@ -468,8 +457,7 @@ submit assignment.
 
 Simulation frontend acceptable pour le prototype.
 
-==================================================
-13. EXAMS
+================================================== 13. EXAMS
 
 Créer un écran très important :
 
@@ -506,8 +494,7 @@ Exemple :
 
 "Complete 80% of the A2 course to unlock."
 
-==================================================
-14. MOCK EXAM
+================================================== 14. MOCK EXAM
 
 Créer une vraie interface de simulation d'examen.
 
@@ -552,8 +539,7 @@ Afficher :
 
 "Good progress"
 
-==================================================
-15. PROGRESSION
+================================================== 15. PROGRESSION
 
 Créer une page très visuelle :
 
@@ -582,8 +568,7 @@ Afficher :
 Current level : A2
 Target : B1
 
-==================================================
-16. PAYMENTS
+================================================== 16. PAYMENTS
 
 Créer un véritable dashboard de démonstration des mensualités.
 
@@ -632,8 +617,7 @@ Boutons :
 
 Pay now
 
-==================================================
-17. ACCESS CONTROL DEMO
+================================================== 17. ACCESS CONTROL DEMO
 
 Le prototype doit démontrer visuellement le concept très important :
 
@@ -665,8 +649,7 @@ Bouton :
 
 Cette logique doit fonctionner visuellement dans le prototype.
 
-==================================================
-18. MESSAGES
+================================================== 18. MESSAGES
 
 Créer une messagerie interne.
 
@@ -686,8 +669,7 @@ joindre fichier.
 
 Créer une interface moderne proche d'un chat professionnel.
 
-==================================================
-19. PROFILE
+================================================== 19. PROFILE
 
 Créer :
 
@@ -709,8 +691,7 @@ Attendance
 Average grade
 Completed lessons
 
-==================================================
-20. TEACHER DASHBOARD
+================================================== 20. TEACHER DASHBOARD
 
 Créer un dashboard complètement différent.
 
@@ -732,8 +713,7 @@ Classes today : 3
 Assignments to grade : 8
 Average attendance : 91%
 
-==================================================
-21. TEACHER SIDEBAR
+================================================== 21. TEACHER SIDEBAR
 
 Dashboard
 My Classes
@@ -746,8 +726,7 @@ Attendance
 Messages
 Profile
 
-==================================================
-22. TEACHER CLASS PAGE
+================================================== 22. TEACHER CLASS PAGE
 
 Créer :
 
@@ -777,8 +756,7 @@ View profile
 Attendance
 Grades
 
-==================================================
-23. TEACHER LESSON MANAGEMENT
+================================================== 23. TEACHER LESSON MANAGEMENT
 
 Le professeur doit pouvoir :
 
@@ -801,8 +779,7 @@ Publish lesson
 
 Pour le prototype, les interactions peuvent être simulées avec des états frontend.
 
-==================================================
-24. TEACHER ASSIGNMENTS
+================================================== 24. TEACHER ASSIGNMENTS
 
 Afficher :
 
@@ -825,8 +802,7 @@ attribuer une note ;
 
 Mark as graded.
 
-==================================================
-25. TEACHER ATTENDANCE
+================================================== 25. TEACHER ATTENDANCE
 
 Créer un système de présence.
 
@@ -839,8 +815,7 @@ Excused
 
 Afficher statistiques de présence.
 
-==================================================
-26. DIRECTOR DASHBOARD
+================================================== 26. DIRECTOR DASHBOARD
 
 C'est le dashboard le plus important après celui étudiant.
 
@@ -883,8 +858,7 @@ Attendance
 
 Exam performance
 
-==================================================
-27. DIRECTOR SIDEBAR
+================================================== 27. DIRECTOR SIDEBAR
 
 Dashboard
 Students
@@ -903,8 +877,7 @@ Reports
 Settings
 Audit Logs
 
-==================================================
-28. STUDENT MANAGEMENT
+================================================== 28. STUDENT MANAGEMENT
 
 Créer une table professionnelle.
 
@@ -939,8 +912,7 @@ Bouton :
 
 Add student
 
-==================================================
-29. STUDENT DETAIL — 360°
+================================================== 29. STUDENT DETAIL — 360°
 
 Créer une page complète :
 
@@ -959,8 +931,7 @@ Afficher toute l'information d'un étudiant dans des onglets.
 Très important :
 montrer que l'administration possède une vue globale de l'étudiant.
 
-==================================================
-30. CLASS MANAGEMENT
+================================================== 30. CLASS MANAGEMENT
 
 Créer :
 
@@ -981,8 +952,7 @@ Students
 Schedule
 Room / Online
 
-==================================================
-31. COURSE MANAGEMENT
+================================================== 31. COURSE MANAGEMENT
 
 Direction peut gérer :
 
@@ -1002,8 +972,7 @@ A2
 → Materials
 → Exercises
 
-==================================================
-32. EXAM MANAGEMENT
+================================================== 32. EXAM MANAGEMENT
 
 Créer une interface direction pour :
 
@@ -1026,8 +995,7 @@ B2 Mock Exam 01
 
 Créer une banque de questions.
 
-==================================================
-33. PAYMENT MANAGEMENT
+================================================== 33. PAYMENT MANAGEMENT
 
 Créer un dashboard financier.
 
@@ -1052,8 +1020,7 @@ Mark paid
 Send reminder
 Suspend access
 
-==================================================
-34. ACCESS / SUBSCRIPTION MANAGEMENT
+================================================== 34. ACCESS / SUBSCRIPTION MANAGEMENT
 
 Créer une page permettant à la direction de voir :
 
@@ -1078,8 +1045,7 @@ PAST DUE → WARNING
 
 SUSPENDED → RESTRICTED ACCESS
 
-==================================================
-35. AUDIT LOGS
+================================================== 35. AUDIT LOGS
 
 Créer une page :
 
@@ -1100,8 +1066,7 @@ Action
 Date
 Time
 
-==================================================
-36. NOTIFICATIONS
+================================================== 36. NOTIFICATIONS
 
 Créer des notifications réalistes :
 
@@ -1113,8 +1078,7 @@ Créer des notifications réalistes :
 
 "A2 Mock Exam 02 is now available."
 
-==================================================
-37. DEMO DATA
+================================================== 37. DEMO DATA
 
 Créer suffisamment de données fictives pour que les dashboards paraissent réels.
 
@@ -1139,8 +1103,7 @@ Créer des cours et ressources sur les quatre niveaux.
 
 Utiliser des noms réalistes mais clairement fictifs.
 
-==================================================
-38. WORKFLOWS À DÉMONTRER
+================================================== 38. WORKFLOWS À DÉMONTRER
 
 Le prototype doit démontrer au minimum les workflows suivants :
 
@@ -1207,8 +1170,7 @@ Director
 → Publish
 → Student exam becomes unlocked.
 
-==================================================
-39. IMPORTANT BUSINESS LOGIC
+================================================== 39. IMPORTANT BUSINESS LOGIC
 
 Même si certaines fonctionnalités sont simulées frontend dans ce prototype, elles doivent être pensées avec ces règles :
 
@@ -1236,8 +1198,7 @@ L'accès aux données sensibles doit être basé sur les rôles.
 
 Les paiements et abonnements doivent être deux concepts distincts.
 
-==================================================
-40. DESIGN SYSTEM
+================================================== 40. DESIGN SYSTEM
 
 Créer des composants réutilisables :
 
@@ -1263,8 +1224,7 @@ Exam card
 
 Créer une vraie cohérence entre toutes les pages.
 
-==================================================
-41. RESPONSIVE
+================================================== 41. RESPONSIVE
 
 Le prototype doit fonctionner proprement sur :
 
@@ -1278,8 +1238,7 @@ Les tableaux doivent devenir scrollables ou responsive.
 
 Les cards doivent se réorganiser correctement.
 
-==================================================
-42. MICRO-INTERACTIONS
+================================================== 42. MICRO-INTERACTIONS
 
 Ajouter des interactions discrètes :
 
@@ -1303,8 +1262,7 @@ exam completion.
 
 Ne pas surcharger l'interface.
 
-==================================================
-43. ARCHITECTURE CODE
+================================================== 43. ARCHITECTURE CODE
 
 Utiliser :
 
@@ -1342,8 +1300,7 @@ Subscription
 Payment
 Notification
 
-==================================================
-44. FUTURE BACKEND
+================================================== 44. FUTURE BACKEND
 
 Préparer le frontend afin qu'il puisse plus tard être connecté à :
 
@@ -1364,8 +1321,7 @@ NotificationService
 
 Pour l'instant, utiliser des données mockées propres.
 
-==================================================
-45. CE QUI DOIT ÊTRE VISIBLE AU CHEF DE PROJET
+================================================== 45. CE QUI DOIT ÊTRE VISIBLE AU CHEF DE PROJET
 
 La démonstration doit immédiatement faire comprendre que le produit permet de gérer :
 
@@ -1401,8 +1357,7 @@ l'administration.
 
 L'application doit donner une impression de produit sérieux, scalable et commercialisable.
 
-==================================================
-46. PRIORITÉ ABSOLUE
+================================================== 46. PRIORITÉ ABSOLUE
 
 Ne crée pas simplement beaucoup de pages statiques.
 
@@ -1444,8 +1399,7 @@ Director
 → Student 360
 → Payments / Learning / Attendance / Exams
 
-==================================================
-47. FINAL UI QUALITY
+================================================== 47. FINAL UI QUALITY
 
 Le résultat final doit ressembler à une vraie plateforme EdTech premium et non à un template générique.
 

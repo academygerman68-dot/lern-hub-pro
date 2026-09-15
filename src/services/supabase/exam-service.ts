@@ -141,7 +141,12 @@ export const SupabaseExamService = {
   },
 
   async updateExam(id: string, patch: Database["public"]["Tables"]["exams"]["Update"]) {
-    const { data, error } = await requireClient().from("exams").update(patch).eq("id", id).select("*").single();
+    const { data, error } = await requireClient()
+      .from("exams")
+      .update(patch)
+      .eq("id", id)
+      .select("*")
+      .single();
     if (error) throw error;
     return data;
   },

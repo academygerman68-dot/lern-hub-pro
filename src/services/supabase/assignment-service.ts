@@ -13,10 +13,14 @@ function requireClient() {
 
 export const SupabaseAssignmentService = {
   async list(classId?: string): Promise<Assignment[]> {
-    let query = requireClient().from("assignments").select("*").is("archived_at", null).order("due_at", {
-      ascending: true,
-      nullsFirst: false,
-    });
+    let query = requireClient()
+      .from("assignments")
+      .select("*")
+      .is("archived_at", null)
+      .order("due_at", {
+        ascending: true,
+        nullsFirst: false,
+      });
     if (classId) query = query.eq("class_id", classId);
     const { data, error } = await query;
     if (error) throw error;

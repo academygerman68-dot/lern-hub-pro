@@ -48,7 +48,8 @@ export function TeacherPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "calendar") return <CalendarPage />;
   if (page === "materials") return <MaterialsLibraryPage />;
   if (page === "exams") return <StaffExamsPage />;
-  if (page === "live" || page === "meeting") return <LiveClassesPage meeting={page === "meeting"} />;
+  if (page === "live" || page === "meeting")
+    return <LiveClassesPage meeting={page === "meeting"} />;
   if (page === "messages") return <Messages />;
   if (page === "profile") return <TeacherProfile />;
   return <PremiumTeacherDashboard />;
@@ -199,7 +200,8 @@ export function DirectorPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "materials") return <MaterialsLibraryPage />;
   if (page === "assignments") return <DirectorAssignmentsPage />;
   if (page === "calendar") return <CalendarPage />;
-  if (page === "live" || page === "meeting") return <LiveClassesPage meeting={page === "meeting"} />;
+  if (page === "live" || page === "meeting")
+    return <LiveClassesPage meeting={page === "meeting"} />;
   if (page === "messages") return <Messages counterpart="Ahmed Benali" />;
   if (page === "reports") return <DirectorReports />;
   if (page === "settings") return <DirectorSettings />;

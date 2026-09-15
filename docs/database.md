@@ -4,23 +4,23 @@ Project: `omxemusaqgzkogqvcdfw` (eu-west-1)
 
 ## Tables
 
-| Table | Purpose |
-|-------|---------|
-| `profiles` | App user profile linked to Auth |
-| `students` | Student entity (`profile_id` unique) |
-| `teachers` | Teacher entity (`profile_id` unique) |
-| `levels` | A1–B2 catalog |
-| `courses` | Courses under a level |
-| `modules` | Course modules |
-| `units` | Module units |
-| `lessons` | Unit lessons |
-| `classes` | Class groups |
-| `enrollments` | Student ↔ class (one active pair) |
-| `app_settings` | Branding / languages / config |
-| `audit_logs` | Sensitive action audit trail |
-| `student_subscriptions` | Academic access entitlement |
-| `student_payments` | Student payments (not payroll) |
-| `invoices` | Student invoices |
+| Table                   | Purpose                              |
+| ----------------------- | ------------------------------------ |
+| `profiles`              | App user profile linked to Auth      |
+| `students`              | Student entity (`profile_id` unique) |
+| `teachers`              | Teacher entity (`profile_id` unique) |
+| `levels`                | A1–B2 catalog                        |
+| `courses`               | Courses under a level                |
+| `modules`               | Course modules                       |
+| `units`                 | Module units                         |
+| `lessons`               | Unit lessons                         |
+| `classes`               | Class groups                         |
+| `enrollments`           | Student ↔ class (one active pair)    |
+| `app_settings`          | Branding / languages / config        |
+| `audit_logs`            | Sensitive action audit trail         |
+| `student_subscriptions` | Academic access entitlement          |
+| `student_payments`      | Student payments (not payroll)       |
+| `invoices`              | Student invoices                     |
 
 ## Conventions
 

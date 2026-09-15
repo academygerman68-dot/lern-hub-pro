@@ -190,7 +190,11 @@ function StudentExamRunner() {
   const questions = useMemo(
     () =>
       (examQuery.data?.sections ?? []).flatMap((section) =>
-        (section.questions ?? []).map((q) => ({ ...q, skill: section.skill, sectionTitle: section.title })),
+        (section.questions ?? []).map((q) => ({
+          ...q,
+          skill: section.skill,
+          sectionTitle: section.title,
+        })),
       ),
     [examQuery.data],
   );
@@ -198,7 +202,8 @@ function StudentExamRunner() {
   const current = questions[index];
   const remaining = formatRemaining(attemptQuery.data?.expires_at);
   const expired =
-    attemptQuery.data?.expires_at != null && new Date(attemptQuery.data.expires_at).getTime() <= now;
+    attemptQuery.data?.expires_at != null &&
+    new Date(attemptQuery.data.expires_at).getTime() <= now;
 
   useEffect(() => {
     if (!expired || !session.attemptId || submitExam.isPending) return;
@@ -274,9 +279,11 @@ function StudentExamRunner() {
         <div className="grid gap-6 lg:grid-cols-[1fr_14rem]">
           <Surface className="p-6 sm:p-8">
             <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              {current ? SKILL_LABELS[current.skill] ?? current.sectionTitle : ""}
+              {current ? (SKILL_LABELS[current.skill] ?? current.sectionTitle) : ""}
             </p>
-            <h2 className="mt-3 text-xl font-semibold leading-snug sm:text-2xl">{current?.prompt}</h2>
+            <h2 className="mt-3 text-xl font-semibold leading-snug sm:text-2xl">
+              {current?.prompt}
+            </h2>
 
             {current?.type === "listening" && (
               <div className="mt-5 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
@@ -317,7 +324,9 @@ function StudentExamRunner() {
                   );
                 })}
 
-              {(current?.type === "writing" || current?.type === "text" || current?.type === "speaking") && (
+              {(current?.type === "writing" ||
+                current?.type === "text" ||
+                current?.type === "speaking") && (
                 <Textarea
                   className="min-h-40"
                   value={answerValue(localAnswers[current.id])}
@@ -336,7 +345,11 @@ function StudentExamRunner() {
 
             <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
               <div className="flex gap-2">
-                <Button variant="outline" disabled={index === 0} onClick={() => setIndex((v) => v - 1)}>
+                <Button
+                  variant="outline"
+                  disabled={index === 0}
+                  onClick={() => setIndex((v) => v - 1)}
+                >
                   Previous
                 </Button>
                 <Button
@@ -409,9 +422,7 @@ function StudentExamRunner() {
                 );
               })}
             </div>
-            {saveAnswer.isPending && (
-              <p className="mt-3 text-xs text-muted-foreground">Saving…</p>
-            )}
+            {saveAnswer.isPending && <p className="mt-3 text-xs text-muted-foreground">Saving…</p>}
           </Surface>
         </div>
       </div>
@@ -451,7 +462,9 @@ function StudentExamResult() {
             <span className="font-display text-4xl">{percentage.toFixed(0)}%</span>
           </div>
           <div>
-            <p className="text-xs tracking-wide uppercase text-primary-foreground/70">Your result</p>
+            <p className="text-xs tracking-wide uppercase text-primary-foreground/70">
+              Your result
+            </p>
             <h1 className="mt-2 font-display text-3xl md:text-4xl">
               {resultQuery.data?.passed ? "Passed" : "Needs improvement"}
             </h1>
@@ -483,7 +496,10 @@ function StudentExamResult() {
                       </span>
                     </div>
                     <div className="h-2 rounded-full bg-secondary">
-                      <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{ width: `${pct}%` }}
+                      />
                     </div>
                   </div>
                 );
@@ -496,8 +512,8 @@ function StudentExamResult() {
                 Next focus
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Review weaker objective skills, then practice writing with your teacher feedback when
-                available.
+                Review weaker objective skills, then practice writing with your teacher feedback
+                when available.
               </p>
             </div>
             <Button onClick={() => navigate("courses")}>Continue learning</Button>
@@ -524,7 +540,10 @@ export function StaffExamsPage() {
       >
         <div className="space-y-3">
           {examsQuery.data?.map((exam) => (
-            <Surface className="flex flex-wrap items-center justify-between gap-3 p-5" key={exam.id}>
+            <Surface
+              className="flex flex-wrap items-center justify-between gap-3 p-5"
+              key={exam.id}
+            >
               <div>
                 <h2 className="font-semibold">{exam.title}</h2>
                 <p className="text-sm text-muted-foreground">
@@ -567,7 +586,10 @@ export function DirectorExamsPage() {
       >
         <div className="space-y-3">
           {examsQuery.data?.map((exam) => (
-            <Surface className="flex flex-wrap items-center justify-between gap-3 p-5" key={exam.id}>
+            <Surface
+              className="flex flex-wrap items-center justify-between gap-3 p-5"
+              key={exam.id}
+            >
               <div>
                 <h2 className="font-semibold">{exam.title}</h2>
                 <p className="text-sm text-muted-foreground">
@@ -576,7 +598,9 @@ export function DirectorExamsPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Status tone={exam.status === "published" ? "green" : "amber"}>{exam.status}</Status>
+                <Status tone={exam.status === "published" ? "green" : "amber"}>
+                  {exam.status}
+                </Status>
                 {exam.status !== "published" && (
                   <Button
                     size="sm"
@@ -601,7 +625,11 @@ export function DirectorExamsPage() {
         <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4">
           <Surface className="w-full max-w-lg space-y-4 p-6">
             <h2 className="text-lg font-semibold">Create exam</h2>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Exam title" />
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Exam title"
+            />
             <select
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={levelId}

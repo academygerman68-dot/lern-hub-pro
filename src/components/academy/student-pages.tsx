@@ -17,7 +17,8 @@ export function StudentPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "courses") return <StudentLearningPage />;
   if (page === "lesson") return <PremiumLesson />;
   if (page === "materials") return <MaterialsLibraryPage />;
-  if (page === "live" || page === "meeting") return <LiveClassesPage meeting={page === "meeting"} />;
+  if (page === "live" || page === "meeting")
+    return <LiveClassesPage meeting={page === "meeting"} />;
   if (page === "calendar") return <CalendarPage />;
   if (page === "assignments" || page === "assignment-detail")
     return <StudentAssignmentsPage detail={page === "assignment-detail"} />;

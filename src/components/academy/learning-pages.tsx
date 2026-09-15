@@ -69,7 +69,9 @@ export function DirectorCoursesPage() {
                       {moduleCount} modules · {lessonCount} lessons · status {course.status}
                     </p>
                   </div>
-                  <Status tone={course.status === "published" ? "green" : "amber"}>{course.status}</Status>
+                  <Status tone={course.status === "published" ? "green" : "amber"}>
+                    {course.status}
+                  </Status>
                 </div>
               </Surface>
             );
@@ -81,7 +83,11 @@ export function DirectorCoursesPage() {
         <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4">
           <Surface className="w-full max-w-lg space-y-4 p-6">
             <h2 className="text-lg font-semibold">Create course</h2>
-            <Input placeholder="Course title" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Input
+              placeholder="Course title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
             <select
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={levelId}
@@ -153,13 +159,20 @@ export function TeacherLessonManagerPage() {
       >
         <div className="space-y-3">
           {lessonsQuery.data?.map((lesson) => (
-            <Surface className="flex flex-wrap items-center justify-between gap-3 p-4" key={lesson.id}>
+            <Surface
+              className="flex flex-wrap items-center justify-between gap-3 p-4"
+              key={lesson.id}
+            >
               <div>
                 <h2 className="font-semibold">{lesson.title}</h2>
-                <p className="text-sm text-muted-foreground">{lesson.description ?? "No description"}</p>
+                <p className="text-sm text-muted-foreground">
+                  {lesson.description ?? "No description"}
+                </p>
               </div>
               <div className="flex items-center gap-2">
-                <Status tone={lesson.status === "published" ? "green" : "amber"}>{lesson.status}</Status>
+                <Status tone={lesson.status === "published" ? "green" : "amber"}>
+                  {lesson.status}
+                </Status>
                 {lesson.status !== "published" && (
                   <Button
                     size="sm"
@@ -196,7 +209,11 @@ export function TeacherLessonManagerPage() {
                 </option>
               ))}
             </select>
-            <Input placeholder="Lesson title" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Input
+              placeholder="Lesson title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
             <Textarea
               placeholder="Markdown content"
               value={content}
@@ -313,7 +330,10 @@ export function MaterialsLibraryPage() {
       >
         <div className="space-y-3">
           {libraryQuery.data?.map((item) => (
-            <Surface className="flex flex-wrap items-center justify-between gap-3 p-4" key={item.id}>
+            <Surface
+              className="flex flex-wrap items-center justify-between gap-3 p-4"
+              key={item.id}
+            >
               <div>
                 <h2 className="font-semibold">{item.title}</h2>
                 <p className="text-sm text-muted-foreground">
@@ -486,7 +506,11 @@ export function TeacherAssignmentsPage() {
     <>
       <PageHeader title="Assignments" subtitle="Publish real class assignments to Supabase." />
       <Surface className="mb-5 space-y-3 p-5">
-        <Input placeholder="Assignment title" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <Input
+          placeholder="Assignment title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
         <select
           className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
           value={classId}

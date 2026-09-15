@@ -69,7 +69,9 @@ export const SupabaseLibraryService = {
     const uploadOptions = input.file.type
       ? { upsert: false as const, contentType: input.file.type }
       : { upsert: false as const };
-    const { error: uploadError } = await supabase.storage.from("library").upload(path, input.file, uploadOptions);
+    const { error: uploadError } = await supabase.storage
+      .from("library")
+      .upload(path, input.file, uploadOptions);
     if (uploadError) throw uploadError;
 
     return this.create({

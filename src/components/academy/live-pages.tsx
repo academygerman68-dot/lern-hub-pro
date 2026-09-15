@@ -46,7 +46,7 @@ function errorMessage(error: Error | null): string {
     case "SERVER_ERROR":
       return "Live service is temporarily unavailable. Check JAAS secrets on the Edge Function.";
     case "SUPABASE_REQUIRED":
-      return "Supabase is not configured in this app build. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then restart the app.";
+      return "Supabase client is unavailable. Restart the app after a fresh pull/build.";
     default:
       return error.message || "Unable to join the live class.";
   }
@@ -93,7 +93,8 @@ function LiveClassLobby() {
                 <div className="min-w-0 flex-1">
                   <h2 className="text-lg font-semibold">{item.name}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {item.level} · {item.schedule || "Schedule TBD"} · {item.teacher || "Teacher TBD"}
+                    {item.level} · {item.schedule || "Schedule TBD"} ·{" "}
+                    {item.teacher || "Teacher TBD"}
                   </p>
                 </div>
                 <Status tone={item.status === "active" ? "green" : "amber"}>{item.status}</Status>
