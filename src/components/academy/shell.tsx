@@ -14,7 +14,6 @@ import {
   LogOut,
   Menu,
   MessageSquare,
-  ScrollText,
   Settings,
   ShieldCheck,
   UserRound,
@@ -38,13 +37,14 @@ type NavSection = { label?: string; items: NavItem[] };
 const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
   student: [
     {
+      label: "Learning",
       items: [
         ["dashboard", "nav.home", Home],
         ["courses", "nav.learning", BookOpen],
-        ["live", "nav.live", Video],
         ["assignments", "nav.assignments", ClipboardCheck],
         ["exams", "nav.exams", FileText],
         ["progress", "nav.progress", BarChart3],
+        ["live", "nav.live", Video],
       ],
     },
     {
@@ -58,11 +58,11 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
   ],
   teacher: [
     {
+      label: "Teaching",
       items: [
         ["dashboard", "nav.home", Home],
         ["classes", "nav.classes", Users],
         ["students", "nav.students", GraduationCap],
-        ["calendar", "nav.calendar", CalendarDays],
         ["lessons", "nav.lessons", BookOpen],
         ["assignments", "nav.assignments", ClipboardCheck],
         ["exams", "nav.exams", FileText],
@@ -73,6 +73,7 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
     {
       label: "Account",
       items: [
+        ["calendar", "nav.calendar", CalendarDays],
         ["messages", "nav.messages", MessageSquare],
         ["profile", "nav.profile", UserRound],
       ],
@@ -91,23 +92,22 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
       ],
     },
     {
-      label: "Operations",
+      label: "Learning",
       items: [
         ["assignments", "nav.assignments", ClipboardCheck],
         ["exams", "nav.exams", FileText],
-        ["payments", "nav.payments", CreditCard],
-        ["payroll", "nav.payroll", Wallet],
-        ["calendar", "nav.calendar", CalendarDays],
         ["live", "nav.live", Video],
-        ["messages", "nav.messages", MessageSquare],
       ],
     },
     {
-      label: "System",
+      label: "Operations",
       items: [
+        ["payments", "nav.payments", CreditCard],
+        ["payroll", "nav.payroll", Wallet],
+        ["calendar", "nav.calendar", CalendarDays],
+        ["messages", "nav.messages", MessageSquare],
         ["reports", "nav.reports", BarChart3],
         ["settings", "nav.settings", Settings],
-        ["audit", "nav.audit", ScrollText],
       ],
     },
   ],
