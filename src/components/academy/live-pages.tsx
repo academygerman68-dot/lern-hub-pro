@@ -10,16 +10,45 @@ import {
   Users,
   Video,
 } from "lucide-react";
+import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useClasses } from "@/hooks/use-academy-data";
+import { useRealAccount } from "@/hooks/use-real-account";
 import { clearLiveClassId, getLiveClassId, setLiveClassId } from "@/lib/live-class-session";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
 import { PageHeader, Status, Surface } from "./primitives";
 
 export function LiveClassesPage({ meeting }: { meeting: boolean }) {
+  const account = useRealAccount();
+
+  if (account.checking) return <div className="min-h-[50vh] bg-background" />;
+  if (!account.authenticated) return <RealAccountRequired />;
   if (meeting) return <LiveMeetingRoom />;
   return <LiveClassLobby />;
+}
+
+function RealAccountRequired() {
+  const { l, setRole } = useAcademy();
+  return (
+    <Surface className="mx-auto max-w-xl space-y-4 p-8 text-center">
+      <span className="mx-auto grid size-12 place-items-center rounded-lg bg-secondary text-primary">
+        <Lock className="size-5" />
+      </span>
+      <h2 className="text-xl font-semibold">
+        {l("Compte réel requis", "مطلوب حساب حقيقي")}
+      </h2>
+      <p className="text-sm text-muted-foreground">
+        {l(
+          "Les cours en direct sont réservés aux comptes réels de l’académie. Connectez-vous avec votre adresse e-mail et votre mot de passe pour rejoindre une salle.",
+          "الدروس المباشرة مخصّصة لحسابات الأكاديمية الحقيقية. سجّل الدخول ببريدك الإلكتروني وكلمة المرور للانضمام إلى القاعة.",
+        )}
+      </p>
+      <Button onClick={() => setRole(null)}>
+        {l("Se connecter avec un compte réel", "تسجيل الدخول بحساب حقيقي")}
+      </Button>
+    </Surface>
+  );
 }
 
 function LiveClassLobby() {
