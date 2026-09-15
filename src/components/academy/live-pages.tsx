@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useClasses } from "@/hooks/use-academy-data";
-import { clearLiveClassId, getLiveClassId, setLiveClassId } from "@/hooks/use-jaas-meeting";
+import { clearLiveClassId, getLiveClassId, setLiveClassId } from "@/lib/live-class-session";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
 import { PageHeader, Status, Surface } from "./primitives";
