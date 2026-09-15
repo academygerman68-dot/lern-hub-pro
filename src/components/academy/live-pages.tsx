@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Camera,
   CameraOff,
@@ -84,9 +84,8 @@ function LiveClassLobby() {
 function LiveMeetingRoom() {
   const { navigate, l } = useAcademy();
   const classesQuery = useClasses();
-  const [classId] = useState<string | null>(() =>
-    typeof window === "undefined" ? null : getLiveClassId(),
-  );
+  const [classId, setClassId] = useState<string | null>(null);
+  const [clientReady, setClientReady] = useState(false);
   const [microphoneOn, setMicrophoneOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
   const [message, setMessage] = useState("");
@@ -96,10 +95,17 @@ function LiveMeetingRoom() {
   ]);
   const selectedClass = (classesQuery.data ?? []).find((item) => item.id === classId);
 
+  useEffect(() => {
+    setClassId(getLiveClassId());
+    setClientReady(true);
+  }, []);
+
   const leave = () => {
     clearLiveClassId();
     navigate("live");
   };
+
+  if (!clientReady) return <div className="min-h-[50vh] bg-background" />;
 
   if (!classId) {
     return (
