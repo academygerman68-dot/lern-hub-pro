@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
@@ -6,19 +6,26 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { isDemoAuthAllowed } from "@/lib/auth-config";
+import { getAuthRedirects, isDemoAuthAllowed } from "@/lib/auth-config";
 import { loginSchema, signupSchema, type LoginValues, type SignupValues } from "@/lib/auth-schemas";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import {
+  getTestAccountPassword,
+  isTestLoginAllowed,
+  TEST_QUICK_ACCOUNTS,
+} from "@/data/test-accounts";
 import { AuthService } from "@/services/academy-services";
 import { AuthError } from "@/services/supabase/auth-service";
 import type { Role } from "@/types/academy";
 import { useAcademy } from "./academy-context";
 import { AuthShell, GoogleIcon } from "./auth-shell";
 
+const RESEND_COOLDOWN_SECONDS = 60;
+
 function authErrorMessage(
   error: unknown,
   l: (fr: string, ar: string) => string,
-  mode: "signin" | "signup",
+  mode: "signin" | "signup" | "resend",
 ): string {
   const code =
     error instanceof AuthError ? error.code : error instanceof Error ? error.message : "";
@@ -34,7 +41,15 @@ function authErrorMessage(
       return l("Ce compte est suspendu ou archivé.", "هذا الحساب موقوف أو مؤرشف.");
     case "INVALID_CREDENTIALS":
       return l("E-mail ou mot de passe incorrect.", "البريد أو كلمة المرور غير صحيحة.");
+    case "EMAIL_RATE_LIMIT":
+      return l(
+        "Trop de demandes. Attendez environ 1 minute avant de renvoyer l’e-mail.",
+        "طلبات كثيرة. انتظر دقيقة تقريبًا قبل إعادة الإرسال.",
+      );
     default:
+      if (mode === "resend") {
+        return l("Impossible de renvoyer l’e-mail.", "تعذّر إعادة إرسال البريد.");
+      }
       return mode === "signup"
         ? l("Impossible de créer le compte.", "تعذّر إنشاء الحساب.")
         : l("Connexion impossible.", "تعذّر تسجيل الدخول.");
@@ -46,8 +61,11 @@ export function Login() {
   const [mode, setMode] = useState<"signin" | "signup" | "check-email">("signin");
   const [pendingEmail, setPendingEmail] = useState("");
   const [show, setShow] = useState(false);
-  const [loading, setLoading] = useState<"form" | "google" | Role | "resend" | null>(null);
+  const [loading, setLoading] = useState<"form" | "google" | Role | "resend" | "test" | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const demoAllowed = useMemo(() => isDemoAuthAllowed(isSupabaseConfigured), []);
+  const testLoginAllowed = useMemo(() => isTestLoginAllowed() && isSupabaseConfigured, []);
+  const confirmRedirect = useMemo(() => getAuthRedirects().callback, []);
 
   const loginForm = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -65,6 +83,14 @@ export function Login() {
     },
   });
 
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const id = window.setInterval(() => {
+      setResendCooldown((value) => (value <= 1 ? 0 : value - 1));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [resendCooldown]);
+
   const enterRole = async (role: Role) => {
     if (!demoAllowed) {
       toast.error(l("Le mode démo est désactivé.", "وضع العرض التجريبي معطّل."));
@@ -76,6 +102,21 @@ export function Login() {
       signIn(user);
     } catch {
       toast.error(t("login.invalid"));
+      setLoading(null);
+    }
+  };
+
+  const enterTestAccount = async (email: string) => {
+    if (!testLoginAllowed) {
+      toast.error(l("Connexion rapide désactivée.", "تسجيل الدخول السريع معطّل."));
+      return;
+    }
+    setLoading("test");
+    try {
+      const user = await AuthService.login(email, getTestAccountPassword());
+      signIn(user);
+    } catch (error) {
+      toast.error(authErrorMessage(error, l, "signin"));
       setLoading(null);
     }
   };
@@ -103,6 +144,7 @@ export function Login() {
       if ("needsEmailConfirmation" in result) {
         setPendingEmail(result.email);
         setMode("check-email");
+        setResendCooldown(RESEND_COOLDOWN_SECONDS);
         setLoading(null);
         return;
       }
@@ -126,13 +168,17 @@ export function Login() {
   };
 
   const resend = async () => {
-    if (!pendingEmail) return;
+    if (!pendingEmail || resendCooldown > 0) return;
     setLoading("resend");
     try {
       await AuthService.resendConfirmation(pendingEmail);
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
       toast.success(l("E-mail de confirmation renvoyé.", "أُعيد إرسال رسالة التأكيد."));
-    } catch {
-      toast.error(l("Impossible de renvoyer l’e-mail.", "تعذّر إعادة إرسال البريد."));
+    } catch (error) {
+      toast.error(authErrorMessage(error, l, "resend"));
+      if (error instanceof AuthError && error.code === "EMAIL_RATE_LIMIT") {
+        setResendCooldown(RESEND_COOLDOWN_SECONDS);
+      }
     } finally {
       setLoading(null);
     }
@@ -147,10 +193,28 @@ export function Login() {
           `أرسلنا رابط تأكيد إلى ${pendingEmail}.`,
         )}
       >
-        <div className="space-y-3">
-          <Button className="h-11 w-full" disabled={loading !== null} onClick={() => void resend()}>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {l(
+              `Le lien doit ouvrir : ${confirmRedirect}. Si le mail ouvre localhost, ajoutez cette URL dans Supabase → Authentication → URL Configuration (Site URL + Redirect URLs).`,
+              `يجب أن يفتح الرابط: ${confirmRedirect}. إذا فتح localhost، أضف هذا العنوان في Supabase → Authentication → URL Configuration.`,
+            )}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {l(
+              "Vérifiez aussi les spams. Supabase limite les renvois (environ 1 minute entre chaque envoi).",
+              "تحقق أيضًا من البريد غير المرغوب. سوباسبيس يحدّ إعادة الإرسال (حوالي دقيقة بين كل إرسال).",
+            )}
+          </p>
+          <Button
+            className="h-11 w-full"
+            disabled={loading !== null || resendCooldown > 0}
+            onClick={() => void resend()}
+          >
             {loading === "resend" ? <Loader2 className="size-4 animate-spin" /> : null}
-            {l("Renvoyer l’e-mail", "إعادة إرسال البريد")}
+            {resendCooldown > 0
+              ? l(`Renvoyer dans ${resendCooldown}s`, `إعادة الإرسال بعد ${resendCooldown}ث`)
+              : l("Renvoyer l’e-mail", "إعادة إرسال البريد")}
           </Button>
           <Button
             variant="outline"
@@ -361,10 +425,47 @@ export function Login() {
             : l("Continuer avec Google", "المتابعة بواسطة جوجل")}
       </Button>
 
+      {testLoginAllowed ? (
+        <div className="mt-8 border-t border-border pt-6">
+          <p className="mb-1 text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+            {l("Accès rapide (phase test)", "دخول سريع (مرحلة الاختبار)")}
+          </p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            {l(
+              "Connexion Supabase réelle en un clic — comptes seed GLA.",
+              "تسجيل دخول سوباسبيس حقيقي بنقرة — حسابات الاختبار.",
+            )}
+          </p>
+          <div className="grid gap-2">
+            {TEST_QUICK_ACCOUNTS.map((account) => (
+              <Button
+                key={account.email}
+                variant="outline"
+                className="justify-between"
+                disabled={loading !== null}
+                onClick={() => void enterTestAccount(account.email)}
+              >
+                <span className="flex flex-col items-start gap-0.5 text-left">
+                  <span>{l(account.labelFr, account.labelAr)}</span>
+                  <span className="text-[11px] font-normal text-muted-foreground">
+                    {account.email}
+                  </span>
+                </span>
+                {loading === "test" ? (
+                  <Loader2 className="size-4 animate-spin opacity-50" />
+                ) : (
+                  <ArrowRight className="size-4 opacity-50" />
+                )}
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {demoAllowed ? (
         <div className="mt-8 border-t border-border pt-6">
           <p className="mb-3 text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-            {t("login.demo")} (DEV)
+            {t("login.demo")} (DEV offline)
           </p>
           <div className="grid gap-2">
             {(["student", "teacher", "director"] as Role[]).map((role) => (

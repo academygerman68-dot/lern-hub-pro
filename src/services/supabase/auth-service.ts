@@ -66,6 +66,14 @@ function mapAuthApiError(error: { message?: string; code?: string } | null | und
   if (message.includes("user already registered") || code.includes("user_already_exists")) {
     return new AuthError("EMAIL_TAKEN", "EMAIL_TAKEN");
   }
+  if (
+    message.includes("rate limit") ||
+    message.includes("for security purposes") ||
+    message.includes("only request this after") ||
+    code.includes("over_email_send_rate_limit")
+  ) {
+    return new AuthError("EMAIL_RATE_LIMIT", "EMAIL_RATE_LIMIT");
+  }
   return new AuthError("AUTH_FAILED", error?.message ?? "AUTH_FAILED");
 }
 
@@ -159,6 +167,11 @@ export const SupabaseAuthService = {
       throw mapAuthApiError(
         error ? { message: error.message, code: String(error.code ?? "") } : null,
       );
+    }
+    // Supabase may return a user with empty identities when the email is already registered
+    // (anti-enumeration). Treat as already taken instead of "check your email".
+    if (Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      throw new AuthError("EMAIL_TAKEN", "EMAIL_TAKEN");
     }
     if (!data.session) {
       return { needsEmailConfirmation: true, email: input.email.trim().toLowerCase() };
