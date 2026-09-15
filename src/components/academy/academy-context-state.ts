@@ -1,4 +1,5 @@
 import { createContext } from "react";
+import type { Profile } from "@/lib/roles";
 import type { PersistedSession } from "@/services/academy-store";
 import type {
   AcademyPage,
@@ -12,10 +13,15 @@ import type {
 
 export type AcademyState = {
   ready: boolean;
+  isAuthenticated: boolean;
+  isAuthLoading: boolean;
   user: SessionUser | null;
+  profile: Profile | null;
   role: Role | null;
+  /** Logout when role is null. Role switching is disabled with Supabase Auth. */
   setRole: (role: Role | null) => void;
   signIn: (user: SessionUser) => void;
+  signOut: () => Promise<void>;
   page: AcademyPage;
   navigate: (page: AcademyPage, extra?: NavigateOptions) => void;
   subscription: SubscriptionStatus;

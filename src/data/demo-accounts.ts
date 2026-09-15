@@ -1,6 +1,6 @@
 /**
  * DEVELOPMENT ONLY — fake credentials for local UI prototyping when
- * VITE_SUPABASE_URL is unset. Never use these accounts in production.
+ * VITE_ENABLE_DEMO_AUTH=true AND Supabase is unset. Never use in production.
  * When Supabase Auth is configured, identity comes exclusively from Auth + profiles.
  */
 import type { DemoAccount } from "@/types/academy";

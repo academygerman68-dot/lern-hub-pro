@@ -1,6 +1,8 @@
 import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { isDemoAuthAllowed } from "@/lib/auth-config";
 import { translate } from "@/lib/i18n";
+import type { Profile } from "@/lib/roles";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { AuthService } from "@/services/academy-services";
 import {
@@ -40,6 +42,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
   const routerNavigate = useNavigate();
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<PersistedSession | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [lastScore, setLastScore] = useState<ExamScore | null>(null);
   const [locale, setLocaleState] = useState<Locale>("fr");
 
@@ -52,19 +55,22 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
           const auth = await SupabaseAuthService.getSession();
           if (cancelled) return;
           if (auth) {
-            const locale = toUiLocale(auth.profile.language);
-            const next = startSession(auth.sessionUser, { locale });
+            const nextLocale = toUiLocale(auth.profile.language);
+            const next = startSession(auth.sessionUser, { locale: nextLocale });
             setSession(next);
-            setLocaleState(locale);
+            setProfile(auth.profile);
+            setLocaleState(nextLocale);
           } else {
             clearSession();
             setSession(null);
+            setProfile(null);
             setLocaleState(readLocale());
           }
         } catch {
           if (!cancelled) {
             clearSession();
             setSession(null);
+            setProfile(null);
             setLocaleState(readLocale());
           }
         } finally {
@@ -73,10 +79,22 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const stored = loadSession();
+      if (isDemoAuthAllowed(false)) {
+        const stored = loadSession();
+        if (!cancelled) {
+          setSession(stored);
+          setProfile(null);
+          setLocaleState(toUiLocale(stored?.locale));
+          setReady(true);
+        }
+        return;
+      }
+
       if (!cancelled) {
-        setSession(stored);
-        setLocaleState(toUiLocale(stored?.locale));
+        clearSession();
+        setSession(null);
+        setProfile(null);
+        setLocaleState(readLocale());
         setReady(true);
       }
     };
@@ -89,17 +107,26 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
-    return SupabaseAuthService.onAuthStateChange((payload) => {
+    return SupabaseAuthService.onAuthStateChange((payload, event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        void routerNavigate({ to: "/auth/reset-password" });
+      }
+
       if (!payload) {
         clearSession();
         setSession(null);
-        void routerNavigate({ to: "/" });
+        setProfile(null);
+        if (event === "SIGNED_OUT") {
+          void routerNavigate({ to: "/" });
+        }
         return;
       }
-      const locale = toUiLocale(payload.profile.language);
+
+      const nextLocale = toUiLocale(payload.profile.language);
+      setProfile(payload.profile);
       setSession((prev) =>
         startSession(payload.sessionUser, {
-          locale,
+          locale: nextLocale,
           ...(prev
             ? {
                 page: prev.page,
@@ -111,7 +138,10 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
             : {}),
         }),
       );
-      setLocaleState(locale);
+      setLocaleState(nextLocale);
+
+      // Navigation is owned by login / OAuth callback / password-recovery handlers.
+      // Avoid forcing redirects on TOKEN_REFRESHED / INITIAL_SESSION / SIGNED_IN here.
     });
   }, [routerNavigate]);
 
@@ -126,7 +156,10 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
     (next: PersistedSession | null) => {
       setSession(next);
       if (next) saveSession({ ...next, locale, lastScore: lastScore?.overall ?? null });
-      else clearSession();
+      else {
+        clearSession();
+        setProfile(null);
+      }
     },
     [locale, lastScore],
   );
@@ -155,17 +188,23 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
     [go, persist, session, locale],
   );
 
+  const signOut = useCallback(async () => {
+    try {
+      await AuthService.logout();
+    } finally {
+      persist(null);
+      setProfile(null);
+      void routerNavigate({ to: "/" });
+    }
+  }, [persist, routerNavigate]);
+
   const setRole = useCallback(
     (role: Role | null) => {
       if (!role) {
-        void AuthService.logout().finally(() => {
-          persist(null);
-          void routerNavigate({ to: "/" });
-        });
+        void signOut();
         return;
       }
-      if (isSupabaseConfigured) {
-        // Role switching without credentials is not allowed with real Auth.
+      if (isSupabaseConfigured || !isDemoAuthAllowed(false)) {
         return;
       }
       const name =
@@ -182,7 +221,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
             : "samira@demo.ma";
       signIn({ role, name, email });
     },
-    [persist, routerNavigate, signIn],
+    [signIn, signOut],
   );
 
   const navigate = useCallback(
@@ -202,10 +241,14 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AcademyState>(
     () => ({
       ready,
+      isAuthenticated: Boolean(session?.user),
+      isAuthLoading: !ready,
       user: session?.user ?? null,
+      profile,
       role: session?.user.role ?? null,
       setRole,
       signIn,
+      signOut,
       page: session?.page ?? "dashboard",
       navigate,
       subscription: session?.subscription ?? "ACTIVE",
@@ -229,7 +272,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
       session,
       replaceSession: persist,
     }),
-    [ready, session, lastScore, locale, setRole, signIn, navigate, persist],
+    [ready, session, profile, lastScore, locale, setRole, signIn, signOut, navigate, persist],
   );
 
   return (

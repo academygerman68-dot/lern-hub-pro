@@ -7,7 +7,8 @@ import { SupabaseEnrollmentService } from "@/services/supabase/enrollment-servic
 import { SupabaseStudentService } from "@/services/supabase/student-service";
 import { SupabaseTeacherService } from "@/services/supabase/teacher-service";
 import { SupabaseClassService } from "@/services/supabase/class-service";
-import { SupabaseAuthService } from "@/services/supabase/auth-service";
+import { AuthError, SupabaseAuthService } from "@/services/supabase/auth-service";
+import { isDemoAuthAllowed } from "@/lib/auth-config";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { authenticate } from "@/lib/academy-logic";
 import {
@@ -28,8 +29,8 @@ type ClassStatus = Database["public"]["Enums"]["class_status"];
 type EnrollmentStatus = Database["public"]["Enums"]["enrollment_status"];
 
 /**
- * Auth: Supabase Auth is the sole identity source when configured.
- * Mock authenticate() is only used when VITE_SUPABASE_* is missing (local UI without backend).
+ * Auth: Supabase Auth is the sole identity source on the normal app path.
+ * Demo authenticate() only runs when explicitly enabled for local UI prototyping.
  */
 export const AuthService = {
   async login(email: string, password: string): Promise<SessionUser> {
@@ -37,43 +38,41 @@ export const AuthService = {
       const payload = await SupabaseAuthService.login(email, password);
       return payload.sessionUser;
     }
+    if (!isDemoAuthAllowed(isSupabaseConfigured)) {
+      throw new AuthError("SUPABASE_REQUIRED", "SUPABASE_REQUIRED");
+    }
     await wait(350);
     const user = authenticate(email, password);
-    if (!user) throw new Error("INVALID_CREDENTIALS");
+    if (!user) throw new AuthError("INVALID_CREDENTIALS");
     return user;
   },
   async demoLogin(role: Role): Promise<SessionUser> {
-    if (isSupabaseConfigured) {
-      throw new Error("DEMO_AUTH_DISABLED");
+    if (!isDemoAuthAllowed(isSupabaseConfigured)) {
+      throw new AuthError("DEMO_AUTH_DISABLED", "DEMO_AUTH_DISABLED");
     }
     await wait();
     const email =
       role === "student" ? "ahmed@demo.ma" : role === "teacher" ? "anna@demo.ma" : "samira@demo.ma";
     const user = authenticate(email, "password");
-    if (!user) throw new Error("INVALID_CREDENTIALS");
+    if (!user) throw new AuthError("INVALID_CREDENTIALS");
     return user;
   },
-  /** Returns null when the account needs email confirmation before first sign-in. */
   async signUp(input: {
     email: string;
     password: string;
     firstName: string;
     lastName: string;
-  }): Promise<SessionUser | null> {
+  }): Promise<SessionUser | { needsEmailConfirmation: true; email: string }> {
     if (!isSupabaseConfigured) {
-      throw new Error("SIGNUP_UNAVAILABLE");
+      throw new AuthError("SIGNUP_UNAVAILABLE", "SIGNUP_UNAVAILABLE");
     }
-    try {
-      const payload = await SupabaseAuthService.signUpStudent(input);
-      return payload.sessionUser;
-    } catch (error) {
-      if (error instanceof Error && error.message === "CONFIRM_EMAIL_REQUIRED") return null;
-      throw error;
-    }
+    const result = await SupabaseAuthService.signUpStudent(input);
+    if ("needsEmailConfirmation" in result) return result;
+    return result.sessionUser;
   },
   async signInWithGoogle(): Promise<void> {
     if (!isSupabaseConfigured) {
-      throw new Error("GOOGLE_AUTH_UNAVAILABLE");
+      throw new AuthError("GOOGLE_AUTH_UNAVAILABLE", "GOOGLE_AUTH_UNAVAILABLE");
     }
     await SupabaseAuthService.signInWithGoogle();
   },
@@ -83,11 +82,22 @@ export const AuthService = {
     }
   },
   async requestReset(email: string) {
-    if (isSupabaseConfigured) {
-      return SupabaseAuthService.requestPasswordReset(email);
+    if (!isSupabaseConfigured) {
+      throw new AuthError("RESET_UNAVAILABLE", "RESET_UNAVAILABLE");
     }
-    await wait(250);
-    return { sent: email.trim().length > 0 };
+    return SupabaseAuthService.requestPasswordReset(email);
+  },
+  async updatePassword(newPassword: string) {
+    if (!isSupabaseConfigured) {
+      throw new AuthError("RESET_UNAVAILABLE", "RESET_UNAVAILABLE");
+    }
+    await SupabaseAuthService.updatePassword(newPassword);
+  },
+  async resendConfirmation(email: string) {
+    if (!isSupabaseConfigured) {
+      throw new AuthError("SIGNUP_UNAVAILABLE", "SIGNUP_UNAVAILABLE");
+    }
+    await SupabaseAuthService.resendSignupConfirmation(email);
   },
 };
 

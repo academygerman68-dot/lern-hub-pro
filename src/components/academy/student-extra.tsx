@@ -407,7 +407,7 @@ export function TeacherProfile() {
       <div className="grid gap-5 lg:grid-cols-[20rem_1fr]">
         <Surface className="p-6">
           <h2 className="font-semibold">{LEAD_TEACHER}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">anna@demo.ma</p>
+          <p className="mt-2 text-sm text-muted-foreground">teacher@gla.academy</p>
           <p className="mt-4 text-sm">Assigned classes: A2-G2, B1-G1</p>
         </Surface>
         <div className="grid gap-4 sm:grid-cols-3">

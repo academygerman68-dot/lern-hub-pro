@@ -1,8 +1,8 @@
-import type { Session, User } from "@supabase/supabase-js";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
+import { getAuthRedirects } from "@/lib/auth-config";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
-import { profileToSessionUser } from "@/lib/roles";
-import type { Profile } from "@/lib/roles";
-import type { Role, SessionUser } from "@/types/academy";
+import { profileToSessionUser, type Profile } from "@/lib/roles";
+import type { SessionUser } from "@/types/academy";
 
 export type AuthSessionPayload = {
   user: User;
@@ -11,28 +11,92 @@ export type AuthSessionPayload = {
   sessionUser: SessionUser;
 };
 
+export class AuthError extends Error {
+  code: string;
+
+  constructor(code: string, message?: string) {
+    super(message ?? code);
+    this.name = "AuthError";
+    this.code = code;
+  }
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchProfile(userId: string): Promise<Profile> {
   const supabase = getSupabase();
   const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
   if (error || !data) {
-    throw new Error(error?.message ?? "PROFILE_NOT_FOUND");
+    throw new AuthError("PROFILE_NOT_FOUND", error?.message ?? "PROFILE_NOT_FOUND");
   }
   return data;
+}
+
+/** Profile trigger can lag a moment after signup/OAuth — retry briefly. */
+async function fetchProfileWithRetry(userId: string, attempts = 6): Promise<Profile> {
+  let lastError: unknown;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await fetchProfile(userId);
+    } catch (error) {
+      lastError = error;
+      await sleep(200 + i * 150);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new AuthError("PROFILE_NOT_FOUND");
+}
+
+function assertActiveProfile(profile: Profile) {
+  if (profile.status === "suspended" || profile.status === "archived") {
+    throw new AuthError("ACCOUNT_INACTIVE", "ACCOUNT_INACTIVE");
+  }
+}
+
+function mapAuthApiError(error: { message?: string; code?: string } | null | undefined): AuthError {
+  const message = (error?.message ?? "").toLowerCase();
+  const code = String(error?.code ?? "").toLowerCase();
+  if (message.includes("email not confirmed") || code.includes("email_not_confirmed")) {
+    return new AuthError("EMAIL_NOT_CONFIRMED", "EMAIL_NOT_CONFIRMED");
+  }
+  if (message.includes("invalid login") || message.includes("invalid credentials")) {
+    return new AuthError("INVALID_CREDENTIALS", "INVALID_CREDENTIALS");
+  }
+  if (message.includes("user already registered") || code.includes("user_already_exists")) {
+    return new AuthError("EMAIL_TAKEN", "EMAIL_TAKEN");
+  }
+  return new AuthError("AUTH_FAILED", error?.message ?? "AUTH_FAILED");
 }
 
 export const SupabaseAuthService = {
   isConfigured: isSupabaseConfigured,
 
+  /**
+   * Verifies identity with getUser() (server-validated) then attaches local session + profile.
+   */
   async getSession(): Promise<AuthSessionPayload | null> {
     if (!isSupabaseConfigured) return null;
     const supabase = getSupabase();
-    const { data, error } = await supabase.auth.getSession();
-    if (error) throw error;
-    if (!data.session?.user) return null;
-    const profile = await fetchProfile(data.session.user.id);
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    if (!user) return null;
+
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    if (!session) return null;
+
+    const profile = await fetchProfileWithRetry(user.id);
+    assertActiveProfile(profile);
     return {
-      user: data.session.user,
-      session: data.session,
+      user,
+      session,
       profile,
       sessionUser: profileToSessionUser(profile),
     };
@@ -41,16 +105,20 @@ export const SupabaseAuthService = {
   async login(email: string, password: string): Promise<AuthSessionPayload> {
     const supabase = getSupabase();
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      email: email.trim().toLowerCase(),
       password,
     });
     if (error || !data.session || !data.user) {
-      throw new Error(error?.message ?? "INVALID_CREDENTIALS");
+      throw mapAuthApiError(
+        error ? { message: error.message, code: String(error.code ?? "") } : null,
+      );
     }
-    const profile = await fetchProfile(data.user.id);
-    if (profile.status === "suspended" || profile.status === "archived") {
+    const profile = await fetchProfileWithRetry(data.user.id);
+    try {
+      assertActiveProfile(profile);
+    } catch (err) {
       await supabase.auth.signOut();
-      throw new Error("ACCOUNT_INACTIVE");
+      throw err;
     }
     return {
       user: data.user,
@@ -60,34 +128,42 @@ export const SupabaseAuthService = {
     };
   },
 
+  /**
+   * Public signup always creates a student. Role is enforced by DB trigger
+   * (client metadata role is ignored server-side).
+   */
   async signUpStudent(input: {
     email: string;
     password: string;
     firstName: string;
     lastName: string;
     language?: "en" | "fr" | "de";
-  }): Promise<AuthSessionPayload> {
+  }): Promise<AuthSessionPayload | { needsEmailConfirmation: true; email: string }> {
     const supabase = getSupabase();
+    const redirects = getAuthRedirects();
     const { data, error } = await supabase.auth.signUp({
-      email: input.email.trim(),
+      email: input.email.trim().toLowerCase(),
       password: input.password,
       options: {
+        emailRedirectTo: redirects.callback,
         data: {
+          // Informational only — DB trigger forces student.
           role: "student",
-          first_name: input.firstName,
-          last_name: input.lastName,
-          language: input.language ?? "en",
+          first_name: input.firstName.trim(),
+          last_name: input.lastName.trim(),
+          language: input.language ?? "fr",
         },
       },
     });
     if (error || !data.user) {
-      throw new Error(error?.message ?? "SIGNUP_FAILED");
+      throw mapAuthApiError(
+        error ? { message: error.message, code: String(error.code ?? "") } : null,
+      );
     }
-    // Email confirmation may leave session null — still create student row when session exists.
     if (!data.session) {
-      throw new Error("CONFIRM_EMAIL_REQUIRED");
+      return { needsEmailConfirmation: true, email: input.email.trim().toLowerCase() };
     }
-    const profile = await fetchProfile(data.user.id);
+    const profile = await fetchProfileWithRetry(data.user.id);
     return {
       user: data.user,
       session: data.session,
@@ -98,12 +174,18 @@ export const SupabaseAuthService = {
 
   async signInWithGoogle(): Promise<void> {
     const supabase = getSupabase();
-    const redirectTo = typeof window === "undefined" ? "" : window.location.origin;
+    const redirects = getAuthRedirects();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: redirectTo ? { redirectTo } : {},
+      options: {
+        redirectTo: redirects.callback,
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
+      },
     });
-    if (error) throw error;
+    if (error) throw mapAuthApiError({ message: error.message, code: String(error.code ?? "") });
   },
 
   async logout(): Promise<void> {
@@ -114,38 +196,61 @@ export const SupabaseAuthService = {
 
   async requestPasswordReset(email: string): Promise<{ sent: boolean }> {
     const supabase = getSupabase();
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
-    if (error) throw error;
+    const redirects = getAuthRedirects();
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: redirects.passwordReset,
+    });
+    if (error) throw mapAuthApiError({ message: error.message, code: String(error.code ?? "") });
     return { sent: true };
   },
 
-  onAuthStateChange(callback: (payload: AuthSessionPayload | null) => void) {
+  async updatePassword(newPassword: string): Promise<void> {
+    const supabase = getSupabase();
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw mapAuthApiError({ message: error.message, code: String(error.code ?? "") });
+  },
+
+  async resendSignupConfirmation(email: string): Promise<void> {
+    const supabase = getSupabase();
+    const redirects = getAuthRedirects();
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: email.trim().toLowerCase(),
+      options: { emailRedirectTo: redirects.callback },
+    });
+    if (error) throw mapAuthApiError({ message: error.message, code: String(error.code ?? "") });
+  },
+
+  onAuthStateChange(
+    callback: (payload: AuthSessionPayload | null, event: AuthChangeEvent) => void,
+  ) {
     if (!isSupabaseConfigured) return () => undefined;
     const supabase = getSupabase();
     const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_OUT" || !session?.user) {
-        callback(null);
+        callback(null, event);
         return;
       }
       try {
-        const profile = await fetchProfile(session.user.id);
-        callback({
-          user: session.user,
-          session,
-          profile,
-          sessionUser: profileToSessionUser(profile),
-        });
+        const profile = await fetchProfileWithRetry(session.user.id);
+        if (profile.status === "suspended" || profile.status === "archived") {
+          await supabase.auth.signOut();
+          callback(null, "SIGNED_OUT");
+          return;
+        }
+        callback(
+          {
+            user: session.user,
+            session,
+            profile,
+            sessionUser: profileToSessionUser(profile),
+          },
+          event,
+        );
       } catch {
-        callback(null);
+        callback(null, event);
       }
     });
     return () => data.subscription.unsubscribe();
   },
 };
-
-/** @deprecated Demo-only helper — never use in production identity flows. */
-export function assertNotUsingDemoIdentity(role: Role) {
-  if (isSupabaseConfigured) {
-    throw new Error(`Demo identity for ${role} is disabled while Supabase Auth is configured.`);
-  }
-}
