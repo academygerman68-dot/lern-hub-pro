@@ -1,47 +1,27 @@
-import { useState } from "react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { useMemo, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
   Download,
   FileText,
   Headphones,
-  Mic,
-  MicOff,
-  MonitorUp,
   Paperclip,
   Send,
   Upload,
   Video,
-  VideoOff,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LEAD_TEACHER } from "@/data/demo-accounts";
-import { LIVE_ROOM_URL, resources } from "@/data/mock-data";
+import { resources } from "@/data/mock-data";
 import { AssignmentService, CourseService } from "@/services/academy-services";
 import { useQuery } from "@tanstack/react-query";
+import { useMyExamAttempts } from "@/hooks/use-academy-data";
 import { Metric, PageHeader, ProgressLine, SectionTitle, Status, Surface } from "./primitives";
 import { useAcademy } from "./academy-context";
-
-const chartData = [
-  { m: "Apr", v: 38 },
-  { m: "May", v: 45 },
-  { m: "Jun", v: 51 },
-  { m: "Jul", v: 57 },
-  { m: "Aug", v: 62 },
-  { m: "Sep", v: 68 },
-];
+import { QueryState } from "./query-state";
 
 const weekOffsets = ["mt-2", "mt-3", "mt-4", "mt-5", "mt-6", "mt-7", "mt-8"] as const;
 
@@ -112,96 +92,6 @@ export function Materials() {
   );
 }
 
-export function Live({ meeting }: { meeting: boolean }) {
-  const { navigate } = useAcademy();
-  const [mic, setMic] = useState(true);
-  const [cam, setCam] = useState(true);
-  if (!meeting) {
-    return (
-      <>
-        <PageHeader title="Live Classes" subtitle="Join your scheduled virtual classroom." />
-        <SectionTitle title="Today's classes" />
-        <Surface className="p-6">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-            <span className="grid size-14 place-items-center rounded-lg bg-secondary text-primary">
-              <Video />
-            </span>
-            <div className="flex-1">
-              <h2 className="text-lg font-semibold">A2 Group 2</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                18:00 – 19:30 · Teacher: {LEAD_TEACHER}
-              </p>
-            </div>
-            <Status tone="amber">Starting soon</Status>
-            <Button onClick={() => navigate("meeting")}>
-              <Video />
-              Join class
-            </Button>
-          </div>
-        </Surface>
-      </>
-    );
-  }
-  return (
-    <div className="-m-4 min-h-[calc(100vh-4.25rem)] bg-meeting p-4 text-primary-foreground sm:-m-7 sm:p-7">
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <p className="text-xs text-primary-foreground/60">LIVE · A2 GROUP 2</p>
-          <h1 className="text-xl font-semibold">Deutsch im Alltag</h1>
-        </div>
-        <Status tone="red">Jitsi live room</Status>
-      </div>
-      <div className="grid gap-4 xl:grid-cols-[1fr_20rem]">
-        <div className="min-h-[55vh] overflow-hidden rounded-lg bg-meeting-panel">
-          <iframe
-            title="GLA live class"
-            src={LIVE_ROOM_URL}
-            allow="camera; microphone; fullscreen; display-capture; autoplay"
-            className="h-[55vh] w-full border-0"
-          />
-        </div>
-        <Surface className="bg-meeting-panel p-4 text-primary-foreground">
-          <h2 className="font-semibold">Class chat</h2>
-          <div className="mt-5 space-y-4 text-sm">
-            <p>
-              <strong>Anna:</strong> Guten Abend zusammen!
-            </p>
-            <p>
-              <strong>Sara:</strong> Guten Abend
-            </p>
-            <p>
-              <strong>Youssef:</strong> Ich kann Sie gut hören.
-            </p>
-          </div>
-        </Surface>
-      </div>
-      <div className="mt-5 flex flex-wrap justify-center gap-3">
-        <Button
-          variant={mic ? "secondary" : "destructive"}
-          size="icon"
-          onClick={() => setMic(!mic)}
-        >
-          {mic ? <Mic /> : <MicOff />}
-        </Button>
-        <Button
-          variant={cam ? "secondary" : "destructive"}
-          size="icon"
-          onClick={() => setCam(!cam)}
-        >
-          {cam ? <Video /> : <VideoOff />}
-        </Button>
-        <Button variant="secondary" size="icon">
-          <MonitorUp />
-        </Button>
-        <Button variant="destructive" onClick={() => navigate("live")}>
-          <X />
-          Leave meeting
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 export function CalendarPage() {
   const events = [
     "A2 German|18:00",
@@ -259,7 +149,7 @@ export function CalendarPage() {
 
 export function Assignments({ detail }: { detail: boolean }) {
   const { navigate } = useAcademy();
-  const { data = [] } = useQuery({ queryKey: ["assignments"], queryFn: AssignmentService.list });
+  const { data = [] } = useQuery({ queryKey: ["assignments"], queryFn: () => AssignmentService.list() });
   if (detail) {
     return (
       <>
@@ -326,13 +216,13 @@ export function Assignments({ detail }: { detail: boolean }) {
             {data.map((row, index) => (
               <tr key={row.id}>
                 <td className="font-medium">{row.title}</td>
-                <td>{row.deadline}</td>
+                <td>{row.due}</td>
                 <td>
                   <Status tone={index === 0 ? "amber" : index === 1 ? "blue" : "green"}>
                     {row.status}
                   </Status>
                 </td>
-                <td>{row.grade}</td>
+                <td>{row.grade ?? "—"}</td>
                 <td>
                   <Button size="sm" variant="ghost" onClick={() => navigate("assignment-detail")}>
                     View
@@ -348,74 +238,95 @@ export function Assignments({ detail }: { detail: boolean }) {
 }
 
 export function Progress() {
+  const attemptsQuery = useMyExamAttempts();
+  const graded = (attemptsQuery.data ?? []).filter(
+    (a) => a.status === "graded" || a.status === "submitted",
+  );
+  const skillTotals = useMemo(() => {
+    const totals: Record<string, { score: number; max: number }> = {};
+    for (const attempt of graded) {
+      const breakdown = attempt.skill_breakdown;
+      if (!breakdown || typeof breakdown !== "object" || Array.isArray(breakdown)) continue;
+      for (const [skill, value] of Object.entries(breakdown)) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+        const score = Number((value as { score?: unknown }).score ?? 0);
+        const max = Number((value as { max?: unknown }).max ?? 0);
+        totals[skill] = {
+          score: (totals[skill]?.score ?? 0) + score,
+          max: (totals[skill]?.max ?? 0) + max,
+        };
+      }
+    }
+    return totals;
+  }, [graded]);
+  const avg =
+    graded.length > 0
+      ? Math.round(graded.reduce((acc, a) => acc + Number(a.percentage ?? 0), 0) / graded.length)
+      : null;
+  const skillLabels: Record<string, string> = {
+    lesen: "Lesen",
+    hoeren: "Hören",
+    schreiben: "Schreiben",
+    sprechen: "Sprechen",
+    grammatik: "Grammatik",
+    wortschatz: "Wortschatz",
+  };
+
   return (
     <>
       <PageHeader
         title="My Progress"
-        subtitle="A clear view of your learning momentum and next milestone."
+        subtitle="Derived from submitted exam attempts — no invented percentages."
       />
-      <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
-        <Surface className="p-6">
-          <SectionTitle title="Monthly progress" />
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="fillProgress" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.25} />
-                    <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="m" axisLine={false} tickLine={false} />
-                <YAxis hide domain={[0, 100]} />
-                <Tooltip />
-                <Area
-                  type="monotone"
-                  dataKey="v"
-                  stroke="var(--primary)"
-                  strokeWidth={2}
-                  fill="url(#fillProgress)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </Surface>
-        <Surface className="p-6">
-          <h2 className="font-semibold">Level journey</h2>
-          <div className="mt-6 flex items-center justify-between">
-            <div>
-              <small className="text-muted-foreground">Current level</small>
-              <strong className="block text-3xl">A2</strong>
+      <QueryState
+        isLoading={attemptsQuery.isLoading}
+        isError={attemptsQuery.isError}
+        error={attemptsQuery.error}
+        isEmpty={graded.length === 0}
+        emptyTitle="Not enough data yet"
+        emptyMessage="Complete a mock exam to unlock real skill progress."
+        onRetry={() => void attemptsQuery.refetch()}
+      >
+        <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
+          <Surface className="p-6">
+            <h2 className="font-semibold">Exam average</h2>
+            <p className="mt-4 font-display text-5xl">{avg ?? "—"}%</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Across {graded.length} submitted attempt{graded.length === 1 ? "" : "s"}.
+            </p>
+            <div className="mt-6 space-y-3">
+              {graded.slice(0, 5).map((attempt) => (
+                <div key={attempt.id} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {new Date(attempt.submitted_at ?? attempt.started_at).toLocaleDateString()}
+                  </span>
+                  <span className="font-medium">{Number(attempt.percentage ?? 0).toFixed(0)}%</span>
+                </div>
+              ))}
             </div>
-            <span className="text-muted-foreground">→</span>
-            <div className="text-right">
-              <small className="text-muted-foreground">Target</small>
-              <strong className="block text-3xl text-primary">B1</strong>
-            </div>
-          </div>
-          <ProgressLine value={68} className="mt-6" />
-          <p className="mt-2 text-right text-sm font-medium">68% complete</p>
-        </Surface>
-      </div>
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {[
-          ["Hören", 72],
-          ["Lesen", 81],
-          ["Schreiben", 65],
-          ["Sprechen", 70],
-          ["Grammatik", 74],
-          ["Wortschatz", 79],
-        ].map(([label, value]) => (
-          <Surface className="p-5" key={label as string}>
-            <div className="flex justify-between">
-              <span className="font-medium">{label}</span>
-              <strong>{value}%</strong>
-            </div>
-            <ProgressLine value={value as number} className="mt-3" />
           </Surface>
-        ))}
-      </div>
+          <Surface className="p-6">
+            <h2 className="font-semibold">Skill breakdown</h2>
+            <div className="mt-5 space-y-4">
+              {Object.entries(skillTotals).map(([skill, value]) => {
+                const pct = value.max > 0 ? Math.round((value.score / value.max) * 100) : 0;
+                return (
+                  <div key={skill}>
+                    <div className="mb-1 flex justify-between text-sm">
+                      <span>{skillLabels[skill] ?? skill}</span>
+                      <strong>{pct}%</strong>
+                    </div>
+                    <ProgressLine value={pct} />
+                  </div>
+                );
+              })}
+              {Object.keys(skillTotals).length === 0 && (
+                <p className="text-sm text-muted-foreground">No skill scores yet.</p>
+              )}
+            </div>
+          </Surface>
+        </div>
+      </QueryState>
     </>
   );
 }
@@ -551,32 +462,8 @@ export function DirectorSettings() {
   );
 }
 
-export function StaffExams() {
-  const { examPublished } = useAcademy();
-  return (
-    <>
-      <PageHeader title="Exams" subtitle="Assessments assigned to your classes." />
-      <Surface className="divide-y">
-        {["A2 Mock Exam 01", "A2 Mock Exam 02", "A2 Final Assessment"].map((title, index) => (
-          <div key={title} className="flex items-center justify-between p-5">
-            <div>
-              <h3 className="font-semibold">{title}</h3>
-              <p className="text-sm text-muted-foreground">
-                {index === 1 && !examPublished ? "Waiting for publication" : "Ready for A2-G2"}
-              </p>
-            </div>
-            <Status tone={index === 1 && !examPublished ? "amber" : "green"}>
-              {index === 1 && !examPublished ? "Draft" : "Published"}
-            </Status>
-          </div>
-        ))}
-      </Surface>
-    </>
-  );
-}
-
 export function DirectorAssignments() {
-  const { data = [] } = useQuery({ queryKey: ["assignments"], queryFn: AssignmentService.list });
+  const { data = [] } = useQuery({ queryKey: ["assignments"], queryFn: () => AssignmentService.list() });
   return (
     <>
       <PageHeader title="Assignments" subtitle="Academy-wide homework pipeline." />
@@ -594,11 +481,11 @@ export function DirectorAssignments() {
             {data.map((row) => (
               <tr key={row.id}>
                 <td>{row.title}</td>
-                <td>{row.studentName}</td>
+                <td>{row.studentName ?? "—"}</td>
                 <td>
                   <Status>{row.status}</Status>
                 </td>
-                <td>{row.grade}</td>
+                <td>{row.grade ?? "—"}</td>
               </tr>
             ))}
           </tbody>

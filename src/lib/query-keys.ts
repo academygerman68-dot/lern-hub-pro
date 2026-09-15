@@ -18,4 +18,28 @@ export const queryKeys = {
     byStudent: (studentId: string) => ["enrollments", "student", studentId] as const,
     byClass: (classId: string) => ["enrollments", "class", classId] as const,
   },
+  courses: {
+    all: ["courses"] as const,
+    modules: ["courses", "modules"] as const,
+    lessons: ["courses", "lessons"] as const,
+  },
+  library: {
+    all: ["library"] as const,
+  },
+  assignments: {
+    all: ["assignments"] as const,
+    byClass: (classId: string) => ["assignments", "class", classId] as const,
+  },
+  attendance: {
+    byClass: (classId: string) => ["attendance", "class", classId] as const,
+  },
+  exams: {
+    all: ["exams"] as const,
+    published: ["exams", "published"] as const,
+    detail: (id: string) => ["exams", id] as const,
+    attempt: (id: string) => ["exams", "attempt", id] as const,
+    answers: (attemptId: string) => ["exams", "answers", attemptId] as const,
+    result: (attemptId: string) => ["exams", "result", attemptId] as const,
+    myAttempts: ["exams", "my-attempts"] as const,
+  },
 };

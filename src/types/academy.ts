@@ -32,6 +32,8 @@ export const TEACHER_PAGES = [
   "assignments",
   "exams",
   "attendance",
+  "live",
+  "meeting",
   "messages",
   "profile",
 ] as const;
@@ -52,6 +54,8 @@ export const DIRECTOR_PAGES = [
   "subscriptions",
   "invoices",
   "calendar",
+  "live",
+  "meeting",
   "messages",
   "reports",
   "settings",
@@ -88,14 +92,31 @@ export interface CourseModule {
   progress: number;
   lessons: number;
   exercises: number;
+  level?: string;
+  courseTitle?: string;
 }
 
 export interface Resource {
+  id?: string;
   title: string;
   level: string;
   type: "PDF" | "Audio" | "Video" | "Exercise";
   date: string;
   size: string;
+  storage_path?: string;
+  storage_bucket?: string;
+}
+
+export interface AssignmentListItem {
+  id: string;
+  title: string;
+  due: string;
+  status: string;
+  classId?: string;
+  description?: string | null;
+  studentId?: string;
+  studentName?: string;
+  grade?: string;
 }
 
 export interface Question {

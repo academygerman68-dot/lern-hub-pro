@@ -1,22 +1,25 @@
-import {
-  students as mockStudents,
-  teachers as mockTeachers,
-  classes as mockClasses,
-  assignments,
-  exams,
-  modules,
-  resources,
-} from "@/data/mock-data";
-import { authenticate, scoreExam } from "@/lib/academy-logic";
-import { isSupabaseConfigured } from "@/lib/supabase";
-import { SupabaseAuthService } from "@/services/supabase/auth-service";
-import { SupabaseClassService } from "@/services/supabase/class-service";
+import { SupabaseAssignmentService } from "@/services/supabase/assignment-service";
+import { SupabaseAttendanceService } from "@/services/supabase/attendance-service";
+import { SupabaseCurriculumService } from "@/services/supabase/curriculum-service";
+import { SupabaseExamService } from "@/services/supabase/exam-service";
+import { SupabaseLibraryService } from "@/services/supabase/library-service";
 import { SupabaseEnrollmentService } from "@/services/supabase/enrollment-service";
 import { SupabaseStudentService } from "@/services/supabase/student-service";
 import { SupabaseTeacherService } from "@/services/supabase/teacher-service";
-import { getSupabase } from "@/lib/supabase";
-import type { ExamScore, Role, SessionUser, SubscriptionStatus } from "@/types/academy";
-import type { Database } from "@/types/database";
+import { SupabaseClassService } from "@/services/supabase/class-service";
+import { SupabaseAuthService } from "@/services/supabase/auth-service";
+import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
+import { authenticate } from "@/lib/academy-logic";
+import {
+  assignments as mockAssignments,
+  modules as mockModules,
+  resources as mockResources,
+  students as mockStudents,
+  teachers as mockTeachers,
+  classes as mockClasses,
+} from "@/data/mock-data";
+import type { Role, SessionUser, SubscriptionStatus, AssignmentListItem } from "@/types/academy";
+import type { Database, Json } from "@/types/database";
 
 const wait = (ms = 450) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -309,33 +312,224 @@ export const EnrollmentService = {
   },
 };
 
-/** Remaining LMS modules still mock until migrated. */
+/** Curriculum + library are Supabase-backed when configured. */
 export const CourseService = {
   async listModules() {
+    if (isSupabaseConfigured) return SupabaseCurriculumService.listPublishedModules();
     await wait(200);
-    return modules;
+    return mockModules;
+  },
+  async listCourses() {
+    if (isSupabaseConfigured) return SupabaseCurriculumService.listCourses();
+    await wait(200);
+    return [];
+  },
+  async listLessons() {
+    if (isSupabaseConfigured) return SupabaseCurriculumService.listLessons();
+    await wait(160);
+    return [];
+  },
+  async getLesson(id: string) {
+    if (isSupabaseConfigured) return SupabaseCurriculumService.getLesson(id);
+    return null;
+  },
+  async createCourse(input: { levelId: string; title: string; description?: string }) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseCurriculumService.createCourse(input);
+  },
+  async createLesson(input: {
+    courseId?: string;
+    unitId?: string;
+    title: string;
+    description?: string;
+    contentMarkdown?: string;
+  }) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    let unitId = input.unitId;
+    if (!unitId && input.courseId) {
+      unitId = await SupabaseCurriculumService.ensureDefaultUnitForCourse(input.courseId);
+    }
+    if (!unitId) throw new Error("UNIT_REQUIRED");
+    return SupabaseCurriculumService.createLesson({
+      unitId,
+      title: input.title,
+      ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.contentMarkdown !== undefined ? { contentMarkdown: input.contentMarkdown } : {}),
+    });
+  },
+  async publishLesson(id: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseCurriculumService.publishLesson(id);
+  },
+  async updateLesson(
+    id: string,
+    patch: { title?: string; description?: string | null; content_markdown?: string | null; status?: Database["public"]["Enums"]["content_status"] },
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseCurriculumService.updateLesson(id, patch);
   },
   async listResources() {
+    if (isSupabaseConfigured) {
+      const items = await SupabaseLibraryService.list();
+      return items.map((item) => ({
+        id: item.id,
+        title: item.title,
+        level: item.level_code ?? "—",
+        type: (item.category === "audio"
+          ? "Audio"
+          : item.category === "video"
+            ? "Video"
+            : item.category === "pdf" || item.category === "book"
+              ? "PDF"
+              : "Exercise") as "PDF" | "Audio" | "Video" | "Exercise",
+        date: item.created_at.slice(0, 10),
+        size: item.file_size ? `${Math.max(1, Math.round(item.file_size / 1024))} KB` : "—",
+        storage_path: item.storage_path,
+        storage_bucket: item.storage_bucket,
+      }));
+    }
     await wait(160);
-    return resources;
+    return mockResources;
+  },
+};
+
+export const LibraryService = {
+  async list() {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseLibraryService.list();
+  },
+  async uploadAndCreate(input: Parameters<typeof SupabaseLibraryService.uploadAndCreate>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseLibraryService.uploadAndCreate(input);
+  },
+  async getSignedUrl(item: { storage_bucket: string; storage_path: string }) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseLibraryService.getSignedUrl(item);
   },
 };
 
 export const AssignmentService = {
-  async list() {
+  async list(classId?: string): Promise<AssignmentListItem[]> {
+    if (isSupabaseConfigured) {
+      const rows = await SupabaseAssignmentService.list(classId);
+      return rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        due: row.due_at ? new Date(row.due_at).toLocaleString() : "—",
+        status: row.status === "published" ? "Open" : row.status,
+        classId: row.class_id,
+        description: row.description,
+      }));
+    }
     await wait(180);
-    return assignments;
+    return mockAssignments.map((row) => ({
+      id: row.id,
+      title: row.title,
+      due: row.deadline,
+      status: row.status,
+      studentId: row.studentId,
+      studentName: row.studentName,
+      grade: row.grade,
+      description: null,
+    }));
+  },
+  async create(input: Parameters<typeof SupabaseAssignmentService.create>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseAssignmentService.create(input);
+  },
+  async publish(id: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseAssignmentService.publish(id);
+  },
+  async submit(input: Parameters<typeof SupabaseAssignmentService.upsertSubmission>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseAssignmentService.upsertSubmission(input);
+  },
+  async grade(input: Parameters<typeof SupabaseAssignmentService.grade>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseAssignmentService.grade(input);
+  },
+  async listSubmissions(assignmentId: string) {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseAssignmentService.listSubmissions(assignmentId);
+  },
+};
+
+export const AttendanceService = {
+  async openSession(input: Parameters<typeof SupabaseAttendanceService.openSession>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseAttendanceService.openSession(input);
+  },
+  async saveRecords(
+    sessionId: string,
+    records: Array<{ studentId: string; mark: Database["public"]["Enums"]["attendance_mark"]; note?: string }>,
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseAttendanceService.saveRecords(sessionId, records);
+  },
+  async listSessions(classId: string) {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseAttendanceService.listSessions(classId);
   },
 };
 
 export const ExamService = {
-  async list() {
-    await wait(160);
-    return exams;
+  async listPublished() {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.listPublished();
   },
-  async submit(answers: Record<number, number>): Promise<ExamScore> {
-    await wait(600);
-    return scoreExam(answers);
+  async listAll() {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.listAll();
+  },
+  async getExam(id: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.getExam(id);
+  },
+  async startAttempt(examId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.startAttempt(examId);
+  },
+  async getAttempt(attemptId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.getAttempt(attemptId);
+  },
+  async listAnswers(attemptId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.listAnswers(attemptId);
+  },
+  async saveAnswer(input: {
+    attemptId: string;
+    questionId: string;
+    answer: Json;
+    flagged?: boolean;
+  }) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.saveAnswer(input);
+  },
+  async submitAttempt(attemptId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.submitAttempt(attemptId);
+  },
+  async getResult(attemptId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.getResult(attemptId);
+  },
+  async listMyAttempts(examId?: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.listMyAttempts(examId);
+  },
+  async createExam(input: Parameters<typeof SupabaseExamService.createExam>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.createExam(input);
+  },
+  async publishExam(id: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.publishExam(id);
+  },
+  async archiveExam(id: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.archiveExam(id);
   },
 };
 

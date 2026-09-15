@@ -317,5 +317,3 @@ export const invoices: InvoiceRecord[] = [
     status: "PENDING",
   },
 ];
-
-export const LIVE_ROOM_URL = "https://meet.jit.si/DeutschAcademy-A2-Group-2";

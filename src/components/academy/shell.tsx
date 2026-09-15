@@ -67,6 +67,7 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
         ["assignments", "nav.assignments", ClipboardCheck],
         ["exams", "nav.exams", FileText],
         ["attendance", "nav.attendance", ShieldCheck],
+        ["live", "nav.live", Video],
       ],
     },
     {
@@ -97,6 +98,7 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
         ["payments", "nav.payments", CreditCard],
         ["payroll", "nav.payroll", Wallet],
         ["calendar", "nav.calendar", CalendarDays],
+        ["live", "nav.live", Video],
         ["messages", "nav.messages", MessageSquare],
       ],
     },

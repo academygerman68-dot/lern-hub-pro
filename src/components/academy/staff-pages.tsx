@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { ClipboardCheck, FilePlus2, Search, UserCheck } from "lucide-react";
+import { Search, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   useClassRoster,
   useClasses,
@@ -16,20 +15,26 @@ import {
 import type { AcademyPage } from "@/types/academy";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
-import { Metric, PageHeader, ProgressLine, Status, Surface } from "./primitives";
+import { PageHeader, Metric, ProgressLine, Status, Surface } from "./primitives";
 import { PremiumStudent360 } from "./premium-screens";
 import { PremiumDirectorDashboard, PremiumTeacherDashboard } from "./dashboards";
 import {
   CalendarPage,
-  DirectorAssignments,
   DirectorReports,
   DirectorSettings,
-  Materials,
   Messages,
-  StaffExams,
   TeacherProfile,
 } from "./student-extra";
-import { lessons } from "@/data/mock-data";
+import {
+  DirectorAssignmentsPage,
+  DirectorCoursesPage,
+  MaterialsLibraryPage,
+  TeacherAssignmentsPage,
+  TeacherAttendancePage,
+  TeacherLessonManagerPage,
+} from "./learning-pages";
+import { DirectorExamsPage, StaffExamsPage } from "./exam-pages";
+import { LiveClassesPage } from "./live-pages";
 import { LEAD_TEACHER } from "@/data/demo-accounts";
 
 export function TeacherPages({ page: pageProp }: { page?: AcademyPage } = {}) {
@@ -37,12 +42,13 @@ export function TeacherPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   const page = pageProp ?? contextPage;
   if (page === "classes") return <TeacherClass />;
   if (page === "students") return <TeacherStudents />;
-  if (page === "lessons") return <LessonManager />;
-  if (page === "assignments") return <Grading />;
-  if (page === "attendance") return <Attendance />;
+  if (page === "lessons") return <TeacherLessonManagerPage />;
+  if (page === "assignments") return <TeacherAssignmentsPage />;
+  if (page === "attendance") return <TeacherAttendancePage />;
   if (page === "calendar") return <CalendarPage />;
-  if (page === "materials") return <Materials />;
-  if (page === "exams") return <StaffExams />;
+  if (page === "materials") return <MaterialsLibraryPage />;
+  if (page === "exams") return <StaffExamsPage />;
+  if (page === "live" || page === "meeting") return <LiveClassesPage meeting={page === "meeting"} />;
   if (page === "messages") return <Messages />;
   if (page === "profile") return <TeacherProfile />;
   return <PremiumTeacherDashboard />;
@@ -178,222 +184,6 @@ function TeacherClass() {
   );
 }
 
-function LessonManager() {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <PageHeader
-        title="Lessons"
-        subtitle="Build and publish course content for your classes."
-        action={
-          <Button onClick={() => setOpen(true)}>
-            <FilePlus2 />
-            Create lesson
-          </Button>
-        }
-      />
-      <div className="grid gap-4 md:grid-cols-3">
-        {lessons.map((lesson) => (
-          <Surface className="p-5" key={lesson.id}>
-            <Status tone={lesson.status === "DRAFT" ? "gray" : "green"}>{lesson.status}</Status>
-            <h2 className="mt-4 font-semibold">{lesson.title}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {lesson.level} · {lesson.module} · {lesson.resources} resources
-            </p>
-            <Button variant="outline" size="sm" className="mt-5">
-              Edit lesson
-            </Button>
-          </Surface>
-        ))}
-      </div>
-      {open && (
-        <div className="modal-backdrop">
-          <Surface className="modal-panel p-6">
-            <h2 className="text-xl font-semibold">Create lesson</h2>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <label className="text-sm font-medium">
-                Title
-                <Input className="mt-2" placeholder="Lesson title" />
-              </label>
-              <label className="text-sm font-medium">
-                Level
-                <Input className="mt-2" defaultValue="A2" />
-              </label>
-              <label className="text-sm font-medium sm:col-span-2">
-                Module
-                <Input className="mt-2" placeholder="Module" />
-              </label>
-              <label className="text-sm font-medium sm:col-span-2">
-                Description
-                <Textarea className="mt-2" placeholder="Learning objectives…" />
-              </label>
-            </div>
-            <div className="mt-7 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  setOpen(false);
-                  toast.success("Lesson published");
-                }}
-              >
-                Publish lesson
-              </Button>
-            </div>
-          </Surface>
-        </div>
-      )}
-    </>
-  );
-}
-
-function Grading() {
-  const [grade, setGrade] = useState("82");
-  const [selected, setSelected] = useState(false);
-  const classesQuery = useClasses();
-  const primaryClass = classesQuery.data?.[0];
-  const rosterQuery = useClassRoster(primaryClass?.id);
-  const roster = rosterQuery.data ?? [];
-  if (selected) {
-    return (
-      <>
-        <PageHeader title="Grade assignment" subtitle="Ahmed Benali · German Email Writing" />
-        <div className="grid gap-5 lg:grid-cols-[1fr_22rem]">
-          <Surface className="p-6">
-            <h2 className="font-semibold">Student response</h2>
-            <p className="mt-4 whitespace-pre-line text-sm leading-7 text-muted-foreground">
-              {`Sehr geehrte Frau Schneider,\n\nleider komme ich heute ungefähr 15 Minuten später zur Besprechung. Mein Bus hat Verspätung. Bitte beginnen Sie ohne mich.\n\nMit freundlichen Grüßen,\nAhmed Benali`}
-            </p>
-          </Surface>
-          <Surface className="p-6">
-            <label className="text-sm font-medium">
-              Grade / 100
-              <Input
-                className="mt-2"
-                value={grade}
-                onChange={(event) => setGrade(event.target.value)}
-              />
-            </label>
-            <label className="mt-4 block text-sm font-medium">
-              Feedback
-              <Textarea
-                className="mt-2"
-                defaultValue="Sehr gut strukturiert. Achte noch auf die Wortstellung."
-              />
-            </label>
-            <Button
-              className="mt-5 w-full"
-              onClick={() => {
-                toast.success("Marked as graded");
-                setSelected(false);
-              }}
-            >
-              Mark as graded
-            </Button>
-          </Surface>
-        </div>
-      </>
-    );
-  }
-  return (
-    <>
-      <PageHeader
-        title="Assignments to grade"
-        subtitle="Review student work and provide actionable feedback."
-      />
-      <QueryState
-        isLoading={classesQuery.isLoading || rosterQuery.isLoading}
-        isError={classesQuery.isError || rosterQuery.isError}
-        error={(classesQuery.error ?? rosterQuery.error) as Error | null}
-        isEmpty={roster.length === 0}
-        emptyMessage="No students available to grade yet."
-      >
-        <Surface className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>Assignment</th>
-                <th>Class</th>
-                <th>Grade</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {roster.slice(0, 8).map((student, index) => (
-                <tr key={student.id}>
-                  <td className="font-medium">{student.name}</td>
-                  <td>{index % 2 ? "Listening Exercise" : "German Email Writing"}</td>
-                  <td>{student.className}</td>
-                  <td>—</td>
-                  <td>
-                    <Button variant="ghost" size="sm" onClick={() => setSelected(true)}>
-                      Grade
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Surface>
-      </QueryState>
-    </>
-  );
-}
-
-function Attendance() {
-  const [states, setStates] = useState<Record<string, string>>({});
-  const classesQuery = useClasses();
-  const primaryClass = classesQuery.data?.[0];
-  const rosterQuery = useClassRoster(primaryClass?.id);
-  const roster = rosterQuery.data ?? [];
-  const present = roster.filter((s) => (states[s.id] ?? "Present") === "Present").length;
-  const late = roster.filter((s) => states[s.id] === "Late").length;
-  const absent = roster.filter((s) => states[s.id] === "Absent").length;
-  return (
-    <>
-      <PageHeader
-        title="Attendance"
-        subtitle={primaryClass ? `${primaryClass.name} · Today` : "Select a class"}
-        action={<Button onClick={() => toast.success("Attendance saved")}>Save attendance</Button>}
-      />
-      <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <Metric label="Present" value={String(present)} />
-        <Metric label="Late" value={String(late)} />
-        <Metric label="Absent" value={String(absent)} />
-      </div>
-      <QueryState
-        isLoading={classesQuery.isLoading || rosterQuery.isLoading}
-        isError={classesQuery.isError || rosterQuery.isError}
-        error={(classesQuery.error ?? rosterQuery.error) as Error | null}
-        isEmpty={roster.length === 0}
-        emptyMessage="No enrolled students for attendance."
-      >
-        <Surface className="divide-y">
-          {roster.map((student) => (
-            <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center" key={student.id}>
-              <span className="flex-1 font-medium">{student.name}</span>
-              <div className="flex flex-wrap gap-2">
-                {["Present", "Absent", "Late", "Excused"].map((item) => (
-                  <Button
-                    key={item}
-                    size="sm"
-                    variant={(states[student.id] ?? "Present") === item ? "default" : "outline"}
-                    onClick={() => setStates({ ...states, [student.id]: item })}
-                  >
-                    {item}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </Surface>
-      </QueryState>
-    </>
-  );
-}
-
 export function DirectorPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   const { page: contextPage } = useAcademy();
   const page = pageProp ?? contextPage;
@@ -401,14 +191,15 @@ export function DirectorPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "student360") return <PremiumStudent360 />;
   if (page === "classes") return <Classes />;
   if (page === "teachers") return <Teachers />;
-  if (page === "courses" || page === "levels") return <Courses />;
-  if (page === "exams") return <ExamManagement />;
+  if (page === "courses" || page === "levels") return <DirectorCoursesPage />;
+  if (page === "exams") return <DirectorExamsPage />;
   if (page === "payments" || page === "subscriptions" || page === "invoices" || page === "payroll")
     return <Finance mode={page === "payroll" ? "payments" : page} />;
   if (page === "audit") return <Audit />;
-  if (page === "materials") return <Materials />;
-  if (page === "assignments") return <DirectorAssignments />;
+  if (page === "materials") return <MaterialsLibraryPage />;
+  if (page === "assignments") return <DirectorAssignmentsPage />;
   if (page === "calendar") return <CalendarPage />;
+  if (page === "live" || page === "meeting") return <LiveClassesPage meeting={page === "meeting"} />;
   if (page === "messages") return <Messages counterpart="Ahmed Benali" />;
   if (page === "reports") return <DirectorReports />;
   if (page === "settings") return <DirectorSettings />;
@@ -694,110 +485,6 @@ function Teachers() {
           ))}
         </div>
       </QueryState>
-    </>
-  );
-}
-
-function Courses() {
-  return (
-    <>
-      <PageHeader
-        title="Course Management"
-        subtitle="Curriculum structure across A1 to B2."
-        action={<Button>+ Create module</Button>}
-      />
-      <div className="space-y-3">
-        {[
-          "A1 · Foundations",
-          "A2 · Everyday German",
-          "B1 · Independent German",
-          "B2 · Advanced German",
-        ].map((label, index) => (
-          <Surface className="p-5" key={label}>
-            <div className="flex items-center gap-4">
-              <span className="grid size-11 place-items-center rounded-md bg-primary font-semibold text-primary-foreground">
-                {label.slice(0, 2)}
-              </span>
-              <div className="flex-1">
-                <h2 className="font-semibold">{label}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {5 + index} modules → {24 + index * 4} units → {52 + index * 7} lessons →
-                  materials → exercises
-                </p>
-              </div>
-              <Button variant="outline" size="sm">
-                Manage
-              </Button>
-            </div>
-          </Surface>
-        ))}
-      </div>
-    </>
-  );
-}
-
-function ExamManagement() {
-  const { examPublished, setExamPublished } = useAcademy();
-  const [create, setCreate] = useState(false);
-  return (
-    <>
-      <PageHeader
-        title="Exam Management"
-        subtitle="Create assessments, manage question banks and publication."
-        action={<Button onClick={() => setCreate(true)}>+ Create Exam</Button>}
-      />
-      <div className="space-y-3">
-        {["A1 Mock Exam 01", "A2 Mock Exam 01", "A2 Mock Exam 02", "B2 Mock Exam 01"].map(
-          (title, index) => (
-            <Surface className="flex items-center gap-4 p-5" key={title}>
-              <span className="grid size-10 place-items-center rounded-md bg-secondary text-primary">
-                <ClipboardCheck />
-              </span>
-              <div className="flex-1">
-                <h2 className="font-semibold">{title}</h2>
-                <p className="text-xs text-muted-foreground">
-                  Hören · scored questions · 30 minutes · Pass 60%
-                </p>
-              </div>
-              <Status tone={(index === 2 && !examPublished) || index === 3 ? "gray" : "green"}>
-                {(index === 2 && !examPublished) || index === 3 ? "DRAFT" : "PUBLISHED"}
-              </Status>
-            </Surface>
-          ),
-        )}
-      </div>
-      {create && (
-        <div className="modal-backdrop">
-          <Surface className="modal-panel p-6">
-            <h2 className="text-xl font-semibold">Create Exam</h2>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              {["Level", "Skill", "Questions", "Duration", "Passing score"].map((label) => (
-                <label className="text-sm font-medium" key={label}>
-                  {label}
-                  <Input
-                    className="mt-2"
-                    defaultValue={label === "Level" ? "A2" : label === "Skill" ? "Hören" : ""}
-                  />
-                </label>
-              ))}
-            </div>
-            <div className="mt-7 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setCreate(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  setExamPublished(true);
-                  setCreate(false);
-                  toast.success("Exam published · Student access updated");
-                }}
-              >
-                {examPublished ? "Publish again" : "Publish exam"}
-              </Button>
-            </div>
-          </Surface>
-        </div>
-      )}
     </>
   );
 }
