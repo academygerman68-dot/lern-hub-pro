@@ -17,3 +17,5 @@
 - [x] Desktop and mobile browser verification
 - [x] Traduire toute l’interface en français et arabe avec prise en charge RTL
 - [x] Corriger le contraste des surfaces sombres et valider les deux langues
+- [x] Stabiliser le fournisseur de contexte Academy lors des rechargements
+- [x] Remplacer l’appel vidéo protégé par la salle de classe simulée du prototype
