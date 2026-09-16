@@ -2,6 +2,7 @@ import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { Database } from "@/types/database";
 
 type ContentStatus = Database["public"]["Enums"]["content_status"];
+type CourseContentKind = Database["public"]["Enums"]["course_content_kind"];
 type Course = Database["public"]["Tables"]["courses"]["Row"];
 type Module = Database["public"]["Tables"]["modules"]["Row"];
 type Unit = Database["public"]["Tables"]["units"]["Row"];
@@ -110,6 +111,11 @@ export const SupabaseCurriculumService = {
     title: string;
     description?: string;
     status?: ContentStatus;
+    contentKind?: CourseContentKind;
+    contentUrl?: string | null;
+    storageBucket?: string | null;
+    storagePath?: string | null;
+    mimeType?: string | null;
   }) {
     const { data, error } = await requireClient()
       .from("courses")
@@ -118,6 +124,11 @@ export const SupabaseCurriculumService = {
         title: input.title,
         description: input.description ?? null,
         status: input.status ?? "draft",
+        content_kind: input.contentKind ?? "none",
+        content_url: input.contentUrl ?? null,
+        storage_bucket: input.storageBucket ?? null,
+        storage_path: input.storagePath ?? null,
+        mime_type: input.mimeType ?? null,
       })
       .select("*")
       .single();
@@ -134,6 +145,44 @@ export const SupabaseCurriculumService = {
       .single();
     if (error) throw error;
     return data;
+  },
+
+  async archiveCourse(id: string) {
+    return this.updateCourse(id, { status: "archived" });
+  },
+
+  async uploadCourseMaterial(file: File, createdBy?: string | null) {
+    const supabase = requireClient();
+    const ext = file.name.split(".").pop() ?? "bin";
+    const path = `${createdBy ?? "staff"}/${crypto.randomUUID()}.${ext}`;
+    const uploadOptions = file.type
+      ? { upsert: false as const, contentType: file.type }
+      : { upsert: false as const };
+    const { error } = await supabase.storage
+      .from("course-materials")
+      .upload(path, file, uploadOptions);
+    if (error) throw error;
+    return {
+      storageBucket: "course-materials" as const,
+      storagePath: path,
+      mimeType: file.type || null,
+    };
+  },
+
+  async getCourseMaterialUrl(
+    course: Pick<Course, "content_kind" | "content_url" | "storage_bucket" | "storage_path">,
+    expiresIn = 3600,
+  ) {
+    if (course.content_kind === "link" && course.content_url) return course.content_url;
+    if (!course.storage_bucket || !course.storage_path) {
+      if (course.content_url) return course.content_url;
+      throw new Error("Aucun contenu disponible");
+    }
+    const { data, error } = await requireClient()
+      .storage.from(course.storage_bucket)
+      .createSignedUrl(course.storage_path, expiresIn);
+    if (error) throw error;
+    return data.signedUrl;
   },
 
   async createModule(input: { courseId: string; title: string; description?: string }) {

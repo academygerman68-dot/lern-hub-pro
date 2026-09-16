@@ -2,6 +2,7 @@ export type Role = "student" | "teacher" | "director";
 export type SubscriptionStatus = "ACTIVE" | "PAST_DUE" | "SUSPENDED";
 export type Locale = "fr" | "ar";
 export type Level = "A1" | "A2" | "B1" | "B2";
+export type AccountStatus = "active" | "restricted" | "suspended" | "archived";
 
 export const STUDENT_PAGES = [
   "dashboard",
@@ -77,6 +78,13 @@ export interface Student {
   attendance: number;
   average: number;
   subscription: SubscriptionStatus;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  profileId: string;
+  accountStatus: AccountStatus;
+  teacherName?: string;
+  classId?: string;
 }
 
 export interface Teacher {
@@ -84,6 +92,13 @@ export interface Teacher {
   name: string;
   subject: string;
   classes: string[];
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string | null;
+  profileId: string;
+  levels: string[];
+  accountStatus: AccountStatus;
 }
 
 export interface CourseModule {
@@ -202,4 +217,9 @@ export interface ExamScore {
 
 export interface NavigateOptions {
   studentId?: string;
+  classId?: string;
+  moduleId?: string;
+  lessonId?: string;
+  assignmentId?: string;
+  recipientId?: string;
 }

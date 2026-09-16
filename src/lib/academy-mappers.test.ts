@@ -23,6 +23,8 @@ describe("academy-mappers", () => {
         first_name: "Ahmed",
         last_name: "Benali",
         email: "ahmed@demo.ma",
+        phone: "0612345678",
+        status: "active",
       },
       enrollments: [
         {
@@ -33,6 +35,15 @@ describe("academy-mappers", () => {
             name: "A2 Group 2",
             schedule_label: "Tue/Thu",
             level: { code: "A2" },
+            teacher: {
+              id: "t1",
+              profile: {
+                id: "p2",
+                first_name: "Anna",
+                last_name: "Schneider",
+                email: "anna@demo.ma",
+              },
+            },
           },
         },
       ],
@@ -41,8 +52,15 @@ describe("academy-mappers", () => {
 
     const student = mapStudent(row);
     expect(student.name).toBe("Ahmed Benali");
+    expect(student.firstName).toBe("Ahmed");
+    expect(student.lastName).toBe("Benali");
+    expect(student.phone).toBe("0612345678");
+    expect(student.profileId).toBe("p1");
+    expect(student.accountStatus).toBe("active");
     expect(student.level).toBe("A2");
     expect(student.className).toBe("A2 Group 2");
+    expect(student.classId).toBe("c1");
+    expect(student.teacherName).toBe("Anna Schneider");
     expect(student.subscription).toBe("PAST_DUE");
   });
 
@@ -58,17 +76,25 @@ describe("academy-mappers", () => {
         first_name: "Anna",
         last_name: "Schneider",
         email: "anna@demo.ma",
+        phone: "0699887766",
+        status: "restricted",
       },
       classes: [
-        { id: "c1", name: "A2-G2", status: "active" },
-        { id: "c2", name: "Old", status: "archived" },
+        { id: "c1", name: "A2-G2", status: "active", level: { code: "A2" } },
+        { id: "c2", name: "Old", status: "archived", level: { code: "A1" } },
       ],
     };
 
     const teacher = mapTeacher(row);
     expect(teacher.name).toBe("Anna Schneider");
+    expect(teacher.firstName).toBe("Anna");
+    expect(teacher.email).toBe("anna@demo.ma");
+    expect(teacher.phone).toBe("0699887766");
+    expect(teacher.profileId).toBe("p2");
+    expect(teacher.accountStatus).toBe("restricted");
     expect(teacher.subject).toBe("Conversation");
     expect(teacher.classes).toEqual(["A2-G2"]);
+    expect(teacher.levels).toEqual(["A2"]);
   });
 
   it("maps class size from active enrollments", () => {

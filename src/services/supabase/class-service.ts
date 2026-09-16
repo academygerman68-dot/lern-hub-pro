@@ -32,7 +32,9 @@ const CLASS_SELECT = `
       id,
       first_name,
       last_name,
-      email
+      email,
+      phone,
+      status
     )
   ),
   enrollments (
@@ -151,6 +153,7 @@ export const SupabaseClassService = {
             first_name,
             last_name,
             email,
+            phone,
             status
           ),
           enrollments (
@@ -160,7 +163,16 @@ export const SupabaseClassService = {
               id,
               name,
               schedule_label,
-              level:levels ( code )
+              level:levels ( code ),
+              teacher:teachers!classes_teacher_id_fkey (
+                id,
+                profile:profiles!teachers_profile_id_fkey (
+                  id,
+                  first_name,
+                  last_name,
+                  email
+                )
+              )
             )
           ),
           student_subscriptions ( status )

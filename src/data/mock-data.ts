@@ -52,24 +52,96 @@ const levels = [
   "B1",
 ] as const;
 
-export const students: Student[] = names.map((name, i) => ({
-  id: `ST-${String(i + 1).padStart(3, "0")}`,
-  name,
-  email: `${name.toLowerCase().replaceAll(" ", ".")}@demo.ma`,
-  level: levels[i] ?? "A1",
-  className: `${levels[i] ?? "A1"}-G${(i % 2) + 1}`,
-  progress: i === 0 ? 68 : 42 + ((i * 7) % 50),
-  attendance: i === 0 ? 94 : 79 + ((i * 3) % 20),
-  average: i === 0 ? 81 : 64 + ((i * 5) % 29),
-  subscription: i === 3 ? "SUSPENDED" : i === 7 ? "PAST_DUE" : "ACTIVE",
-}));
+export const students: Student[] = names.map((name, i) => {
+  const parts = name.split(" ").filter(Boolean);
+  const firstName = parts[0] ?? name;
+  const lastName = parts.slice(1).join(" ") || firstName;
+  return {
+    id: `ST-${String(i + 1).padStart(3, "0")}`,
+    name,
+    email: `${name.toLowerCase().replaceAll(" ", ".")}@demo.ma`,
+    level: levels[i] ?? "A1",
+    className: `${levels[i] ?? "A1"}-G${(i % 2) + 1}`,
+    progress: i === 0 ? 68 : 42 + ((i * 7) % 50),
+    attendance: i === 0 ? 94 : 79 + ((i * 3) % 20),
+    average: i === 0 ? 81 : 64 + ((i * 5) % 29),
+    subscription: i === 3 ? "SUSPENDED" : i === 7 ? "PAST_DUE" : "ACTIVE",
+    firstName,
+    lastName,
+    phone: `06${String(10000000 + i).slice(0, 8)}`,
+    profileId: `P-ST-${String(i + 1).padStart(3, "0")}`,
+    accountStatus: i === 3 ? "suspended" : "active",
+    teacherName: LEAD_TEACHER,
+    classId: `${levels[i] ?? "A1"}-G${(i % 2) + 1}`,
+  };
+});
 
 export const teachers: Teacher[] = [
-  { id: "T-01", name: LEAD_TEACHER, subject: "Deutsch A2 · B1", classes: ["A2-G2", "B1-G1"] },
-  { id: "T-02", name: "Felix Wagner", subject: "Deutsch A1", classes: ["A1-G1"] },
-  { id: "T-03", name: "Laura Schneider", subject: "Deutsch A1 · A2", classes: ["A1-G2", "A2-G1"] },
-  { id: "T-04", name: "Jonas Fischer", subject: "Deutsch B2", classes: ["B2-G1"] },
-  { id: "T-05", name: "Mia Hoffmann", subject: "Exam preparation", classes: ["A2-G2"] },
+  {
+    id: "T-01",
+    name: LEAD_TEACHER,
+    subject: "Deutsch A2 · B1",
+    classes: ["A2-G2", "B1-G1"],
+    firstName: LEAD_TEACHER.split(" ")[0] ?? "Anna",
+    lastName: LEAD_TEACHER.split(" ").slice(1).join(" ") || "Schneider",
+    email: "anna@demo.ma",
+    phone: "0612345678",
+    profileId: "P-T-01",
+    levels: ["A2", "B1"],
+    accountStatus: "active",
+  },
+  {
+    id: "T-02",
+    name: "Felix Wagner",
+    subject: "Deutsch A1",
+    classes: ["A1-G1"],
+    firstName: "Felix",
+    lastName: "Wagner",
+    email: "felix@demo.ma",
+    phone: null,
+    profileId: "P-T-02",
+    levels: ["A1"],
+    accountStatus: "active",
+  },
+  {
+    id: "T-03",
+    name: "Laura Schneider",
+    subject: "Deutsch A1 · A2",
+    classes: ["A1-G2", "A2-G1"],
+    firstName: "Laura",
+    lastName: "Schneider",
+    email: "laura@demo.ma",
+    phone: null,
+    profileId: "P-T-03",
+    levels: ["A1", "A2"],
+    accountStatus: "active",
+  },
+  {
+    id: "T-04",
+    name: "Jonas Fischer",
+    subject: "Deutsch B2",
+    classes: ["B2-G1"],
+    firstName: "Jonas",
+    lastName: "Fischer",
+    email: "jonas@demo.ma",
+    phone: null,
+    profileId: "P-T-04",
+    levels: ["B2"],
+    accountStatus: "active",
+  },
+  {
+    id: "T-05",
+    name: "Mia Hoffmann",
+    subject: "Exam preparation",
+    classes: ["A2-G2"],
+    firstName: "Mia",
+    lastName: "Hoffmann",
+    email: "mia@demo.ma",
+    phone: null,
+    profileId: "P-T-05",
+    levels: ["A2"],
+    accountStatus: "active",
+  },
 ];
 
 export const modules: CourseModule[] = [

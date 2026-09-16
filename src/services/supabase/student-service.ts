@@ -17,6 +17,7 @@ const STUDENT_SELECT = `
     first_name,
     last_name,
     email,
+    phone,
     status
   ),
   enrollments (
@@ -26,7 +27,16 @@ const STUDENT_SELECT = `
       id,
       name,
       schedule_label,
-      level:levels ( code )
+      level:levels ( code ),
+      teacher:teachers!classes_teacher_id_fkey (
+        id,
+        profile:profiles!teachers_profile_id_fkey (
+          id,
+          first_name,
+          last_name,
+          email
+        )
+      )
     )
   ),
   student_subscriptions ( status )
@@ -66,8 +76,12 @@ export const SupabaseStudentService = {
       rows = rows.filter(
         (s) =>
           s.name.toLowerCase().includes(search) ||
+          s.firstName.toLowerCase().includes(search) ||
+          s.lastName.toLowerCase().includes(search) ||
           s.email.toLowerCase().includes(search) ||
+          (s.phone ?? "").toLowerCase().includes(search) ||
           s.className.toLowerCase().includes(search) ||
+          (s.teacherName ?? "").toLowerCase().includes(search) ||
           s.id.toLowerCase().includes(search),
       );
     }

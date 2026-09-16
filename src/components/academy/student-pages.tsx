@@ -1,9 +1,9 @@
-import { PremiumProfile, PremiumLesson } from "./premium-screens";
+import { PremiumProfile } from "./premium-screens";
+import { StudentLessonPage, AssignmentWorkflow } from "./workflow-pages";
 import { PremiumStudentDashboard } from "./dashboards";
 import { CalendarPage, Messages, Progress } from "./student-extra";
 import {
   MaterialsLibraryPage,
-  StudentAssignmentsPage,
   StudentLearningPage,
 } from "./learning-pages";
 import { StudentExamsPage } from "./exam-pages";
@@ -16,13 +16,13 @@ export function StudentPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   const { page: contextPage } = useAcademy();
   const page = pageProp ?? contextPage;
   if (page === "courses") return <StudentLearningPage />;
-  if (page === "lesson") return <PremiumLesson />;
+  if (page === "lesson") return <StudentLessonPage />;
   if (page === "materials") return <MaterialsLibraryPage />;
   if (page === "live" || page === "meeting")
     return <LiveClassesPage meeting={page === "meeting"} />;
   if (page === "calendar") return <CalendarPage />;
   if (page === "assignments" || page === "assignment-detail")
-    return <StudentAssignmentsPage detail={page === "assignment-detail"} />;
+    return <AssignmentWorkflow detail={page === "assignment-detail"} />;
   if (page === "exams" || page === "mock-exam" || page === "exam-result")
     return <StudentExamsPage mode={page} />;
   if (page === "progress") return <Progress />;

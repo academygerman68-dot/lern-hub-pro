@@ -10,7 +10,12 @@ type LiveSession = Database["public"]["Tables"]["live_sessions"]["Row"];
 type LiveSessionStatus = Database["public"]["Enums"]["live_session_status"];
 
 export type LiveSessionListItem = LiveSession & {
-  class?: { id: string; name: string; teacher_id?: string | null } | null;
+  class?: {
+    id: string;
+    name: string;
+    teacher_id?: string | null;
+    level?: { id: string; code: string; name: string } | null;
+  } | null;
   teacher?: {
     id: string;
     profile: { first_name: string; last_name: string } | null;
@@ -24,7 +29,12 @@ function requireClient() {
 
 const SELECT = `
   *,
-  class:classes ( id, name, teacher_id ),
+  class:classes (
+    id,
+    name,
+    teacher_id,
+    level:levels!classes_level_id_fkey ( id, code, name )
+  ),
   teacher:teachers (
     id,
     profile:profiles!teachers_profile_id_fkey ( first_name, last_name )

@@ -5,11 +5,9 @@ import {
   Download,
   FileText,
   Headphones,
-  Paperclip,
   Send,
   Upload,
   Video,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -19,12 +17,18 @@ import { queryKeys } from "@/lib/query-keys";
 import { AssignmentService, CourseService } from "@/services/academy-services";
 import { SettingsService } from "@/services/supabase/settings-service";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMyExamAttempts } from "@/hooks/use-academy-data";
-import { Metric, PageHeader, ProgressLine, SectionTitle, Status, Surface } from "./primitives";
+import {
+  useClasses,
+  useConversationMessages,
+  useConversations,
+  useCreateClassConversation,
+  useLiveSessions,
+  useMyExamAttempts,
+  useSendMessage,
+} from "@/hooks/use-academy-data";
+import { Metric, PageHeader, ProgressLine, Status, Surface } from "./primitives";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
-
-const weekOffsets = ["mt-2", "mt-3", "mt-4", "mt-5", "mt-6", "mt-7", "mt-8"] as const;
 
 export function Materials() {
   const [type, setType] = useState("All");
@@ -94,56 +98,245 @@ export function Materials() {
 }
 
 export function CalendarPage() {
-  const events = [
-    "A2 German|18:00",
-    "Grammar|18:00",
-    "Vocabulary Lab|17:30",
-    "Speaking|19:00",
-    "Assignment due|20:00",
-    "Mock Exam|10:00",
-    "",
-  ];
+  const sessionsQuery = useLiveSessions();
+  const [view, setView] = useState<"week" | "month">("week");
+  const [anchor, setAnchor] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const sessions = sessionsQuery.data ?? [];
+  const selected = sessions.find((s) => s.id === selectedId) ?? null;
+
+  const weekStart = useMemo(() => {
+    const d = new Date(anchor);
+    const day = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - day);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [anchor]);
+
+  const weekDays = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(weekStart);
+        d.setDate(weekStart.getDate() + i);
+        return d;
+      }),
+    [weekStart],
+  );
+
+  const monthCells = useMemo(() => {
+    const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+    const startOffset = (first.getDay() + 6) % 7;
+    const start = new Date(first);
+    start.setDate(1 - startOffset);
+    return Array.from({ length: 42 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      return d;
+    });
+  }, [anchor]);
+
+  const dayKey = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  const sessionsByDay = useMemo(() => {
+    const map = new Map<string, typeof sessions>();
+    for (const session of sessions) {
+      const key = dayKey(new Date(session.starts_at));
+      const list = map.get(key) ?? [];
+      list.push(session);
+      map.set(key, list);
+    }
+    return map;
+  }, [sessions]);
+
+  const teacherName = (session: (typeof sessions)[number]) => {
+    const p = session.teacher?.profile;
+    if (!p) return "—";
+    return `${p.first_name} ${p.last_name}`.trim() || "—";
+  };
+
+  const formatRange = (startsAt: string, endsAt: string | null) => {
+    const start = new Date(startsAt);
+    const end = endsAt ? new Date(endsAt) : null;
+    const time = (d: Date) =>
+      d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    return end ? `${time(start)} – ${time(end)}` : time(start);
+  };
+
+  const weekdayLabel = (d: Date) =>
+    d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" });
+
   return (
     <>
       <PageHeader
-        title="Calendar"
-        subtitle="Your classes, exams and deadlines for September 2026."
+        title="Calendrier"
+        subtitle="Sessions en direct : groupe, niveau et professeur."
         action={
-          <div className="flex gap-2">
-            <Button size="sm">Week</Button>
-            <Button size="sm" variant="outline">
-              Month
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                setAnchor((prev) => {
+                  const d = new Date(prev);
+                  d.setDate(d.getDate() - (view === "week" ? 7 : 30));
+                  return d;
+                })
+              }
+            >
+              Précédent
+            </Button>
+            <Button size="sm" variant={view === "week" ? "default" : "outline"} onClick={() => setView("week")}>
+              Semaine
+            </Button>
+            <Button
+              size="sm"
+              variant={view === "month" ? "default" : "outline"}
+              onClick={() => setView("month")}
+            >
+              Mois
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                setAnchor((prev) => {
+                  const d = new Date(prev);
+                  d.setDate(d.getDate() + (view === "week" ? 7 : 30));
+                  return d;
+                })
+              }
+            >
+              Suivant
             </Button>
           </div>
         }
       />
-      <Surface className="overflow-x-auto">
-        <div className="grid min-w-[760px] grid-cols-7 border-b bg-muted/50 text-center text-xs font-medium text-muted-foreground">
-          {["Mon 14", "Tue 15", "Wed 16", "Thu 17", "Fri 18", "Sat 19", "Sun 20"].map((day) => (
-            <div className="p-4" key={day}>
-              {day}
+      <QueryState
+        isLoading={sessionsQuery.isLoading}
+        isError={sessionsQuery.isError}
+        error={sessionsQuery.error}
+        isEmpty={false}
+        onRetry={() => void sessionsQuery.refetch()}
+      >
+        {view === "week" ? (
+          <Surface className="overflow-x-auto">
+            <div className="grid min-w-[720px] grid-cols-7 border-b bg-muted/50 text-center text-xs font-medium text-muted-foreground">
+              {weekDays.map((day) => (
+                <div className="p-3 sm:p-4" key={dayKey(day)}>
+                  {weekdayLabel(day)}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div className="grid min-h-[430px] min-w-[760px] grid-cols-7">
-          {events.map((event, index) => {
-            const offset = weekOffsets[index] ?? "mt-2";
-            const [title, time] = event.split("|");
-            return (
-              <div key={`${event}-${index}`} className="border-r p-2">
-                {event && (
-                  <div
-                    className={`${offset} rounded-md border-l-2 border-primary bg-secondary p-3`}
-                  >
-                    <strong className="text-xs">{title}</strong>
-                    <p className="mt-1 text-[11px] text-muted-foreground">{time}</p>
+            <div className="grid min-h-[360px] min-w-[720px] grid-cols-7">
+              {weekDays.map((day) => {
+                const items = sessionsByDay.get(dayKey(day)) ?? [];
+                return (
+                  <div key={dayKey(day)} className="space-y-2 border-r p-2">
+                    {items.map((session) => (
+                      <button
+                        key={session.id}
+                        type="button"
+                        className="w-full rounded-md border-l-2 border-primary bg-secondary p-2 text-left"
+                        onClick={() => setSelectedId(session.id)}
+                      >
+                        <strong className="block text-xs">{session.title}</strong>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {formatRange(session.starts_at, session.ends_at)}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {session.class?.name ?? "—"} · {session.class?.level?.code ?? "—"}
+                        </p>
+                      </button>
+                    ))}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          </Surface>
+        ) : (
+          <Surface className="overflow-x-auto p-2 sm:p-4">
+            <p className="mb-3 text-sm font-medium capitalize">
+              {anchor.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
+            </p>
+            <div className="grid min-w-[640px] grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+              {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((d) => (
+                <div key={d} className="p-2 font-medium">
+                  {d}
+                </div>
+              ))}
+              {monthCells.map((day) => {
+                const inMonth = day.getMonth() === anchor.getMonth();
+                const items = sessionsByDay.get(dayKey(day)) ?? [];
+                return (
+                  <div
+                    key={dayKey(day)}
+                    className={`min-h-24 rounded-md border p-1.5 text-left ${inMonth ? "bg-card" : "bg-muted/40 opacity-60"}`}
+                  >
+                    <p className="mb-1 text-[11px] font-medium">{day.getDate()}</p>
+                    <div className="space-y-1">
+                      {items.slice(0, 3).map((session) => (
+                        <button
+                          key={session.id}
+                          type="button"
+                          className="block w-full truncate rounded bg-secondary px-1 py-0.5 text-[10px]"
+                          onClick={() => setSelectedId(session.id)}
+                        >
+                          {session.title}
+                        </button>
+                      ))}
+                      {items.length > 3 && (
+                        <p className="text-[10px] text-muted-foreground">+{items.length - 3}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Surface>
+        )}
+      </QueryState>
+
+      {selected && (
+        <div className="mobile-modal">
+          <Surface className="mobile-modal-panel space-y-3">
+            <h2 className="text-lg font-semibold">{selected.title}</h2>
+            <p className="text-sm text-muted-foreground">
+              {formatRange(selected.starts_at, selected.ends_at)} ·{" "}
+              {new Date(selected.starts_at).toLocaleDateString("fr-FR")}
+            </p>
+            <p className="text-sm">
+              Groupe : <strong>{selected.class?.name ?? "—"}</strong>
+            </p>
+            <p className="text-sm">
+              Niveau : <strong>{selected.class?.level?.code ?? "—"}</strong>
+            </p>
+            <p className="text-sm">
+              Professeur : <strong>{teacherName(selected)}</strong>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Statut :{" "}
+              {selected.status === "live"
+                ? "En direct"
+                : selected.status === "scheduled"
+                  ? "Planifiée"
+                  : selected.status === "completed"
+                    ? "Terminée"
+                    : "Annulée"}
+            </p>
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => setSelectedId(null)}>
+                Fermer
+              </Button>
+            </div>
+          </Surface>
         </div>
-      </Surface>
+      )}
     </>
   );
 }
@@ -335,68 +528,234 @@ export function Progress() {
   );
 }
 
-export function Messages({ counterpart = LEAD_TEACHER }: { counterpart?: string }) {
-  const [msgs, setMsgs] = useState([
-    `Guten Tag! Your last assignment was very good.`,
-    "Danke! Ich werde die Korrekturen ansehen.",
-  ]);
+export function Messages({ counterpart: _counterpart }: { counterpart?: string } = {}) {
+  const { role, user } = useAcademy();
+  const conversationsQuery = useConversations();
+  const classesQuery = useClasses();
+  const createConversation = useCreateClassConversation();
+  const sendMessage = useSendMessage();
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [text, setText] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [classId, setClassId] = useState("");
+  const [convName, setConvName] = useState("");
+  const [includeTeacher, setIncludeTeacher] = useState(true);
+
+  const conversations = conversationsQuery.data ?? [];
+  const active = conversations.find((c) => c.id === activeId) ?? conversations[0] ?? null;
+  const activeConversationId = active?.id ?? null;
+  const messagesQuery = useConversationMessages(activeConversationId);
+
+  useEffect(() => {
+    if (!activeId && conversations[0]?.id) setActiveId(conversations[0].id);
+  }, [activeId, conversations]);
+
+  const memberLabel = (c: (typeof conversations)[number]) => {
+    const count = c.members?.length ?? 0;
+    return `${count} membre${count === 1 ? "" : "s"}`;
+  };
+
   return (
     <>
-      <PageHeader title="Messages" subtitle="Stay connected with teachers and administration." />
-      <Surface className="grid min-h-[600px] overflow-hidden md:grid-cols-[17rem_1fr]">
+      <PageHeader
+        title="Messages"
+        subtitle="Conversations de groupe et échanges avec l’équipe."
+        action={
+          role === "director" ? (
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              + Conversation de groupe
+            </Button>
+          ) : undefined
+        }
+      />
+      <Surface className="grid min-h-[560px] overflow-hidden md:grid-cols-[17rem_1fr]">
         <aside className="border-r p-3">
-          {[`${counterpart} · Teacher`, "Administration", "A2 Group"].map((item, index) => (
-            <button
-              className={`mb-1 w-full rounded-md p-3 text-left text-sm ${index === 0 ? "bg-secondary text-primary" : "hover:bg-muted"}`}
-              key={item}
-            >
-              {item}
-              <small className="mt-1 block text-muted-foreground">
-                {index === 0 ? "10 min ago" : "Yesterday"}
-              </small>
-            </button>
-          ))}
-        </aside>
-        <div className="flex flex-col">
-          <div className="border-b p-4">
-            <strong>{counterpart}</strong>
-            <small className="ml-2 text-success">● Online</small>
-          </div>
-          <div className="flex-1 space-y-3 p-5">
-            {msgs.map((message, index) => (
-              <div
-                key={`${message}-${index}`}
-                className={`max-w-md rounded-lg p-3 text-sm ${index % 2 ? "ml-auto bg-primary text-primary-foreground" : "bg-muted"}`}
-              >
-                {message}
-              </div>
-            ))}
-          </div>
-          <form
-            className="flex gap-2 border-t p-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (text) {
-                setMsgs([...msgs, text]);
-                setText("");
-              }
-            }}
+          <QueryState
+            isLoading={conversationsQuery.isLoading}
+            isError={conversationsQuery.isError}
+            error={conversationsQuery.error}
+            isEmpty={!conversations.length}
+            emptyTitle="Aucune conversation"
+            emptyMessage={
+              role === "director"
+                ? "Créez une conversation à partir d’un groupe."
+                : "Vous n’êtes membre d’aucune conversation."
+            }
+            onRetry={() => void conversationsQuery.refetch()}
           >
-            <Button variant="ghost" size="icon" type="button">
-              <Paperclip />
-            </Button>
-            <Input
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              placeholder="Write a message…"
-            />
-            <Button size="icon">
-              <Send />
-            </Button>
-          </form>
+            {conversations.map((item) => (
+              <button
+                className={`mb-1 w-full rounded-md p-3 text-left text-sm ${
+                  item.id === activeConversationId
+                    ? "bg-secondary text-primary"
+                    : "hover:bg-muted"
+                }`}
+                key={item.id}
+                type="button"
+                onClick={() => setActiveId(item.id)}
+              >
+                {item.name}
+                <small className="mt-1 block text-muted-foreground">
+                  {item.class?.name ? `${item.class.name} · ` : ""}
+                  {memberLabel(item)}
+                </small>
+              </button>
+            ))}
+          </QueryState>
+        </aside>
+        <div className="flex min-h-[420px] flex-col">
+          {active ? (
+            <>
+              <div className="border-b p-4">
+                <strong>{active.name}</strong>
+                {active.class?.name && (
+                  <small className="ml-2 text-muted-foreground">{active.class.name}</small>
+                )}
+                {(active.members?.length ?? 0) > 0 && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {(active.members ?? [])
+                      .slice(0, 6)
+                      .map((m) =>
+                        m.profile
+                          ? `${m.profile.first_name} ${m.profile.last_name}`.trim()
+                          : "—",
+                      )
+                      .join(", ")}
+                    {(active.members?.length ?? 0) > 6 ? "…" : ""}
+                  </p>
+                )}
+              </div>
+              <div className="flex-1 space-y-3 overflow-y-auto p-5">
+                {(messagesQuery.data ?? []).map((message) => {
+                  const mine = message.sender_id === user?.id;
+                  const senderName = message.sender
+                    ? `${message.sender.first_name} ${message.sender.last_name}`.trim()
+                    : "—";
+                  return (
+                    <div
+                      key={message.id}
+                      className={`max-w-md rounded-lg p-3 text-sm ${
+                        mine ? "ml-auto bg-primary text-primary-foreground" : "bg-muted"
+                      }`}
+                    >
+                      {!mine && (
+                        <p className="mb-1 text-[11px] font-medium opacity-80">{senderName}</p>
+                      )}
+                      {message.body}
+                      <p
+                        className={`mt-1 text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}
+                      >
+                        {new Date(message.created_at).toLocaleString("fr-FR")}
+                      </p>
+                    </div>
+                  );
+                })}
+                {!messagesQuery.isLoading && !(messagesQuery.data?.length) && (
+                  <p className="text-sm text-muted-foreground">Aucun message pour l’instant.</p>
+                )}
+              </div>
+              <form
+                className="flex gap-2 border-t p-4"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!text.trim() || !activeConversationId || !user?.id) return;
+                  sendMessage.mutate(
+                    {
+                      conversationId: activeConversationId,
+                      body: text.trim(),
+                      senderId: user.id,
+                    },
+                    {
+                      onSuccess: () => setText(""),
+                      onError: (err) => toast.error(err.message),
+                    },
+                  );
+                }}
+              >
+                <Input
+                  value={text}
+                  onChange={(event) => setText(event.target.value)}
+                  placeholder="Écrire un message…"
+                  disabled={!user?.id}
+                />
+                <Button size="icon" disabled={sendMessage.isPending || !text.trim()}>
+                  <Send />
+                </Button>
+              </form>
+            </>
+          ) : (
+            <div className="grid flex-1 place-items-center p-6 text-sm text-muted-foreground">
+              Sélectionnez une conversation
+            </div>
+          )}
         </div>
       </Surface>
+
+      {createOpen && role === "director" && (
+        <div className="mobile-modal">
+          <Surface className="mobile-modal-panel space-y-4">
+            <h2 className="text-lg font-semibold">Conversation de groupe</h2>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={classId}
+              onChange={(e) => {
+                setClassId(e.target.value);
+                const cls = (classesQuery.data ?? []).find((c) => c.id === e.target.value);
+                if (cls && !convName) setConvName(cls.name);
+              }}
+            >
+              <option value="">Choisir le groupe</option>
+              {(classesQuery.data ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} · {item.level}
+                </option>
+              ))}
+            </select>
+            <Input
+              placeholder="Nom de la conversation"
+              value={convName}
+              onChange={(e) => setConvName(e.target.value)}
+            />
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={includeTeacher}
+                onChange={(e) => setIncludeTeacher(e.target.checked)}
+              />
+              Inclure le professeur du groupe
+            </label>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setCreateOpen(false)}>
+                Annuler
+              </Button>
+              <Button
+                disabled={!classId || !convName.trim() || createConversation.isPending}
+                onClick={() => {
+                  createConversation.mutate(
+                    {
+                      classId,
+                      name: convName.trim(),
+                      includeTeacher,
+                    },
+                    {
+                      onSuccess: (conv) => {
+                        toast.success("Conversation créée");
+                        setCreateOpen(false);
+                        setClassId("");
+                        setConvName("");
+                        setActiveId(conv.id);
+                      },
+                      onError: (err) => toast.error(err.message),
+                    },
+                  );
+                }}
+              >
+                Créer
+              </Button>
+            </div>
+          </Surface>
+        </div>
+      )}
     </>
   );
 }

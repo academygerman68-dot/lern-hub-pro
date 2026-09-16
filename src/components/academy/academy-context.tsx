@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { isDemoAuthAllowed } from "@/lib/auth-config";
 import { translate } from "@/lib/i18n";
 import type { Profile } from "@/lib/roles";
@@ -40,6 +41,7 @@ function toUiLocale(value?: string | null): Locale {
 
 export function AcademyProvider({ children }: { children: ReactNode }) {
   const routerNavigate = useNavigate();
+  const queryClient = useQueryClient();
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<PersistedSession | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -113,6 +115,11 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
       }
 
       if (!payload) {
+        queryClient.clear();
+        setLastScore(null);
+        for (const key of ["ga_active_exam_id", "ga_active_attempt_id", "ga_live_class_id", "ga_live_session_id"]) {
+          window.sessionStorage.removeItem(key);
+        }
         clearSession();
         setSession(null);
         setProfile(null);
@@ -127,7 +134,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
       setSession((prev) =>
         startSession(payload.sessionUser, {
           locale: nextLocale,
-          ...(prev
+          ...(prev?.user.id === payload.sessionUser.id && prev?.user.role === payload.sessionUser.role
             ? {
                 page: prev.page,
                 invoices: prev.invoices,
@@ -143,7 +150,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
       // Navigation is owned by login / OAuth callback / password-recovery handlers.
       // Avoid forcing redirects on TOKEN_REFRESHED / INITIAL_SESSION / SIGNED_IN here.
     });
-  }, [routerNavigate]);
+  }, [routerNavigate, queryClient]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -155,13 +162,13 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
   const persist = useCallback(
     (next: PersistedSession | null) => {
       setSession(next);
-      if (next) saveSession({ ...next, locale, lastScore: lastScore?.overall ?? null });
+      if (next) saveSession({ ...next, lastScore: lastScore?.overall ?? null });
       else {
         clearSession();
         setProfile(null);
       }
     },
-    [locale, lastScore],
+    [lastScore],
   );
 
   const go = useCallback(
@@ -169,7 +176,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
       void routerNavigate({
         to: "/app/$role/$page",
         params: { role, page },
-        search: extra?.studentId ? { studentId: extra.studentId } : {},
+        search: extra ?? {},
       });
       if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     },
@@ -178,25 +185,29 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(
     (user: SessionUser) => {
+      queryClient.clear();
+      setLastScore(null);
       const next = startSession(
         user,
-        session ? { locale, invoices: session.invoices } : { locale },
+        { locale },
       );
       persist(next);
       go(user.role, "dashboard");
     },
-    [go, persist, session, locale],
+    [go, persist, locale, queryClient],
   );
 
   const signOut = useCallback(async () => {
     try {
       await AuthService.logout();
     } finally {
+      queryClient.clear();
+      setLastScore(null);
       persist(null);
       setProfile(null);
       void routerNavigate({ to: "/" });
     }
-  }, [persist, routerNavigate]);
+  }, [persist, routerNavigate, queryClient]);
 
   const setRole = useCallback(
     (role: Role | null) => {

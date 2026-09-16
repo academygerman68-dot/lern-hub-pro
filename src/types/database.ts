@@ -135,6 +135,7 @@ export type Database = {
           id: string;
           instructions: string | null;
           max_score: number;
+          published_at: string | null;
           status: Database["public"]["Enums"]["assignment_status"];
           title: string;
           updated_at: string;
@@ -151,6 +152,7 @@ export type Database = {
           id?: string;
           instructions?: string | null;
           max_score?: number;
+          published_at?: string | null;
           status?: Database["public"]["Enums"]["assignment_status"];
           title: string;
           updated_at?: string;
@@ -167,6 +169,7 @@ export type Database = {
           id?: string;
           instructions?: string | null;
           max_score?: number;
+          published_at?: string | null;
           status?: Database["public"]["Enums"]["assignment_status"];
           title?: string;
           updated_at?: string;
@@ -403,32 +406,47 @@ export type Database = {
       };
       courses: {
         Row: {
+          content_kind: Database["public"]["Enums"]["course_content_kind"];
+          content_url: string | null;
           created_at: string;
           description: string | null;
           id: string;
           level_id: string;
+          mime_type: string | null;
           sort_order: number;
           status: Database["public"]["Enums"]["content_status"];
+          storage_bucket: string | null;
+          storage_path: string | null;
           title: string;
           updated_at: string;
         };
         Insert: {
+          content_kind?: Database["public"]["Enums"]["course_content_kind"];
+          content_url?: string | null;
           created_at?: string;
           description?: string | null;
           id?: string;
           level_id: string;
+          mime_type?: string | null;
           sort_order?: number;
           status?: Database["public"]["Enums"]["content_status"];
+          storage_bucket?: string | null;
+          storage_path?: string | null;
           title: string;
           updated_at?: string;
         };
         Update: {
+          content_kind?: Database["public"]["Enums"]["course_content_kind"];
+          content_url?: string | null;
           created_at?: string;
           description?: string | null;
           id?: string;
           level_id?: string;
+          mime_type?: string | null;
           sort_order?: number;
           status?: Database["public"]["Enums"]["content_status"];
+          storage_bucket?: string | null;
+          storage_path?: string | null;
           title?: string;
           updated_at?: string;
         };
@@ -438,6 +456,84 @@ export type Database = {
             columns: ["level_id"];
             isOneToOne: false;
             referencedRelation: "levels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      conversations: {
+        Row: {
+          class_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          name: string;
+          updated_at: string;
+        };
+        Insert: {
+          class_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          name: string;
+          updated_at?: string;
+        };
+        Update: {
+          class_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          name?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "conversations_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "conversations_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      conversation_members: {
+        Row: {
+          conversation_id: string;
+          joined_at: string;
+          profile_id: string;
+          role: string;
+        };
+        Insert: {
+          conversation_id: string;
+          joined_at?: string;
+          profile_id: string;
+          role?: string;
+        };
+        Update: {
+          conversation_id?: string;
+          joined_at?: string;
+          profile_id?: string;
+          role?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "conversation_members_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "conversation_members_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -1058,11 +1154,15 @@ export type Database = {
       library_items: {
         Row: {
           archived_at: string | null;
+          audience: Database["public"]["Enums"]["library_audience"];
           category: Database["public"]["Enums"]["library_category"];
+          class_id: string | null;
           course_id: string | null;
           created_at: string;
           created_by: string | null;
           description: string | null;
+          domain: Database["public"]["Enums"]["library_domain"];
+          external_url: string | null;
           file_size: number | null;
           id: string;
           language: string;
@@ -1076,11 +1176,15 @@ export type Database = {
         };
         Insert: {
           archived_at?: string | null;
+          audience?: Database["public"]["Enums"]["library_audience"];
           category?: Database["public"]["Enums"]["library_category"];
+          class_id?: string | null;
           course_id?: string | null;
           created_at?: string;
           created_by?: string | null;
           description?: string | null;
+          domain?: Database["public"]["Enums"]["library_domain"];
+          external_url?: string | null;
           file_size?: number | null;
           id?: string;
           language?: string;
@@ -1094,11 +1198,15 @@ export type Database = {
         };
         Update: {
           archived_at?: string | null;
+          audience?: Database["public"]["Enums"]["library_audience"];
           category?: Database["public"]["Enums"]["library_category"];
+          class_id?: string | null;
           course_id?: string | null;
           created_at?: string;
           created_by?: string | null;
           description?: string | null;
+          domain?: Database["public"]["Enums"]["library_domain"];
+          external_url?: string | null;
           file_size?: number | null;
           id?: string;
           language?: string;
@@ -1111,6 +1219,13 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["library_visibility"];
         };
         Relationships: [
+          {
+            foreignKeyName: "library_items_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "library_items_course_id_fkey";
             columns: ["course_id"];
@@ -1200,6 +1315,45 @@ export type Database = {
             columns: ["teacher_id"];
             isOneToOne: false;
             referencedRelation: "teachers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      messages: {
+        Row: {
+          body: string;
+          conversation_id: string;
+          created_at: string;
+          id: string;
+          sender_id: string;
+        };
+        Insert: {
+          body: string;
+          conversation_id: string;
+          created_at?: string;
+          id?: string;
+          sender_id: string;
+        };
+        Update: {
+          body?: string;
+          conversation_id?: string;
+          created_at?: string;
+          id?: string;
+          sender_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey";
+            columns: ["sender_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -1646,6 +1800,27 @@ export type Database = {
     };
     Functions: {
       _test_as: { Args: { uid: string }; Returns: undefined };
+      admin_create_class_conversation: {
+        Args: {
+          p_class_id: string;
+          p_name: string;
+          p_include_teacher?: boolean;
+        };
+        Returns: {
+          class_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          name: string;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "conversations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       create_in_app_notification: {
         Args: {
           p_category?: string;
@@ -1673,6 +1848,31 @@ export type Database = {
         SetofOptions: {
           from: "*";
           to: "notifications";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      admin_set_profile_status: {
+        Args: {
+          p_profile_id: string;
+          p_status: Database["public"]["Enums"]["profile_status"];
+        };
+        Returns: {
+          archived_at: string | null;
+          created_at: string;
+          email: string | null;
+          first_name: string;
+          id: string;
+          language: Database["public"]["Enums"]["app_locale"];
+          last_name: string;
+          phone: string | null;
+          role: Database["public"]["Enums"]["app_role"];
+          status: Database["public"]["Enums"]["profile_status"];
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "profiles";
           isOneToOne: true;
           isSetofReturn: false;
         };
@@ -1715,6 +1915,8 @@ export type Database = {
       };
       is_active_user: { Args: never; Returns: boolean };
       is_admin: { Args: never; Returns: boolean };
+      is_account_usable: { Args: never; Returns: boolean };
+      is_conversation_member: { Args: { p_conversation_id: string }; Returns: boolean };
       is_enrolled_in_class: { Args: { p_class_id: string }; Returns: boolean };
       is_student: { Args: never; Returns: boolean };
       is_teacher: { Args: never; Returns: boolean };
@@ -1868,6 +2070,7 @@ export type Database = {
       attendance_mark: "present" | "absent" | "late" | "excused";
       class_status: "planned" | "active" | "completed" | "archived";
       content_status: "draft" | "published" | "archived";
+      course_content_kind: "none" | "pdf" | "link" | "image" | "audio";
       enrollment_status: "active" | "completed" | "withdrawn" | "suspended";
       exam_attempt_status: "in_progress" | "submitted" | "graded" | "expired";
       exam_question_type:
@@ -1895,13 +2098,15 @@ export type Database = {
         | "university"
         | "application"
         | "announcement";
+      library_domain: "academic" | "professional";
+      library_audience: "everyone" | "level" | "class";
       library_visibility: "private" | "staff" | "academy" | "published";
       live_session_status: "scheduled" | "live" | "completed" | "cancelled";
       meeting_provider: "jitsi" | "jaas" | "none";
       notification_channel: "in_app" | "email" | "whatsapp";
       notification_status: "unread" | "read" | "archived";
       payment_status: "pending" | "partial" | "paid" | "overdue" | "cancelled";
-      profile_status: "active" | "suspended" | "archived";
+      profile_status: "active" | "restricted" | "suspended" | "archived";
       record_status: "active" | "inactive" | "archived";
       submission_status: "draft" | "submitted" | "graded" | "returned";
       subscription_status:
@@ -2033,6 +2238,7 @@ export const Constants = {
       attendance_mark: ["present", "absent", "late", "excused"],
       class_status: ["planned", "active", "completed", "archived"],
       content_status: ["draft", "published", "archived"],
+      course_content_kind: ["none", "pdf", "link", "image", "audio"],
       enrollment_status: ["active", "completed", "withdrawn", "suspended"],
       exam_attempt_status: ["in_progress", "submitted", "graded", "expired"],
       exam_question_type: [
@@ -2062,13 +2268,15 @@ export const Constants = {
         "application",
         "announcement",
       ],
+      library_domain: ["academic", "professional"],
+      library_audience: ["everyone", "level", "class"],
       library_visibility: ["private", "staff", "academy", "published"],
       live_session_status: ["scheduled", "live", "completed", "cancelled"],
       meeting_provider: ["jitsi", "jaas", "none"],
       notification_channel: ["in_app", "email", "whatsapp"],
       notification_status: ["unread", "read", "archived"],
       payment_status: ["pending", "partial", "paid", "overdue", "cancelled"],
-      profile_status: ["active", "suspended", "archived"],
+      profile_status: ["active", "restricted", "suspended", "archived"],
       record_status: ["active", "inactive", "archived"],
       submission_status: ["draft", "submitted", "graded", "returned"],
       subscription_status: [

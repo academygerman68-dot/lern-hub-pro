@@ -146,6 +146,7 @@ export function Login() {
       firstName: "",
       lastName: "",
       email: "",
+      phone: "",
       password: "",
       confirmPassword: "",
       role: "student",
@@ -212,6 +213,7 @@ export function Login() {
         firstName: values.firstName,
         lastName: values.lastName,
         role: values.role,
+        ...(values.phone?.trim() ? { phone: values.phone.trim() } : {}),
       });
       if ("needsEmailConfirmation" in result) {
         setPendingEmail(result.email);
@@ -590,6 +592,22 @@ export function Login() {
                 </p>
               ) : null}
             </label>
+            {signupForm.watch("role") === "student" ? (
+              <label className="block text-sm font-medium">
+                {l("Téléphone", "الهاتف")}
+                <Input
+                  className="mt-2 h-11"
+                  type="tel"
+                  autoComplete="tel"
+                  {...signupForm.register("phone")}
+                />
+                {signupForm.formState.errors.phone ? (
+                  <p className="mt-1 text-xs text-alert">
+                    {signupForm.formState.errors.phone.message}
+                  </p>
+                ) : null}
+              </label>
+            ) : null}
             <label className="block text-sm font-medium">
               {t("login.password")}
               <Input

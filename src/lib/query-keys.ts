@@ -26,6 +26,11 @@ export const queryKeys = {
   library: {
     all: ["library"] as const,
   },
+  conversations: {
+    all: ["conversations"] as const,
+    messages: (id: string) => ["conversations", id, "messages"] as const,
+    members: (id: string) => ["conversations", id, "members"] as const,
+  },
   assignments: {
     all: ["assignments"] as const,
     byClass: (classId: string) => ["assignments", "class", classId] as const,

@@ -6,7 +6,7 @@
  */
 
 /** Public 8x8 JaaS app id from the academy VPaaS project (safe in client bundles). */
-export const PUBLIC_JAAS_APP_ID = "vpaas-magic-cookie-9ef87bf2ebfd4ab0baf3f0e8a0fbb2de";
+export const PUBLIC_JAAS_APP_ID = "vpaas-magic-cookie-b3c2cc44fe26435e96e8b71deecb6556";
 
 export type JitsiProviderKind = "jitsi" | "jaas" | "none";
 

@@ -147,10 +147,12 @@ export const SupabaseAuthService = {
     lastName: string;
     role?: "student" | "teacher" | "admin";
     language?: "en" | "fr" | "de";
+    phone?: string;
   }): Promise<AuthSessionPayload | { needsEmailConfirmation: true; email: string }> {
     const supabase = getSupabase();
     const redirects = getAuthRedirects();
     const role = input.role ?? "student";
+    const phone = input.phone?.trim() || undefined;
     const { data, error } = await supabase.auth.signUp({
       email: input.email.trim().toLowerCase(),
       password: input.password,
@@ -161,6 +163,7 @@ export const SupabaseAuthService = {
           first_name: input.firstName.trim(),
           last_name: input.lastName.trim(),
           language: input.language ?? "fr",
+          ...(phone ? { phone } : {}),
         },
       },
     });

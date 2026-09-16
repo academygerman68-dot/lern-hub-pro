@@ -16,6 +16,7 @@ import {
 } from "@/hooks/use-academy-data";
 import { PaymentProofService } from "@/services/academy-services";
 import { useAcademy } from "./academy-context";
+import { DocumentViewer } from "./document-viewer";
 import { QueryState } from "./query-state";
 import { Metric, PageHeader, Status, Surface } from "./primitives";
 
@@ -36,109 +37,159 @@ function paymentTone(status: string): "green" | "amber" | "red" {
   return "red";
 }
 
+function proofStatusLabel(status: string) {
+  if (status === "pending") return "En attente";
+  if (status === "approved") return "Confirmé";
+  if (status === "rejected") return "Refusé";
+  return status;
+}
+
 function ProofReviewQueue() {
   const pendingQuery = usePendingPaymentProofs();
   const review = useReviewPaymentProof();
+  const [preview, setPreview] = useState<{
+    title: string;
+    url: string | null;
+    mimeType: string | null;
+    loading: boolean;
+    error: string | null;
+  } | null>(null);
 
   return (
-    <Surface className="mb-6 p-5">
-      <h2 className="font-semibold">File des justificatifs</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Avis d’opération déposés par les étudiants. L’accès reste bloqué jusqu’à validation.
-      </p>
-      <QueryState
-        isLoading={pendingQuery.isLoading}
-        isError={pendingQuery.isError}
-        error={pendingQuery.error}
-        isEmpty={!pendingQuery.data?.length}
-        emptyTitle="Aucun justificatif en attente"
-        emptyMessage="Les dépôts étudiants apparaîtront ici."
-        onRetry={() => void pendingQuery.refetch()}
-      >
-        <div className="mt-4 divide-y">
-          {pendingQuery.data?.map((proof) => (
-            <div key={proof.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-              <div>
-                <p className="font-medium">{studentLabel(proof)}</p>
-                <p className="text-sm text-muted-foreground">
-                  {new Date(proof.created_at).toLocaleString()}
-                  {proof.student_note ? ` · ${proof.student_note}` : ""}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Déclaré : {Number(proof.declared_amount).toLocaleString()}{" "}
-                  {proof.payment?.currency ?? "MAD"}
-                  {proof.payment
-                    ? ` · attendu : ${Number(proof.payment.amount).toLocaleString()} ${proof.payment.currency}`
-                    : ""}
-                  {` · opération du ${proof.operation_date}`}
-                  {proof.operation_reference ? ` · réf. ${proof.operation_reference}` : ""}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    void PaymentProofService.getSignedUrl(proof)
-                      .then((url) => window.open(url, "_blank", "noopener,noreferrer"))
-                      .catch((err: Error) => toast.error(err.message));
-                  }}
-                >
-                  Voir
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={review.isPending}
-                  onClick={() => {
-                    if (
-                      !window.confirm(
-                        "Confirmer l’approbation de ce justificatif et l’activation de l’accès ?",
+    <>
+      <Surface className="mb-6 p-5">
+        <h2 className="font-semibold">File des justificatifs</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Avis d’opération déposés par les étudiants. L’accès reste bloqué jusqu’à validation.
+        </p>
+        <QueryState
+          isLoading={pendingQuery.isLoading}
+          isError={pendingQuery.isError}
+          error={pendingQuery.error}
+          isEmpty={!pendingQuery.data?.length}
+          emptyTitle="Aucun justificatif en attente"
+          emptyMessage="Les dépôts étudiants apparaîtront ici."
+          onRetry={() => void pendingQuery.refetch()}
+        >
+          <div className="mt-4 divide-y">
+            {pendingQuery.data?.map((proof) => (
+              <div key={proof.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <div>
+                  <p className="font-medium">{studentLabel(proof)}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(proof.created_at).toLocaleString("fr-FR")}
+                    {proof.student_note ? ` · ${proof.student_note}` : ""}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Déclaré : {Number(proof.declared_amount).toLocaleString()}{" "}
+                    {proof.payment?.currency ?? "MAD"}
+                    {proof.payment
+                      ? ` · attendu : ${Number(proof.payment.amount).toLocaleString()} ${proof.payment.currency}`
+                      : ""}
+                    {` · opération du ${proof.operation_date}`}
+                    {proof.operation_reference ? ` · réf. ${proof.operation_reference}` : ""}
+                  </p>
+                  <Status tone="amber">{proofStatusLabel(proof.status)}</Status>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      void (async () => {
+                        setPreview({
+                          title: `Justificatif · ${studentLabel(proof)}`,
+                          url: null,
+                          mimeType: proof.mime_type ?? null,
+                          loading: true,
+                          error: null,
+                        });
+                        try {
+                          const url = await PaymentProofService.getSignedUrl(proof);
+                          setPreview({
+                            title: `Justificatif · ${studentLabel(proof)}`,
+                            url,
+                            mimeType: proof.mime_type ?? null,
+                            loading: false,
+                            error: null,
+                          });
+                        } catch (err) {
+                          setPreview({
+                            title: `Justificatif · ${studentLabel(proof)}`,
+                            url: null,
+                            mimeType: proof.mime_type ?? null,
+                            loading: false,
+                            error: err instanceof Error ? err.message : "Aperçu impossible",
+                          });
+                        }
+                      })();
+                    }}
+                  >
+                    Voir
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={review.isPending}
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          "Confirmer ce justificatif et activer l’accès de l’étudiant ?",
+                        )
                       )
-                    )
-                      return;
-                    review.mutate(
-                      { proofId: proof.id, approve: true },
-                      {
-                        onSuccess: () => toast.success("Justificatif approuvé · accès rétabli"),
-                        onError: (err) => toast.error(err.message),
-                      },
-                    );
-                  }}
-                >
-                  Approuver
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={review.isPending}
-                  onClick={() => {
-                    const note = window.prompt("Motif du refus (obligatoire)");
-                    if (note === null) return;
-                    if (!note.trim()) {
-                      toast.error("Le motif du refus est obligatoire.");
-                      return;
-                    }
-                    review.mutate(
-                      {
-                        proofId: proof.id,
-                        approve: false,
-                        adminNote: note.trim(),
-                      },
-                      {
-                        onSuccess: () => toast.message("Justificatif refusé"),
-                        onError: (err) => toast.error(err.message),
-                      },
-                    );
-                  }}
-                >
-                  Refuser
-                </Button>
+                        return;
+                      review.mutate(
+                        { proofId: proof.id, approve: true },
+                        {
+                          onSuccess: () => toast.success("Justificatif confirmé · accès rétabli"),
+                          onError: (err) => toast.error(err.message),
+                        },
+                      );
+                    }}
+                  >
+                    Confirmer
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={review.isPending}
+                    onClick={() => {
+                      const note = window.prompt("Motif du refus (obligatoire)");
+                      if (note === null) return;
+                      if (!note.trim()) {
+                        toast.error("Le motif du refus est obligatoire.");
+                        return;
+                      }
+                      review.mutate(
+                        {
+                          proofId: proof.id,
+                          approve: false,
+                          adminNote: note.trim(),
+                        },
+                        {
+                          onSuccess: () => toast.message("Justificatif refusé"),
+                          onError: (err) => toast.error(err.message),
+                        },
+                      );
+                    }}
+                  >
+                    Refuser
+                  </Button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </QueryState>
-    </Surface>
+            ))}
+          </div>
+        </QueryState>
+      </Surface>
+      <DocumentViewer
+        open={Boolean(preview)}
+        onClose={() => setPreview(null)}
+        title={preview?.title ?? ""}
+        url={preview?.url ?? null}
+        mimeType={preview?.mimeType}
+        loading={preview?.loading}
+        error={preview?.error}
+      />
+    </>
   );
 }
 
@@ -612,7 +663,7 @@ export function StudentPaymentsPage() {
                     {p.operation_date}
                   </p>
                 </div>
-                <Status tone={paymentTone(p.status)}>{p.status}</Status>
+                <Status tone={paymentTone(p.status)}>{proofStatusLabel(p.status)}</Status>
               </div>
             ))}
           </div>

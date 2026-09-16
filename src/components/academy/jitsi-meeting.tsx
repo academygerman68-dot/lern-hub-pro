@@ -20,6 +20,8 @@ type AuthorizationState = "loading" | "ready" | "error";
 
 const tokenErrors: Record<string, string> = {
   JAAS_NOT_CONFIGURED: "Les secrets JaaS ne sont pas encore configurés dans Supabase.",
+  JAAS_KEY_ID_INVALID:
+    "JAAS_KEY_ID contient une clé publique au lieu de l’identifiant de clé affiché dans JaaS.",
   JAAS_SIGNING_FAILED: "La clé privée JaaS configurée dans Supabase est invalide.",
   SESSION_ACCESS_DENIED: "Vous n’êtes pas autorisé à rejoindre cette séance.",
   SESSION_CLOSED: "Cette séance est terminée ou annulée.",
@@ -47,6 +49,7 @@ async function readFunctionError(error: unknown): Promise<string> {
 
 async function fetchJaasAuthorization(
   sessionId: string,
+  expectedAppId: string | null,
 ): Promise<{ jwt: string; roomName: string }> {
   if (!isSupabaseConfigured) throw new Error("Supabase n’est pas configuré.");
   const { data, error } = await getSupabase().functions.invoke<{
@@ -56,6 +59,9 @@ async function fetchJaasAuthorization(
   if (error) throw new Error(await readFunctionError(error));
   if (!data?.jwt || !data.roomName) {
     throw new Error("La fonction jaas-token n’a pas renvoyé une autorisation valide.");
+  }
+  if (expectedAppId && !data.roomName.startsWith(`${expectedAppId}/`)) {
+    throw new Error("L’App ID JaaS du frontend ne correspond pas à JAAS_APP_ID dans Supabase.");
   }
   return { jwt: data.jwt, roomName: data.roomName };
 }
@@ -103,7 +109,7 @@ export function JitsiMeetingEmbed({
     setJwt(undefined);
     setAuthorizationError(null);
     setAuthorizationState("loading");
-    void fetchJaasAuthorization(sessionId)
+    void fetchJaasAuthorization(sessionId, config.jaasAppId)
       .then((authorization) => {
         if (cancelled) return;
         setJwt(authorization.jwt);
@@ -120,7 +126,7 @@ export function JitsiMeetingEmbed({
     return () => {
       cancelled = true;
     };
-  }, [config.requiresJwt, sessionId, roomName, loadKey]);
+  }, [config.requiresJwt, config.jaasAppId, sessionId, roomName, loadKey]);
 
   useEffect(() => {
     if (endConferenceSignal > 0) apiRef.current?.executeCommand("endConference");

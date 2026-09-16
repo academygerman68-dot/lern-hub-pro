@@ -33,9 +33,13 @@ export const SupabaseAssignmentService = {
     description?: string;
     instructions?: string;
     dueAt?: string | null;
+    publishedAt?: string | null;
+    attachmentBucket?: string | null;
+    attachmentPath?: string | null;
     createdBy?: string | null;
     status?: AssignmentStatus;
   }) {
+    const status = input.status ?? "draft";
     const { data, error } = await requireClient()
       .from("assignments")
       .insert({
@@ -44,8 +48,12 @@ export const SupabaseAssignmentService = {
         description: input.description ?? null,
         instructions: input.instructions ?? null,
         due_at: input.dueAt ?? null,
+        published_at:
+          input.publishedAt ?? (status === "published" ? new Date().toISOString() : null),
+        attachment_bucket: input.attachmentBucket ?? null,
+        attachment_path: input.attachmentPath ?? null,
         created_by: input.createdBy ?? null,
-        status: input.status ?? "draft",
+        status,
       })
       .select("*")
       .single();
@@ -53,10 +61,22 @@ export const SupabaseAssignmentService = {
     return data;
   },
 
+  async uploadAttachment(file: File, createdBy?: string | null) {
+    const supabase = requireClient();
+    const ext = file.name.split(".").pop() ?? "bin";
+    const path = `assignments/${createdBy ?? "staff"}/${crypto.randomUUID()}.${ext}`;
+    const uploadOptions = file.type
+      ? { upsert: false as const, contentType: file.type }
+      : { upsert: false as const };
+    const { error } = await supabase.storage.from("documents").upload(path, file, uploadOptions);
+    if (error) throw error;
+    return { attachmentBucket: "documents" as const, attachmentPath: path };
+  },
+
   async publish(id: string) {
     const { data, error } = await requireClient()
       .from("assignments")
-      .update({ status: "published" })
+      .update({ status: "published", published_at: new Date().toISOString() })
       .eq("id", id)
       .select("*")
       .single();

@@ -10,9 +10,11 @@ import {
   ExamService,
   LibraryService,
   LiveSessionService,
+  MessagingService,
   NotificationService,
   PaymentService,
   PaymentProofService,
+  ProfileService,
   RecordingService,
   StudentService,
   SubscriptionService,
@@ -137,6 +139,82 @@ export function useCreateEnrollment() {
   });
 }
 
+export function useUpdateClass() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: string;
+      patch: Parameters<typeof ClassService.update>[1];
+    }) => ClassService.update(id, patch),
+    onSuccess: async (klass) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.classes.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.classes.detail(klass.id) }),
+        qc.invalidateQueries({ queryKey: queryKeys.teachers.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.students.all }),
+      ]);
+    },
+  });
+}
+
+export function useRemoveEnrollment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { enrollmentId: string; classId?: string; studentId?: string }) =>
+      EnrollmentService.withdraw(input.enrollmentId),
+    onSuccess: async (_data, vars) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.enrollments.all }),
+        vars.classId
+          ? qc.invalidateQueries({ queryKey: queryKeys.enrollments.byClass(vars.classId) })
+          : Promise.resolve(),
+        vars.studentId
+          ? qc.invalidateQueries({ queryKey: queryKeys.enrollments.byStudent(vars.studentId) })
+          : Promise.resolve(),
+        qc.invalidateQueries({ queryKey: queryKeys.classes.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.students.all }),
+        vars.classId
+          ? qc.invalidateQueries({ queryKey: queryKeys.classes.roster(vars.classId) })
+          : Promise.resolve(),
+      ]);
+    },
+  });
+}
+
+export function useSetProfileStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      profileId,
+      status,
+    }: {
+      profileId: string;
+      status: "active" | "restricted" | "suspended" | "archived";
+    }) => ProfileService.setProfileStatus(profileId, status),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.students.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.teachers.all }),
+        qc.invalidateQueries({ queryKey: ["students"] }),
+        qc.invalidateQueries({ queryKey: ["teachers"] }),
+      ]);
+    },
+  });
+}
+
+export function useCreateTeacher() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: TeacherService.createViaSignup,
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.teachers.all });
+    },
+  });
+}
+
 export function useUpdateStudent() {
   const qc = useQueryClient();
   return useMutation({
@@ -197,7 +275,7 @@ export function useLessons() {
 export function useLibrary() {
   return useQuery({
     queryKey: queryKeys.library.all,
-    queryFn: () => CourseService.listResources(),
+    queryFn: () => LibraryService.list(),
   });
 }
 
@@ -240,10 +318,43 @@ export function useCreateCourse() {
   });
 }
 
+export function useUpdateCourse() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      id: string;
+      patch: Parameters<typeof CourseService.updateCourse>[1];
+    }) => CourseService.updateCourse(input.id, input.patch),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.courses.all });
+    },
+  });
+}
+
+export function useArchiveCourse() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => CourseService.archiveCourse(id),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.courses.all });
+    },
+  });
+}
+
 export function useUploadLibraryItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: LibraryService.uploadAndCreate,
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.library.all });
+    },
+  });
+}
+
+export function useArchiveLibraryItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => LibraryService.archive(id),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: queryKeys.library.all });
     },
@@ -261,6 +372,47 @@ export function useCreateAssignment() {
   });
 }
 
+export function useConversations() {
+  return useQuery({
+    queryKey: queryKeys.conversations.all,
+    queryFn: () => MessagingService.listConversations(),
+  });
+}
+
+export function useConversationMessages(conversationId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.conversations.messages(conversationId ?? ""),
+    queryFn: () => MessagingService.listMessages(conversationId!),
+    enabled: Boolean(conversationId),
+    refetchInterval: 8_000,
+  });
+}
+
+export function useSendMessage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: MessagingService.sendMessage,
+    onSuccess: async (_data, vars) => {
+      await Promise.all([
+        qc.invalidateQueries({
+          queryKey: queryKeys.conversations.messages(vars.conversationId),
+        }),
+        qc.invalidateQueries({ queryKey: queryKeys.conversations.all }),
+      ]);
+    },
+  });
+}
+
+export function useCreateClassConversation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: MessagingService.createClassConversation,
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.conversations.all });
+    },
+  });
+}
+
 export function useSaveAttendance() {
   const qc = useQueryClient();
   return useMutation({
@@ -268,10 +420,13 @@ export function useSaveAttendance() {
       classId: string;
       teacherId?: string | null;
       createdBy?: string | null;
+      sessionDate: string;
       records: Array<{ studentId: string; mark: "present" | "absent" | "late" | "excused" }>;
     }) => {
-      const session = await AttendanceService.openSession({
+      const existing = await AttendanceService.listSessions(input.classId);
+      const session = existing.find((item) => item.session_date === input.sessionDate) ?? await AttendanceService.openSession({
         classId: input.classId,
+        sessionDate: input.sessionDate,
         ...(input.teacherId !== undefined ? { teacherId: input.teacherId } : {}),
         ...(input.createdBy !== undefined ? { createdBy: input.createdBy } : {}),
       });

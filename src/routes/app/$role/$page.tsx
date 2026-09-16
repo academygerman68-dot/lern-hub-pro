@@ -5,12 +5,10 @@ import { StudentPages } from "@/components/academy/student-pages";
 import { DirectorPages, TeacherPages } from "@/components/academy/staff-pages";
 import { defaultPageForRole, isPageForRole, isRole } from "@/lib/academy-logic";
 import type { AcademyPage } from "@/types/academy";
+import { parseAcademySearch } from "@/lib/academy-search";
 
 export const Route = createFileRoute("/app/$role/$page")({
-  validateSearch: (search: Record<string, unknown>) => {
-    const studentId = typeof search["studentId"] === "string" ? search["studentId"] : undefined;
-    return studentId ? { studentId } : {};
-  },
+  validateSearch: parseAcademySearch,
   component: AcademyPageRoute,
 });
 

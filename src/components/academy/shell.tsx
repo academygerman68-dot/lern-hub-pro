@@ -19,7 +19,6 @@ import {
   UserRound,
   Users,
   Video,
-  Wallet,
   X,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -90,7 +89,7 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
         ["dashboard", "nav.overview", Home],
         ["students", "nav.students", Users],
         ["teachers", "nav.teachers", GraduationCap],
-        ["classes", "nav.classes", Layers3],
+        ["classes", "nav.groups", Layers3],
         ["courses", "nav.courses", BookOpen],
         ["materials", "nav.materials", Library],
       ],
@@ -107,7 +106,6 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
       label: "Operations",
       items: [
         ["payments", "nav.payments", CreditCard],
-        ["payroll", "nav.payroll", Wallet],
         ["calendar", "nav.calendar", CalendarDays],
         ["messages", "nav.messages", MessageSquare],
         ["reports", "nav.reports", BarChart3],

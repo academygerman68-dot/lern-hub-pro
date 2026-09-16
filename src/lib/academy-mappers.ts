@@ -1,16 +1,25 @@
-import type { AcademyClass, Level, Student, SubscriptionStatus, Teacher } from "@/types/academy";
+import type {
+  AcademyClass,
+  AccountStatus,
+  Level,
+  Student,
+  SubscriptionStatus,
+  Teacher,
+} from "@/types/academy";
 import type { Database } from "@/types/database";
 
 type RecordStatus = Database["public"]["Enums"]["record_status"];
 type ClassStatus = Database["public"]["Enums"]["class_status"];
 type DbSubscription = Database["public"]["Enums"]["subscription_status"];
+type ProfileStatus = Database["public"]["Enums"]["profile_status"];
 
 export type ProfileLite = {
   id: string;
   first_name: string;
   last_name: string;
   email: string | null;
-  status?: Database["public"]["Enums"]["profile_status"];
+  phone?: string | null;
+  status?: ProfileStatus;
 };
 
 export type StudentRow = {
@@ -29,12 +38,32 @@ export type StudentRow = {
           name: string;
           schedule_label: string | null;
           level: { code: string } | { code: string }[] | null;
+          teacher?:
+            | {
+                id: string;
+                profile: ProfileLite | ProfileLite[] | null;
+              }
+            | Array<{
+                id: string;
+                profile: ProfileLite | ProfileLite[] | null;
+              }>
+            | null;
         }
       | Array<{
           id: string;
           name: string;
           schedule_label: string | null;
           level: { code: string } | { code: string }[] | null;
+          teacher?:
+            | {
+                id: string;
+                profile: ProfileLite | ProfileLite[] | null;
+              }
+            | Array<{
+                id: string;
+                profile: ProfileLite | ProfileLite[] | null;
+              }>
+            | null;
         }>
       | null;
   }> | null;
@@ -48,7 +77,12 @@ export type TeacherRow = {
   status: RecordStatus;
   bio: string | null;
   profile: ProfileLite | ProfileLite[] | null;
-  classes?: Array<{ id: string; name: string; status: ClassStatus }> | null;
+  classes?: Array<{
+    id: string;
+    name: string;
+    status: ClassStatus;
+    level?: { code: string } | { code: string }[] | null;
+  }> | null;
 };
 
 export type ClassRow = {
@@ -84,13 +118,18 @@ function one<T>(value: T | T[] | null | undefined): T | null {
 }
 
 export function profileName(profile: ProfileLite | null): string {
-  if (!profile) return "Unknown";
-  return [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim() || "Unknown";
+  if (!profile) return "Inconnu";
+  return [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim() || "Inconnu";
 }
 
 export function toLevel(code: string | null | undefined): Level {
   if (code === "A1" || code === "A2" || code === "B1" || code === "B2") return code;
   return "A1";
+}
+
+export function toAccountStatus(status: ProfileStatus | null | undefined): AccountStatus {
+  if (status === "restricted" || status === "suspended" || status === "archived") return status;
+  return "active";
 }
 
 export function toUiSubscription(status: DbSubscription | null | undefined): SubscriptionStatus {
@@ -114,6 +153,8 @@ export function mapStudent(row: StudentRow): Student {
   const klass = one(activeEnrollment?.class ?? null);
   const levelFromClass = one(klass?.level ?? null)?.code;
   const subscription = one(row.student_subscriptions ?? null);
+  const classTeacher = one(klass?.teacher ?? null);
+  const teacherProfile = one(classTeacher?.profile ?? null);
 
   return {
     id: row.id,
@@ -125,18 +166,40 @@ export function mapStudent(row: StudentRow): Student {
     attendance: 0,
     average: 0,
     subscription: toUiSubscription(subscription?.status),
+    firstName: profile?.first_name ?? "",
+    lastName: profile?.last_name ?? "",
+    phone: profile?.phone ?? null,
+    profileId: profile?.id ?? "",
+    accountStatus: toAccountStatus(profile?.status),
+    ...(teacherProfile ? { teacherName: profileName(teacherProfile) } : {}),
+    ...(klass?.id ? { classId: klass.id } : {}),
   };
 }
 
 export function mapTeacher(row: TeacherRow): Teacher {
   const profile = one(row.profile);
-  const classNames = (row.classes ?? []).filter((c) => c.status !== "archived").map((c) => c.name);
+  const activeClasses = (row.classes ?? []).filter((c) => c.status !== "archived");
+  const classNames = activeClasses.map((c) => c.name);
+  const levels = Array.from(
+    new Set(
+      activeClasses
+        .map((c) => one(c.level ?? null)?.code)
+        .filter((code): code is string => Boolean(code)),
+    ),
+  );
 
   return {
     id: row.id,
     name: profileName(profile),
-    subject: row.specialties[0] ?? "German",
+    subject: row.specialties[0] ?? "Allemand",
     classes: classNames,
+    firstName: profile?.first_name ?? "",
+    lastName: profile?.last_name ?? "",
+    email: profile?.email ?? "",
+    phone: profile?.phone ?? null,
+    profileId: profile?.id ?? "",
+    levels,
+    accountStatus: toAccountStatus(profile?.status),
   };
 }
 

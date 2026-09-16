@@ -16,11 +16,24 @@ export const signupSchema = z
     firstName: z.string().trim().min(1, "Prénom requis.").max(80),
     lastName: z.string().trim().min(1, "Nom requis.").max(80),
     email: z.string().trim().email("Adresse e-mail invalide."),
+    phone: z.string().trim().optional(),
     password: passwordSchema,
     confirmPassword: z.string().min(1, "Confirmez le mot de passe."),
     role: z.enum(["student", "teacher", "admin"], {
       required_error: "Choisissez un type de compte.",
     }),
+  })
+  .superRefine((value, ctx) => {
+    if (value.role === "student") {
+      const phone = value.phone?.trim() ?? "";
+      if (phone.length < 8) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Téléphone requis (au moins 8 caractères).",
+          path: ["phone"],
+        });
+      }
+    }
   })
   .refine((value) => value.password === value.confirmPassword, {
     message: "Les mots de passe ne correspondent pas.",

@@ -32,12 +32,13 @@ import { Button } from "@/components/ui/button";
 import { LEAD_TEACHER } from "@/data/demo-accounts";
 import { modules } from "@/data/mock-data";
 import { initials } from "@/lib/academy-logic";
-import { useStudent, useStudents } from "@/hooks/use-academy-data";
+import { useSetProfileStatus, useStudent, useStudents } from "@/hooks/use-academy-data";
 import { useAcademy } from "./academy-context";
 import { StudentExamsPage } from "./exam-pages";
 import { QueryState } from "./query-state";
 import { Eyebrow, PremiumHeader, Ring, SkillBars, Status } from "./premium-kit";
 import { Surface } from "./primitives";
+import { toast } from "sonner";
 
 const momentum = [
   { d: "M", v: 35 },
@@ -687,16 +688,48 @@ export function LegacyPremiumDirectorDashboard() {
 }
 
 export function PremiumStudent360() {
-  const { navigate, selectedStudentId } = useAcademy();
-  const [tab, setTab] = useState("Overview");
+  const { navigate, selectedStudentId, role } = useAcademy();
+  const [tab, setTab] = useState("Aperçu");
+  const [confirmStatus, setConfirmStatus] = useState<"active" | "restricted" | "suspended" | null>(
+    null,
+  );
   const studentQuery = useStudent(selectedStudentId);
+  const setProfileStatus = useSetProfileStatus();
   const student = studentQuery.data ?? null;
-  const tone =
-    student?.subscription === "ACTIVE"
+  const isDirector = role === "director";
+
+  const accountTone =
+    student?.accountStatus === "active"
       ? "green"
-      : student?.subscription === "PAST_DUE"
+      : student?.accountStatus === "restricted"
         ? "amber"
-        : "red";
+        : student?.accountStatus === "suspended"
+          ? "red"
+          : "gray";
+
+  const accountLabel =
+    student?.accountStatus === "restricted"
+      ? "Restreint"
+      : student?.accountStatus === "suspended"
+        ? "Suspendu"
+        : student?.accountStatus === "archived"
+          ? "Archivé"
+          : "Actif";
+
+  const applyStatus = (status: "active" | "restricted" | "suspended") => {
+    if (!student?.profileId) return;
+    setProfileStatus.mutate(
+      { profileId: student.profileId, status },
+      {
+        onSuccess: () => {
+          toast.success(`Statut mis à jour · ${status === "active" ? "Actif" : status === "restricted" ? "Restreint" : "Suspendu"}`);
+          setConfirmStatus(null);
+          void studentQuery.refetch();
+        },
+        onError: (err) => toast.error(err.message),
+      },
+    );
+  };
 
   if (studentQuery.isLoading || studentQuery.isError || !student) {
     return (
@@ -706,14 +739,14 @@ export function PremiumStudent360() {
           className="mb-8 inline-flex items-center gap-2 text-sm text-muted-foreground"
         >
           <ArrowLeft className="size-4" />
-          Students
+          Étudiants
         </button>
         <QueryState
           isLoading={studentQuery.isLoading}
           isError={studentQuery.isError || (!studentQuery.isLoading && !student)}
           error={studentQuery.error}
           isEmpty={!student}
-          emptyMessage="Student not found."
+          emptyMessage="Étudiant introuvable."
         >
           {null}
         </QueryState>
@@ -728,7 +761,7 @@ export function PremiumStudent360() {
         className="mb-8 inline-flex items-center gap-2 text-sm text-muted-foreground"
       >
         <ArrowLeft className="size-4" />
-        Students
+        Étudiants
       </button>
       <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-start">
         <div className="flex min-w-0 items-center gap-5">
@@ -737,18 +770,93 @@ export function PremiumStudent360() {
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="font-display text-4xl">{student.name}</h1>
-              <Status tone={tone}>{student.subscription}</Status>
+              <h1 className="font-display text-4xl">
+                {student.lastName} {student.firstName}
+              </h1>
+              <Status tone={accountTone}>{accountLabel}</Status>
             </div>
             <p className="mt-2 text-muted-foreground">
-              {student.level} · {student.className} · Student {student.id}
+              {student.level} · {student.className} · {student.teacherName || "Sans professeur"}
             </p>
           </div>
         </div>
-        <Button variant="outline">Contact student</Button>
+        <div className="flex flex-wrap gap-2">
+          {student.email ? (
+            <Button variant="outline" asChild>
+              <a href={`mailto:${student.email}`}>Écrire</a>
+            </Button>
+          ) : null}
+          {student.phone ? (
+            <Button variant="outline" asChild>
+              <a href={`tel:${student.phone}`}>Appeler</a>
+            </Button>
+          ) : null}
+        </div>
       </div>
+
+      <section className="mt-8 grid gap-4 rounded-2xl border border-border bg-card p-6 text-sm sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <small className="text-muted-foreground">E-mail</small>
+          <p className="mt-1 font-medium">
+            {student.email ? (
+              <a className="text-primary underline" href={`mailto:${student.email}`}>
+                {student.email}
+              </a>
+            ) : (
+              "—"
+            )}
+          </p>
+        </div>
+        <div>
+          <small className="text-muted-foreground">Téléphone</small>
+          <p className="mt-1 font-medium">
+            {student.phone ? (
+              <a className="text-primary underline" href={`tel:${student.phone}`}>
+                {student.phone}
+              </a>
+            ) : (
+              "—"
+            )}
+          </p>
+        </div>
+        <div>
+          <small className="text-muted-foreground">Groupe</small>
+          <p className="mt-1 font-medium">{student.className}</p>
+        </div>
+        <div>
+          <small className="text-muted-foreground">Abonnement</small>
+          <p className="mt-1 font-medium">{student.subscription}</p>
+        </div>
+      </section>
+
+      {isDirector && student.profileId ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            disabled={student.accountStatus === "active" || setProfileStatus.isPending}
+            onClick={() => setConfirmStatus("active")}
+          >
+            Activer
+          </Button>
+          <Button
+            variant="outline"
+            disabled={student.accountStatus === "restricted" || setProfileStatus.isPending}
+            onClick={() => setConfirmStatus("restricted")}
+          >
+            Restreindre
+          </Button>
+          <Button
+            variant="outline"
+            disabled={student.accountStatus === "suspended" || setProfileStatus.isPending}
+            onClick={() => setConfirmStatus("suspended")}
+          >
+            Suspendre
+          </Button>
+        </div>
+      ) : null}
+
       <nav className="mt-9 flex gap-1 overflow-x-auto border-b border-border">
-        {["Overview", "Learning", "Attendance", "Assignments", "Exams", "Payments"].map((item) => (
+        {["Aperçu", "Apprentissage", "Présence", "Devoirs", "Examens", "Paiements"].map((item) => (
           <button
             key={item}
             onClick={() => setTab(item)}
@@ -760,32 +868,32 @@ export function PremiumStudent360() {
       </nav>
       <section className="mt-9 grid gap-6 xl:grid-cols-[1.35fr_.65fr]">
         <div className="rounded-2xl bg-brand p-8 text-primary-foreground">
-          <Eyebrow>Learning progress</Eyebrow>
+          <Eyebrow>Progression</Eyebrow>
           <div className="mt-5 grid items-center gap-8 sm:grid-cols-[1fr_auto]">
             <div>
               <h2 className="font-display text-4xl">
                 {student.level} ·{" "}
                 {student.level === "A1"
-                  ? "Foundations"
+                  ? "Fondations"
                   : student.level === "A2"
-                    ? "Intermediate"
+                    ? "Intermédiaire"
                     : student.level === "B1"
-                      ? "Independent"
-                      : "Advanced"}
+                      ? "Indépendant"
+                      : "Avancé"}
               </h2>
               <p className="mt-3 text-sm text-primary-foreground/60">{student.email}</p>
               <div className="mt-7 grid grid-cols-3 gap-4 border-t border-primary-foreground/10 pt-6">
                 <div>
-                  <strong className="block text-xl">{student.average}%</strong>
-                  <small className="text-primary-foreground/55">average</small>
+                  <strong className="block text-xl">{student.average || "—"}%</strong>
+                  <small className="text-primary-foreground/55">moyenne</small>
                 </div>
                 <div>
-                  <strong className="block text-xl">{student.attendance}%</strong>
-                  <small className="text-primary-foreground/55">attendance</small>
+                  <strong className="block text-xl">{student.attendance || "—"}%</strong>
+                  <small className="text-primary-foreground/55">présence</small>
                 </div>
                 <div>
-                  <strong className="block text-xl">{student.progress}%</strong>
-                  <small className="text-primary-foreground/55">progress</small>
+                  <strong className="block text-xl">{student.progress || "—"}%</strong>
+                  <small className="text-primary-foreground/55">progression</small>
                 </div>
               </div>
             </div>
@@ -793,47 +901,77 @@ export function PremiumStudent360() {
           </div>
         </div>
         <div className="rounded-2xl bg-success-soft p-7">
-          <Eyebrow>Payment status</Eyebrow>
+          <Eyebrow>Statut abonnement</Eyebrow>
           <CheckCircle2 className="mt-5 size-7 text-success" />
-          <h2 className="mt-4 font-display text-2xl">
-            Subscription {student.subscription.toLowerCase()}
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">A2 Monthly Program</p>
+          <h2 className="mt-4 font-display text-2xl">{student.subscription}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Compte · {accountLabel}
+          </p>
           <div className="mt-6 border-t border-success/15 pt-5">
-            <small className="text-muted-foreground">Teacher</small>
-            <strong className="mt-1 block">{LEAD_TEACHER}</strong>
+            <small className="text-muted-foreground">Professeur</small>
+            <strong className="mt-1 block">{student.teacherName || "—"}</strong>
           </div>
         </div>
       </section>
       <section className="mt-10 grid gap-9 lg:grid-cols-3">
         <div>
           <Eyebrow>{tab}</Eyebrow>
-          <strong className="mt-4 block font-display text-4xl">{student.attendance}%</strong>
+          <strong className="mt-4 block font-display text-4xl">{student.attendance || "—"}%</strong>
           <p className="mt-2 text-sm text-muted-foreground">
-            Attendance · class {student.className}
+            Présence · groupe {student.className}
           </p>
         </div>
         <div>
-          <Eyebrow>Recent activity</Eyebrow>
-          <div className="mt-4 space-y-4 text-sm">
+          <Eyebrow>Coordonnées</Eyebrow>
+          <div className="mt-4 space-y-3 text-sm">
             <p>
-              <span className="text-muted-foreground">Today</span>
+              <span className="text-muted-foreground">Nom</span>
               <br />
-              Completed vocabulary practice
+              {student.lastName} {student.firstName}
             </p>
             <p>
-              <span className="text-muted-foreground">Yesterday</span>
+              <span className="text-muted-foreground">Téléphone</span>
               <br />
-              Submitted German Email Writing
+              {student.phone || "—"}
             </p>
           </div>
         </div>
         <div>
-          <Eyebrow>Next milestone</Eyebrow>
-          <h2 className="mt-4 font-display text-2xl">A2 Mock Exam</h2>
-          <p className="mt-2 text-sm text-muted-foreground">76% ready · 21 September</p>
+          <Eyebrow>Parcours</Eyebrow>
+          <h2 className="mt-4 font-display text-2xl">{student.level}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {student.className} · {student.teacherName || "Sans professeur"}
+          </p>
         </div>
       </section>
+
+      {confirmStatus && (
+        <div className="mobile-modal">
+          <Surface className="mobile-modal-panel space-y-4">
+            <h2 className="font-semibold">Confirmer le changement de statut</h2>
+            <p className="text-sm text-muted-foreground">
+              Passer {student.lastName} {student.firstName} en «{" "}
+              {confirmStatus === "active"
+                ? "Actif"
+                : confirmStatus === "restricted"
+                  ? "Restreint"
+                  : "Suspendu"}{" "}
+              » ?
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setConfirmStatus(null)}>
+                Annuler
+              </Button>
+              <Button
+                disabled={setProfileStatus.isPending}
+                onClick={() => applyStatus(confirmStatus)}
+              >
+                Confirmer
+              </Button>
+            </div>
+          </Surface>
+        </div>
+      )}
     </div>
   );
 }

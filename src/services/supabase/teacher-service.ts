@@ -2,6 +2,7 @@ import { mapTeacher, type TeacherRow } from "@/lib/academy-mappers";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { Teacher } from "@/types/academy";
 import type { Database } from "@/types/database";
+import { SupabaseAuthService } from "@/services/supabase/auth-service";
 
 type TeacherUpdate = Database["public"]["Tables"]["teachers"]["Update"];
 type RecordStatus = Database["public"]["Enums"]["record_status"];
@@ -17,12 +18,14 @@ const TEACHER_SELECT = `
     first_name,
     last_name,
     email,
+    phone,
     status
   ),
   classes (
     id,
     name,
-    status
+    status,
+    level:levels ( code )
   )
 `;
 
@@ -76,6 +79,63 @@ export const SupabaseTeacherService = {
       .single();
     if (error) throw error;
     return mapTeacher(data as TeacherRow);
+  },
+
+  /**
+   * Creates a teacher via Auth signup (role metadata). Restores the admin session afterward.
+   */
+  async createViaSignup(input: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+    specialties?: string[];
+  }): Promise<Teacher | { needsEmailConfirmation: true; email: string }> {
+    const supabase = requireClient();
+    const {
+      data: { session: adminSession },
+    } = await supabase.auth.getSession();
+
+    const result = await SupabaseAuthService.signUp({
+      email: input.email,
+      password: input.password,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      role: "teacher",
+      language: "fr",
+      ...(input.phone?.trim() ? { phone: input.phone.trim() } : {}),
+    });
+
+    if (adminSession?.access_token && adminSession.refresh_token) {
+      await supabase.auth.setSession({
+        access_token: adminSession.access_token,
+        refresh_token: adminSession.refresh_token,
+      });
+    }
+
+    if ("needsEmailConfirmation" in result) {
+      return result;
+    }
+
+    const email = input.email.trim().toLowerCase();
+    const teachers = await this.list();
+    let teacher = teachers.find((t) => t.email.toLowerCase() === email) ?? null;
+
+    if (!teacher) {
+      await new Promise((r) => setTimeout(r, 400));
+      const retry = await this.list();
+      teacher = retry.find((t) => t.email.toLowerCase() === email) ?? null;
+    }
+
+    if (!teacher) {
+      throw new Error("TEACHER_PROFILE_PENDING");
+    }
+
+    if (input.specialties?.length) {
+      return this.update(teacher.id, { specialties: input.specialties });
+    }
+    return teacher;
   },
 
   async update(

@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   useAllExams,
   useAcademicAccess,
+  useClasses,
   useCreateExam,
   useExam,
   useExamAnswers,
@@ -579,26 +580,32 @@ export function StaffExamsPage() {
 export function DirectorExamsPage() {
   const examsQuery = useAllExams();
   const levelsQuery = useLevels();
+  const classesQuery = useClasses();
   const createExam = useCreateExam();
   const publishExam = usePublishExam();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [levelId, setLevelId] = useState("");
+  const [classId, setClassId] = useState("");
+
+  const classesForLevel = (classesQuery.data ?? []).filter(
+    (c) => !levelId || c.levelId === levelId,
+  );
 
   return (
     <>
       <PageHeader
-        title="Exam Management"
-        subtitle="Create, publish and manage academy assessments."
-        action={<Button onClick={() => setOpen(true)}>+ Create exam</Button>}
+        title="Gestion des examens"
+        subtitle="Créer, publier et gérer les évaluations de l’académie."
+        action={<Button onClick={() => setOpen(true)}>+ Créer un examen</Button>}
       />
       <QueryState
         isLoading={examsQuery.isLoading}
         isError={examsQuery.isError}
         error={examsQuery.error}
         isEmpty={!examsQuery.data?.length}
-        emptyTitle="No exams yet"
-        emptyMessage="Seeded mock exams should appear after Wave 3 migration."
+        emptyTitle="Aucun examen"
+        emptyMessage="Créez un examen pour un niveau CECR."
         onRetry={() => void examsQuery.refetch()}
       >
         <div className="space-y-3">
@@ -611,12 +618,12 @@ export function DirectorExamsPage() {
                 <h2 className="font-semibold">{exam.title}</h2>
                 <p className="text-sm text-muted-foreground">
                   {exam.level?.code} · {exam.duration_minutes} min ·{" "}
-                  {exam.is_mock ? "Mock" : "Official"}
+                  {exam.is_mock ? "Blanc" : "Officiel"}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <Status tone={exam.status === "published" ? "green" : "amber"}>
-                  {exam.status}
+                  {exam.status === "published" ? "Publié" : "Brouillon"}
                 </Status>
                 {exam.status !== "published" && (
                   <Button
@@ -624,12 +631,12 @@ export function DirectorExamsPage() {
                     disabled={publishExam.isPending}
                     onClick={() =>
                       publishExam.mutate(exam.id, {
-                        onSuccess: () => toast.success("Exam published"),
+                        onSuccess: () => toast.success("Examen publié"),
                         onError: (err) => toast.error(err.message),
                       })
                     }
                   >
-                    Publish
+                    Publier
                   </Button>
                 )}
               </div>
@@ -641,46 +648,72 @@ export function DirectorExamsPage() {
       {open && (
         <div className="mobile-modal">
           <Surface className="mobile-modal-panel space-y-4">
-            <h2 className="text-lg font-semibold">Create exam</h2>
+            <h2 className="text-lg font-semibold">Créer un examen</h2>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Exam title"
+              placeholder="Titre de l’examen"
             />
             <select
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={levelId}
-              onChange={(e) => setLevelId(e.target.value)}
+              onChange={(e) => {
+                setLevelId(e.target.value);
+                setClassId("");
+              }}
             >
-              <option value="">Select level</option>
+              <option value="">Choisir le niveau</option>
               {(levelsQuery.data ?? []).map((level) => (
                 <option key={level.id} value={level.id}>
                   {level.code} · {level.name}
                 </option>
               ))}
             </select>
+            {classesForLevel.length > 0 && (
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={classId}
+                onChange={(e) => setClassId(e.target.value)}
+              >
+                <option value="">Groupe (facultatif)</option>
+                {classesForLevel.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setOpen(false)}>
-                Cancel
+                Annuler
               </Button>
               <Button
                 disabled={!title.trim() || !levelId || createExam.isPending}
                 onClick={() => {
                   createExam.mutate(
-                    { title: title.trim(), levelId },
+                    {
+                      title: title.trim(),
+                      levelId,
+                      ...(classId
+                        ? {
+                            description: `Groupe : ${(classesQuery.data ?? []).find((c) => c.id === classId)?.name ?? classId}`,
+                          }
+                        : {}),
+                    },
                     {
                       onSuccess: () => {
-                        toast.success("Exam created as draft");
+                        toast.success("Examen créé en brouillon");
                         setOpen(false);
                         setTitle("");
                         setLevelId("");
+                        setClassId("");
                       },
                       onError: (err) => toast.error(err.message),
                     },
                   );
                 }}
               >
-                Create
+                Créer
               </Button>
             </div>
           </Surface>

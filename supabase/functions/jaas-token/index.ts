@@ -117,6 +117,19 @@ Deno.serve(async (req) => {
       message: "Les secrets JaaS de la fonction Supabase sont incomplets.",
     });
   }
+  if (
+    rawKeyId.length > 200 ||
+    /[\r\n]/.test(rawKeyId) ||
+    rawKeyId.includes("BEGIN PUBLIC KEY") ||
+    rawKeyId.startsWith("ssh-rsa") ||
+    rawKeyId.startsWith("MIIB")
+  ) {
+    return respond(503, {
+      error: "JAAS_KEY_ID_INVALID",
+      message:
+        "JAAS_KEY_ID doit contenir l’identifiant de la clé affiché par JaaS, pas la clé publique.",
+    });
+  }
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return respond(401, { error: "UNAUTHORIZED" });

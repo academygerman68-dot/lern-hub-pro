@@ -15,6 +15,7 @@ import {
 import { SupabaseNotificationService } from "@/services/supabase/notification-service";
 import { SupabaseLiveSessionService } from "@/services/supabase/live-session-service";
 import { AuthError, SupabaseAuthService } from "@/services/supabase/auth-service";
+import { SupabaseProfileService } from "@/services/supabase/profile-service";
 import { isDemoAuthAllowed } from "@/lib/auth-config";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { authenticate } from "@/lib/academy-logic";
@@ -26,7 +27,13 @@ import {
   teachers as mockTeachers,
   classes as mockClasses,
 } from "@/data/mock-data";
-import type { Role, SessionUser, SubscriptionStatus, AssignmentListItem } from "@/types/academy";
+import type {
+  AccountStatus,
+  Role,
+  SessionUser,
+  SubscriptionStatus,
+  AssignmentListItem,
+} from "@/types/academy";
 import type { Database, Json } from "@/types/database";
 
 const wait = (ms = 450) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -70,6 +77,7 @@ export const AuthService = {
     firstName: string;
     lastName: string;
     role?: "student" | "teacher" | "admin";
+    phone?: string;
   }): Promise<SessionUser | { needsEmailConfirmation: true; email: string }> {
     if (!isSupabaseConfigured) {
       throw new AuthError("SIGNUP_UNAVAILABLE", "SIGNUP_UNAVAILABLE");
@@ -166,6 +174,17 @@ export const StudentService = {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseStudentService.reactivate(id);
   },
+  async setProfileStatus(profileId: string, status: AccountStatus) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseProfileService.setProfileStatus(profileId, status);
+  },
+};
+
+export const ProfileService = {
+  async setProfileStatus(profileId: string, status: AccountStatus) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseProfileService.setProfileStatus(profileId, status);
+  },
 };
 
 export const TeacherService = {
@@ -212,6 +231,17 @@ export const TeacherService = {
   async reactivate(id: string) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseTeacherService.reactivate(id);
+  },
+  async createViaSignup(input: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+    specialties?: string[];
+  }) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseTeacherService.createViaSignup(input);
   },
   async listAssignedClasses(teacherId: string) {
     if (isSupabaseConfigured) return SupabaseTeacherService.listAssignedClasses(teacherId);
@@ -375,9 +405,40 @@ export const CourseService = {
     if (isSupabaseConfigured) return SupabaseCurriculumService.getLesson(id);
     return null;
   },
-  async createCourse(input: { levelId: string; title: string; description?: string }) {
+  async createCourse(input: {
+    levelId: string;
+    title: string;
+    description?: string;
+    contentKind?: Database["public"]["Enums"]["course_content_kind"];
+    contentUrl?: string | null;
+    storageBucket?: string | null;
+    storagePath?: string | null;
+    mimeType?: string | null;
+    status?: Database["public"]["Enums"]["content_status"];
+  }) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseCurriculumService.createCourse(input);
+  },
+  async updateCourse(
+    id: string,
+    patch: Database["public"]["Tables"]["courses"]["Update"],
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseCurriculumService.updateCourse(id, patch);
+  },
+  async archiveCourse(id: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseCurriculumService.archiveCourse(id);
+  },
+  async uploadCourseMaterial(file: File, createdBy?: string | null) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseCurriculumService.uploadCourseMaterial(file, createdBy);
+  },
+  async getCourseMaterialUrl(
+    course: Parameters<typeof SupabaseCurriculumService.getCourseMaterialUrl>[0],
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseCurriculumService.getCourseMaterialUrl(course);
   },
   async createLesson(input: {
     courseId?: string;
@@ -451,9 +512,15 @@ export const LibraryService = {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseLibraryService.uploadAndCreate(input);
   },
-  async getSignedUrl(item: { storage_bucket: string; storage_path: string }) {
+  async getSignedUrl(
+    item: Parameters<typeof SupabaseLibraryService.getSignedUrl>[0],
+  ) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseLibraryService.getSignedUrl(item);
+  },
+  async archive(id: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseLibraryService.archive(id);
   },
 };
 
@@ -485,6 +552,10 @@ export const AssignmentService = {
   async create(input: Parameters<typeof SupabaseAssignmentService.create>[0]) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseAssignmentService.create(input);
+  },
+  async uploadAttachment(file: File, createdBy?: string | null) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseAssignmentService.uploadAttachment(file, createdBy);
   },
   async publish(id: string) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
@@ -618,6 +689,7 @@ export const PaymentService = {
 export { SupabasePaymentProofService as PaymentProofService } from "@/services/supabase/payment-proof-service";
 export { SupabaseRecordingService as RecordingService } from "@/services/supabase/recording-service";
 export { OutboxService } from "@/services/messaging/outbox-service";
+export { SupabaseMessagingService as MessagingService } from "@/services/supabase/messaging-service";
 
 export const SubscriptionService = {
   async list() {
