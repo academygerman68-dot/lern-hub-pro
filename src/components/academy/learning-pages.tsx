@@ -82,8 +82,8 @@ export function DirectorCoursesPage() {
       </QueryState>
 
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4">
-          <Surface className="w-full max-w-lg space-y-4 p-6">
+        <div className="mobile-modal">
+          <Surface className="mobile-modal-panel space-y-4">
             <h2 className="text-lg font-semibold">Create course</h2>
             <Input
               placeholder="Course title"
@@ -196,8 +196,8 @@ export function TeacherLessonManagerPage() {
       </QueryState>
 
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4">
-          <Surface className="w-full max-w-lg space-y-4 p-6">
+        <div className="mobile-modal">
+          <Surface className="mobile-modal-panel space-y-4">
             <h2 className="text-lg font-semibold">Create lesson</h2>
             <select
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -642,7 +642,7 @@ export function DirectorAssignmentsPage() {
         emptyMessage="Teachers publish assignments from their class workspace."
         onRetry={() => void listQuery.refetch()}
       >
-        <Surface className="overflow-x-auto">
+        <Surface className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>

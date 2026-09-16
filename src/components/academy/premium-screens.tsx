@@ -33,13 +33,11 @@ import { LEAD_TEACHER } from "@/data/demo-accounts";
 import { modules } from "@/data/mock-data";
 import { initials } from "@/lib/academy-logic";
 import { useStudent } from "@/hooks/use-academy-data";
-import { PaymentService } from "@/services/academy-services";
-import { recordPayment } from "@/services/academy-store";
-import { toast } from "sonner";
 import { useAcademy } from "./academy-context";
 import { StudentExamsPage } from "./exam-pages";
 import { QueryState } from "./query-state";
 import { Eyebrow, PremiumHeader, Ring, SkillBars, Status } from "./premium-kit";
+import { Surface } from "./primitives";
 
 const momentum = [
   { d: "M", v: 35 },
@@ -841,117 +839,18 @@ export function PremiumStudent360() {
 }
 
 export function PremiumPayments() {
-  const { subscription, setSubscription, session, replaceSession, role } = useAcademy();
-  const [paying, setPaying] = useState(false);
-  const pay = async () => {
-    setPaying(true);
-    await PaymentService.pay();
-    if (session && role) replaceSession(recordPayment(session, role));
-    else setSubscription("ACTIVE");
-    setPaying(false);
-    toast.success("Payment successful · Access restored");
-  };
+  const { navigate } = useAcademy();
   return (
     <div className="animate-fade-in">
       <PremiumHeader
-        title="Your program"
-        subtitle="A clear view of your subscription and payment history."
-        action={
-          <Button
-            variant="outline"
-            onClick={() => setSubscription(subscription === "ACTIVE" ? "SUSPENDED" : "ACTIVE")}
-          >
-            Preview {subscription === "ACTIVE" ? "paused" : "active"} state
-          </Button>
-        }
+        title="Votre programme"
+        subtitle="Utilisez la page Paiements pour l’historique réel et le dépôt de justificatif."
+        action={<Button onClick={() => navigate("payments")}>Ouvrir les paiements</Button>}
       />
-      {subscription !== "ACTIVE" && (
-        <section className="mb-8 grid gap-7 rounded-2xl bg-brand p-8 text-primary-foreground md:grid-cols-[1fr_auto] md:items-center">
-          <div>
-            <Eyebrow>Subscription required</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl">
-              Your learning access is currently paused.
-            </h2>
-            <p className="mt-3 max-w-xl text-sm text-primary-foreground/65">
-              Course materials, live classes and mock exams are temporarily unavailable. Your
-              progress is safely preserved.
-            </p>
-          </div>
-          <Button variant="secondary" onClick={() => void pay()} disabled={paying}>
-            {paying ? "Restoring access…" : "Renew access"}
-            <ArrowRight />
-          </Button>
-        </section>
-      )}
-      <section className="grid gap-6 xl:grid-cols-[1.3fr_.7fr]">
-        <div className="rounded-2xl bg-secondary/60 p-8 sm:p-10">
-          <Eyebrow>A2 program</Eyebrow>
-          <div className="mt-5 flex flex-wrap items-end justify-between gap-5">
-            <div>
-              <strong className="font-display text-5xl font-normal">1,200 MAD</strong>
-              <span className="ml-2 text-sm text-muted-foreground">/ month</span>
-            </div>
-            <Status tone={subscription === "ACTIVE" ? "green" : "red"}>{subscription}</Status>
-          </div>
-          <div className="mt-10 grid gap-5 border-t border-border pt-7 sm:grid-cols-2">
-            <div>
-              <small className="text-muted-foreground">Next payment</small>
-              <strong className="mt-1 block">01 October 2026</strong>
-            </div>
-            <div>
-              <small className="text-muted-foreground">Learning access</small>
-              <strong className="mt-1 block">
-                {subscription === "ACTIVE" ? "Full access" : "Paused"}
-              </strong>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-2xl border border-border p-8">
-          <Eyebrow>Subscription timeline</Eyebrow>
-          <div className="mt-7 space-y-0">
-            {[
-              ["12 Mar", "Program started"],
-              ["01 Sep", "Payment confirmed"],
-              ["01 Oct", "Next renewal"],
-            ].map(([date, label], i) => (
-              <div key={label} className="grid grid-cols-[auto_1fr] gap-4">
-                <div className="flex flex-col items-center">
-                  <span
-                    className={`size-2 rounded-full ${i < 2 ? "bg-primary" : "border border-primary bg-background"}`}
-                  />
-                  {i < 2 && <span className="h-14 w-px bg-border" />}
-                </div>
-                <div className="-mt-1">
-                  <small className="text-muted-foreground">{date}</small>
-                  <p className="text-sm">{label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className="mt-12">
-        <Eyebrow>Payment history</Eyebrow>
-        <div className="mt-5 divide-y divide-border border-y border-border">
-          {[
-            ["September 2026", "01 Sep 2026"],
-            ["August 2026", "01 Aug 2026"],
-            ["July 2026", "01 Jul 2026"],
-          ].map(([period, date]) => (
-            <div
-              key={period}
-              className="grid grid-cols-[1fr_auto] items-center gap-5 py-5 sm:grid-cols-[1fr_10rem_8rem]"
-            >
-              <div>
-                <strong className="block text-sm">{period}</strong>
-                <small className="text-muted-foreground">{date}</small>
-              </div>
-              <span className="hidden text-sm sm:block">1,200 MAD</span>
-              <Status tone="green">Paid</Status>
-            </div>
-          ))}
-        </div>
-      </section>
+      <Surface className="p-6 text-sm text-muted-foreground">
+        Le renouvellement fictif est désactivé. Déposez un avis d’opération ou contactez
+        l’administration pour rétablir l’accès.
+      </Surface>
     </div>
   );
 }

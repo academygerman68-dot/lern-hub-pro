@@ -46,6 +46,11 @@ export const queryKeys = {
     all: ["payments"] as const,
     byStudent: (studentId: string) => ["payments", "student", studentId] as const,
   },
+  paymentProofs: {
+    all: ["payment-proofs"] as const,
+    byStudent: (studentId: string) => ["payment-proofs", "student", studentId] as const,
+    pending: ["payment-proofs", "pending"] as const,
+  },
   subscriptions: {
     all: ["subscriptions"] as const,
   },
@@ -53,11 +58,18 @@ export const queryKeys = {
     all: ["notifications"] as const,
     unread: ["notifications", "unread"] as const,
   },
+  recordings: {
+    all: ["recordings"] as const,
+    provider: ["recordings", "provider"] as const,
+  },
   liveSessions: {
     all: ["live-sessions"] as const,
     detail: (id: string) => ["live-sessions", id] as const,
   },
   access: {
     me: ["access", "me"] as const,
+  },
+  branding: {
+    settings: ["branding", "settings"] as const,
   },
 };

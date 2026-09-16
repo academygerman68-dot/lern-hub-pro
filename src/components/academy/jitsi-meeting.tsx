@@ -68,7 +68,7 @@ export function JitsiMeetingEmbed({ roomName, displayName, email, onLeave }: Pro
 
   return (
     <div className="space-y-3">
-      <div className="h-[min(78vh,720px)] w-full overflow-hidden rounded-xl border border-border bg-black">
+      <div className="h-[min(70dvh,640px)] w-full overflow-hidden rounded-xl border border-border bg-black sm:h-[min(78vh,720px)]">
         <JitsiMeeting
           key={`${roomName}-${loadKey}`}
           domain={config.domain}

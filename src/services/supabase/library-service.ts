@@ -33,6 +33,8 @@ export const SupabaseLibraryService = {
     mimeType?: string | null;
     fileSize?: number | null;
     createdBy?: string | null;
+    expiresAt?: string | null;
+    publishedAt?: string | null;
   }) {
     const { data, error } = await requireClient()
       .from("library_items")
@@ -48,7 +50,9 @@ export const SupabaseLibraryService = {
         mime_type: input.mimeType ?? null,
         file_size: input.fileSize ?? null,
         created_by: input.createdBy ?? null,
-      })
+        expires_at: input.expiresAt ?? null,
+        published_at: input.publishedAt ?? new Date().toISOString(),
+      } as never)
       .select("*")
       .single();
     if (error) throw error;

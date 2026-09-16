@@ -361,6 +361,15 @@
     background: color-mix(in oklab, var(--soft-blue) 55%, white);
   }
 }
+
+@utility table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
 @utility skeleton {
   background: linear-gradient(
     90deg,
@@ -380,6 +389,37 @@
     background-position: -200% 0;
   }
 }
+
+@utility mobile-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  background: oklch(0.14 0.012 70 / 0.5);
+  @media (min-width: 640px) {
+    align-items: center;
+    padding: 1rem;
+  }
+}
+
+@utility mobile-modal-panel {
+  width: 100%;
+  max-height: min(92dvh, 100%);
+  overflow-y: auto;
+  border-radius: 1rem 1rem 0 0;
+  padding: 1.25rem;
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  @media (min-width: 640px) {
+    width: min(32rem, 100%);
+    max-height: 90vh;
+    border-radius: 1rem;
+    padding: 1.5rem;
+  }
+}
+
 @utility modal-backdrop {
   position: fixed;
   inset: 0;
@@ -415,11 +455,40 @@
     transform: scale(1);
   }
 }
+@keyframes slide-in-left {
+  from {
+    opacity: 0.6;
+    transform: translateX(-1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
 @utility animate-fade-in {
   animation: fade-in 240ms ease-out both;
 }
 @utility animate-scale-in {
   animation: scale-in 180ms ease-out both;
+}
+@utility animate-slide-in-left {
+  animation: slide-in-left 200ms ease-out both;
+}
+
+@media (max-width: 639px) {
+  .data-table {
+    min-width: 520px;
+    font-size: 0.75rem;
+  }
+  .data-table th,
+  .data-table td {
+    padding: 0.65rem 0.7rem;
+  }
+  .nav-item {
+    min-height: 2.75rem;
+    padding: 0.7rem 0.85rem;
+    font-size: 0.875rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -38,17 +38,26 @@ export function DocumentViewer({
     if (!open) setZoom(1);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-foreground/50 p-3 sm:p-6">
-      <div className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-xl">
-        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+    <div className="fixed inset-0 z-50 flex flex-col bg-foreground/50 p-0 sm:p-6">
+      <div className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-none border-0 bg-background shadow-xl sm:rounded-2xl sm:border sm:border-border">
+        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))] sm:gap-3 sm:px-4">
           <div className="min-w-0">
             <p className="truncate font-semibold">{title}</p>
             <p className="text-xs text-muted-foreground">{mimeType || kind}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {kind === "pdf" && (
               <>
                 <Button
@@ -70,10 +79,17 @@ export function DocumentViewer({
               </>
             )}
             {url && (
-              <Button size="sm" variant="outline" asChild>
+              <Button size="sm" variant="outline" asChild className="hidden sm:inline-flex">
                 <a href={url} download target="_blank" rel="noreferrer">
                   <Download className="size-4" />
                   Download
+                </a>
+              </Button>
+            )}
+            {url && (
+              <Button size="icon" variant="outline" asChild className="sm:hidden">
+                <a href={url} download target="_blank" rel="noreferrer" aria-label="Download">
+                  <Download className="size-4" />
                 </a>
               </Button>
             )}
@@ -83,7 +99,7 @@ export function DocumentViewer({
           </div>
         </div>
 
-        <div className="relative flex-1 overflow-auto bg-secondary/30 p-3">
+        <div className="relative flex-1 overflow-auto bg-secondary/30 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:p-3">
           {loading && (
             <div className="grid h-full place-items-center text-sm text-muted-foreground">
               Loading document…
@@ -96,7 +112,7 @@ export function DocumentViewer({
             <iframe
               title={title}
               src={`${url}#toolbar=1`}
-              className="mx-auto h-full min-h-[70vh] w-full rounded-lg border border-border bg-white"
+              className="mx-auto h-full min-h-[70dvh] w-full rounded-lg border border-border bg-white sm:min-h-[70vh]"
               style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
             />
           )}
@@ -104,7 +120,7 @@ export function DocumentViewer({
             <img src={url} alt={title} className="mx-auto max-h-full max-w-full object-contain" />
           )}
           {!loading && !error && url && kind === "audio" && (
-            <div className="grid h-full place-items-center">
+            <div className="grid h-full place-items-center px-4">
               <audio controls src={url} className="w-full max-w-lg" />
             </div>
           )}
@@ -112,7 +128,7 @@ export function DocumentViewer({
             <video controls src={url} className="mx-auto max-h-full max-w-full rounded-lg" />
           )}
           {!loading && !error && url && kind === "other" && (
-            <div className="grid h-full place-items-center gap-3 text-center">
+            <div className="grid h-full place-items-center gap-3 px-4 text-center">
               <p className="text-sm text-muted-foreground">
                 Preview not available for this file type.
               </p>

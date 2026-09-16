@@ -12,6 +12,8 @@ import {
   LiveSessionService,
   NotificationService,
   PaymentService,
+  PaymentProofService,
+  RecordingService,
   StudentService,
   SubscriptionService,
   TeacherService,
@@ -454,6 +456,73 @@ export function useMarkPaymentOverdue() {
         qc.invalidateQueries({ queryKey: queryKeys.access.me }),
       ]);
     },
+  });
+}
+
+export function usePaymentProofs(studentId?: string) {
+  return useQuery({
+    queryKey: studentId
+      ? queryKeys.paymentProofs.byStudent(studentId)
+      : queryKeys.paymentProofs.all,
+    queryFn: () =>
+      studentId ? PaymentProofService.listMine(studentId) : PaymentProofService.list(),
+    enabled: studentId === undefined || Boolean(studentId),
+  });
+}
+
+export function usePendingPaymentProofs() {
+  return useQuery({
+    queryKey: queryKeys.paymentProofs.pending,
+    queryFn: () => PaymentProofService.listPending(),
+  });
+}
+
+export function useSubmitPaymentProof() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: PaymentProofService.uploadAndSubmit,
+    onSuccess: async (_data, vars) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.paymentProofs.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.paymentProofs.pending }),
+        qc.invalidateQueries({ queryKey: queryKeys.paymentProofs.byStudent(vars.studentId) }),
+      ]);
+    },
+  });
+}
+
+export function useReviewPaymentProof() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { proofId: string; approve: boolean; adminNote?: string | null }) =>
+      PaymentProofService.review(input.proofId, input.approve, input.adminNote),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.paymentProofs.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.paymentProofs.pending }),
+        qc.invalidateQueries({ queryKey: queryKeys.payments.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.subscriptions.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.students.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.access.me }),
+      ]);
+    },
+  });
+}
+
+export function useRecordingProvider() {
+  return useQuery({
+    queryKey: queryKeys.recordings.provider,
+    queryFn: () => RecordingService.getProviderStatus(),
+  });
+}
+
+export function useRecordings(classId?: string) {
+  return useQuery({
+    queryKey: classId
+      ? ([...queryKeys.recordings.all, classId] as const)
+      : queryKeys.recordings.all,
+    queryFn: () => RecordingService.list(classId ? { classId } : undefined),
   });
 }
 

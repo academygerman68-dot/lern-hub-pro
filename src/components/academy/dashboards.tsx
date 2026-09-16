@@ -42,10 +42,10 @@ export function PremiumStudentDashboard() {
       </div>
 
       <section className="grid gap-5 xl:grid-cols-[1.35fr_0.9fr]">
-        <div className="rounded-2xl bg-brand p-7 text-brand-foreground sm:p-8">
+        <div className="rounded-2xl bg-brand p-5 text-brand-foreground sm:p-7 md:p-8">
           <Eyebrow>{l("Niveau actuel", "المستوى الحالي")}</Eyebrow>
-          <div className="mt-4 flex items-end gap-3">
-            <span className="font-display text-6xl">{level}</span>
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <span className="font-display text-5xl sm:text-6xl">{level}</span>
             <span className="mb-2 text-sm text-brand-foreground/65">
               {className
                 ? l(`Classe · ${className}`, `القسم · ${className}`)

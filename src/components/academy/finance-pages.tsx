@@ -3,13 +3,19 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  useAcademicAccess,
   useCreatePayment,
   useMarkPaymentOverdue,
   useMarkPaymentPaid,
+  usePaymentProofs,
   usePayments,
+  usePendingPaymentProofs,
+  useReviewPaymentProof,
   useStudents,
+  useSubmitPaymentProof,
   useSubscriptions,
 } from "@/hooks/use-academy-data";
+import { PaymentProofService } from "@/services/academy-services";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
 import { Metric, PageHeader, Status, Surface } from "./primitives";
@@ -26,9 +32,95 @@ function studentLabel(row: {
 }
 
 function paymentTone(status: string): "green" | "amber" | "red" {
-  if (status === "paid") return "green";
+  if (status === "paid" || status === "approved") return "green";
   if (status === "pending" || status === "partial") return "amber";
   return "red";
+}
+
+function ProofReviewQueue() {
+  const pendingQuery = usePendingPaymentProofs();
+  const review = useReviewPaymentProof();
+
+  return (
+    <Surface className="mb-6 p-5">
+      <h2 className="font-semibold">File des justificatifs</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Avis d’opération déposés par les étudiants. L’accès reste bloqué jusqu’à validation.
+      </p>
+      <QueryState
+        isLoading={pendingQuery.isLoading}
+        isError={pendingQuery.isError}
+        error={pendingQuery.error}
+        isEmpty={!pendingQuery.data?.length}
+        emptyTitle="Aucun justificatif en attente"
+        emptyMessage="Les dépôts étudiants apparaîtront ici."
+        onRetry={() => void pendingQuery.refetch()}
+      >
+        <div className="mt-4 divide-y">
+          {pendingQuery.data?.map((proof) => (
+            <div key={proof.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <div>
+                <p className="font-medium">{studentLabel(proof)}</p>
+                <p className="text-sm text-muted-foreground">
+                  {new Date(proof.created_at).toLocaleString()}
+                  {proof.student_note ? ` · ${proof.student_note}` : ""}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    void PaymentProofService.getSignedUrl(proof)
+                      .then((url) => window.open(url, "_blank", "noopener,noreferrer"))
+                      .catch((err: Error) => toast.error(err.message));
+                  }}
+                >
+                  Voir
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={review.isPending}
+                  onClick={() => {
+                    review.mutate(
+                      { proofId: proof.id, approve: true },
+                      {
+                        onSuccess: () => toast.success("Justificatif approuvé · accès rétabli"),
+                        onError: (err) => toast.error(err.message),
+                      },
+                    );
+                  }}
+                >
+                  Approuver
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={review.isPending}
+                  onClick={() => {
+                    const note = window.prompt("Motif du refus (optionnel)");
+                    review.mutate(
+                      {
+                        proofId: proof.id,
+                        approve: false,
+                        adminNote: note === null ? null : note,
+                      },
+                      {
+                        onSuccess: () => toast.message("Justificatif refusé"),
+                        onError: (err) => toast.error(err.message),
+                      },
+                    );
+                  }}
+                >
+                  Refuser
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </QueryState>
+    </Surface>
+  );
 }
 
 export function FinancePages({ mode }: { mode: string }) {
@@ -81,7 +173,7 @@ export function FinancePages({ mode }: { mode: string }) {
           emptyMessage="Create a payment and mark it paid to activate a subscription."
           onRetry={() => void subscriptionsQuery.refetch()}
         >
-          <Surface className="overflow-x-auto">
+          <Surface className="table-scroll overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
@@ -127,6 +219,7 @@ export function FinancePages({ mode }: { mode: string }) {
         subtitle="Payments linked to subscriptions and academic access."
         action={<Button onClick={() => setCreateOpen(true)}>+ Record payment</Button>}
       />
+      <ProofReviewQueue />
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Total amount" value={`${counts.total.toLocaleString()} MAD`} />
         <Metric label="Paid" value={String(counts.paid)} />
@@ -163,7 +256,60 @@ export function FinancePages({ mode }: { mode: string }) {
         emptyMessage="Record a payment for a student to start the subscription workflow."
         onRetry={() => void paymentsQuery.refetch()}
       >
-        <Surface className="overflow-x-auto">
+        <div className="space-y-3 md:hidden">
+          {filtered.map((row) => (
+            <Surface key={row.id} className="space-y-3 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{studentLabel(row)}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {Number(row.amount).toLocaleString()} {row.currency}
+                  </p>
+                </div>
+                <Status tone={paymentTone(row.status)}>{row.status}</Status>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Due {row.due_date ?? "—"}
+                {row.payment_method ? ` · ${row.payment_method}` : ""}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {row.status !== "paid" && row.status !== "cancelled" && (
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    disabled={markPaid.isPending}
+                    onClick={() => {
+                      markPaid.mutate(row.id, {
+                        onSuccess: () =>
+                          toast.success("Payment marked paid · subscription activated"),
+                        onError: (err) => toast.error(err.message),
+                      });
+                    }}
+                  >
+                    Mark paid
+                  </Button>
+                )}
+                {row.status === "pending" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    disabled={markOverdue.isPending}
+                    onClick={() => {
+                      markOverdue.mutate(row.id, {
+                        onSuccess: () => toast.success("Marked overdue · access restricted"),
+                        onError: (err) => toast.error(err.message),
+                      });
+                    }}
+                  >
+                    Mark overdue
+                  </Button>
+                )}
+              </div>
+            </Surface>
+          ))}
+        </div>
+        <Surface className="table-scroll hidden md:block">
           <table className="data-table">
             <thead>
               <tr>
@@ -228,7 +374,7 @@ export function FinancePages({ mode }: { mode: string }) {
         </Surface>
       </QueryState>
 
-      <Surface className="mt-5 p-5">
+      <Surface className="mt-5 p-4 sm:p-5">
         <h2 className="font-semibold">Access policy</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <div className="rounded-md bg-success-soft p-4">
@@ -247,8 +393,8 @@ export function FinancePages({ mode }: { mode: string }) {
       </Surface>
 
       {createOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4">
-          <Surface className="w-full max-w-lg space-y-4 p-6">
+        <div className="mobile-modal">
+          <Surface className="mobile-modal-panel space-y-4">
             <h2 className="text-lg font-semibold">Record payment</h2>
             <select
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -313,46 +459,108 @@ export function FinancePages({ mode }: { mode: string }) {
 export function StudentPaymentsPage() {
   const { user } = useAcademy();
   const studentsQuery = useStudents();
+  const accessQuery = useAcademicAccess();
   const myStudent = (studentsQuery.data ?? []).find(
     (s) => s.email.toLowerCase() === (user?.email ?? "").toLowerCase(),
   );
   const paymentsQuery = usePayments(myStudent?.id);
-  const accessBlocked =
-    myStudent?.subscription === "SUSPENDED" || myStudent?.subscription === "PAST_DUE";
+  const proofsQuery = usePaymentProofs(myStudent?.id);
+  const submitProof = useSubmitPaymentProof();
+  const [note, setNote] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const accessBlocked = accessQuery.data === false;
 
   return (
     <>
-      <PageHeader
-        title="Your program"
-        subtitle="Subscription and payment history from your academy account."
-      />
+      <PageHeader title="Votre programme" subtitle="Abonnement, paiements et avis d’opération." />
       {accessBlocked && (
         <Surface className="mb-6 border-destructive/30 bg-alert-soft p-6">
-          <h2 className="font-semibold">Academic access restricted</h2>
+          <h2 className="font-semibold">Accès académique restreint</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Your subscription is {myStudent?.subscription?.toLowerCase()}. You can still view
-            payments and profile. Contact administration or wait for a recorded payment to restore
-            access.
+            Votre abonnement est inactif. Vous pouvez consulter les paiements, déposer un
+            justificatif, gérer le profil et l’assistance. Les cours restent bloqués jusqu’à
+            validation administrative.
           </p>
         </Surface>
       )}
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <Surface className="p-5">
-          <p className="text-xs text-muted-foreground uppercase">Subscription</p>
+          <p className="text-xs text-muted-foreground uppercase">Abonnement</p>
           <p className="mt-2 text-2xl font-semibold">{myStudent?.subscription ?? "—"}</p>
         </Surface>
         <Surface className="p-5">
-          <p className="text-xs text-muted-foreground uppercase">Payments</p>
+          <p className="text-xs text-muted-foreground uppercase">Paiements</p>
           <p className="mt-2 text-2xl font-semibold">{paymentsQuery.data?.length ?? 0}</p>
         </Surface>
       </div>
+
+      <Surface className="mb-6 p-5">
+        <h2 className="font-semibold">Déposer un avis d’opération</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          PDF, JPEG ou PNG · max 10 Mo. L’accès reste bloqué jusqu’à approbation.
+        </p>
+        <div className="mt-4 space-y-3">
+          <label className="block text-sm">
+            Fichier
+            <Input
+              type="file"
+              accept="application/pdf,image/jpeg,image/png"
+              className="mt-1"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
+          <label className="block text-sm">
+            Note (optionnel)
+            <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1" />
+          </label>
+          <Button
+            disabled={!myStudent?.id || !file || submitProof.isPending}
+            onClick={() => {
+              if (!myStudent?.id || !file) return;
+              submitProof.mutate(
+                {
+                  studentId: myStudent.id,
+                  file,
+                  studentNote: note || null,
+                },
+                {
+                  onSuccess: () => {
+                    toast.success("Justificatif déposé — en attente de validation");
+                    setFile(null);
+                    setNote("");
+                  },
+                  onError: (err) => toast.error(err.message),
+                },
+              );
+            }}
+          >
+            Envoyer le justificatif
+          </Button>
+        </div>
+        {(proofsQuery.data?.length ?? 0) > 0 && (
+          <div className="mt-6 divide-y border-t">
+            {proofsQuery.data?.map((p) => (
+              <div key={p.id} className="flex items-center justify-between gap-3 py-3">
+                <div>
+                  <p className="text-sm font-medium">
+                    {p.created_at.slice(0, 16).replace("T", " ")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{p.student_note || "Sans note"}</p>
+                </div>
+                <Status tone={paymentTone(p.status)}>{p.status}</Status>
+              </div>
+            ))}
+          </div>
+        )}
+      </Surface>
+
       <QueryState
         isLoading={studentsQuery.isLoading || paymentsQuery.isLoading}
         isError={studentsQuery.isError || paymentsQuery.isError}
         error={(studentsQuery.error ?? paymentsQuery.error) as Error | null}
         isEmpty={!paymentsQuery.data?.length}
-        emptyTitle="No payments yet"
-        emptyMessage="When administration records a payment, it will appear here."
+        emptyTitle="Aucun paiement"
+        emptyMessage="Lorsqu’un paiement est enregistré, il apparaîtra ici."
         onRetry={() => void paymentsQuery.refetch()}
       >
         <Surface className="divide-y">
@@ -366,7 +574,7 @@ export function StudentPaymentsPage() {
                   {Number(row.amount).toLocaleString()} {row.currency}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Due {row.due_date ?? "—"}
+                  Échéance {row.due_date ?? "—"}
                   {row.reference ? ` · ${row.reference}` : ""}
                 </p>
               </div>

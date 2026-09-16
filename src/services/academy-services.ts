@@ -436,6 +436,7 @@ export const CourseService = {
       }));
     }
     await wait(160);
+    if (!isDemoAuthAllowed(isSupabaseConfigured)) return [];
     return mockResources;
   },
 };
@@ -605,12 +606,17 @@ export const PaymentService = {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabasePaymentService.markOverdue(paymentId);
   },
-  /** @deprecated Use markPaid with a real payment id. Kept for legacy student renew UI. */
-  async pay(): Promise<SubscriptionStatus> {
-    await wait(300);
-    return "ACTIVE";
+  /** Legacy renew button — does not fake activation. Use payment proofs or admin markPaid. */
+  async pay(): Promise<never> {
+    throw new Error(
+      "Paiement fictif désactivé. Déposez un avis d’opération ou contactez l’administration.",
+    );
   },
 };
+
+export { SupabasePaymentProofService as PaymentProofService } from "@/services/supabase/payment-proof-service";
+export { SupabaseRecordingService as RecordingService } from "@/services/supabase/recording-service";
+export { OutboxService } from "@/services/messaging/outbox-service";
 
 export const SubscriptionService = {
   async list() {

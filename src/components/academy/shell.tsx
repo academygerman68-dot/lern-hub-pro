@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   BarChart3,
   Bell,
@@ -125,6 +125,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   const unreadQuery = useUnreadNotificationCount();
   const markAllRead = useMarkAllNotificationsRead();
   const markRead = useMarkNotificationRead();
+
+  useEffect(() => {
+    if (!mobile) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobile]);
+
+  useEffect(() => {
+    setMobile(false);
+    setNotice(false);
+  }, [page]);
+
   if (!role || !user) return null;
   const sections = menus[role];
   const roleLabel =
@@ -136,9 +151,26 @@ export function AppShell({ children }: { children: ReactNode }) {
   const unread = unreadQuery.data ?? 0;
   const notificationRows = notificationsQuery.data ?? [];
 
+  const languageSwitch = (
+    <div className="flex gap-1" role="group" aria-label="Language">
+      {(["fr", "ar"] as Locale[]).map((code) => (
+        <button
+          key={code}
+          type="button"
+          onClick={() => setLocale(code)}
+          className={`min-h-9 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
+            locale === code ? "bg-soft-blue text-primary" : "text-muted-foreground hover:bg-muted"
+          }`}
+        >
+          {localeLabels[code]}
+        </button>
+      ))}
+    </div>
+  );
+
   const sidebar = (
     <>
-      <div className="flex h-[4.5rem] items-center justify-between gap-2 border-b border-sidebar-border px-4">
+      <div className="flex h-[4.5rem] items-center justify-between gap-2 border-b border-sidebar-border px-4 pt-[env(safe-area-inset-top,0px)]">
         <BrandLogo variant="compact" className="min-w-0" imgClassName="size-10" />
         <Button
           size="icon"
@@ -150,12 +182,24 @@ export function AppShell({ children }: { children: ReactNode }) {
           <X className="size-5" />
         </Button>
       </div>
-      <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-5">
+      <nav className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 py-5">
         {sections.map((section, sectionIndex) => (
           <div key={section.label ?? sectionIndex}>
             {section.label && (
               <p className="mb-2 px-3 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-                {section.label}
+                {t(
+                  section.label === "Learning"
+                    ? "nav.section.learning"
+                    : section.label === "Account"
+                      ? "nav.section.account"
+                      : section.label === "Teaching"
+                        ? "nav.section.teaching"
+                        : section.label === "Academy"
+                          ? "nav.section.academy"
+                          : section.label === "Operations"
+                            ? "nav.section.operations"
+                            : section.label,
+                )}
               </p>
             )}
             <div className="space-y-0.5">
@@ -180,9 +224,15 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         ))}
       </nav>
-      <div className="border-t border-sidebar-border p-3">
+      <div className="border-t border-sidebar-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
+        <div className="mb-3 flex items-center justify-between gap-2 px-1 lg:hidden">
+          <span className="text-[11px] font-medium text-muted-foreground uppercase">
+            {t("shell.language")}
+          </span>
+          {languageSwitch}
+        </div>
         <div className="mb-2 flex items-center gap-3 rounded-xl bg-muted/70 px-3 py-2.5">
-          <span className="grid size-8 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
             {initials(user.name)}
           </span>
           <div className="min-w-0">
@@ -199,29 +249,29 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       <aside className="academy-sidebar fixed inset-y-0 left-0 z-40 hidden w-[16.5rem] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
         {sidebar}
       </aside>
       {mobile && (
-        <div
-          className="fixed inset-0 z-50 bg-foreground/20 backdrop-blur-[2px] lg:hidden"
-          onClick={() => setMobile(false)}
-        >
-          <aside
-            className="flex h-full w-[18rem] flex-col bg-sidebar shadow-card"
-            onClick={(event) => event.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            className="absolute inset-0 bg-foreground/30 backdrop-blur-[2px]"
+            aria-label={locale === "ar" ? "إغلاق" : "Fermer"}
+            onClick={() => setMobile(false)}
+          />
+          <aside className="relative flex h-full w-[min(18.5rem,88vw)] flex-col bg-sidebar text-sidebar-foreground shadow-card animate-slide-in-left">
             {sidebar}
           </aside>
         </div>
       )}
       <div className="academy-content lg:pl-[16.5rem]">
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/85 px-4 backdrop-blur-xl sm:px-8">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/90 px-3 backdrop-blur-xl sm:h-16 sm:gap-3 sm:px-8 pt-[env(safe-area-inset-top,0px)]">
           <Button
             size="icon"
             variant="ghost"
-            className="lg:hidden"
+            className="shrink-0 lg:hidden"
             onClick={() => setMobile(true)}
             aria-label={locale === "ar" ? "فتح القائمة" : "Ouvrir la navigation"}
           >
@@ -231,23 +281,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             <p className="truncate text-sm font-medium tracking-tight">{roleLabel}</p>
             <p className="hidden truncate text-xs text-muted-foreground sm:block">{user.name}</p>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="hidden gap-1 sm:flex" role="group" aria-label="Language">
-              {(["fr", "ar"] as Locale[]).map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => setLocale(code)}
-                  className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                    locale === code
-                      ? "bg-soft-blue text-primary"
-                      : "text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {localeLabels[code]}
-                </button>
-              ))}
-            </div>
+          <div className="flex items-center gap-1">
+            <div className="hidden sm:flex">{languageSwitch}</div>
             <div className="relative">
               <Button
                 size="icon"
@@ -265,42 +300,56 @@ export function AppShell({ children }: { children: ReactNode }) {
                 )}
               </Button>
               {notice && (
-                <div className="absolute top-12 right-0 w-[min(22rem,85vw)] rounded-xl border border-border bg-popover p-2 shadow-card animate-scale-in">
-                  <div className="px-3 py-2 text-sm font-medium">{t("shell.notifications")}</div>
-                  {notificationRows.length === 0 && (
-                    <p className="px-3 py-4 text-sm text-muted-foreground">No notifications yet.</p>
-                  )}
-                  {notificationRows.slice(0, 8).map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className="flex w-full gap-3 rounded-lg px-3 py-3 text-left hover:bg-muted"
-                      onClick={() => {
-                        if (item.status === "unread") markRead.mutate(item.id);
-                        if (item.link_page) navigate(item.link_page as AcademyPage);
-                        setNotice(false);
-                      }}
-                    >
-                      <span
-                        className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
-                          item.status === "unread" ? "bg-primary" : "bg-border"
-                        }`}
-                      />
-                      <div>
-                        <p className="text-sm">{item.title}</p>
-                        <p className="text-xs text-muted-foreground line-clamp-2">{item.message}</p>
-                        <p className="mt-1 text-[10px] text-muted-foreground">
-                          {new Date(item.created_at).toLocaleString()}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-40 sm:hidden"
+                    aria-label="Close"
+                    onClick={() => setNotice(false)}
+                  />
+                  <div className="absolute top-12 right-0 z-50 w-[min(22rem,calc(100vw-1.25rem))] max-h-[min(70dvh,28rem)] overflow-y-auto rounded-xl border border-border bg-popover p-2 shadow-card animate-scale-in">
+                    <div className="px-3 py-2 text-sm font-medium">{t("shell.notifications")}</div>
+                    {notificationRows.length === 0 && (
+                      <p className="px-3 py-4 text-sm text-muted-foreground">
+                        No notifications yet.
+                      </p>
+                    )}
+                    {notificationRows.slice(0, 8).map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className="flex w-full gap-3 rounded-lg px-3 py-3 text-left hover:bg-muted active:bg-muted"
+                        onClick={() => {
+                          if (item.status === "unread") markRead.mutate(item.id);
+                          if (item.link_page) navigate(item.link_page as AcademyPage);
+                          setNotice(false);
+                        }}
+                      >
+                        <span
+                          className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
+                            item.status === "unread" ? "bg-primary" : "bg-border"
+                          }`}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm">{item.title}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {item.message}
+                          </p>
+                          <p className="mt-1 text-[10px] text-muted-foreground">
+                            {new Date(item.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>
         </header>
-        <main className="px-4 py-6 sm:px-8 sm:py-8">{children}</main>
+        <main className="px-3 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))] sm:px-8 sm:py-8">
+          {children}
+        </main>
       </div>
     </div>
   );

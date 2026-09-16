@@ -9,6 +9,8 @@ import {
   useCreateLiveSession,
   useLiveSession,
   useLiveSessions,
+  useRecordingProvider,
+  useRecordings,
   useUpdateLiveSessionStatus,
 } from "@/hooks/use-academy-data";
 import { getLiveSessionId, setLiveSessionId, clearLiveSessionId } from "@/lib/live-class-session";
@@ -97,6 +99,8 @@ function LiveSessionLobby() {
   const { navigate, role, user } = useAcademy();
   const sessionsQuery = useLiveSessions();
   const classesQuery = useClasses();
+  const recordingProvider = useRecordingProvider();
+  const recordingsQuery = useRecordings();
   const createSession = useCreateLiveSession();
   const updateStatus = useUpdateLiveSessionStatus();
   const [open, setOpen] = useState(false);
@@ -160,9 +164,37 @@ function LiveSessionLobby() {
       {jitsi.requiresJwt && (
         <Surface className="mb-4 border-amber-500/30 bg-warning-soft p-4 text-sm">
           JaaS JWT required. For a real meeting without JaaS, remove VITE_JAAS_APP_ID (defaults to
-          meet.jit.si).
+          meet.jit.si). Edge Function `jaas-token` mints JWT when JAAS_* secrets exist.
         </Surface>
       )}
+
+      <Surface className="mb-4 p-4 text-sm">
+        <p className="font-medium">
+          {recordingProvider.data?.configured
+            ? recordingProvider.data.message
+            : "Enregistrement non configuré"}
+        </p>
+        <p className="mt-1 text-muted-foreground">
+          Les réunions ne sont jamais présentées comme enregistrées sans fournisseur réel.
+          {recordingProvider.data?.configured
+            ? " Les enregistrements prêts apparaissent ci-dessous."
+            : " Les actions d’enregistrement sont masquées."}
+        </p>
+        {recordingProvider.data?.configured && (recordingsQuery.data?.length ?? 0) > 0 && (
+          <ul className="mt-3 space-y-2">
+            {recordingsQuery.data
+              ?.filter((r) => r.status === "ready")
+              .map((r) => (
+                <li key={r.id} className="flex justify-between gap-2">
+                  <span>{r.title}</span>
+                  <span className="text-muted-foreground">
+                    {r.duration_seconds ? `${Math.round(r.duration_seconds / 60)} min` : "—"}
+                  </span>
+                </li>
+              ))}
+          </ul>
+        )}
+      </Surface>
 
       <QueryState
         isLoading={sessionsQuery.isLoading}
@@ -210,8 +242,8 @@ function LiveSessionLobby() {
       </QueryState>
 
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4">
-          <Surface className="w-full max-w-lg space-y-4 p-6">
+        <div className="mobile-modal">
+          <Surface className="mobile-modal-panel space-y-4">
             <h2 className="text-lg font-semibold">Create session</h2>
             <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
             <select
@@ -289,7 +321,6 @@ function LiveMeetingRoom() {
   const sessionQuery = useLiveSession(sessionId);
   const updateStatus = useUpdateLiveSessionStatus();
   const session = sessionQuery.data;
-  const jitsi = getJitsiConfig();
 
   useEffect(() => {
     if (session && session.status === "scheduled") {
@@ -361,14 +392,14 @@ function LiveMeetingRoom() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-medium">{session.title}</h1>
-          <p className="text-sm text-muted-foreground">
-            {session.class?.name} · {teacherLabel(session)} · room {session.meeting_room}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="font-display text-xl font-medium sm:text-2xl">{session.title}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {session.class?.name} · {teacherLabel(session)}
           </p>
-          <p className="text-xs text-muted-foreground">
-            Domain {jitsi.domain} · You join as {displayName}
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            Room {session.meeting_room} · {displayName}
             {role ? ` (${role})` : ""}
           </p>
         </div>
@@ -376,6 +407,8 @@ function LiveMeetingRoom() {
           {(role === "director" || role === "teacher") && session.status === "live" && (
             <Button
               variant="outline"
+              size="sm"
+              className="flex-1 sm:flex-none"
               onClick={() => {
                 updateStatus.mutate(
                   { id: session.id, status: "completed" },
@@ -389,7 +422,12 @@ function LiveMeetingRoom() {
               End session
             </Button>
           )}
-          <Button variant="outline" onClick={leaveMeeting}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 sm:flex-none"
+            onClick={leaveMeeting}
+          >
             Leave meeting
           </Button>
         </div>

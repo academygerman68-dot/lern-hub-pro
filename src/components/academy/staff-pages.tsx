@@ -78,7 +78,7 @@ function TeacherStudents() {
           void rosterQuery.refetch();
         }}
       >
-        <Surface className="overflow-x-auto">
+        <Surface className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
@@ -146,7 +146,7 @@ function TeacherClass() {
         isEmpty={!rosterQuery.data?.length}
         emptyMessage="No enrolled students in this class yet."
       >
-        <Surface className="overflow-x-auto">
+        <Surface className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
@@ -210,7 +210,8 @@ export function DirectorPages({ page: pageProp }: { page?: AcademyPage } = {}) {
 }
 
 function Students() {
-  const { navigate } = useAcademy();
+  const { navigate, role } = useAcademy();
+  const isTeacher = role === "teacher";
   const [query, setQuery] = useState("");
   const studentsQuery = useStudents(query);
   const enroll = useCreateEnrollment();
@@ -219,31 +220,39 @@ function Students() {
     <>
       <PageHeader
         title="Students"
-        subtitle={`${studentsQuery.data?.length ?? 0} learners in the academy.`}
+        subtitle={
+          isTeacher
+            ? `${studentsQuery.data?.length ?? 0} learners in your classes.`
+            : `${studentsQuery.data?.length ?? 0} learners in the academy.`
+        }
         action={
-          <Button
-            onClick={() => {
-              const studentId = studentsQuery.data?.[0]?.id;
-              const classId = classesQuery.data?.[0]?.id;
-              if (!studentId || !classId) {
-                toast.message("Create a class first, then enroll students with existing profiles.");
-                return;
-              }
-              enroll.mutate(
-                { studentId, classId },
-                {
-                  onSuccess: () => toast.success("Enrollment created"),
-                  onError: (err) => toast.error(err.message),
-                },
-              );
-            }}
-          >
-            + Enroll in class
-          </Button>
+          isTeacher ? undefined : (
+            <Button
+              onClick={() => {
+                const studentId = studentsQuery.data?.[0]?.id;
+                const classId = classesQuery.data?.[0]?.id;
+                if (!studentId || !classId) {
+                  toast.message(
+                    "Create a class first, then enroll students with existing profiles.",
+                  );
+                  return;
+                }
+                enroll.mutate(
+                  { studentId, classId },
+                  {
+                    onSuccess: () => toast.success("Enrollment created"),
+                    onError: (err) => toast.error(err.message),
+                  },
+                );
+              }}
+            >
+              + Enroll in class
+            </Button>
+          )
         }
       />
       <div className="mb-4 flex flex-wrap gap-2">
-        <div className="relative min-w-60 flex-1">
+        <div className="relative min-w-0 w-full flex-1 sm:min-w-60">
           <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
           <Input
             className="pl-9"
@@ -260,7 +269,40 @@ function Students() {
         isEmpty={!studentsQuery.data?.length}
         emptyMessage="No students found."
       >
-        <Surface className="overflow-x-auto">
+        <div className="space-y-3 md:hidden">
+          {studentsQuery.data?.map((student) => (
+            <Surface
+              key={student.id}
+              className="space-y-3 p-4"
+              onClick={() => navigate("student360", { studentId: student.id })}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{student.name}</p>
+                  <p className="truncate text-sm text-muted-foreground">{student.email}</p>
+                </div>
+                {!isTeacher && (
+                  <Status
+                    tone={
+                      student.subscription === "ACTIVE"
+                        ? "green"
+                        : student.subscription === "PAST_DUE"
+                          ? "amber"
+                          : "red"
+                    }
+                  >
+                    {student.subscription}
+                  </Status>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                <span>Level · {student.level}</span>
+                <span className="truncate">Class · {student.className || "—"}</span>
+              </div>
+            </Surface>
+          ))}
+        </div>
+        <Surface className="table-scroll hidden md:block">
           <table className="data-table">
             <thead>
               <tr>
@@ -269,7 +311,7 @@ function Students() {
                 <th>Class</th>
                 <th>Progress</th>
                 <th>Attendance</th>
-                <th>Subscription</th>
+                {!isTeacher && <th>Subscription</th>}
               </tr>
             </thead>
             <tbody>
@@ -287,19 +329,21 @@ function Students() {
                   <td>{student.className}</td>
                   <td>{student.progress || "—"}%</td>
                   <td>{student.attendance || "—"}%</td>
-                  <td>
-                    <Status
-                      tone={
-                        student.subscription === "ACTIVE"
-                          ? "green"
-                          : student.subscription === "PAST_DUE"
-                            ? "amber"
-                            : "red"
-                      }
-                    >
-                      {student.subscription}
-                    </Status>
-                  </td>
+                  {!isTeacher && (
+                    <td>
+                      <Status
+                        tone={
+                          student.subscription === "ACTIVE"
+                            ? "green"
+                            : student.subscription === "PAST_DUE"
+                              ? "amber"
+                              : "red"
+                        }
+                      >
+                        {student.subscription}
+                      </Status>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -363,8 +407,8 @@ function Classes() {
       </QueryState>
 
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4">
-          <Surface className="w-full max-w-lg space-y-4 p-6">
+        <div className="mobile-modal">
+          <Surface className="mobile-modal-panel space-y-4">
             <h2 className="text-lg font-semibold">Create class</h2>
             <Input
               placeholder="Class name"

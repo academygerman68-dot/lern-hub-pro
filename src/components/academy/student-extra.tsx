@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -15,9 +15,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LEAD_TEACHER } from "@/data/demo-accounts";
-import { resources } from "@/data/mock-data";
+import { queryKeys } from "@/lib/query-keys";
 import { AssignmentService, CourseService } from "@/services/academy-services";
-import { useQuery } from "@tanstack/react-query";
+import { SettingsService } from "@/services/supabase/settings-service";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMyExamAttempts } from "@/hooks/use-academy-data";
 import { Metric, PageHeader, ProgressLine, SectionTitle, Status, Surface } from "./primitives";
 import { useAcademy } from "./academy-context";
@@ -27,7 +28,7 @@ const weekOffsets = ["mt-2", "mt-3", "mt-4", "mt-5", "mt-6", "mt-7", "mt-8"] as 
 
 export function Materials() {
   const [type, setType] = useState("All");
-  const { data = resources } = useQuery({
+  const { data = [] } = useQuery({
     queryKey: ["resources"],
     queryFn: CourseService.listResources,
   });
@@ -437,27 +438,73 @@ export function DirectorReports() {
 }
 
 export function DirectorSettings() {
+  const qc = useQueryClient();
+  const mapQuery = useQuery({
+    queryKey: queryKeys.branding.settings,
+    queryFn: () => SettingsService.getMap(),
+  });
+  const [name, setName] = useState("");
+  const [tagline, setTagline] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+
+  useEffect(() => {
+    const map = mapQuery.data;
+    if (!map) return;
+    if (typeof map["academy_name"] === "string") setName(map["academy_name"]);
+    if (typeof map["academy_tagline"] === "string") setTagline(map["academy_tagline"]);
+    if (typeof map["logo_url"] === "string") setLogoUrl(map["logo_url"]);
+  }, [mapQuery.data]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      await SettingsService.upsertPublic("academy_name", name);
+      await SettingsService.upsertPublic("academy_tagline", tagline);
+      await SettingsService.upsertPublic("logo_url", logoUrl || null);
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.branding.settings });
+      toast.success("Identité du centre mise à jour");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   return (
     <>
-      <PageHeader title="Settings" subtitle="Academy defaults for access, billing and exams." />
+      <PageHeader
+        title="Paramètres"
+        subtitle="Identité publique, accès et canaux de notification."
+      />
+      <Surface className="mb-6 space-y-4 p-6">
+        <h2 className="font-semibold">Identité du centre</h2>
+        <label className="block text-sm">
+          Nom
+          <Input className="mt-1" value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+        <label className="block text-sm">
+          Slogan
+          <Input className="mt-1" value={tagline} onChange={(e) => setTagline(e.target.value)} />
+        </label>
+        <label className="block text-sm">
+          URL du logo (ou chemin public)
+          <Input className="mt-1" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} />
+        </label>
+        <Button disabled={save.isPending} onClick={() => save.mutate()}>
+          Enregistrer
+        </Button>
+      </Surface>
       <Surface className="space-y-5 p-6">
         <div>
-          <h2 className="font-semibold">Access policy</h2>
+          <h2 className="font-semibold">Politique d’accès</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            ACTIVE students keep full access. PAST DUE receive a warning. SUSPENDED learners are
-            locked out of live class, exams and materials.
+            ACTIVE : accès complet. PAST DUE : avertissement. SUSPENDED : cours, live et examens
+            bloqués ; paiements, profil et assistance restent ouverts.
           </p>
         </div>
         <div>
-          <h2 className="font-semibold">Billing</h2>
+          <h2 className="font-semibold">Canaux externes</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Default program fee is 1,200 MAD / month. Invoices are generated on the 1st.
-          </p>
-        </div>
-        <div>
-          <h2 className="font-semibold">Exam publication</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Publishing an exam immediately unlocks it on the student Prüfung page.
+            E-mail / WhatsApp : voir adaptateurs non configurés tant que les secrets Edge ne sont
+            pas définis. Les notifications in-app restent toujours disponibles.
           </p>
         </div>
       </Surface>

@@ -1,3 +1,29 @@
+# German Language Academy (lern-hub-pro)
+
+## Statut produit (réel vs externe)
+
+**Réel (Supabase)** : Auth, profils, étudiants/professeurs/classes, abonnements/paiements, justificatifs bancaires (dépôt + file admin + RPC d’approbation), accès académique, notifications in-app, bibliothèque (expiration), examens, sessions live Jitsi (`meet.jit.si`), branding via `app_settings`.
+
+**Nécessite un fournisseur / secrets Edge** : JaaS JWT (`jaas-token`), enregistrement vidéo, e-mail, WhatsApp. Sans secrets : adaptateurs **non configurés** — aucun succès fictif.
+
+**Hors parcours réel** : `src/data/mock-data.ts` (seeds UI uniquement si demo auth explicite).
+
+## Lancer le projet
+
+```bash
+cp .env.example .env.local   # renseigner VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
+npm ci
+npm run dev
+```
+
+Validations : `npx tsc --noEmit` · `npm run lint` · `npm test` · `npm run build`
+
+Docs : [docs/deployment-checklist.md](docs/deployment-checklist.md) · [docs/demo-script.md](docs/demo-script.md)
+
+Migrations à appliquer manuellement (pas de push auto) : `supabase/migrations/20260916120000_phase3_proofs_recordings_outbox.sql`
+
+---
+
 # German Ascent Platform
 
 Crée un prototype web premium, moderne et entièrement navigable d’une plateforme digitale pour un centre d’apprentissage de la langue allemande, de niveau A1 à C1.

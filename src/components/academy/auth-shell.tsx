@@ -44,9 +44,9 @@ export function AuthShell({
         <p className="text-sm text-brand-foreground/50">{brand.name}</p>
       </section>
 
-      <section className="flex min-h-screen items-center justify-center px-5 py-10">
+      <section className="flex min-h-dvh items-center justify-center px-4 py-8 pb-[max(2rem,env(safe-area-inset-bottom,0px))] pt-[max(2rem,env(safe-area-inset-top,0px))] sm:px-5 sm:py-10">
         <div className="w-full max-w-md">
-          <div className="mb-8 flex items-center justify-between gap-3">
+          <div className="mb-6 flex items-center justify-between gap-3 sm:mb-8">
             <Link to="/" className="lg:hidden">
               <BrandLogo variant="compact" />
             </Link>
@@ -67,7 +67,9 @@ export function AuthShell({
           </div>
 
           <p className="text-sm font-medium text-primary">{t("login.welcome")}</p>
-          <h2 className="mt-2 font-display text-3xl font-medium tracking-tight">{title}</h2>
+          <h2 className="mt-2 font-display text-2xl font-medium tracking-tight sm:text-3xl">
+            {title}
+          </h2>
           {subtitle ? <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p> : null}
 
           <div className="mt-6">{children}</div>

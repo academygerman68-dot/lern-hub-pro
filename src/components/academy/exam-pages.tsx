@@ -29,12 +29,12 @@ const EXAM_ID_KEY = "ga_active_exam_id";
 const ATTEMPT_ID_KEY = "ga_active_attempt_id";
 
 const SKILL_LABELS: Record<string, string> = {
-  lesen: "Lesen",
-  hoeren: "Hören",
-  schreiben: "Schreiben",
-  sprechen: "Sprechen",
-  grammatik: "Grammatik",
-  wortschatz: "Wortschatz",
+  lesen: "Lecture",
+  hoeren: "Écoute",
+  schreiben: "Écriture",
+  sprechen: "Expression orale",
+  grammatik: "Grammaire",
+  wortschatz: "Vocabulaire",
 };
 
 function persistExamSession(examId: string, attemptId: string) {
@@ -639,8 +639,8 @@ export function DirectorExamsPage() {
       </QueryState>
 
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4">
-          <Surface className="w-full max-w-lg space-y-4 p-6">
+        <div className="mobile-modal">
+          <Surface className="mobile-modal-panel space-y-4">
             <h2 className="text-lg font-semibold">Create exam</h2>
             <Input
               value={title}

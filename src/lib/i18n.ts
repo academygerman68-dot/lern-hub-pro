@@ -40,10 +40,16 @@ const fr = {
   "nav.audit": "Journal d’audit",
   "nav.payroll": "Paie",
   "nav.signout": "Déconnexion",
+  "nav.section.learning": "Apprentissage",
+  "nav.section.account": "Compte",
+  "nav.section.teaching": "Enseignement",
+  "nav.section.academy": "Académie",
+  "nav.section.operations": "Opérations",
   "shell.admin": "Administration de l’académie",
   "shell.teacher": "Studio pédagogique",
-  "shell.student": "Lundi · 14 septembre",
+  "shell.student": "Espace étudiant",
   "shell.notifications": "Notifications",
+  "shell.language": "Langue",
   "role.student": "Étudiant",
   "role.teacher": "Professeur",
   "role.director": "Direction",
@@ -89,10 +95,16 @@ const ar: typeof fr = {
   "nav.audit": "سجل النشاط",
   "nav.payroll": "الرواتب",
   "nav.signout": "تسجيل الخروج",
+  "nav.section.learning": "التعلّم",
+  "nav.section.account": "الحساب",
+  "nav.section.teaching": "التدريس",
+  "nav.section.academy": "الأكاديمية",
+  "nav.section.operations": "العمليات",
   "shell.admin": "إدارة الأكاديمية",
   "shell.teacher": "مساحة التدريس",
-  "shell.student": "الاثنين · 14 سبتمبر",
+  "shell.student": "مساحة الطالب",
   "shell.notifications": "الإشعارات",
+  "shell.language": "اللغة",
   "role.student": "طالب",
   "role.teacher": "أستاذ",
   "role.director": "الإدارة",
@@ -114,4 +126,4 @@ export function translateKnownValue(locale: Locale, value: string) {
   return value;
 }
 
-export const localeLabels: Record<Locale, string> = { fr: "FR", ar: "العربية" };
+export const localeLabels: Record<Locale, string> = { fr: "fr", ar: "ar" };
