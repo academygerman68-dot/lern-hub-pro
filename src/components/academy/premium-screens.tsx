@@ -32,7 +32,7 @@ import { Button } from "@/components/ui/button";
 import { LEAD_TEACHER } from "@/data/demo-accounts";
 import { modules } from "@/data/mock-data";
 import { initials } from "@/lib/academy-logic";
-import { useStudent } from "@/hooks/use-academy-data";
+import { useStudent, useStudents } from "@/hooks/use-academy-data";
 import { useAcademy } from "./academy-context";
 import { StudentExamsPage } from "./exam-pages";
 import { QueryState } from "./query-state";
@@ -856,66 +856,48 @@ export function PremiumPayments() {
 }
 
 export function PremiumProfile() {
+  const { user } = useAcademy();
+  const studentsQuery = useStudents();
+  const myStudent = (studentsQuery.data ?? []).find(
+    (s) => s.email.toLowerCase() === (user?.email ?? "").toLowerCase(),
+  );
+  const displayName = user?.name?.trim() || user?.email || "Profil";
+  const initialsText = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+
   return (
     <div className="animate-fade-in">
       <PremiumHeader
-        title="Ahmed Benali"
-        subtitle="A2 · Intermediate German"
-        action={<Button variant="outline">Edit profile</Button>}
+        title={displayName}
+        subtitle={`${myStudent?.level ?? "—"} · ${myStudent?.className || "Sans classe"}`}
       />
       <section className="grid gap-8 xl:grid-cols-[.62fr_1.38fr]">
         <div className="rounded-2xl bg-brand p-8 text-primary-foreground">
           <span className="grid size-24 place-items-center rounded-full bg-primary-foreground/10 font-display text-3xl">
-            AB
+            {initialsText || "?"}
           </span>
-          <h2 className="mt-7 font-display text-3xl">Ahmed Benali</h2>
-          <p className="mt-2 text-sm text-primary-foreground/60">A2 · Group 02</p>
+          <h2 className="mt-7 font-display text-3xl">{displayName}</h2>
+          <p className="mt-2 text-sm text-primary-foreground/60">
+            {myStudent?.level ?? "—"} · {myStudent?.className || "Sans classe"}
+          </p>
           <div className="mt-8 space-y-5 border-t border-primary-foreground/10 pt-6 text-sm">
             <p>
-              <span className="block text-primary-foreground/45">Teacher</span>
-              {LEAD_TEACHER}
+              <span className="block text-primary-foreground/45">E-mail</span>
+              {user?.email || "—"}
             </p>
             <p>
-              <span className="block text-primary-foreground/45">Email</span>ahmed.benali@demo.ma
-            </p>
-            <p>
-              <span className="block text-primary-foreground/45">Member since</span>12 March 2026
+              <span className="block text-primary-foreground/45">Abonnement</span>
+              {myStudent?.subscription ?? "—"}
             </p>
           </div>
         </div>
-        <div>
-          <Eyebrow>Learning statistics</Eyebrow>
-          <div className="mt-6 grid gap-7 sm:grid-cols-2">
-            {[
-              ["Attendance", "94%", "Consistently excellent"],
-              ["Current streak", "12 days", "Your personal best"],
-              ["Lessons completed", "42", "of 52 at A2"],
-              ["Mock exams", "3", "Average score 77%"],
-            ].map(([label, value, note]) => (
-              <div key={label} className="border-t border-border pt-5">
-                <span className="text-sm text-muted-foreground">{label}</span>
-                <strong className="mt-2 block font-display text-4xl font-normal">{value}</strong>
-                <small className="text-muted-foreground">{note}</small>
-              </div>
-            ))}
-          </div>
-          <div className="mt-12">
-            <Eyebrow>Learning timeline</Eyebrow>
-            <div className="mt-6 border-l border-border pl-6">
-              {[
-                ["September", "Reached 68% of A2"],
-                ["August", "Completed Alltag module"],
-                ["July", "Passed A1 final assessment"],
-                ["March", "Joined Deutsch Academy"],
-              ].map(([date, event]) => (
-                <div className="relative pb-7" key={date}>
-                  <span className="absolute -left-[1.68rem] top-1 size-2 rounded-full bg-primary" />
-                  <small className="text-muted-foreground">{date} 2026</small>
-                  <p className="mt-1 text-sm">{event}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+        <div className="rounded-2xl border border-border p-8 text-sm text-muted-foreground">
+          Les informations affichées proviennent de votre compte Supabase (profil et fiche
+          étudiant). L’accès aux cours dépend de la validation de votre abonnement.
         </div>
       </section>
     </div>

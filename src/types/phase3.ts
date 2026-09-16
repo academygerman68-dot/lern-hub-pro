@@ -7,7 +7,7 @@ export type OutboxStatus = "queued" | "sent" | "failed" | "skipped";
 export type PaymentProof = {
   id: string;
   student_id: string;
-  payment_id: string | null;
+  payment_id: string;
   storage_bucket: string;
   storage_path: string;
   mime_type: string | null;

@@ -492,7 +492,7 @@ export function StudentPaymentsPage() {
       <Surface className="mb-6 p-5">
         <h2 className="font-semibold">Déposer un avis d’opération</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          PDF, JPEG ou PNG · max 10 Mo. L’accès reste bloqué jusqu’à approbation.
+          PDF, JPEG ou PNG · max 10 Mo. L’accès reste bloqué jusqu’à approbation administrative.
         </p>
         <div className="mt-4 space-y-3">
           <label className="block text-sm">

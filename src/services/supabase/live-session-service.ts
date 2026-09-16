@@ -1,6 +1,10 @@
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { Database } from "@/types/database";
-import { buildSessionRoomName, getJitsiConfig } from "@/lib/jitsi-config";
+import {
+  buildSessionRoomName,
+  getJitsiConfig,
+  validateLiveSessionSchedule,
+} from "@/lib/jitsi-config";
 
 type LiveSession = Database["public"]["Tables"]["live_sessions"]["Row"];
 type LiveSessionStatus = Database["public"]["Enums"]["live_session_status"];
@@ -60,6 +64,11 @@ export const SupabaseLiveSessionService = {
     endsAt?: string | null;
     createdBy?: string | null;
   }) {
+    const title = input.title.trim();
+    if (!title) throw new Error("Le titre de la réunion est obligatoire.");
+    if (!input.classId) throw new Error("La classe est obligatoire.");
+    validateLiveSessionSchedule(input.startsAt, input.endsAt);
+
     const jitsi = getJitsiConfig();
     const supabase = requireClient();
     const id = crypto.randomUUID();
@@ -81,7 +90,7 @@ export const SupabaseLiveSessionService = {
       .from("live_sessions")
       .insert({
         id,
-        title: input.title,
+        title,
         class_id: input.classId,
         teacher_id: teacherId,
         starts_at: input.startsAt,

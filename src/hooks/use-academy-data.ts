@@ -588,6 +588,7 @@ export function useLiveSessions(classId?: string) {
       ? ([...queryKeys.liveSessions.all, classId] as const)
       : queryKeys.liveSessions.all,
     queryFn: () => LiveSessionService.list(classId ? { classId } : undefined),
+    refetchInterval: 15_000,
   });
 }
 
@@ -596,6 +597,7 @@ export function useLiveSession(id: string | null | undefined) {
     queryKey: queryKeys.liveSessions.detail(id ?? ""),
     queryFn: () => LiveSessionService.get(id!),
     enabled: Boolean(id),
+    refetchInterval: 10_000,
   });
 }
 

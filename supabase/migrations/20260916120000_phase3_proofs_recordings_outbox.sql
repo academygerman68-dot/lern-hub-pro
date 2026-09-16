@@ -32,6 +32,13 @@ CREATE UNIQUE INDEX payment_proofs_one_open_review_per_payment_idx
   ON public.payment_proofs (payment_id)
   WHERE status IN ('pending', 'approved');
 
+-- The table may have been created by an earlier preview of this migration.
+-- Enforce the production contract even in that case.
+ALTER TABLE public.payment_proofs
+  ALTER COLUMN payment_id SET NOT NULL,
+  ALTER COLUMN declared_amount SET NOT NULL,
+  ALTER COLUMN operation_date SET NOT NULL;
+
 CREATE TABLE IF NOT EXISTS public.meeting_recordings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   live_session_id uuid REFERENCES public.live_sessions (id) ON DELETE SET NULL,
@@ -187,7 +194,8 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.enqueue_notification_outbox(public.notification_channel, text, uuid, text, jsonb, text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.enqueue_notification_outbox(public.notification_channel, text, uuid, text, jsonb, text) FROM anon, authenticated;
+REVOKE ALL ON FUNCTION public.enqueue_notification_outbox(public.notification_channel, text, uuid, text, jsonb, text) FROM anon;
+REVOKE ALL ON FUNCTION public.enqueue_notification_outbox(public.notification_channel, text, uuid, text, jsonb, text) FROM authenticated;
 
 CREATE OR REPLACE FUNCTION public.review_payment_proof(
   p_proof_id uuid,
@@ -253,14 +261,6 @@ BEGIN
         v_proof.id::text,
         jsonb_build_object('proof_id', v_proof.id)
       );
-      PERFORM public.enqueue_notification_outbox(
-        'email',
-        'payment_proof_approved',
-        v_profile_id,
-        NULL,
-        jsonb_build_object('proof_id', v_proof.id),
-        'proof-approved-' || v_proof.id::text
-      );
     END IF;
     PERFORM public.write_audit_log(
       'payment_proof.approved', 'payment_proof', v_proof.id, NULL,
@@ -303,6 +303,8 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.review_payment_proof(uuid, boolean, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.review_payment_proof(uuid, boolean, text) FROM anon;
+REVOKE ALL ON FUNCTION public.review_payment_proof(uuid, boolean, text) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.review_payment_proof(uuid, boolean, text) TO authenticated;
 
 -- Hide expired library items from students (staff still see them)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Video } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,7 @@ function teacherLabel(item: {
 function SessionCard({
   item,
   onJoin,
+  joinLabel = "Join meeting",
 }: {
   item: {
     id: string;
@@ -63,6 +64,7 @@ function SessionCard({
     teacher?: { profile: { first_name: string; last_name: string } | null } | null;
   };
   onJoin: () => void;
+  joinLabel?: string;
 }) {
   return (
     <Surface className="p-5">
@@ -87,7 +89,7 @@ function SessionCard({
         {(item.status === "scheduled" || item.status === "live") && (
           <Button onClick={onJoin}>
             <Video className="size-4" />
-            Join meeting
+            {joinLabel}
           </Button>
         )}
       </div>
@@ -102,7 +104,6 @@ function LiveSessionLobby() {
   const recordingProvider = useRecordingProvider();
   const recordingsQuery = useRecordings();
   const createSession = useCreateLiveSession();
-  const updateStatus = useUpdateLiveSessionStatus();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [classId, setClassId] = useState("");
@@ -136,7 +137,6 @@ function LiveSessionLobby() {
 
   const join = (id: string) => {
     setLiveSessionId(id);
-    updateStatus.mutate({ id, status: "live" });
     navigate("meeting");
   };
 
@@ -224,7 +224,16 @@ function LiveSessionLobby() {
               <p className="text-sm text-muted-foreground">No scheduled sessions.</p>
             ) : (
               upcoming.map((item) => (
-                <SessionCard key={item.id} item={item} onJoin={() => join(item.id)} />
+                <SessionCard
+                  key={item.id}
+                  item={item}
+                  onJoin={() => join(item.id)}
+                  joinLabel={
+                    role !== "student" && item.status === "scheduled"
+                      ? "Start meeting"
+                      : "Join meeting"
+                  }
+                />
               ))
             )}
           </section>
@@ -284,6 +293,10 @@ function LiveSessionLobby() {
                 onClick={() => {
                   const startsAt = new Date(`${date}T${startTime}:00`);
                   const endsAt = endTime ? new Date(`${date}T${endTime}:00`) : null;
+                  if (endsAt && endsAt <= startsAt) {
+                    toast.error("L’heure de fin doit être après l’heure de début.");
+                    return;
+                  }
                   createSession.mutate(
                     {
                       title: title.trim(),
@@ -297,7 +310,6 @@ function LiveSessionLobby() {
                         toast.success("Meeting created");
                         resetForm();
                         setLiveSessionId(session.id);
-                        updateStatus.mutate({ id: session.id, status: "live" });
                         navigate("meeting");
                       },
                       onError: (err) => toast.error(err.message),
@@ -321,14 +333,6 @@ function LiveMeetingRoom() {
   const sessionQuery = useLiveSession(sessionId);
   const updateStatus = useUpdateLiveSessionStatus();
   const session = sessionQuery.data;
-
-  useEffect(() => {
-    if (session && session.status === "scheduled") {
-      updateStatus.mutate({ id: session.id, status: "live" });
-    }
-    // Mark live once when opening the room; avoid re-firing on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.id]);
 
   const leaveMeeting = () => {
     clearLiveSessionId();
@@ -413,7 +417,10 @@ function LiveMeetingRoom() {
                 updateStatus.mutate(
                   { id: session.id, status: "completed" },
                   {
-                    onSuccess: () => toast.success("Session marked completed"),
+                    onSuccess: () => {
+                      toast.success("Session terminée");
+                      leaveMeeting();
+                    },
                     onError: (err) => toast.error(err.message),
                   },
                 );
@@ -438,6 +445,14 @@ function LiveMeetingRoom() {
         displayName={displayName}
         {...(user?.email ? { email: user.email } : {})}
         onLeave={leaveMeeting}
+        onConferenceJoined={() => {
+          if ((role === "director" || role === "teacher") && session.status === "scheduled") {
+            updateStatus.mutate(
+              { id: session.id, status: "live" },
+              { onError: (err) => toast.error(err.message) },
+            );
+          }
+        }}
       />
     </div>
   );

@@ -47,3 +47,14 @@ export function buildSessionRoomName(sessionId: string): string {
   const clean = sessionId.replace(/[^a-zA-Z0-9-]/g, "").toLowerCase();
   return `academy-${clean}`;
 }
+
+export function validateLiveSessionSchedule(startsAt: string, endsAt?: string | null): void {
+  const start = new Date(startsAt).getTime();
+  if (!Number.isFinite(start)) throw new Error("Date de début invalide.");
+
+  if (endsAt) {
+    const end = new Date(endsAt).getTime();
+    if (!Number.isFinite(end)) throw new Error("Date de fin invalide.");
+    if (end <= start) throw new Error("L’heure de fin doit être après l’heure de début.");
+  }
+}

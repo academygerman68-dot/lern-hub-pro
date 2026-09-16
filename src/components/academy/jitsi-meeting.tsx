@@ -8,20 +8,56 @@ type Props = {
   displayName: string;
   email?: string;
   onLeave?: () => void;
+  onConferenceJoined?: () => void;
 };
+
+type ConnectionState = "connecting" | "joined" | "left";
 
 /**
  * Real Jitsi Meet embed via official @jitsi/react-sdk.
  * Same roomName + domain = same conference for all participants.
  */
-export function JitsiMeetingEmbed({ roomName, displayName, email, onLeave }: Props) {
+export function JitsiMeetingEmbed({
+  roomName,
+  displayName,
+  email,
+  onLeave,
+  onConferenceJoined,
+}: Props) {
   const config = getJitsiConfig();
   const [loadKey, setLoadKey] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
+  const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
+  const [participantCount, setParticipantCount] = useState(0);
 
   const handleReadyToClose = useCallback(() => {
+    setConnectionState("left");
     onLeave?.();
   }, [onLeave]);
+
+  const handleApiReady = useCallback(
+    (api: {
+      on: (event: string, listener: () => void) => unknown;
+      getNumberOfParticipants: () => number;
+    }) => {
+      const refreshParticipantCount = () => {
+        setParticipantCount(api.getNumberOfParticipants());
+      };
+
+      api.on("videoConferenceJoined", () => {
+        setConnectionState("joined");
+        refreshParticipantCount();
+        onConferenceJoined?.();
+      });
+      api.on("participantJoined", refreshParticipantCount);
+      api.on("participantLeft", refreshParticipantCount);
+      api.on("videoConferenceLeft", () => {
+        setConnectionState("left");
+        setParticipantCount(0);
+      });
+    },
+    [onConferenceJoined],
+  );
 
   if (!config.configured) {
     return (
@@ -65,6 +101,7 @@ export function JitsiMeetingEmbed({ roomName, displayName, email, onLeave }: Pro
     email && email.trim()
       ? { displayName, email: email.trim() }
       : { displayName, email: `${displayName.replace(/\s+/g, ".").toLowerCase()}@gla.local` };
+  const directMeetingUrl = `https://${config.domain}/${encodeURIComponent(roomName)}`;
 
   return (
     <div className="space-y-3">
@@ -97,6 +134,7 @@ export function JitsiMeetingEmbed({ roomName, displayName, email, onLeave }: Pro
             DISABLE_JOIN_LEAVE_NOTIFICATIONS: false,
             MOBILE_APP_PROMO: false,
           }}
+          onApiReady={handleApiReady}
           onReadyToClose={handleReadyToClose}
           getIFrameRef={(parentNode) => {
             parentNode.style.height = "100%";
@@ -111,11 +149,36 @@ export function JitsiMeetingEmbed({ roomName, displayName, email, onLeave }: Pro
         />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <p>
-          Allow camera & microphone when the browser asks. Use Hang up inside Jitsi or Leave meeting
-          above.
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-medium ${
+              connectionState === "joined"
+                ? "bg-success-soft text-success"
+                : connectionState === "left"
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-warning-soft text-warning-foreground"
+            }`}
+          >
+            <span className="size-1.5 rounded-full bg-current" />
+            {connectionState === "joined"
+              ? "Connecté"
+              : connectionState === "left"
+                ? "Déconnecté"
+                : "Connexion…"}
+          </span>
+          {connectionState === "joined" && (
+            <span>
+              {participantCount} participant{participantCount > 1 ? "s" : ""}
+            </span>
+          )}
+          <span>Chat et partage d’écran disponibles dans la barre Jitsi.</span>
+        </div>
         <div className="flex gap-2">
+          <Button size="sm" variant="outline" asChild>
+            <a href={directMeetingUrl} target="_blank" rel="noreferrer">
+              Ouvrir Jitsi dans un nouvel onglet
+            </a>
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setLoadKey((k) => k + 1)}>
             Retry
           </Button>
