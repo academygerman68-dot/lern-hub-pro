@@ -18,6 +18,9 @@ export const signupSchema = z
     email: z.string().trim().email("Adresse e-mail invalide."),
     password: passwordSchema,
     confirmPassword: z.string().min(1, "Confirmez le mot de passe."),
+    role: z.enum(["student", "teacher", "admin"], {
+      required_error: "Choisissez un type de compte.",
+    }),
   })
   .refine((value) => value.password === value.confirmPassword, {
     message: "Les mots de passe ne correspondent pas.",

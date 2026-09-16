@@ -137,26 +137,27 @@ export const SupabaseAuthService = {
   },
 
   /**
-   * Public signup always creates a student. Role is enforced by DB trigger
-   * (client metadata role is ignored server-side).
+   * Public signup with role selection (student | teacher | admin).
+   * Role is applied by DB trigger `handle_new_user` from user metadata.
    */
-  async signUpStudent(input: {
+  async signUp(input: {
     email: string;
     password: string;
     firstName: string;
     lastName: string;
+    role?: "student" | "teacher" | "admin";
     language?: "en" | "fr" | "de";
   }): Promise<AuthSessionPayload | { needsEmailConfirmation: true; email: string }> {
     const supabase = getSupabase();
     const redirects = getAuthRedirects();
+    const role = input.role ?? "student";
     const { data, error } = await supabase.auth.signUp({
       email: input.email.trim().toLowerCase(),
       password: input.password,
       options: {
         emailRedirectTo: redirects.callback,
         data: {
-          // Informational only — DB trigger forces student.
-          role: "student",
+          role,
           first_name: input.firstName.trim(),
           last_name: input.lastName.trim(),
           language: input.language ?? "fr",
@@ -183,6 +184,17 @@ export const SupabaseAuthService = {
       profile,
       sessionUser: profileToSessionUser(profile),
     };
+  },
+
+  /** @deprecated Prefer signUp({ role: "student" }) */
+  async signUpStudent(input: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    language?: "en" | "fr" | "de";
+  }) {
+    return this.signUp({ ...input, role: "student" });
   },
 
   async signInWithGoogle(): Promise<void> {

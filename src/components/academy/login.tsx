@@ -148,6 +148,7 @@ export function Login() {
       email: "",
       password: "",
       confirmPassword: "",
+      role: "student",
     },
   });
 
@@ -210,6 +211,7 @@ export function Login() {
         password: values.password,
         firstName: values.firstName,
         lastName: values.lastName,
+        role: values.role,
       });
       if ("needsEmailConfirmation" in result) {
         setPendingEmail(result.email);
@@ -515,6 +517,37 @@ export function Login() {
       {mode === "signup" ? (
         <>
           <form className="space-y-4" onSubmit={onSignup} noValidate>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">{l("Type de compte", "نوع الحساب")}</legend>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {(
+                  [
+                    ["student", "Étudiant", "طالب"],
+                    ["teacher", "Professeur", "أستاذ"],
+                    ["admin", "Admin", "إدارة"],
+                  ] as const
+                ).map(([value, fr, ar]) => {
+                  const selected = signupForm.watch("role") === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`rounded-lg border px-3 py-2.5 text-left text-sm transition ${
+                        selected
+                          ? "border-primary bg-primary/5 font-medium text-foreground"
+                          : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                      }`}
+                      onClick={() => signupForm.setValue("role", value, { shouldValidate: true })}
+                    >
+                      {l(fr, ar)}
+                    </button>
+                  );
+                })}
+              </div>
+              {signupForm.formState.errors.role ? (
+                <p className="text-xs text-alert">{signupForm.formState.errors.role.message}</p>
+              ) : null}
+            </fieldset>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block text-sm font-medium">
                 {l("Prénom", "الاسم")}

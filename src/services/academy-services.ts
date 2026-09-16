@@ -69,11 +69,12 @@ export const AuthService = {
     password: string;
     firstName: string;
     lastName: string;
+    role?: "student" | "teacher" | "admin";
   }): Promise<SessionUser | { needsEmailConfirmation: true; email: string }> {
     if (!isSupabaseConfigured) {
       throw new AuthError("SIGNUP_UNAVAILABLE", "SIGNUP_UNAVAILABLE");
     }
-    const result = await SupabaseAuthService.signUpStudent(input);
+    const result = await SupabaseAuthService.signUp(input);
     if ("needsEmailConfirmation" in result) return result;
     return result.sessionUser;
   },
