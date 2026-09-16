@@ -72,7 +72,7 @@ export const SupabaseLiveSessionService = {
     const jitsi = getJitsiConfig();
     const supabase = requireClient();
     const id = crypto.randomUUID();
-    const room = buildSessionRoomName(id);
+    const room = buildSessionRoomName(id, jitsi.jaasAppId);
 
     let teacherId = input.teacherId ?? null;
     if (!teacherId) {
@@ -84,7 +84,7 @@ export const SupabaseLiveSessionService = {
       teacherId = classRow?.teacher_id ?? null;
     }
 
-    const provider = jitsi.requiresJwt ? "jaas" : "jitsi";
+    const provider = jitsi.provider === "jaas" ? "jaas" : "jitsi";
 
     const { data, error } = await supabase
       .from("live_sessions")

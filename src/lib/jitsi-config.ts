@@ -1,51 +1,75 @@
 /**
  * Central Jitsi / JaaS configuration.
- * Defaults to public meet.jit.si for real WebRTC meetings (no server secrets).
- * Production: set VITE_JITSI_DOMAIN; for JaaS set VITE_JAAS_APP_ID (+ JWT via Edge Function only).
+ * JaaS (8x8.vc): set VITE_JAAS_APP_ID (public app id, not a secret).
+ * Basic meetings work without JWT; recording / premium features need Edge JWT.
+ * Fallback without app id: public meet.jit.si.
  */
+
+/** Public 8x8 JaaS app id from the academy VPaaS project (safe in client bundles). */
+export const PUBLIC_JAAS_APP_ID = "vpaas-magic-cookie-9ef87bf2ebfd4ab0baf3f0e8a0fbb2de";
+
 export type JitsiProviderKind = "jitsi" | "jaas" | "none";
 
 export type JitsiRuntimeConfig = {
   configured: boolean;
   provider: JitsiProviderKind;
   domain: string;
-  /** When true, JWT must be fetched from Edge Function before join — never in the browser. */
+  /** When true, UI may fetch a JWT; meetings still work without it for basic join. */
+  jwtOptional: boolean;
+  /** @deprecated Prefer jwtOptional — kept for older banners. */
   requiresJwt: boolean;
   reasonIfUnavailable: string | null;
-  /** Public JaaS app id (not a secret). Room is prefixed by JaaSMeeting. */
+  /** Public JaaS app id (not a secret). Room is prefixed `{appId}/…`. */
   jaasAppId: string | null;
 };
 
-export function getJitsiConfig(): JitsiRuntimeConfig {
-  const domain = (import.meta.env.VITE_JITSI_DOMAIN as string | undefined)?.trim();
-  const appId = (import.meta.env.VITE_JAAS_APP_ID as string | undefined)?.trim();
+function readEnv(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "undefined") return "";
+  return trimmed;
+}
 
-  if (appId) {
+export function getJitsiConfig(): JitsiRuntimeConfig {
+  const domainOverride = readEnv(import.meta.env.VITE_JITSI_DOMAIN);
+  const appId =
+    readEnv(import.meta.env.VITE_JAAS_APP_ID) ||
+    (domainOverride === "meet.jit.si" ? "" : PUBLIC_JAAS_APP_ID);
+
+  // Explicit public meet.jit.si opt-out when JAAS id unset and domain forced.
+  if (!appId) {
     return {
       configured: true,
-      provider: "jaas",
-      domain: domain || "8x8.vc",
-      requiresJwt: true,
-      reasonIfUnavailable:
-        "JaaS JWT is required. Configure the generate-jaas-token Edge Function (server secrets only).",
-      jaasAppId: appId,
+      provider: "jitsi",
+      domain: domainOverride || "meet.jit.si",
+      jwtOptional: false,
+      requiresJwt: false,
+      reasonIfUnavailable: null,
+      jaasAppId: null,
     };
   }
 
   return {
     configured: true,
-    provider: "jitsi",
-    domain: domain || "meet.jit.si",
+    provider: "jaas",
+    domain: domainOverride && domainOverride !== "meet.jit.si" ? domainOverride : "8x8.vc",
+    jwtOptional: true,
     requiresJwt: false,
     reasonIfUnavailable: null,
-    jaasAppId: null,
+    jaasAppId: appId,
   };
 }
 
-/** Deterministic unique room bound to the session row. */
-export function buildSessionRoomName(sessionId: string): string {
+/** Deterministic unique room bound to the session row (JaaS-prefixed when applicable). */
+export function buildSessionRoomName(
+  sessionId: string,
+  jaasAppId?: string | null,
+): string {
   const clean = sessionId.replace(/[^a-zA-Z0-9-]/g, "").toLowerCase();
-  return `academy-${clean}`;
+  const base = `academy-${clean}`;
+  // Explicit null = no prefix. Undefined = use current runtime config.
+  const appId = jaasAppId === undefined ? getJitsiConfig().jaasAppId : jaasAppId;
+  return appId ? `${appId}/${base}` : base;
 }
 
 export function validateLiveSessionSchedule(startsAt: string, endsAt?: string | null): void {
@@ -57,4 +81,39 @@ export function validateLiveSessionSchedule(startsAt: string, endsAt?: string | 
     if (!Number.isFinite(end)) throw new Error("Date de fin invalide.");
     if (end <= start) throw new Error("L’heure de fin doit être après l’heure de début.");
   }
+}
+
+export const LIVE_SESSION_EARLY_JOIN_MS = 15 * 60_000;
+export const LIVE_SESSION_LATE_JOIN_MS = 15 * 60_000;
+export const LIVE_SESSION_DEFAULT_DURATION_MS = 2 * 60 * 60_000;
+
+export function getLiveSessionJoinState(input: {
+  startsAt: string;
+  endsAt?: string | null;
+  status: "scheduled" | "live" | "completed" | "cancelled" | string;
+  isStaff: boolean;
+  now?: number;
+}): { allowed: boolean; reason: "allowed" | "too_early" | "ended" | "closed" } {
+  if (input.status === "completed" || input.status === "cancelled") {
+    return { allowed: false, reason: "closed" };
+  }
+
+  const start = new Date(input.startsAt).getTime();
+  const end = input.endsAt
+    ? new Date(input.endsAt).getTime()
+    : start + LIVE_SESSION_DEFAULT_DURATION_MS;
+  const now = input.now ?? Date.now();
+
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+    return { allowed: false, reason: "closed" };
+  }
+
+  if (input.isStaff) return { allowed: true, reason: "allowed" };
+  if (now < start - LIVE_SESSION_EARLY_JOIN_MS) {
+    return { allowed: false, reason: "too_early" };
+  }
+  if (now > end + LIVE_SESSION_LATE_JOIN_MS) {
+    return { allowed: false, reason: "ended" };
+  }
+  return { allowed: true, reason: "allowed" };
 }

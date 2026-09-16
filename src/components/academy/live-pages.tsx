@@ -14,7 +14,7 @@ import {
   useUpdateLiveSessionStatus,
 } from "@/hooks/use-academy-data";
 import { getLiveSessionId, setLiveSessionId, clearLiveSessionId } from "@/lib/live-class-session";
-import { getJitsiConfig } from "@/lib/jitsi-config";
+import { getJitsiConfig, getLiveSessionJoinState } from "@/lib/jitsi-config";
 import { useAcademy } from "./academy-context";
 import { JitsiMeetingEmbed } from "./jitsi-meeting";
 import { QueryState } from "./query-state";
@@ -51,6 +51,8 @@ function teacherLabel(item: {
 function SessionCard({
   item,
   onJoin,
+  canJoin = true,
+  unavailableLabel,
   joinLabel = "Join meeting",
 }: {
   item: {
@@ -64,6 +66,8 @@ function SessionCard({
     teacher?: { profile: { first_name: string; last_name: string } | null } | null;
   };
   onJoin: () => void;
+  canJoin?: boolean;
+  unavailableLabel?: string;
   joinLabel?: string;
 }) {
   return (
@@ -79,7 +83,9 @@ function SessionCard({
             {new Date(item.starts_at).toLocaleString()}
             {item.ends_at ? ` → ${new Date(item.ends_at).toLocaleTimeString()}` : ""}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">Room · {item.meeting_room}</p>
+          {!canJoin && unavailableLabel && (
+            <p className="mt-1 text-xs text-muted-foreground">{unavailableLabel}</p>
+          )}
         </div>
         <Status
           tone={item.status === "live" ? "green" : item.status === "scheduled" ? "amber" : "red"}
@@ -87,7 +93,7 @@ function SessionCard({
           {item.status}
         </Status>
         {(item.status === "scheduled" || item.status === "live") && (
-          <Button onClick={onJoin}>
+          <Button onClick={onJoin} disabled={!canJoin}>
             <Video className="size-4" />
             {joinLabel}
           </Button>
@@ -111,6 +117,30 @@ function LiveSessionLobby() {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const jitsi = getJitsiConfig();
+  const isStaff = role === "director" || role === "teacher";
+
+  const joinAvailability = (item: {
+    starts_at: string;
+    ends_at: string | null;
+    status: string;
+  }) => {
+    const state = getLiveSessionJoinState({
+      startsAt: item.starts_at,
+      endsAt: item.ends_at,
+      status: item.status,
+      isStaff,
+    });
+    const unavailableLabel =
+      state.reason === "too_early"
+        ? "Accès disponible 15 minutes avant le début."
+        : state.reason === "ended" || state.reason === "closed"
+          ? "Cette séance est fermée."
+          : null;
+    return {
+      canJoin: state.allowed,
+      ...(unavailableLabel ? { unavailableLabel } : {}),
+    };
+  };
 
   const { liveNow, upcoming, past } = useMemo(() => {
     const rows = sessionsQuery.data ?? [];
@@ -161,10 +191,10 @@ function LiveSessionLobby() {
         }
       />
 
-      {jitsi.requiresJwt && (
-        <Surface className="mb-4 border-amber-500/30 bg-warning-soft p-4 text-sm">
-          JaaS JWT required. For a real meeting without JaaS, remove VITE_JAAS_APP_ID (defaults to
-          meet.jit.si). Edge Function `jaas-token` mints JWT when JAAS_* secrets exist.
+      {jitsi.provider === "jaas" && (
+        <Surface className="mb-4 border-border bg-secondary/40 p-4 text-sm">
+          Réunions via <strong>JaaS (8x8.vc)</strong>. Chat et partage d’écran disponibles. Un JWT
+          Edge (`jaas-token`) est optionnel pour l’enregistrement et les options premium.
         </Surface>
       )}
 
@@ -212,7 +242,12 @@ function LiveSessionLobby() {
                 Live now
               </h2>
               {liveNow.map((item) => (
-                <SessionCard key={item.id} item={item} onJoin={() => join(item.id)} />
+                <SessionCard
+                  key={item.id}
+                  item={item}
+                  onJoin={() => join(item.id)}
+                  {...joinAvailability(item)}
+                />
               ))}
             </section>
           )}
@@ -228,6 +263,7 @@ function LiveSessionLobby() {
                   key={item.id}
                   item={item}
                   onJoin={() => join(item.id)}
+                  {...joinAvailability(item)}
                   joinLabel={
                     role !== "student" && item.status === "scheduled"
                       ? "Start meeting"
@@ -332,6 +368,7 @@ function LiveMeetingRoom() {
   const sessionId = getLiveSessionId();
   const sessionQuery = useLiveSession(sessionId);
   const updateStatus = useUpdateLiveSessionStatus();
+  const [endConferenceSignal, setEndConferenceSignal] = useState(0);
   const session = sessionQuery.data;
 
   const leaveMeeting = () => {
@@ -392,6 +429,30 @@ function LiveMeetingRoom() {
     );
   }
 
+  const isStaff = role === "director" || role === "teacher";
+  const joinState = getLiveSessionJoinState({
+    startsAt: session.starts_at,
+    endsAt: session.ends_at,
+    status: session.status,
+    isStaff,
+  });
+
+  if (!joinState.allowed) {
+    return (
+      <Surface className="mx-auto max-w-lg space-y-4 p-8 text-center">
+        <h2 className="text-lg font-semibold">Accès à la réunion indisponible</h2>
+        <p className="text-sm text-muted-foreground">
+          {joinState.reason === "too_early"
+            ? "La salle ouvre 15 minutes avant le début de la séance."
+            : "Cette séance est terminée ou fermée."}
+        </p>
+        <Button variant="outline" onClick={leaveMeeting}>
+          Retour aux séances
+        </Button>
+      </Surface>
+    );
+  }
+
   const displayName = user?.name?.trim() || user?.email || "Participant";
 
   return (
@@ -403,7 +464,7 @@ function LiveMeetingRoom() {
             {session.class?.name} · {teacherLabel(session)}
           </p>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
-            Room {session.meeting_room} · {displayName}
+            {displayName}
             {role ? ` (${role})` : ""}
           </p>
         </div>
@@ -414,6 +475,7 @@ function LiveMeetingRoom() {
               size="sm"
               className="flex-1 sm:flex-none"
               onClick={() => {
+                setEndConferenceSignal((value) => value + 1);
                 updateStatus.mutate(
                   { id: session.id, status: "completed" },
                   {
@@ -443,6 +505,8 @@ function LiveMeetingRoom() {
       <JitsiMeetingEmbed
         roomName={session.meeting_room}
         displayName={displayName}
+        startMuted={role === "student"}
+        endConferenceSignal={endConferenceSignal}
         {...(user?.email ? { email: user.email } : {})}
         onLeave={leaveMeeting}
         onConferenceJoined={() => {

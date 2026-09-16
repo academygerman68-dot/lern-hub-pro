@@ -12,9 +12,9 @@ interface ImportMetaEnv {
   readonly VITE_TEST_ACCOUNT_PASSWORD?: string;
   /** Dev-only: set "true" with missing Supabase env to enable offline demo login buttons. */
   readonly VITE_ENABLE_DEMO_AUTH?: string;
-  /** Jitsi domain (e.g. meet.jit.si). Defaults to public meet.jit.si when unset. */
+  /** Jitsi domain — use 8x8.vc with JaaS, or meet.jit.si for public. */
   readonly VITE_JITSI_DOMAIN?: string;
-  /** Optional 8x8 JaaS app id — enables JWT-required mode. */
+  /** Public 8x8 JaaS app id (vpaas-magic-cookie-…). Not a secret. */
   readonly VITE_JAAS_APP_ID?: string;
 }
 
