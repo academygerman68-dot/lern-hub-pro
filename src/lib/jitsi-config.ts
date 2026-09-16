@@ -1,7 +1,7 @@
 /**
  * Central Jitsi / JaaS configuration.
  * JaaS (8x8.vc): set VITE_JAAS_APP_ID (public app id, not a secret).
- * Basic meetings work without JWT; recording / premium features need Edge JWT.
+ * Every JaaS participant must receive a signed JWT from the Edge Function.
  * Fallback without app id: public meet.jit.si.
  */
 
@@ -14,9 +14,7 @@ export type JitsiRuntimeConfig = {
   configured: boolean;
   provider: JitsiProviderKind;
   domain: string;
-  /** When true, UI may fetch a JWT; meetings still work without it for basic join. */
-  jwtOptional: boolean;
-  /** @deprecated Prefer jwtOptional — kept for older banners. */
+  /** JaaS requires one server-signed JWT for every participant. */
   requiresJwt: boolean;
   reasonIfUnavailable: string | null;
   /** Public JaaS app id (not a secret). Room is prefixed `{appId}/…`. */
@@ -42,7 +40,6 @@ export function getJitsiConfig(): JitsiRuntimeConfig {
       configured: true,
       provider: "jitsi",
       domain: domainOverride || "meet.jit.si",
-      jwtOptional: false,
       requiresJwt: false,
       reasonIfUnavailable: null,
       jaasAppId: null,
@@ -53,18 +50,14 @@ export function getJitsiConfig(): JitsiRuntimeConfig {
     configured: true,
     provider: "jaas",
     domain: domainOverride && domainOverride !== "meet.jit.si" ? domainOverride : "8x8.vc",
-    jwtOptional: true,
-    requiresJwt: false,
+    requiresJwt: true,
     reasonIfUnavailable: null,
     jaasAppId: appId,
   };
 }
 
 /** Deterministic unique room bound to the session row (JaaS-prefixed when applicable). */
-export function buildSessionRoomName(
-  sessionId: string,
-  jaasAppId?: string | null,
-): string {
+export function buildSessionRoomName(sessionId: string, jaasAppId?: string | null): string {
   const clean = sessionId.replace(/[^a-zA-Z0-9-]/g, "").toLowerCase();
   const base = `academy-${clean}`;
   // Explicit null = no prefix. Undefined = use current runtime config.

@@ -20,6 +20,7 @@ describe("jitsi-config", () => {
     expect(cfg.configured).toBe(true);
     expect(cfg.domain).toBeTruthy();
     expect(cfg.provider === "jaas" || cfg.provider === "jitsi").toBe(true);
+    expect(cfg.requiresJwt).toBe(cfg.provider === "jaas");
   });
 
   it("rejects a meeting that ends before it starts", () => {

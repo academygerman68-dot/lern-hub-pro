@@ -5,6 +5,7 @@ import { getJitsiConfig } from "@/lib/jitsi-config";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 
 type Props = {
+  sessionId: string;
   roomName: string;
   displayName: string;
   email?: string;
@@ -15,27 +16,57 @@ type Props = {
 };
 
 type ConnectionState = "connecting" | "joined" | "left";
+type AuthorizationState = "loading" | "ready" | "error";
 
-async function tryFetchJaasJwt(roomName: string): Promise<string | undefined> {
-  if (!isSupabaseConfigured) return undefined;
-  try {
-    const { data, error } = await getSupabase().functions.invoke<{
-      jwt?: string | null;
-      configured?: boolean;
-    }>("jaas-token", { body: { roomName } });
-    if (error || !data?.jwt) return undefined;
-    return data.jwt;
-  } catch {
-    return undefined;
+const tokenErrors: Record<string, string> = {
+  JAAS_NOT_CONFIGURED: "Les secrets JaaS ne sont pas encore configurés dans Supabase.",
+  JAAS_SIGNING_FAILED: "La clé privée JaaS configurée dans Supabase est invalide.",
+  SESSION_ACCESS_DENIED: "Vous n’êtes pas autorisé à rejoindre cette séance.",
+  SESSION_CLOSED: "Cette séance est terminée ou annulée.",
+  SESSION_TOO_EARLY: "La salle ouvre 15 minutes avant le début de la séance.",
+  SESSION_ENDED: "La période d’accès à cette séance est terminée.",
+  PROFILE_INACTIVE: "Votre compte n’est pas actif.",
+  STUDENT_RECORD_MISSING: "Votre dossier étudiant est introuvable.",
+  SUBSCRIPTION_REQUIRED: "Un abonnement actif est nécessaire pour rejoindre cette séance.",
+  UNAUTHORIZED: "Votre connexion a expiré. Reconnectez-vous puis réessayez.",
+};
+
+async function readFunctionError(error: unknown): Promise<string> {
+  const context = (error as { context?: Response } | null)?.context;
+  if (context && typeof context.clone === "function") {
+    try {
+      const body = (await context.clone().json()) as { error?: string; message?: string };
+      if (body.error && tokenErrors[body.error]) return tokenErrors[body.error];
+      if (body.message) return body.message;
+    } catch {
+      // Fall through to the safe generic message.
+    }
   }
+  return "Impossible d’autoriser l’accès à la réunion. Vérifiez la fonction jaas-token.";
+}
+
+async function fetchJaasAuthorization(
+  sessionId: string,
+): Promise<{ jwt: string; roomName: string }> {
+  if (!isSupabaseConfigured) throw new Error("Supabase n’est pas configuré.");
+  const { data, error } = await getSupabase().functions.invoke<{
+    jwt?: string;
+    roomName?: string;
+  }>("jaas-token", { body: { sessionId } });
+  if (error) throw new Error(await readFunctionError(error));
+  if (!data?.jwt || !data.roomName) {
+    throw new Error("La fonction jaas-token n’a pas renvoyé une autorisation valide.");
+  }
+  return { jwt: data.jwt, roomName: data.roomName };
 }
 
 /**
  * Real Jitsi / JaaS embed via @jitsi/react-sdk.
  * JaaS roomName format: `{appId}/{room}` on domain 8x8.vc.
- * JWT is optional for basic join; Edge Function may supply it for premium features.
+ * Every JaaS participant receives a server-signed, room-bound JWT.
  */
 export function JitsiMeetingEmbed({
+  sessionId,
   roomName,
   displayName,
   email,
@@ -50,27 +81,46 @@ export function JitsiMeetingEmbed({
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [participantCount, setParticipantCount] = useState(0);
   const [jwt, setJwt] = useState<string | undefined>(undefined);
-  const [jwtReady, setJwtReady] = useState(!config.jwtOptional);
+  const [authorizedRoomName, setAuthorizedRoomName] = useState(roomName);
+  const [authorizationState, setAuthorizationState] = useState<AuthorizationState>(
+    config.requiresJwt ? "loading" : "ready",
+  );
+  const [authorizationError, setAuthorizationError] = useState<string | null>(null);
   const apiRef = useRef<{ executeCommand: (command: string, ...args: unknown[]) => void } | null>(
     null,
   );
 
   useEffect(() => {
     let cancelled = false;
-    if (!config.jwtOptional) {
-      setJwtReady(true);
+    setConnectionState("connecting");
+    if (!config.requiresJwt) {
+      setJwt(undefined);
+      setAuthorizedRoomName(roomName);
+      setAuthorizationError(null);
+      setAuthorizationState("ready");
       return;
     }
-    setJwtReady(false);
-    void tryFetchJaasJwt(roomName).then((token) => {
-      if (cancelled) return;
-      setJwt(token);
-      setJwtReady(true);
-    });
+    setJwt(undefined);
+    setAuthorizationError(null);
+    setAuthorizationState("loading");
+    void fetchJaasAuthorization(sessionId)
+      .then((authorization) => {
+        if (cancelled) return;
+        setJwt(authorization.jwt);
+        setAuthorizedRoomName(authorization.roomName);
+        setAuthorizationState("ready");
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setAuthorizationError(
+          error instanceof Error ? error.message : "Impossible d’autoriser la réunion.",
+        );
+        setAuthorizationState("error");
+      });
     return () => {
       cancelled = true;
     };
-  }, [config.jwtOptional, roomName, loadKey]);
+  }, [config.requiresJwt, sessionId, roomName, loadKey]);
 
   useEffect(() => {
     if (endConferenceSignal > 0) apiRef.current?.executeCommand("endConference");
@@ -123,10 +173,29 @@ export function JitsiMeetingEmbed({
     );
   }
 
-  if (!jwtReady) {
+  if (authorizationState === "loading") {
     return (
       <div className="grid min-h-[400px] place-items-center text-sm text-muted-foreground">
         Préparation de la salle JaaS…
+      </div>
+    );
+  }
+
+  if (authorizationState === "error" || (config.requiresJwt && !jwt)) {
+    return (
+      <div className="grid min-h-[400px] place-items-center rounded-xl border border-border bg-secondary/40 p-8 text-center">
+        <div className="max-w-md space-y-4">
+          <p className="font-semibold">Impossible de rejoindre la réunion</p>
+          <p className="text-sm text-muted-foreground">
+            {authorizationError ?? "Autorisation JaaS manquante."}
+          </p>
+          <div className="flex justify-center gap-2">
+            <Button variant="outline" onClick={() => setLoadKey((key) => key + 1)}>
+              Réessayer
+            </Button>
+            {onLeave && <Button onClick={onLeave}>Retour aux séances</Button>}
+          </div>
+        </div>
       </div>
     );
   }
@@ -140,13 +209,12 @@ export function JitsiMeetingEmbed({
     <div className="space-y-3">
       <div className="h-[min(70dvh,640px)] w-full overflow-hidden rounded-xl border border-border bg-black sm:h-[min(78vh,720px)]">
         <JitsiMeeting
-          key={`${roomName}-${loadKey}-${jwt ? "jwt" : "guest"}`}
+          key={`${authorizedRoomName}-${loadKey}-${jwt ? "jwt" : "guest"}`}
           domain={config.domain}
-          roomName={roomName}
+          roomName={authorizedRoomName}
           {...(jwt ? { jwt } : {})}
           userInfo={userInfo}
           configOverwrite={{
-            prejoinPageEnabled: true,
             startWithAudioMuted: startMuted,
             startWithVideoMuted: startMuted,
             startAudioMuted: 5,
@@ -211,9 +279,6 @@ export function JitsiMeetingEmbed({
           <span>
             {config.provider === "jaas" ? "JaaS 8x8.vc" : config.domain} · chat et partage d’écran
             disponibles.
-            {!jwt && config.jwtOptional
-              ? " JWT non fourni (enregistrement premium indisponible)."
-              : ""}
           </span>
         </div>
         <div className="flex gap-2">
@@ -228,8 +293,8 @@ export function JitsiMeetingEmbed({
       {showHelp && (
         <div className="rounded-lg border border-border bg-secondary/40 p-3 text-sm text-muted-foreground">
           Autorisez micro/caméra dans le navigateur. Tous les participants doivent rejoindre la même
-          salle sur {config.domain}. Pour l’enregistrement JaaS, déployez l’Edge Function
-          `jaas-token` avec JAAS_KEY_ID / JAAS_PRIVATE_KEY (jamais en VITE_*).
+          salle sur {config.domain}. L’accès JaaS est vérifié par votre compte et un jeton
+          temporaire généré côté serveur.
         </div>
       )}
     </div>

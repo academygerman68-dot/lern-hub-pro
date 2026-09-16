@@ -193,8 +193,8 @@ function LiveSessionLobby() {
 
       {jitsi.provider === "jaas" && (
         <Surface className="mb-4 border-border bg-secondary/40 p-4 text-sm">
-          Réunions via <strong>JaaS (8x8.vc)</strong>. Chat et partage d’écran disponibles. Un JWT
-          Edge (`jaas-token`) est optionnel pour l’enregistrement et les options premium.
+          Réunions sécurisées via <strong>JaaS (8x8.vc)</strong>. Chaque participant est autorisé
+          par un jeton temporaire généré côté serveur.
         </Surface>
       )}
 
@@ -503,6 +503,7 @@ function LiveMeetingRoom() {
       </div>
 
       <JitsiMeetingEmbed
+        sessionId={session.id}
         roomName={session.meeting_room}
         displayName={displayName}
         startMuted={role === "student"}
