@@ -12,6 +12,14 @@ const PROOF_SELECT = `
       last_name,
       email
     )
+  ),
+  payment:student_payments (
+    id,
+    amount,
+    currency,
+    due_date,
+    status,
+    reference
   )
 `;
 
@@ -24,6 +32,14 @@ export type PaymentProofListItem = PaymentProof & {
       last_name: string;
       email: string | null;
     } | null;
+  } | null;
+  payment?: {
+    id: string;
+    amount: number;
+    currency: string;
+    due_date: string | null;
+    status: string;
+    reference: string | null;
   } | null;
 };
 
@@ -61,7 +77,10 @@ export const SupabasePaymentProofService = {
   async uploadAndSubmit(input: {
     studentId: string;
     file: File;
-    paymentId?: string | null;
+    paymentId: string;
+    declaredAmount: number;
+    operationDate: string;
+    operationReference?: string | null;
     studentNote?: string | null;
   }) {
     if (!ALLOWED_MIME.has(input.file.type)) {
@@ -70,6 +89,10 @@ export const SupabasePaymentProofService = {
     if (input.file.size > MAX_PROOF_BYTES) {
       throw new Error("Fichier trop volumineux (max 10 Mo).");
     }
+    if (!Number.isFinite(input.declaredAmount) || input.declaredAmount <= 0) {
+      throw new Error("Le montant déclaré doit être supérieur à zéro.");
+    }
+    if (!input.operationDate) throw new Error("La date de l’opération est obligatoire.");
 
     const supabase = requireClient();
     const ext = input.file.name.split(".").pop()?.toLowerCase() || "bin";
@@ -87,17 +110,23 @@ export const SupabasePaymentProofService = {
       .from("payment_proofs")
       .insert({
         student_id: input.studentId,
-        payment_id: input.paymentId ?? null,
+        payment_id: input.paymentId,
         storage_bucket: "documents",
         storage_path: path,
         mime_type: input.file.type,
         file_size: input.file.size,
+        declared_amount: input.declaredAmount,
+        operation_date: input.operationDate,
+        operation_reference: input.operationReference?.trim() || null,
         status: "pending",
         student_note: input.studentNote ?? null,
       })
       .select(PROOF_SELECT)
       .single();
-    if (error) throw error;
+    if (error) {
+      await supabase.storage.from("documents").remove([path]);
+      throw error;
+    }
     return data as PaymentProofListItem;
   },
 

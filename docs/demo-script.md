@@ -24,8 +24,8 @@ Password: use the seeded QA password shown in the test-login panel (`Gla-…` / 
 2. **Teacher & student** — Navigate Students / Teachers → open or create profiles (or use seeds).
 3. **Assign class** — Classes → enroll student in a class taught by the demo teacher.
 4. **Block for unpaid** — Ensure student subscription is `suspended` / `past_due` (admin: create pending payment without marking paid, or set subscription status).
-5. **Student deposits proof** — Logout → student login → Paiements → upload PDF/JPEG/PNG avis d’opération → status `pending`. Confirm courses still blocked.
-6. **Admin queue** — Admin → Paiements → File des justificatifs → Voir (signed URL). Access still blocked for student.
+5. **Student deposits proof** — Logout → student login → Paiements → select the pending payment, enter the amount and operation date, then upload the PDF/JPEG/PNG avis d’opération → status `pending`. Confirm courses still blocked.
+6. **Admin queue** — Admin → Paiements → File des justificatifs → compare declared and expected amounts, operation date/reference, then Voir (signed URL). Access still blocked for student.
 7. **Approve** — Approuver → RPC activates subscription + in-app notification.
 8. **Access restored** — Student sees notification; academic pages unlock (`has_active_academic_access`).
 9. **Teacher scope** — Teacher login → Students list shows only assigned learners; no Subscription / payment proof column; no finance menu.

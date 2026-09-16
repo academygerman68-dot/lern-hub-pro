@@ -12,6 +12,9 @@ export type PaymentProof = {
   storage_path: string;
   mime_type: string | null;
   file_size: number | null;
+  declared_amount: number;
+  operation_date: string;
+  operation_reference: string | null;
   status: PaymentProofStatus;
   student_note: string | null;
   admin_note: string | null;

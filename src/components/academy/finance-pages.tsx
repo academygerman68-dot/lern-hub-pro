@@ -6,7 +6,6 @@ import {
   useAcademicAccess,
   useCreatePayment,
   useMarkPaymentOverdue,
-  useMarkPaymentPaid,
   usePaymentProofs,
   usePayments,
   usePendingPaymentProofs,
@@ -65,6 +64,15 @@ function ProofReviewQueue() {
                   {new Date(proof.created_at).toLocaleString()}
                   {proof.student_note ? ` · ${proof.student_note}` : ""}
                 </p>
+                <p className="text-sm text-muted-foreground">
+                  Déclaré : {Number(proof.declared_amount).toLocaleString()}{" "}
+                  {proof.payment?.currency ?? "MAD"}
+                  {proof.payment
+                    ? ` · attendu : ${Number(proof.payment.amount).toLocaleString()} ${proof.payment.currency}`
+                    : ""}
+                  {` · opération du ${proof.operation_date}`}
+                  {proof.operation_reference ? ` · réf. ${proof.operation_reference}` : ""}
+                </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -82,6 +90,12 @@ function ProofReviewQueue() {
                   size="sm"
                   disabled={review.isPending}
                   onClick={() => {
+                    if (
+                      !window.confirm(
+                        "Confirmer l’approbation de ce justificatif et l’activation de l’accès ?",
+                      )
+                    )
+                      return;
                     review.mutate(
                       { proofId: proof.id, approve: true },
                       {
@@ -98,12 +112,17 @@ function ProofReviewQueue() {
                   variant="outline"
                   disabled={review.isPending}
                   onClick={() => {
-                    const note = window.prompt("Motif du refus (optionnel)");
+                    const note = window.prompt("Motif du refus (obligatoire)");
+                    if (note === null) return;
+                    if (!note.trim()) {
+                      toast.error("Le motif du refus est obligatoire.");
+                      return;
+                    }
                     review.mutate(
                       {
                         proofId: proof.id,
                         approve: false,
-                        adminNote: note === null ? null : note,
+                        adminNote: note.trim(),
                       },
                       {
                         onSuccess: () => toast.message("Justificatif refusé"),
@@ -128,7 +147,6 @@ export function FinancePages({ mode }: { mode: string }) {
   const subscriptionsQuery = useSubscriptions();
   const studentsQuery = useStudents();
   const createPayment = useCreatePayment();
-  const markPaid = useMarkPaymentPaid();
   const markOverdue = useMarkPaymentOverdue();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -273,22 +291,6 @@ export function FinancePages({ mode }: { mode: string }) {
                 {row.payment_method ? ` · ${row.payment_method}` : ""}
               </p>
               <div className="flex flex-wrap gap-2">
-                {row.status !== "paid" && row.status !== "cancelled" && (
-                  <Button
-                    size="sm"
-                    className="flex-1"
-                    disabled={markPaid.isPending}
-                    onClick={() => {
-                      markPaid.mutate(row.id, {
-                        onSuccess: () =>
-                          toast.success("Payment marked paid · subscription activated"),
-                        onError: (err) => toast.error(err.message),
-                      });
-                    }}
-                  >
-                    Mark paid
-                  </Button>
-                )}
                 {row.status === "pending" && (
                   <Button
                     size="sm"
@@ -336,21 +338,6 @@ export function FinancePages({ mode }: { mode: string }) {
                     <Status tone={paymentTone(row.status)}>{row.status}</Status>
                   </td>
                   <td className="space-x-1 whitespace-nowrap">
-                    {row.status !== "paid" && row.status !== "cancelled" && (
-                      <Button
-                        size="sm"
-                        disabled={markPaid.isPending}
-                        onClick={() => {
-                          markPaid.mutate(row.id, {
-                            onSuccess: () =>
-                              toast.success("Payment marked paid · subscription activated"),
-                            onError: (err) => toast.error(err.message),
-                          });
-                        }}
-                      >
-                        Mark paid
-                      </Button>
-                    )}
                     {row.status === "pending" && (
                       <Button
                         size="sm"
@@ -466,6 +453,14 @@ export function StudentPaymentsPage() {
   const paymentsQuery = usePayments(myStudent?.id);
   const proofsQuery = usePaymentProofs(myStudent?.id);
   const submitProof = useSubmitPaymentProof();
+  const eligiblePayments = (paymentsQuery.data ?? []).filter((payment) =>
+    ["pending", "partial", "overdue"].includes(payment.status),
+  );
+  const [paymentId, setPaymentId] = useState("");
+  const selectedPayment = eligiblePayments.find((payment) => payment.id === paymentId);
+  const [declaredAmount, setDeclaredAmount] = useState("");
+  const [operationDate, setOperationDate] = useState("");
+  const [operationReference, setOperationReference] = useState("");
   const [note, setNote] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const accessBlocked = accessQuery.data === false;
@@ -501,6 +496,57 @@ export function StudentPaymentsPage() {
         </p>
         <div className="mt-4 space-y-3">
           <label className="block text-sm">
+            Échéance concernée
+            <select
+              className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={paymentId}
+              onChange={(event) => {
+                const nextId = event.target.value;
+                const payment = eligiblePayments.find((item) => item.id === nextId);
+                setPaymentId(nextId);
+                setDeclaredAmount(payment ? String(payment.amount) : "");
+              }}
+            >
+              <option value="">Sélectionner un paiement à régler</option>
+              {eligiblePayments.map((payment) => (
+                <option key={payment.id} value={payment.id}>
+                  {Number(payment.amount).toLocaleString()} {payment.currency} · échéance{" "}
+                  {payment.due_date ?? "non définie"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm">
+              Montant versé
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={declaredAmount}
+                onChange={(event) => setDeclaredAmount(event.target.value)}
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-sm">
+              Date de l’opération
+              <Input
+                type="date"
+                value={operationDate}
+                onChange={(event) => setOperationDate(event.target.value)}
+                className="mt-1"
+              />
+            </label>
+          </div>
+          <label className="block text-sm">
+            Référence de l’opération (optionnel)
+            <Input
+              value={operationReference}
+              onChange={(event) => setOperationReference(event.target.value)}
+              className="mt-1"
+            />
+          </label>
+          <label className="block text-sm">
             Fichier
             <Input
               type="file"
@@ -514,13 +560,24 @@ export function StudentPaymentsPage() {
             <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1" />
           </label>
           <Button
-            disabled={!myStudent?.id || !file || submitProof.isPending}
+            disabled={
+              !myStudent?.id ||
+              !selectedPayment ||
+              !file ||
+              !operationDate ||
+              Number(declaredAmount) <= 0 ||
+              submitProof.isPending
+            }
             onClick={() => {
-              if (!myStudent?.id || !file) return;
+              if (!myStudent?.id || !file || !selectedPayment) return;
               submitProof.mutate(
                 {
                   studentId: myStudent.id,
                   file,
+                  paymentId: selectedPayment.id,
+                  declaredAmount: Number(declaredAmount),
+                  operationDate,
+                  operationReference: operationReference || null,
                   studentNote: note || null,
                 },
                 {
@@ -528,6 +585,10 @@ export function StudentPaymentsPage() {
                     toast.success("Justificatif déposé — en attente de validation");
                     setFile(null);
                     setNote("");
+                    setPaymentId("");
+                    setDeclaredAmount("");
+                    setOperationDate("");
+                    setOperationReference("");
                   },
                   onError: (err) => toast.error(err.message),
                 },
@@ -546,6 +607,10 @@ export function StudentPaymentsPage() {
                     {p.created_at.slice(0, 16).replace("T", " ")}
                   </p>
                   <p className="text-xs text-muted-foreground">{p.student_note || "Sans note"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {Number(p.declared_amount).toLocaleString()} {p.payment?.currency ?? "MAD"} ·{" "}
+                    {p.operation_date}
+                  </p>
                 </div>
                 <Status tone={paymentTone(p.status)}>{p.status}</Status>
               </div>

@@ -8,11 +8,14 @@ CREATE TYPE public.outbox_status AS ENUM ('queued', 'sent', 'failed', 'skipped')
 CREATE TABLE IF NOT EXISTS public.payment_proofs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id uuid NOT NULL REFERENCES public.students (id) ON DELETE CASCADE,
-  payment_id uuid REFERENCES public.student_payments (id) ON DELETE SET NULL,
+  payment_id uuid NOT NULL REFERENCES public.student_payments (id) ON DELETE RESTRICT,
   storage_bucket text NOT NULL DEFAULT 'documents',
   storage_path text NOT NULL,
   mime_type text,
   file_size bigint,
+  declared_amount numeric(12, 2) NOT NULL CHECK (declared_amount > 0),
+  operation_date date NOT NULL,
+  operation_reference text,
   status public.payment_proof_status NOT NULL DEFAULT 'pending',
   student_note text,
   admin_note text,
@@ -25,6 +28,9 @@ CREATE TABLE IF NOT EXISTS public.payment_proofs (
 CREATE INDEX IF NOT EXISTS payment_proofs_student_id_idx ON public.payment_proofs (student_id);
 CREATE INDEX IF NOT EXISTS payment_proofs_status_idx ON public.payment_proofs (status);
 CREATE INDEX IF NOT EXISTS payment_proofs_created_at_idx ON public.payment_proofs (created_at DESC);
+CREATE UNIQUE INDEX payment_proofs_one_open_review_per_payment_idx
+  ON public.payment_proofs (payment_id)
+  WHERE status IN ('pending', 'approved');
 
 CREATE TABLE IF NOT EXISTS public.meeting_recordings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -99,7 +105,16 @@ CREATE POLICY payment_proofs_insert_own ON public.payment_proofs
 FOR INSERT TO authenticated
 WITH CHECK (
   public.is_admin()
-  OR student_id = public.current_student_id()
+  OR (
+    student_id = public.current_student_id()
+    AND EXISTS (
+      SELECT 1
+      FROM public.student_payments p
+      WHERE p.id = payment_id
+        AND p.student_id = student_id
+        AND p.status IN ('pending', 'partial', 'overdue')
+    )
+  )
 );
 
 CREATE POLICY payment_proofs_update_admin ON public.payment_proofs
@@ -150,6 +165,10 @@ AS $$
 DECLARE
   v_row public.notification_outbox;
 BEGIN
+  IF NOT public.is_admin() THEN
+    RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
+  END IF;
+
   INSERT INTO public.notification_outbox (
     channel, template_key, recipient_profile_id, recipient_address, payload, idempotency_key, status
   ) VALUES (
@@ -168,7 +187,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.enqueue_notification_outbox(public.notification_channel, text, uuid, text, jsonb, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.enqueue_notification_outbox(public.notification_channel, text, uuid, text, jsonb, text) TO authenticated;
+REVOKE ALL ON FUNCTION public.enqueue_notification_outbox(public.notification_channel, text, uuid, text, jsonb, text) FROM anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.review_payment_proof(
   p_proof_id uuid,
@@ -184,7 +203,6 @@ DECLARE
   v_proof public.payment_proofs;
   v_payment public.student_payments;
   v_profile_id uuid;
-  v_expires timestamptz;
 BEGIN
   IF NOT public.is_admin() THEN
     RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
@@ -199,6 +217,18 @@ BEGIN
     RAISE EXCEPTION 'proof_already_reviewed' USING ERRCODE = 'P0001';
   END IF;
 
+  SELECT * INTO v_payment
+  FROM public.student_payments
+  WHERE id = v_proof.payment_id
+    AND student_id = v_proof.student_id
+  FOR UPDATE;
+  IF v_payment.id IS NULL THEN
+    RAISE EXCEPTION 'payment_mismatch' USING ERRCODE = '23503';
+  END IF;
+  IF v_payment.status NOT IN ('pending', 'partial', 'overdue') THEN
+    RAISE EXCEPTION 'payment_not_reviewable' USING ERRCODE = 'P0001';
+  END IF;
+
   IF p_approve THEN
     UPDATE public.payment_proofs
     SET
@@ -210,33 +240,7 @@ BEGIN
     WHERE id = p_proof_id
     RETURNING * INTO v_proof;
 
-    IF v_proof.payment_id IS NOT NULL THEN
-      PERFORM public.mark_student_payment_paid(v_proof.payment_id);
-    ELSE
-      v_expires := now() + interval '30 days';
-      INSERT INTO public.student_subscriptions (student_id, status, starts_at, expires_at)
-      VALUES (v_proof.student_id, 'active', now(), v_expires)
-      ON CONFLICT (student_id) DO UPDATE
-      SET
-        status = 'active',
-        starts_at = coalesce(public.student_subscriptions.starts_at, now()),
-        expires_at = greatest(coalesce(public.student_subscriptions.expires_at, now()), v_expires),
-        grace_until = null,
-        updated_at = now();
-
-      INSERT INTO public.student_payments (
-        student_id, amount, currency, payment_date, status, payment_method, reference, notes, created_by
-      ) VALUES (
-        v_proof.student_id, 0, 'MAD', CURRENT_DATE, 'paid', 'bank_transfer',
-        'PROOF-' || left(v_proof.id::text, 8),
-        'Activated via approved payment proof',
-        auth.uid()
-      )
-      RETURNING * INTO v_payment;
-
-      UPDATE public.payment_proofs SET payment_id = v_payment.id WHERE id = v_proof.id
-      RETURNING * INTO v_proof;
-    END IF;
+    PERFORM public.mark_student_payment_paid(v_proof.payment_id);
 
     SELECT profile_id INTO v_profile_id FROM public.students WHERE id = v_proof.student_id;
     IF v_profile_id IS NOT NULL THEN
@@ -258,7 +262,14 @@ BEGIN
         'proof-approved-' || v_proof.id::text
       );
     END IF;
+    PERFORM public.write_audit_log(
+      'payment_proof.approved', 'payment_proof', v_proof.id, NULL,
+      to_jsonb(v_proof), jsonb_build_object('payment_id', v_proof.payment_id)
+    );
   ELSE
+    IF nullif(btrim(p_admin_note), '') IS NULL THEN
+      RAISE EXCEPTION 'rejection_reason_required' USING ERRCODE = '22023';
+    END IF;
     UPDATE public.payment_proofs
     SET
       status = 'rejected',
@@ -281,6 +292,10 @@ BEGIN
         jsonb_build_object('proof_id', v_proof.id)
       );
     END IF;
+    PERFORM public.write_audit_log(
+      'payment_proof.rejected', 'payment_proof', v_proof.id, NULL,
+      to_jsonb(v_proof), jsonb_build_object('payment_id', v_proof.payment_id)
+    );
   END IF;
 
   RETURN v_proof;
@@ -314,7 +329,10 @@ WITH CHECK (
   bucket_id = 'documents'
   AND (
     public.is_admin()
-    OR public.is_teacher()
+    OR (
+      public.is_teacher()
+      AND (storage.foldername(name))[3] IS DISTINCT FROM 'payment-proofs'
+    )
     OR (
       (storage.foldername(name))[1] = 'students'
       AND (storage.foldername(name))[2] = public.current_student_id()::text
@@ -337,6 +355,7 @@ USING (
     OR (
       public.is_teacher()
       AND (storage.foldername(name))[3] IS DISTINCT FROM 'payment-proofs'
+      AND (storage.foldername(name))[1] <> 'students'
     )
   )
 );
