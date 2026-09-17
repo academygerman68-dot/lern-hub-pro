@@ -596,7 +596,7 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
   const [convName, setConvName] = useState("");
   const [includeTeacher, setIncludeTeacher] = useState(true);
 
-  const conversations = conversationsQuery.data ?? [];
+  const conversations = useMemo(() => conversationsQuery.data ?? [], [conversationsQuery.data]);
   const active = conversations.find((c) => c.id === activeId) ?? conversations[0] ?? null;
   const activeConversationId = active?.id ?? null;
   const messagesQuery = useConversationMessages(activeConversationId);
@@ -834,14 +834,14 @@ export function TeacherProfile() {
 export function DirectorReports() {
   return (
     <>
-      <PageHeader title="Reports" subtitle="Academy performance snapshots for September 2026." />
+      <PageHeader title="Rapports" subtitle="Indicateurs de performance de l’académie." />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Metric label="Enrollment growth" value="+12" note="New students this month" />
-        <Metric label="Revenue" value="184,500 MAD" note="+6.2% vs August" />
-        <Metric label="Attendance" value="91%" note="Across 16 classes" />
-        <Metric label="Exam pass rate" value="78%" note="A2 mock exams" />
-        <Metric label="Overdue invoices" value="12" note="14,400 MAD" />
-        <Metric label="Teacher utilization" value="86%" />
+        <Metric label="Croissance des inscriptions" value="+12" note="Nouveaux étudiants ce mois" />
+        <Metric label="Revenus" value="184 500 MAD" note="+6,2 % vs mois précédent" />
+        <Metric label="Présence" value="91 %" note="Sur l’ensemble des groupes" />
+        <Metric label="Taux de réussite" value="78 %" note="Examens blancs" />
+        <Metric label="Factures en retard" value="12" note="14 400 MAD" />
+        <Metric label="Charge professeurs" value="86 %" />
       </div>
     </>
   );

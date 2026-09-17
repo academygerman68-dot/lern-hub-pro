@@ -781,14 +781,18 @@ export function TeacherAttendancePage() {
   });
   const [marks, setMarks] = useState<Record<string, "present" | "absent" | "late" | "excused">>({});
 
-  const roster = rosterQuery.data ?? [];
-  const effectiveMarks = Object.fromEntries(
-    roster.map((s) => [
-      s.id,
-      marks[`${primaryClass?.id}:${sessionDate}:${s.id}`] ??
-        existing.data?.records.find((r) => r.student_id === s.id)?.mark ??
-        "present",
-    ]),
+  const roster = useMemo(() => rosterQuery.data ?? [], [rosterQuery.data]);
+  const effectiveMarks = useMemo(
+    () =>
+      Object.fromEntries(
+        roster.map((s) => [
+          s.id,
+          marks[`${primaryClass?.id}:${sessionDate}:${s.id}`] ??
+            existing.data?.records.find((r) => r.student_id === s.id)?.mark ??
+            "present",
+        ]),
+      ),
+    [existing.data?.records, marks, primaryClass?.id, roster, sessionDate],
   );
   const counts = useMemo(() => {
     const values = roster.map((s) => effectiveMarks[s.id] ?? "present");
