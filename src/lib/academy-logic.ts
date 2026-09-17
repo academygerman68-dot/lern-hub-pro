@@ -37,6 +37,22 @@ export function defaultPageForRole(_role: Role): AcademyPage {
   return "dashboard";
 }
 
+/** Pages a restricted student may still open (profile / main space / payments). */
+export const STUDENT_RESTRICTED_ALLOWED_PAGES = [
+  "dashboard",
+  "profile",
+  "payments",
+  "messages",
+  "materials",
+] as const;
+
+export const STUDENT_RESTRICTED_MESSAGE =
+  "Votre accès à cette fonctionnalité est actuellement restreint. Veuillez contacter l’administration.";
+
+export function isStudentRestrictedAllowedPage(page: string): boolean {
+  return (STUDENT_RESTRICTED_ALLOWED_PAGES as readonly string[]).includes(page);
+}
+
 export function authenticate(email: string, password: string): SessionUser | null {
   const account = demoAccounts.find(
     (item) => item.email.toLowerCase() === email.trim().toLowerCase() && item.password === password,

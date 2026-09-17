@@ -14,7 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LEAD_TEACHER } from "@/data/demo-accounts";
 import { queryKeys } from "@/lib/query-keys";
-import { AssignmentService, CourseService } from "@/services/academy-services";
+import { getLiveSessionJoinState } from "@/lib/jitsi-config";
+import { setLiveSessionId } from "@/lib/live-class-session";
+import { openExternalMeeting, videoProviderLabel } from "@/lib/live-meeting";
+import { AssignmentService, CourseService, LiveSessionService } from "@/services/academy-services";
 import { SettingsService } from "@/services/supabase/settings-service";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -23,6 +26,7 @@ import {
   useConversations,
   useCreateClassConversation,
   useLiveSessions,
+  useLiveSessionsRealtime,
   useMyExamAttempts,
   useSendMessage,
 } from "@/hooks/use-academy-data";
@@ -98,6 +102,8 @@ export function Materials() {
 }
 
 export function CalendarPage() {
+  const { navigate, role } = useAcademy();
+  useLiveSessionsRealtime();
   const sessionsQuery = useLiveSessions();
   const [view, setView] = useState<"week" | "month">("week");
   const [anchor, setAnchor] = useState(() => {
@@ -107,7 +113,7 @@ export function CalendarPage() {
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const sessions = sessionsQuery.data ?? [];
+  const sessions = useMemo(() => sessionsQuery.data ?? [], [sessionsQuery.data]);
   const selected = sessions.find((s) => s.id === selectedId) ?? null;
 
   const weekStart = useMemo(() => {
@@ -163,13 +169,39 @@ export function CalendarPage() {
   const formatRange = (startsAt: string, endsAt: string | null) => {
     const start = new Date(startsAt);
     const end = endsAt ? new Date(endsAt) : null;
-    const time = (d: Date) =>
-      d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    const time = (d: Date) => d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
     return end ? `${time(start)} – ${time(end)}` : time(start);
   };
 
   const weekdayLabel = (d: Date) =>
     d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" });
+
+  const isStaff = role === "director" || role === "teacher";
+  const joinState = selected
+    ? getLiveSessionJoinState({
+        startsAt: selected.starts_at,
+        endsAt: selected.ends_at,
+        status: selected.status,
+        isStaff,
+      })
+    : null;
+
+  const joinFromCalendar = async () => {
+    if (!selected) return;
+    try {
+      const target = await LiveSessionService.joinTarget(selected.id);
+      if (target.provider === "zoom") {
+        const href = isStaff ? target.start_url || target.url : target.url;
+        if (!href) throw new Error("La réunion Zoom n’est pas encore prête.");
+        openExternalMeeting(href);
+        return;
+      }
+      setLiveSessionId(selected.id);
+      navigate("meeting");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Ouverture impossible");
+    }
+  };
 
   return (
     <>
@@ -191,7 +223,11 @@ export function CalendarPage() {
             >
               Précédent
             </Button>
-            <Button size="sm" variant={view === "week" ? "default" : "outline"} onClick={() => setView("week")}>
+            <Button
+              size="sm"
+              variant={view === "week" ? "default" : "outline"}
+              onClick={() => setView("week")}
+            >
               Semaine
             </Button>
             <Button
@@ -319,6 +355,17 @@ export function CalendarPage() {
             <p className="text-sm">
               Professeur : <strong>{teacherName(selected)}</strong>
             </p>
+            <p className="text-sm">
+              Mode : <strong>En ligne</strong>
+            </p>
+            {isStaff && (
+              <p className="text-sm">
+                Visioconférence :{" "}
+                <strong>
+                  {videoProviderLabel(selected.video_provider, selected.video_provider === "zoom")}
+                </strong>
+              </p>
+            )}
             <p className="text-sm text-muted-foreground">
               Statut :{" "}
               {selected.status === "live"
@@ -329,7 +376,15 @@ export function CalendarPage() {
                     ? "Terminée"
                     : "Annulée"}
             </p>
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              {(selected.status === "scheduled" || selected.status === "live") && (
+                <Button
+                  onClick={() => void joinFromCalendar()}
+                  disabled={Boolean(joinState && !joinState.allowed && !isStaff)}
+                >
+                  Rejoindre le cours
+                </Button>
+              )}
               <Button variant="outline" onClick={() => setSelectedId(null)}>
                 Fermer
               </Button>
@@ -558,7 +613,7 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
   return (
     <>
       <PageHeader
-        title="Messages"
+        title="Messagerie"
         subtitle="Conversations de groupe et échanges avec l’équipe."
         action={
           role === "director" ? (
@@ -586,9 +641,7 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
             {conversations.map((item) => (
               <button
                 className={`mb-1 w-full rounded-md p-3 text-left text-sm ${
-                  item.id === activeConversationId
-                    ? "bg-secondary text-primary"
-                    : "hover:bg-muted"
+                  item.id === activeConversationId ? "bg-secondary text-primary" : "hover:bg-muted"
                 }`}
                 key={item.id}
                 type="button"
@@ -616,9 +669,7 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
                     {(active.members ?? [])
                       .slice(0, 6)
                       .map((m) =>
-                        m.profile
-                          ? `${m.profile.first_name} ${m.profile.last_name}`.trim()
-                          : "—",
+                        m.profile ? `${m.profile.first_name} ${m.profile.last_name}`.trim() : "—",
                       )
                       .join(", ")}
                     {(active.members?.length ?? 0) > 6 ? "…" : ""}
@@ -650,7 +701,7 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
                     </div>
                   );
                 })}
-                {!messagesQuery.isLoading && !(messagesQuery.data?.length) && (
+                {!messagesQuery.isLoading && !messagesQuery.data?.length && (
                   <p className="text-sm text-muted-foreground">Aucun message pour l’instant.</p>
                 )}
               </div>

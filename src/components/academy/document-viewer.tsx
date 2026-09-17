@@ -64,7 +64,7 @@ export function DocumentViewer({
                   size="icon"
                   variant="outline"
                   onClick={() => setZoom((z) => Math.max(0.6, z - 0.1))}
-                  aria-label="Zoom out"
+                  aria-label="Réduire"
                 >
                   <ZoomOut className="size-4" />
                 </Button>
@@ -72,7 +72,7 @@ export function DocumentViewer({
                   size="icon"
                   variant="outline"
                   onClick={() => setZoom((z) => Math.min(1.8, z + 0.1))}
-                  aria-label="Zoom in"
+                  aria-label="Agrandir"
                 >
                   <ZoomIn className="size-4" />
                 </Button>
@@ -82,18 +82,18 @@ export function DocumentViewer({
               <Button size="sm" variant="outline" asChild className="hidden sm:inline-flex">
                 <a href={url} download target="_blank" rel="noreferrer">
                   <Download className="size-4" />
-                  Download
+                  Télécharger
                 </a>
               </Button>
             )}
             {url && (
               <Button size="icon" variant="outline" asChild className="sm:hidden">
-                <a href={url} download target="_blank" rel="noreferrer" aria-label="Download">
+                <a href={url} download target="_blank" rel="noreferrer" aria-label="Télécharger">
                   <Download className="size-4" />
                 </a>
               </Button>
             )}
-            <Button size="icon" variant="ghost" onClick={onClose} aria-label="Close">
+            <Button size="icon" variant="ghost" onClick={onClose} aria-label="Fermer">
               <X className="size-4" />
             </Button>
           </div>
@@ -102,7 +102,7 @@ export function DocumentViewer({
         <div className="relative flex-1 overflow-auto bg-secondary/30 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:p-3">
           {loading && (
             <div className="grid h-full place-items-center text-sm text-muted-foreground">
-              Loading document…
+              Chargement du document…
             </div>
           )}
           {!loading && error && (
@@ -130,11 +130,11 @@ export function DocumentViewer({
           {!loading && !error && url && kind === "other" && (
             <div className="grid h-full place-items-center gap-3 px-4 text-center">
               <p className="text-sm text-muted-foreground">
-                Preview not available for this file type.
+                Aperçu indisponible pour ce type de fichier.
               </p>
               <Button asChild>
                 <a href={url} target="_blank" rel="noreferrer">
-                  Open in new tab
+                  Ouvrir dans un nouvel onglet
                 </a>
               </Button>
             </div>

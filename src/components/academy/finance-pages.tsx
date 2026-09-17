@@ -39,8 +39,11 @@ function paymentTone(status: string): "green" | "amber" | "red" {
 
 function proofStatusLabel(status: string) {
   if (status === "pending") return "En attente";
-  if (status === "approved") return "Confirmé";
+  if (status === "approved" || status === "paid") return "Confirmé";
   if (status === "rejected") return "Refusé";
+  if (status === "partial") return "Partiel";
+  if (status === "overdue") return "En retard";
+  if (status === "cancelled") return "Annulé";
   return status;
 }
 
@@ -232,24 +235,24 @@ export function FinancePages({ mode }: { mode: string }) {
   if (mode === "subscriptions") {
     return (
       <>
-        <PageHeader title="Subscriptions" subtitle="Student subscription status from Supabase." />
+        <PageHeader title="Abonnements" subtitle="Statut des abonnements étudiants depuis Supabase." />
         <QueryState
           isLoading={subscriptionsQuery.isLoading}
           isError={subscriptionsQuery.isError}
           error={subscriptionsQuery.error}
           isEmpty={!subscriptionsQuery.data?.length}
-          emptyTitle="No subscriptions"
-          emptyMessage="Create a payment and mark it paid to activate a subscription."
+          emptyTitle="Aucun abonnement"
+          emptyMessage="Créez un paiement et confirmez-le pour activer un abonnement."
           onRetry={() => void subscriptionsQuery.refetch()}
         >
           <Surface className="table-scroll overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Student</th>
-                  <th>Status</th>
-                  <th>Starts</th>
-                  <th>Expires</th>
+                  <th>Étudiant</th>
+                  <th>Statut</th>
+                  <th>Début</th>
+                  <th>Expiration</th>
                 </tr>
               </thead>
               <tbody>
@@ -284,21 +287,21 @@ export function FinancePages({ mode }: { mode: string }) {
   return (
     <>
       <PageHeader
-        title={mode === "invoices" ? "Invoices" : "Payment Management"}
-        subtitle="Payments linked to subscriptions and academic access."
-        action={<Button onClick={() => setCreateOpen(true)}>+ Record payment</Button>}
+        title={mode === "invoices" ? "Factures" : "Paiements"}
+        subtitle="Paiements liés aux abonnements et à l’accès académique."
+        action={<Button onClick={() => setCreateOpen(true)}>+ Enregistrer un paiement</Button>}
       />
       <ProofReviewQueue />
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Total amount" value={`${counts.total.toLocaleString()} MAD`} />
-        <Metric label="Paid" value={String(counts.paid)} />
-        <Metric label="Pending" value={String(counts.pending)} />
-        <Metric label="Overdue" value={String(counts.overdue)} />
+        <Metric label="Montant total" value={`${counts.total.toLocaleString()} MAD`} />
+        <Metric label="Confirmés" value={String(counts.paid)} />
+        <Metric label="En attente" value={String(counts.pending)} />
+        <Metric label="En retard" value={String(counts.overdue)} />
       </div>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row">
         <Input
-          placeholder="Search student or reference…"
+          placeholder="Rechercher un étudiant ou une référence…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="sm:max-w-xs"
@@ -308,11 +311,11 @@ export function FinancePages({ mode }: { mode: string }) {
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
-          <option value="all">All statuses</option>
-          <option value="pending">Pending</option>
-          <option value="paid">Paid</option>
-          <option value="overdue">Overdue</option>
-          <option value="cancelled">Cancelled</option>
+          <option value="all">Tous les statuts</option>
+          <option value="pending">En attente</option>
+          <option value="paid">Confirmé</option>
+          <option value="overdue">En retard</option>
+          <option value="cancelled">Annulé</option>
         </select>
       </div>
 
@@ -350,12 +353,12 @@ export function FinancePages({ mode }: { mode: string }) {
                     disabled={markOverdue.isPending}
                     onClick={() => {
                       markOverdue.mutate(row.id, {
-                        onSuccess: () => toast.success("Marked overdue · access restricted"),
+                        onSuccess: () => toast.success("Marqué en retard · accès restreint"),
                         onError: (err) => toast.error(err.message),
                       });
                     }}
                   >
-                    Mark overdue
+                    Marquer en retard
                   </Button>
                 )}
               </div>
@@ -366,12 +369,12 @@ export function FinancePages({ mode }: { mode: string }) {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Student</th>
-                <th>Amount</th>
-                <th>Due</th>
-                <th>Paid on</th>
-                <th>Method</th>
-                <th>Status</th>
+                <th>Étudiant</th>
+                <th>Montant</th>
+                <th>Échéance</th>
+                <th>Payé le</th>
+                <th>Méthode</th>
+                <th>Statut</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -386,7 +389,7 @@ export function FinancePages({ mode }: { mode: string }) {
                   <td>{row.payment_date ?? "—"}</td>
                   <td>{row.payment_method ?? "—"}</td>
                   <td>
-                    <Status tone={paymentTone(row.status)}>{row.status}</Status>
+                    <Status tone={paymentTone(row.status)}>{proofStatusLabel(row.status)}</Status>
                   </td>
                   <td className="space-x-1 whitespace-nowrap">
                     {row.status === "pending" && (
@@ -396,12 +399,12 @@ export function FinancePages({ mode }: { mode: string }) {
                         disabled={markOverdue.isPending}
                         onClick={() => {
                           markOverdue.mutate(row.id, {
-                            onSuccess: () => toast.success("Marked overdue · access restricted"),
+                            onSuccess: () => toast.success("Marqué en retard · accès restreint"),
                             onError: (err) => toast.error(err.message),
                           });
                         }}
                       >
-                        Mark overdue
+                        Marquer en retard
                       </Button>
                     )}
                   </td>
@@ -413,19 +416,19 @@ export function FinancePages({ mode }: { mode: string }) {
       </QueryState>
 
       <Surface className="mt-5 p-4 sm:p-5">
-        <h2 className="font-semibold">Access policy</h2>
+        <h2 className="font-semibold">Politique d’accès</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <div className="rounded-md bg-success-soft p-4">
-            <Status tone="green">ACTIVE</Status>
-            <p className="mt-2 text-sm font-medium">Full academic access</p>
+            <Status tone="green">ACTIF</Status>
+            <p className="mt-2 text-sm font-medium">Accès académique complet</p>
           </div>
           <div className="rounded-md bg-warning-soft p-4">
-            <Status tone="amber">PAST DUE</Status>
-            <p className="mt-2 text-sm font-medium">Access restricted</p>
+            <Status tone="amber">EN RETARD</Status>
+            <p className="mt-2 text-sm font-medium">Accès restreint</p>
           </div>
           <div className="rounded-md bg-alert-soft p-4">
-            <Status tone="red">SUSPENDED</Status>
-            <p className="mt-2 text-sm font-medium">Learning locked</p>
+            <Status tone="red">SUSPENDU</Status>
+            <p className="mt-2 text-sm font-medium">Apprentissage verrouillé</p>
           </div>
         </div>
       </Surface>
@@ -433,13 +436,13 @@ export function FinancePages({ mode }: { mode: string }) {
       {createOpen && (
         <div className="mobile-modal">
           <Surface className="mobile-modal-panel space-y-4">
-            <h2 className="text-lg font-semibold">Record payment</h2>
+            <h2 className="text-lg font-semibold">Enregistrer un paiement</h2>
             <select
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={studentId}
               onChange={(e) => setStudentId(e.target.value)}
             >
-              <option value="">Select student</option>
+              <option value="">Choisir un étudiant</option>
               {(studentsQuery.data ?? []).map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name} · {s.email}
@@ -450,14 +453,14 @@ export function FinancePages({ mode }: { mode: string }) {
               type="number"
               min="0"
               step="0.01"
-              placeholder="Amount"
+              placeholder="Montant"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
             <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setCreateOpen(false)}>
-                Cancel
+                Annuler
               </Button>
               <Button
                 disabled={!studentId || !amount || createPayment.isPending}
@@ -473,7 +476,7 @@ export function FinancePages({ mode }: { mode: string }) {
                     },
                     {
                       onSuccess: () => {
-                        toast.success("Payment created");
+                        toast.success("Paiement enregistré");
                         setCreateOpen(false);
                         setStudentId("");
                         setAmount("1200");
@@ -484,7 +487,7 @@ export function FinancePages({ mode }: { mode: string }) {
                   );
                 }}
               >
-                Create
+                Enregistrer
               </Button>
             </div>
           </Surface>

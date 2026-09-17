@@ -13,6 +13,7 @@ type Props = {
   endConferenceSignal?: number;
   onLeave?: () => void;
   onConferenceJoined?: () => void;
+  onEmergencyZoom?: () => void;
 };
 
 type ConnectionState = "connecting" | "joined" | "left";
@@ -38,7 +39,8 @@ async function readFunctionError(error: unknown): Promise<string> {
   if (context && typeof context.clone === "function") {
     try {
       const body = (await context.clone().json()) as { error?: string; message?: string };
-      if (body.error && tokenErrors[body.error]) return tokenErrors[body.error];
+      const mapped = body.error ? tokenErrors[body.error] : undefined;
+      if (mapped) return mapped;
       if (body.message) return body.message;
     } catch {
       // Fall through to the safe generic message.
@@ -80,6 +82,7 @@ export function JitsiMeetingEmbed({
   endConferenceSignal = 0,
   onLeave,
   onConferenceJoined,
+  onEmergencyZoom,
 }: Props) {
   const config = getJitsiConfig();
   const [loadKey, setLoadKey] = useState(0);
@@ -92,6 +95,7 @@ export function JitsiMeetingEmbed({
     config.requiresJwt ? "loading" : "ready",
   );
   const [authorizationError, setAuthorizationError] = useState<string | null>(null);
+  const [embedFailed, setEmbedFailed] = useState(false);
   const apiRef = useRef<{ executeCommand: (command: string, ...args: unknown[]) => void } | null>(
     null,
   );
@@ -99,6 +103,7 @@ export function JitsiMeetingEmbed({
   useEffect(() => {
     let cancelled = false;
     setConnectionState("connecting");
+    setEmbedFailed(false);
     if (!config.requiresJwt) {
       setJwt(undefined);
       setAuthorizedRoomName(roomName);
@@ -139,7 +144,7 @@ export function JitsiMeetingEmbed({
 
   const handleApiReady = useCallback(
     (api: {
-      on: (event: string, listener: () => void) => unknown;
+      on: (event: string, listener: (...args: unknown[]) => void) => unknown;
       getNumberOfParticipants: () => number;
       executeCommand: (command: string, ...args: unknown[]) => void;
     }) => {
@@ -149,6 +154,7 @@ export function JitsiMeetingEmbed({
       };
 
       api.on("videoConferenceJoined", () => {
+        setEmbedFailed(false);
         setConnectionState("joined");
         refreshParticipantCount();
         onConferenceJoined?.();
@@ -159,21 +165,31 @@ export function JitsiMeetingEmbed({
         setConnectionState("left");
         setParticipantCount(0);
       });
+      api.on("conferenceFailed", () => setEmbedFailed(true));
+      api.on("connectionFailed", () => setEmbedFailed(true));
     },
     [onConferenceJoined],
   );
+
+  const retryJitsi = () => {
+    setEmbedFailed(false);
+    setLoadKey((key) => key + 1);
+  };
 
   if (!config.configured) {
     return (
       <div className="grid min-h-[520px] place-items-center rounded-xl border border-border bg-secondary/40 p-8 text-center">
         <div className="max-w-md space-y-3">
-          <p className="font-semibold">Impossible de rejoindre la réunion</p>
+          <p className="font-semibold">Impossible de démarrer la réunion Jitsi.</p>
           <p className="text-sm text-muted-foreground">Configuration Jitsi manquante.</p>
-          {onLeave && (
-            <Button variant="outline" onClick={onLeave}>
-              Retour aux séances
-            </Button>
-          )}
+          <div className="flex flex-wrap justify-center gap-2">
+            {onEmergencyZoom && <Button onClick={onEmergencyZoom}>Réunion d’urgence Zoom</Button>}
+            {onLeave && (
+              <Button variant="outline" onClick={onLeave}>
+                Retour à En direct
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -187,19 +203,26 @@ export function JitsiMeetingEmbed({
     );
   }
 
-  if (authorizationState === "error" || (config.requiresJwt && !jwt)) {
+  if (authorizationState === "error" || (config.requiresJwt && !jwt) || embedFailed) {
     return (
       <div className="grid min-h-[400px] place-items-center rounded-xl border border-border bg-secondary/40 p-8 text-center">
         <div className="max-w-md space-y-4">
-          <p className="font-semibold">Impossible de rejoindre la réunion</p>
+          <p className="font-semibold">Impossible de démarrer la réunion Jitsi.</p>
           <p className="text-sm text-muted-foreground">
-            {authorizationError ?? "Autorisation JaaS manquante."}
+            {embedFailed
+              ? "La connexion à la salle a échoué."
+              : (authorizationError ?? "Autorisation JaaS manquante.")}
           </p>
-          <div className="flex justify-center gap-2">
-            <Button variant="outline" onClick={() => setLoadKey((key) => key + 1)}>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button variant="outline" onClick={retryJitsi}>
               Réessayer
             </Button>
-            {onLeave && <Button onClick={onLeave}>Retour aux séances</Button>}
+            {onEmergencyZoom && <Button onClick={onEmergencyZoom}>Réunion d’urgence Zoom</Button>}
+            {onLeave && (
+              <Button variant="outline" onClick={onLeave}>
+                Retour à En direct
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -248,9 +271,10 @@ export function JitsiMeetingEmbed({
           onApiReady={handleApiReady}
           onReadyToClose={handleReadyToClose}
           getIFrameRef={(parentNode) => {
-            parentNode.style.height = "100%";
-            parentNode.style.width = "100%";
-            parentNode.style.border = "0";
+            const node = parentNode as HTMLElement;
+            node.style.height = "100%";
+            node.style.width = "100%";
+            node.style.border = "0";
           }}
           spinner={() => (
             <div className="grid h-full min-h-[400px] place-items-center text-sm text-muted-foreground">
@@ -287,10 +311,15 @@ export function JitsiMeetingEmbed({
             disponibles.
           </span>
         </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setLoadKey((k) => k + 1)}>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={retryJitsi}>
             Réessayer
           </Button>
+          {onEmergencyZoom && (
+            <Button size="sm" variant="outline" onClick={onEmergencyZoom}>
+              Réunion d’urgence Zoom
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={() => setShowHelp((v) => !v)}>
             {showHelp ? "Masquer l’aide" : "Aide"}
           </Button>

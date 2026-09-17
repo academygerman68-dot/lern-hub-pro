@@ -5,17 +5,29 @@ type Assignment = Database["public"]["Tables"]["assignments"]["Row"];
 type Submission = Database["public"]["Tables"]["assignment_submissions"]["Row"];
 type AssignmentStatus = Database["public"]["Enums"]["assignment_status"];
 type SubmissionStatus = Database["public"]["Enums"]["submission_status"];
+type MediaKind = Database["public"]["Enums"]["media_content_kind"];
+
+export type AssignmentRow = Assignment & {
+  level: { id: string; code: string; name: string } | null;
+  class: { id: string; name: string } | null;
+};
 
 function requireClient() {
   if (!isSupabaseConfigured) throw new Error("SUPABASE_NOT_CONFIGURED");
   return getSupabase();
 }
 
+const ASSIGNMENT_SELECT = `
+  *,
+  level:levels!assignments_level_id_fkey ( id, code, name ),
+  class:classes!assignments_class_id_fkey ( id, name )
+`;
+
 export const SupabaseAssignmentService = {
-  async list(classId?: string): Promise<Assignment[]> {
+  async list(classId?: string): Promise<AssignmentRow[]> {
     let query = requireClient()
       .from("assignments")
-      .select("*")
+      .select(ASSIGNMENT_SELECT)
       .is("archived_at", null)
       .order("due_at", {
         ascending: true,
@@ -24,16 +36,20 @@ export const SupabaseAssignmentService = {
     if (classId) query = query.eq("class_id", classId);
     const { data, error } = await query;
     if (error) throw error;
-    return data ?? [];
+    return (data as AssignmentRow[] | null) ?? [];
   },
 
   async create(input: {
-    classId: string;
+    levelId: string;
+    classId?: string | null;
     title: string;
     description?: string;
     instructions?: string;
     dueAt?: string | null;
     publishedAt?: string | null;
+    contentKind?: MediaKind;
+    contentUrl?: string | null;
+    mimeType?: string | null;
     attachmentBucket?: string | null;
     attachmentPath?: string | null;
     createdBy?: string | null;
@@ -43,40 +59,75 @@ export const SupabaseAssignmentService = {
     const { data, error } = await requireClient()
       .from("assignments")
       .insert({
-        class_id: input.classId,
+        level_id: input.levelId,
+        class_id: input.classId ?? null,
         title: input.title,
         description: input.description ?? null,
         instructions: input.instructions ?? null,
         due_at: input.dueAt ?? null,
         published_at:
           input.publishedAt ?? (status === "published" ? new Date().toISOString() : null),
+        content_kind: input.contentKind ?? "pdf",
+        content_url: input.contentUrl ?? null,
+        mime_type: input.mimeType ?? null,
         attachment_bucket: input.attachmentBucket ?? null,
         attachment_path: input.attachmentPath ?? null,
         created_by: input.createdBy ?? null,
         status,
       })
-      .select("*")
+      .select(ASSIGNMENT_SELECT)
       .single();
     if (error) throw error;
-    return data;
+    return data as AssignmentRow;
   },
 
-  async uploadAttachment(file: File, createdBy?: string | null) {
+  async uploadAttachment(file: File) {
     const supabase = requireClient();
     const ext = file.name.split(".").pop() ?? "bin";
-    const path = `assignments/${createdBy ?? "staff"}/${crypto.randomUUID()}.${ext}`;
+    const path = `assignments/${crypto.randomUUID()}.${ext}`;
     const uploadOptions = file.type
       ? { upsert: false as const, contentType: file.type }
       : { upsert: false as const };
-    const { error } = await supabase.storage.from("documents").upload(path, file, uploadOptions);
+    const { error } = await supabase.storage
+      .from("course-materials")
+      .upload(path, file, uploadOptions);
     if (error) throw error;
-    return { attachmentBucket: "documents" as const, attachmentPath: path };
+    return {
+      attachmentBucket: "course-materials" as const,
+      attachmentPath: path,
+      mimeType: file.type || null,
+    };
+  },
+
+  async getAttachmentUrl(
+    row: Pick<Assignment, "content_url" | "attachment_bucket" | "attachment_path">,
+  ) {
+    if (row.content_url) return row.content_url;
+    if (!row.attachment_bucket || !row.attachment_path) {
+      throw new Error("Aucune pièce jointe disponible");
+    }
+    const { data, error } = await requireClient()
+      .storage.from(row.attachment_bucket)
+      .createSignedUrl(row.attachment_path, 3600);
+    if (error) throw error;
+    return data.signedUrl;
   },
 
   async publish(id: string) {
     const { data, error } = await requireClient()
       .from("assignments")
       .update({ status: "published", published_at: new Date().toISOString() })
+      .eq("id", id)
+      .select(ASSIGNMENT_SELECT)
+      .single();
+    if (error) throw error;
+    return data as AssignmentRow;
+  },
+
+  async archive(id: string) {
+    const { data, error } = await requireClient()
+      .from("assignments")
+      .update({ archived_at: new Date().toISOString(), status: "archived" })
       .eq("id", id)
       .select("*")
       .single();

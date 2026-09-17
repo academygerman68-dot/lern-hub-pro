@@ -2,7 +2,6 @@ import { mapTeacher, type TeacherRow } from "@/lib/academy-mappers";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { Teacher } from "@/types/academy";
 import type { Database } from "@/types/database";
-import { SupabaseAuthService } from "@/services/supabase/auth-service";
 
 type TeacherUpdate = Database["public"]["Tables"]["teachers"]["Update"];
 type RecordStatus = Database["public"]["Enums"]["record_status"];
@@ -34,6 +33,35 @@ function requireClient() {
     throw new Error("SUPABASE_NOT_CONFIGURED");
   }
   return getSupabase();
+}
+
+const createUserErrors: Record<string, string> = {
+  UNAUTHORIZED: "Votre session a expiré. Reconnectez-vous puis réessayez.",
+  FORBIDDEN: "Seul un administrateur actif peut créer un professeur.",
+  EMAIL_TAKEN: "Un compte existe déjà avec cet e-mail.",
+  EMAIL_REQUIRED: "L’adresse e-mail est obligatoire.",
+  PASSWORD_TOO_SHORT: "Le mot de passe doit contenir au moins 8 caractères.",
+  NAME_REQUIRED: "Le prénom et le nom sont obligatoires.",
+  UNSUPPORTED_ROLE: "Seul un compte professeur peut être créé ici.",
+  TEACHER_PROFILE_PENDING:
+    "Le compte Auth a été créé, mais le profil professeur n’est pas encore disponible.",
+  SUPABASE_NOT_CONFIGURED: "Supabase n’est pas configuré.",
+  CREATE_USER_FAILED: "Impossible de créer le compte professeur.",
+};
+
+async function readFunctionError(error: unknown): Promise<string> {
+  const context = (error as { context?: Response; message?: string } | null)?.context;
+  if (context && typeof context.clone === "function") {
+    try {
+      const body = (await context.clone().json()) as { error?: string; message?: string };
+      const mapped = body.error ? createUserErrors[body.error] : undefined;
+      if (mapped) return mapped;
+      if (body.message) return body.message;
+    } catch {
+      // Fall through.
+    }
+  }
+  return "Impossible de créer le professeur. Vérifiez la fonction admin-create-user.";
 }
 
 export const SupabaseTeacherService = {
@@ -82,7 +110,8 @@ export const SupabaseTeacherService = {
   },
 
   /**
-   * Creates a teacher via Auth signup (role metadata). Restores the admin session afterward.
+   * Creates a teacher via the admin-create-user Edge Function (Auth Admin API).
+   * The current admin session is never replaced.
    */
   async createViaSignup(input: {
     email: string;
@@ -91,49 +120,35 @@ export const SupabaseTeacherService = {
     lastName: string;
     phone?: string;
     specialties?: string[];
-  }): Promise<Teacher | { needsEmailConfirmation: true; email: string }> {
+  }): Promise<Teacher> {
     const supabase = requireClient();
-    const {
-      data: { session: adminSession },
-    } = await supabase.auth.getSession();
-
-    const result = await SupabaseAuthService.signUp({
-      email: input.email,
-      password: input.password,
-      firstName: input.firstName,
-      lastName: input.lastName,
-      role: "teacher",
-      language: "fr",
-      ...(input.phone?.trim() ? { phone: input.phone.trim() } : {}),
+    const { data, error } = await supabase.functions.invoke<{
+      id?: string;
+      email?: string;
+      error?: string;
+    }>("admin-create-user", {
+      body: {
+        email: input.email,
+        password: input.password,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        role: "teacher",
+        ...(input.phone?.trim() ? { phone: input.phone.trim() } : {}),
+        ...(input.specialties?.length ? { specialties: input.specialties } : {}),
+      },
     });
-
-    if (adminSession?.access_token && adminSession.refresh_token) {
-      await supabase.auth.setSession({
-        access_token: adminSession.access_token,
-        refresh_token: adminSession.refresh_token,
-      });
-    }
-
-    if ("needsEmailConfirmation" in result) {
-      return result;
-    }
+    if (error) throw new Error(await readFunctionError(error));
+    const mappedError = data?.error ? createUserErrors[data.error] : undefined;
+    if (mappedError) throw new Error(mappedError);
 
     const email = input.email.trim().toLowerCase();
     const teachers = await this.list();
-    let teacher = teachers.find((t) => t.email.toLowerCase() === email) ?? null;
-
+    const teacher =
+      (data?.id ? teachers.find((item) => item.id === data.id) : null) ??
+      teachers.find((item) => item.email.toLowerCase() === email) ??
+      null;
     if (!teacher) {
-      await new Promise((r) => setTimeout(r, 400));
-      const retry = await this.list();
-      teacher = retry.find((t) => t.email.toLowerCase() === email) ?? null;
-    }
-
-    if (!teacher) {
-      throw new Error("TEACHER_PROFILE_PENDING");
-    }
-
-    if (input.specialties?.length) {
-      return this.update(teacher.id, { specialties: input.specialties });
+      throw new Error(createUserErrors["TEACHER_PROFILE_PENDING"]);
     }
     return teacher;
   },

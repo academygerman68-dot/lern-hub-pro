@@ -13,7 +13,7 @@ import { Eyebrow, Status } from "./premium-kit";
 import { Surface } from "./primitives";
 
 export function PremiumStudentDashboard() {
-  const { navigate, user, l } = useAcademy();
+  const { navigate, user, l, profile } = useAcademy();
   const firstName = user?.name?.split(" ")[0] ?? "there";
   const studentsQuery = useStudents();
   const myStudent = (studentsQuery.data ?? []).find(
@@ -26,6 +26,12 @@ export function PremiumStudentDashboard() {
 
   return (
     <div className="animate-fade-in space-y-8">
+      {profile?.status === "restricted" && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          Votre accès aux cours, ressources, devoirs, examens et classes en direct est actuellement
+          restreint. Veuillez contacter l’administration.
+        </div>
+      )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm text-muted-foreground">{l("Bienvenue", "مرحبًا")}</p>

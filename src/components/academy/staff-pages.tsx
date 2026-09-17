@@ -34,6 +34,8 @@ import {
   DirectorAssignmentsPage,
   DirectorCoursesPage,
   MaterialsLibraryPage,
+} from "./academic-pages";
+import {
   TeacherAssignmentsPage,
   TeacherAttendancePage,
   TeacherLessonManagerPage,
@@ -68,17 +70,17 @@ function TeacherStudents() {
   return (
     <>
       <PageHeader
-        title="Students"
+        title="Étudiants"
         action={selector}
-        subtitle={primaryClass ? `Assigned via ${primaryClass.name}` : "Students in your classes"}
+        subtitle={primaryClass ? `Assignés via ${primaryClass.name}` : "Étudiants de vos groupes"}
       />
       <QueryState
         isLoading={classesQuery.isLoading || rosterQuery.isLoading}
         isError={classesQuery.isError || rosterQuery.isError}
         error={(classesQuery.error ?? rosterQuery.error) as Error | null}
         isEmpty={!rosterQuery.data?.length}
-        emptyTitle="No assigned students"
-        emptyMessage="Students appear here once they are enrolled in your classes."
+        emptyTitle="Aucun étudiant assigné"
+        emptyMessage="Les étudiants apparaissent ici dès qu’ils sont inscrits dans vos groupes."
         onRetry={() => {
           void classesQuery.refetch();
           void rosterQuery.refetch();
@@ -88,10 +90,10 @@ function TeacherStudents() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Student</th>
-                <th>Level</th>
-                <th>Class</th>
-                <th>Subscription</th>
+                <th>Étudiant</th>
+                <th>Niveau</th>
+                <th>Groupe</th>
+                <th>Abonnement</th>
               </tr>
             </thead>
             <tbody>
@@ -105,7 +107,11 @@ function TeacherStudents() {
                   <td>{student.className}</td>
                   <td>
                     <Status tone={student.subscription === "ACTIVE" ? "green" : "amber"}>
-                      {student.subscription}
+                      {student.subscription === "ACTIVE"
+                        ? "Actif"
+                        : student.subscription === "PAST_DUE"
+                          ? "En retard"
+                          : "Suspendu"}
                     </Status>
                   </td>
                 </tr>
@@ -126,41 +132,44 @@ function TeacherClass() {
   return (
     <>
       <PageHeader
-        title={primaryClass?.name ?? "My class"}
+        title={primaryClass?.name ?? "Mon groupe"}
         subtitle={
           primaryClass
-            ? `${rosterQuery.data?.length ?? 0} students · ${primaryClass.schedule} · ${primaryClass.teacher}`
-            : "Classes assigned to you"
+            ? `${rosterQuery.data?.length ?? 0} étudiants · ${primaryClass.schedule} · ${primaryClass.teacher}`
+            : "Groupes qui vous sont assignés"
         }
         action={
-          <Button onClick={() => primaryClass && navigate("attendance", { classId: primaryClass.id })} disabled={!primaryClass}>
+          <Button
+            onClick={() => primaryClass && navigate("attendance", { classId: primaryClass.id })}
+            disabled={!primaryClass}
+          >
             <UserCheck />
-            Take attendance
+            Faire l’appel
           </Button>
         }
       />
       {selector}
       <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <Metric label="Enrolled" value={String(rosterQuery.data?.length ?? "—")} />
-        <Metric label="Level" value={primaryClass?.level ?? "—"} />
-        <Metric label="Room" value={primaryClass?.room ?? "—"} />
+        <Metric label="Inscrits" value={String(rosterQuery.data?.length ?? "—")} />
+        <Metric label="Niveau" value={primaryClass?.level ?? "—"} />
+        <Metric label="Salle" value={primaryClass?.room ?? "—"} />
       </div>
       <QueryState
         isLoading={classesQuery.isLoading || rosterQuery.isLoading}
         isError={classesQuery.isError || rosterQuery.isError}
         error={(classesQuery.error ?? rosterQuery.error) as Error | null}
         isEmpty={!rosterQuery.data?.length}
-        emptyMessage="No enrolled students in this class yet."
+        emptyMessage="Aucun étudiant inscrit dans ce groupe pour le moment."
       >
         <Surface className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Student</th>
-                <th>Attendance</th>
-                <th>Progress</th>
-                <th>Average</th>
-                <th>Status</th>
+                <th>Étudiant</th>
+                <th>Présence</th>
+                <th>Progression</th>
+                <th>Moyenne</th>
+                <th>Statut</th>
               </tr>
             </thead>
             <tbody>
@@ -180,7 +189,7 @@ function TeacherClass() {
                   </td>
                   <td>{student.average || "—"}%</td>
                   <td>
-                    <Status tone="green">Active</Status>
+                    <Status tone="green">Actif</Status>
                   </td>
                 </tr>
               ))}
@@ -209,7 +218,7 @@ export function DirectorPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "calendar") return <CalendarPage />;
   if (page === "live" || page === "meeting")
     return <LiveClassesPage meeting={page === "meeting"} />;
-  if (page === "messages") return <Messages counterpart="Ahmed Benali" />;
+  if (page === "messages") return <Messages />;
   if (page === "reports") return <DirectorReports />;
   if (page === "settings") return <DirectorSettings />;
   return <PremiumDirectorDashboard />;
@@ -239,6 +248,44 @@ function accountStatusTone(status: AccountStatus): "green" | "amber" | "red" | "
     default:
       return "gray";
   }
+}
+
+function subscriptionLabel(status: Student["subscription"]) {
+  switch (status) {
+    case "PAST_DUE":
+      return "Impayé";
+    case "SUSPENDED":
+      return "Suspendu";
+    default:
+      return "Actif";
+  }
+}
+
+function classStatusLabel(status: string) {
+  switch (status) {
+    case "active":
+      return "Actif";
+    case "planned":
+      return "Planifié";
+    case "completed":
+      return "Terminé";
+    case "archived":
+      return "Archivé";
+    default:
+      return status;
+  }
+}
+
+function adminActionError(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  if (message.includes("FORBIDDEN")) return "Action réservée à l’administration.";
+  if (message.includes("CANNOT_SELF_LOCK"))
+    return "Vous ne pouvez pas verrouiller votre propre compte.";
+  if (message.includes("PROFILE_NOT_FOUND")) return "Profil introuvable.";
+  if (message.includes("duplicate") || message.includes("already exists")) {
+    return "Cet enregistrement existe déjà.";
+  }
+  return message;
 }
 
 function Students() {
@@ -288,7 +335,7 @@ function Students() {
           setDetail({ ...detail, accountStatus: status });
           setConfirmStatus(null);
         },
-        onError: (err) => toast.error(err.message),
+        onError: (err) => toast.error(adminActionError(err)),
       },
     );
   };
@@ -367,7 +414,7 @@ function Students() {
                         setStudentId("");
                         setClassId("");
                       },
-                      onError: (err) => toast.error(err.message),
+                      onError: (err) => toast.error(adminActionError(err)),
                     },
                   )
                 }
@@ -443,15 +490,12 @@ function Students() {
         isError={studentsQuery.isError}
         error={studentsQuery.error}
         isEmpty={!filtered.length}
+        emptyTitle="Aucun étudiant"
         emptyMessage="Aucun étudiant trouvé."
       >
         <div className="space-y-3 md:hidden">
           {filtered.map((student) => (
-            <Surface
-              key={student.id}
-              className="space-y-3 p-4"
-              onClick={() => setDetail(student)}
-            >
+            <Surface key={student.id} className="space-y-3 p-4" onClick={() => setDetail(student)}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate font-semibold">
@@ -486,17 +530,29 @@ function Students() {
             </thead>
             <tbody>
               {filtered.map((student) => (
-                <tr
-                  key={student.id}
-                  className="cursor-pointer"
-                  onClick={() => setDetail(student)}
-                >
+                <tr key={student.id} className="cursor-pointer" onClick={() => setDetail(student)}>
                   <td>
                     <strong>{student.lastName || "—"}</strong>
                   </td>
                   <td>{student.firstName || "—"}</td>
-                  <td>{student.email || "—"}</td>
-                  <td>{student.phone || "—"}</td>
+                  <td onClick={(event) => event.stopPropagation()}>
+                    {student.email ? (
+                      <a className="text-primary underline" href={`mailto:${student.email}`}>
+                        {student.email}
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td onClick={(event) => event.stopPropagation()}>
+                    {student.phone ? (
+                      <a className="text-primary underline" href={`tel:${student.phone}`}>
+                        {student.phone}
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td>{student.level}</td>
                   <td>{student.className}</td>
                   <td>{student.teacherName || "—"}</td>
@@ -567,7 +623,7 @@ function Students() {
               <p>
                 <span className="text-muted-foreground">Abonnement</span>
                 <br />
-                {detail.subscription}
+                {subscriptionLabel(detail.subscription)}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -618,7 +674,10 @@ function Students() {
               <Button variant="outline" onClick={() => setConfirmStatus(null)}>
                 Annuler
               </Button>
-              <Button disabled={setProfileStatus.isPending} onClick={() => applyStatus(confirmStatus)}>
+              <Button
+                disabled={setProfileStatus.isPending}
+                onClick={() => applyStatus(confirmStatus)}
+              >
                 Confirmer
               </Button>
             </div>
@@ -700,6 +759,7 @@ function Classes() {
         isError={classesQuery.isError}
         error={classesQuery.error}
         isEmpty={!classesQuery.data?.length}
+        emptyTitle="Aucun groupe"
         emptyMessage="Aucun groupe pour le moment. Créez le premier."
       >
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -713,7 +773,9 @@ function Classes() {
                 <span className="grid size-10 place-items-center rounded-md bg-secondary font-semibold text-primary">
                   {item.level}
                 </span>
-                <Status tone={item.status === "active" ? "green" : "amber"}>{item.status}</Status>
+                <Status tone={item.status === "active" ? "green" : "amber"}>
+                  {classStatusLabel(item.status)}
+                </Status>
               </div>
               <h2 className="mt-4 text-lg font-semibold">{item.name}</h2>
               <div className="mt-3 space-y-2 text-sm text-muted-foreground">
@@ -794,7 +856,9 @@ function Classes() {
                 Annuler
               </Button>
               <Button
-                disabled={!name.trim() || !levelId || createClass.isPending || updateClass.isPending}
+                disabled={
+                  !name.trim() || !levelId || createClass.isPending || updateClass.isPending
+                }
                 onClick={() => {
                   if (editingId) {
                     updateClass.mutate(
@@ -814,7 +878,7 @@ function Classes() {
                           setOpen(false);
                           resetForm();
                         },
-                        onError: (err) => toast.error(err.message),
+                        onError: (err) => toast.error(adminActionError(err)),
                       },
                     );
                     return;
@@ -834,7 +898,7 @@ function Classes() {
                         setOpen(false);
                         resetForm();
                       },
-                      onError: (err) => toast.error(err.message),
+                      onError: (err) => toast.error(adminActionError(err)),
                     },
                   );
                 }}
@@ -872,8 +936,9 @@ function Classes() {
                   updateClass.mutate(
                     { id: selected.id, patch: { teacher_id: next } },
                     {
-                      onSuccess: () => toast.success(next ? "Professeur associé" : "Professeur retiré"),
-                      onError: (err) => toast.error(err.message),
+                      onSuccess: () =>
+                        toast.success(next ? "Professeur associé" : "Professeur retiré"),
+                      onError: (err) => toast.error(adminActionError(err)),
                     },
                   );
                 }}
@@ -912,7 +977,7 @@ function Classes() {
                         toast.success("Étudiant ajouté au groupe");
                         setAddStudentId("");
                       },
-                      onError: (err) => toast.error(err.message),
+                      onError: (err) => toast.error(adminActionError(err)),
                     },
                   )
                 }
@@ -973,7 +1038,7 @@ function Classes() {
                                 },
                                 {
                                   onSuccess: () => toast.success("Étudiant retiré du groupe"),
-                                  onError: (err) => toast.error(err.message),
+                                  onError: (err) => toast.error(adminActionError(err)),
                                 },
                               );
                             }}
@@ -1050,6 +1115,7 @@ function Teachers() {
         isError={teachersQuery.isError}
         error={teachersQuery.error}
         isEmpty={!filtered.length}
+        emptyTitle="Aucun professeur"
         emptyMessage="Aucun professeur trouvé."
       >
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -1071,7 +1137,9 @@ function Teachers() {
                 </Status>
               </div>
               <h2 className="mt-4 font-semibold">{teacher.name}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{teacher.email || teacher.subject}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {teacher.email || teacher.subject}
+              </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {teacher.levels.length ? (
                   teacher.levels.map((level) => <Status key={level}>{level}</Status>)
@@ -1145,14 +1213,10 @@ function Teachers() {
                       ...(phone.trim() ? { phone: phone.trim() } : {}),
                     },
                     {
-                      onSuccess: (result) => {
-                        if (result && "needsEmailConfirmation" in result) {
-                          toast.success(
-                            "Compte créé. Une confirmation e-mail a été envoyée au professeur.",
-                          );
-                        } else {
-                          toast.success("Professeur créé");
-                        }
+                      onSuccess: () => {
+                        toast.success(
+                          "Professeur créé. Il peut se connecter avec le mot de passe temporaire.",
+                        );
                         setOpen(false);
                         setFirstName("");
                         setLastName("");
@@ -1160,7 +1224,7 @@ function Teachers() {
                         setPhone("");
                         setPassword("");
                       },
-                      onError: (err) => toast.error(err.message),
+                      onError: (err) => toast.error(adminActionError(err)),
                     },
                   )
                 }
@@ -1219,33 +1283,49 @@ function Teachers() {
               {teacherGroups.length ? (
                 <div className="space-y-2">
                   {teacherGroups.map((group) => {
-                    const count = (studentsQuery.data ?? []).filter(
+                    const groupStudents = (studentsQuery.data ?? []).filter(
                       (s) => s.classId === group.id || s.className === group.name,
-                    ).length;
+                    );
                     return (
-                      <Surface key={group.id} className="flex items-center justify-between gap-3 p-3">
-                        <div>
-                          <strong>{group.name}</strong>
-                          <p className="text-sm text-muted-foreground">
-                            {group.level} · {count} étudiant{count > 1 ? "s" : ""}
-                          </p>
+                      <Surface key={group.id} className="space-y-2 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <strong>{group.name}</strong>
+                            <p className="text-sm text-muted-foreground">
+                              {group.level} · {groupStudents.length} étudiant
+                              {groupStudents.length > 1 ? "s" : ""}
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={updateClass.isPending}
+                            onClick={() =>
+                              updateClass.mutate(
+                                { id: group.id, patch: { teacher_id: null } },
+                                {
+                                  onSuccess: () => toast.success("Professeur retiré du groupe"),
+                                  onError: (err) => toast.error(adminActionError(err)),
+                                },
+                              )
+                            }
+                          >
+                            Retirer
+                          </Button>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={updateClass.isPending}
-                          onClick={() =>
-                            updateClass.mutate(
-                              { id: group.id, patch: { teacher_id: null } },
-                              {
-                                onSuccess: () => toast.success("Professeur retiré du groupe"),
-                                onError: (err) => toast.error(err.message),
-                              },
-                            )
-                          }
-                        >
-                          Retirer
-                        </Button>
+                        {groupStudents.length ? (
+                          <ul className="space-y-1 text-sm text-muted-foreground">
+                            {groupStudents.map((student) => (
+                              <li key={student.id}>
+                                {student.lastName} {student.firstName}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            Aucun étudiant dans ce groupe.
+                          </p>
+                        )}
                       </Surface>
                     );
                   })}
@@ -1279,7 +1359,7 @@ function Teachers() {
                         toast.success("Groupe assigné");
                         setAssignClassId("");
                       },
-                      onError: (err) => toast.error(err.message),
+                      onError: (err) => toast.error(adminActionError(err)),
                     },
                   )
                 }
@@ -1299,7 +1379,7 @@ function Teachers() {
                     { profileId: selected.profileId, status: "active" },
                     {
                       onSuccess: () => toast.success("Compte activé"),
-                      onError: (err) => toast.error(err.message),
+                      onError: (err) => toast.error(adminActionError(err)),
                     },
                   );
                 }}
@@ -1316,7 +1396,7 @@ function Teachers() {
                     { profileId: selected.profileId, status: "restricted" },
                     {
                       onSuccess: () => toast.success("Compte restreint"),
-                      onError: (err) => toast.error(err.message),
+                      onError: (err) => toast.error(adminActionError(err)),
                     },
                   );
                 }}
@@ -1333,7 +1413,7 @@ function Teachers() {
                     { profileId: selected.profileId, status: "suspended" },
                     {
                       onSuccess: () => toast.success("Compte suspendu"),
-                      onError: (err) => toast.error(err.message),
+                      onError: (err) => toast.error(adminActionError(err)),
                     },
                   );
                 }}

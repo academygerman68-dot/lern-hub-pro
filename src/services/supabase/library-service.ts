@@ -31,6 +31,7 @@ export const SupabaseLibraryService = {
     audience?: LibraryAudience;
     classId?: string | null;
     levelCode?: string | null;
+    contentKind?: Database["public"]["Enums"]["media_content_kind"];
     language?: string;
     visibility?: LibraryVisibility;
     storagePath: string;
@@ -56,8 +57,14 @@ export const SupabaseLibraryService = {
         category: input.category ?? "course_material",
         domain: input.domain ?? "academic",
         audience,
+        content_kind: input.contentKind ?? "document",
         class_id: audience === "class" ? (input.classId ?? null) : null,
-        level_code: input.levelCode ?? null,
+        level_code:
+          audience === "everyone"
+            ? null
+            : audience === "class"
+              ? (input.levelCode ?? null)
+              : (input.levelCode ?? null),
         language: input.language ?? "de",
         visibility: input.visibility ?? "academy",
         storage_path: input.storagePath,
@@ -82,18 +89,19 @@ export const SupabaseLibraryService = {
     audience?: LibraryAudience;
     classId?: string | null;
     levelCode?: string | null;
+    contentKind?: Database["public"]["Enums"]["media_content_kind"];
     externalUrl?: string | null;
     createdBy?: string | null;
   }) {
     const supabase = requireClient();
-    let storagePath = `external/${crypto.randomUUID()}`;
-    let storageBucket = "library";
+    let storagePath = `resources/external/${crypto.randomUUID()}`;
+    const storageBucket = "library";
     let mimeType: string | null = null;
     let fileSize: number | null = null;
 
     if (input.file) {
       const ext = input.file.name.split(".").pop() ?? "bin";
-      storagePath = `${input.createdBy ?? "staff"}/${crypto.randomUUID()}.${ext}`;
+      storagePath = `resources/${crypto.randomUUID()}.${ext}`;
       const uploadOptions = input.file.type
         ? { upsert: false as const, contentType: input.file.type }
         : { upsert: false as const };
@@ -115,6 +123,7 @@ export const SupabaseLibraryService = {
       ...(input.audience !== undefined ? { audience: input.audience } : {}),
       classId: input.classId ?? null,
       levelCode: input.levelCode ?? null,
+      ...(input.contentKind !== undefined ? { contentKind: input.contentKind } : {}),
       storagePath,
       storageBucket,
       mimeType,

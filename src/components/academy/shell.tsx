@@ -40,10 +40,11 @@ type NavSection = { label?: string; items: NavItem[] };
 const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
   student: [
     {
-      label: "Learning",
+      label: "nav.section.learning",
       items: [
         ["dashboard", "nav.home", Home],
-        ["courses", "nav.learning", BookOpen],
+        ["courses", "nav.courses", BookOpen],
+        ["materials", "nav.materials", Library],
         ["assignments", "nav.assignments", ClipboardCheck],
         ["exams", "nav.exams", FileText],
         ["progress", "nav.progress", BarChart3],
@@ -51,7 +52,7 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
       ],
     },
     {
-      label: "Account",
+      label: "nav.section.account",
       items: [
         ["payments", "nav.payments", CreditCard],
         ["messages", "nav.messages", MessageSquare],
@@ -61,7 +62,7 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
   ],
   teacher: [
     {
-      label: "Teaching",
+      label: "nav.section.teaching",
       items: [
         ["dashboard", "nav.home", Home],
         ["classes", "nav.classes", Users],
@@ -74,7 +75,7 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
       ],
     },
     {
-      label: "Account",
+      label: "nav.section.account",
       items: [
         ["calendar", "nav.calendar", CalendarDays],
         ["messages", "nav.messages", MessageSquare],
@@ -84,7 +85,7 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
   ],
   director: [
     {
-      label: "Academy",
+      label: "nav.section.academy",
       items: [
         ["dashboard", "nav.overview", Home],
         ["students", "nav.students", Users],
@@ -95,7 +96,7 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
       ],
     },
     {
-      label: "Learning",
+      label: "nav.section.learning",
       items: [
         ["assignments", "nav.assignments", ClipboardCheck],
         ["exams", "nav.exams", FileText],
@@ -103,7 +104,7 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
       ],
     },
     {
-      label: "Operations",
+      label: "nav.section.operations",
       items: [
         ["payments", "nav.payments", CreditCard],
         ["calendar", "nav.calendar", CalendarDays],
@@ -185,19 +186,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div key={section.label ?? sectionIndex}>
             {section.label && (
               <p className="mb-2 px-3 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-                {t(
-                  section.label === "Learning"
-                    ? "nav.section.learning"
-                    : section.label === "Account"
-                      ? "nav.section.account"
-                      : section.label === "Teaching"
-                        ? "nav.section.teaching"
-                        : section.label === "Academy"
-                          ? "nav.section.academy"
-                          : section.label === "Operations"
-                            ? "nav.section.operations"
-                            : section.label,
-                )}
+                {t(section.label)}
               </p>
             )}
             <div className="space-y-0.5">

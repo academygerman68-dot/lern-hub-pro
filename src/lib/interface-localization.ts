@@ -281,6 +281,11 @@ const copy: Record<string, Pair> = {
   "Join meeting": ["Rejoindre la réunion", "الانضمام إلى الاجتماع"],
   "End session": ["Terminer la session", "إنهاء الجلسة"],
   "Access restricted": ["Accès restreint", "الوصول مقيد"],
+  "Votre accès à cette fonctionnalité est actuellement restreint. Veuillez contacter l’administration.":
+    [
+      "Votre accès à cette fonctionnalité est actuellement restreint. Veuillez contacter l’administration.",
+      "وصولك إلى هذه الميزة مقيّد حالياً. يرجى التواصل مع الإدارة.",
+    ],
   "Live classes require an active subscription. Open Payments to review your status.": [
     "Les cours en direct nécessitent un abonnement actif. Ouvrez Paiements pour vérifier votre statut.",
     "الدروس المباشرة تتطلب اشتراكاً نشطاً. افتح المدفوعات لمراجعة حالتك.",

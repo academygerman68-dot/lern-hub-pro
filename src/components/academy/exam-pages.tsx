@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  useArchiveExam,
   useAllExams,
   useAcademicAccess,
   useClasses,
@@ -21,7 +22,16 @@ import {
   useStartExam,
   useSubmitExam,
 } from "@/hooks/use-academy-data";
+import { ExamService } from "@/services/academy-services";
 import type { Json } from "@/types/database";
+import {
+  formatFrDate,
+  isValidHttpUrl,
+  MEDIA_KIND_LABELS,
+  validateFileForKind,
+  type MediaKind,
+} from "@/lib/academic-content";
+import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
 import { PageHeader, Status, Surface } from "./primitives";
@@ -86,18 +96,18 @@ function StudentExamCatalog() {
       if (!map.has(attempt.exam_id)) map.set(attempt.exam_id, attempt);
     }
     return map;
-  }, [attemptsQuery.data]);
+  }, [attemptsQuery]);
 
   if (accessQuery.data === false) {
     return (
       <>
-        <PageHeader title="Exams" subtitle="Published mock exams for your level." />
+        <PageHeader title="Examens blancs" subtitle="Examens publiés pour votre niveau." />
         <Surface className="space-y-3 p-6">
-          <h2 className="font-semibold">Access restricted</h2>
+          <h2 className="font-semibold">Accès académique indisponible</h2>
           <p className="text-sm text-muted-foreground">
-            An active subscription is required to take exams.
+            Un abonnement actif est nécessaire pour passer un examen.
           </p>
-          <Button onClick={() => navigate("payments")}>Open payments</Button>
+          <Button onClick={() => navigate("payments")}>Mes paiements</Button>
         </Surface>
       </>
     );
@@ -106,16 +116,16 @@ function StudentExamCatalog() {
   return (
     <>
       <PageHeader
-        title="Exams"
-        subtitle="Published mock exams for your level. Timer and scoring are server-backed."
+        title="Examens blancs"
+        subtitle="Uniquement les examens de votre niveau, avec consignes et documents."
       />
       <QueryState
         isLoading={examsQuery.isLoading}
         isError={examsQuery.isError}
         error={examsQuery.error}
         isEmpty={!examsQuery.data?.length}
-        emptyTitle="No exams available"
-        emptyMessage="Published exams for your level will appear here."
+        emptyTitle="Aucun examen"
+        emptyMessage="Les examens blancs de votre niveau apparaîtront ici."
         onRetry={() => void examsQuery.refetch()}
       >
         <div className="grid gap-4 md:grid-cols-2">
@@ -126,21 +136,56 @@ function StudentExamCatalog() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                      {exam.level?.code ?? "—"} · {exam.duration_minutes} min
+                      {exam.level?.code ?? "—"}
+                      {exam.class?.name ? ` · ${exam.class.name}` : " · Niveau entier"} ·{" "}
+                      {exam.duration_minutes} min · {MEDIA_KIND_LABELS[exam.content_kind]}
                     </p>
                     <h2 className="mt-2 text-xl font-semibold">{exam.title}</h2>
                     <p className="mt-2 text-sm text-muted-foreground">
-                      {exam.description ?? "Mock examination"}
+                      {exam.starts_at
+                        ? `Début ${formatFrDate(exam.starts_at)}`
+                        : "Horaire non précisé"}
+                      {exam.ends_at ? ` · Fin ${formatFrDate(exam.ends_at)}` : ""}
                     </p>
+                    {exam.instructions || exam.description ? (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {exam.instructions || exam.description}
+                      </p>
+                    ) : null}
                   </div>
-                  <Status tone="green">{exam.status}</Status>
+                  <Status tone="green">
+                    {exam.status === "published" ? "Publié" : exam.status}
+                  </Status>
                 </div>
                 {latest && latest.status !== "in_progress" && (
                   <p className="mt-4 text-sm text-muted-foreground">
-                    Last result: {Number(latest.percentage ?? 0).toFixed(0)}% · {latest.status}
+                    Dernier résultat : {Number(latest.percentage ?? 0).toFixed(0)} % ·{" "}
+                    {latest.status === "submitted"
+                      ? "Remis"
+                      : latest.status === "graded"
+                        ? "Corrigé"
+                        : latest.status}
                   </p>
                 )}
                 <div className="mt-5 flex flex-wrap gap-2">
+                  {(exam.content_url || exam.storage_path) && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        void ExamService.getExamMaterialUrl(exam)
+                          .then((url) => {
+                            if (exam.content_kind === "link") {
+                              window.open(url, "_blank", "noopener,noreferrer");
+                              return;
+                            }
+                            window.open(url, "_blank", "noopener,noreferrer");
+                          })
+                          .catch((err: Error) => toast.error(err.message));
+                      }}
+                    >
+                      Ouvrir le document
+                    </Button>
+                  )}
                   <Button
                     disabled={startExam.isPending}
                     onClick={() => {
@@ -153,7 +198,7 @@ function StudentExamCatalog() {
                       });
                     }}
                   >
-                    {latest?.status === "in_progress" ? "Continue exam" : "Start exam"}
+                    {latest?.status === "in_progress" ? "Continuer" : "Commencer"}
                   </Button>
                   {latest && latest.status !== "in_progress" && (
                     <Button
@@ -163,7 +208,7 @@ function StudentExamCatalog() {
                         navigate("exam-result");
                       }}
                     >
-                      View result
+                      Voir le résultat
                     </Button>
                   )}
                 </div>
@@ -228,7 +273,7 @@ function StudentExamRunner() {
     if (attemptQuery.data?.status !== "in_progress") return;
     submitExam.mutate(session.attemptId, {
       onSuccess: () => {
-        toast.message("Time is up — exam submitted");
+        toast.message("Temps écoulé — examen envoyé");
         navigate("exam-result");
       },
     });
@@ -247,9 +292,9 @@ function StudentExamRunner() {
   if (!session.examId || !session.attemptId) {
     return (
       <Surface className="p-8 text-center">
-        <p className="text-muted-foreground">No active exam session.</p>
+        <p className="text-muted-foreground">Aucune session d’examen en cours.</p>
         <Button className="mt-4" onClick={() => navigate("exams")}>
-          Back to exams
+          Retour aux examens
         </Button>
       </Surface>
     );
@@ -261,8 +306,8 @@ function StudentExamRunner() {
       isError={examQuery.isError || attemptQuery.isError}
       error={(examQuery.error ?? attemptQuery.error) as Error | null}
       isEmpty={!current}
-      emptyTitle="Exam unavailable"
-      emptyMessage="This exam has no questions yet."
+      emptyTitle="Examen indisponible"
+      emptyMessage="Cet examen n’a pas encore de questions."
     >
       <div className="mx-auto max-w-5xl">
         <header className="sticky top-0 z-20 mb-6 border-b border-border bg-background/95 py-4 backdrop-blur">
@@ -273,7 +318,7 @@ function StudentExamRunner() {
               className="inline-flex items-center gap-2 text-sm text-muted-foreground"
             >
               <ArrowLeft className="size-4" />
-              Exit
+              Quitter
             </button>
             <div className="min-w-0 flex-1 text-center sm:text-left">
               <p className="truncate text-sm font-medium">{examQuery.data?.title}</p>
@@ -311,8 +356,8 @@ function StudentExamRunner() {
                 </div>
                 <p className="mt-2">
                   {current.media_path
-                    ? "Audio available for this item."
-                    : "Audio file not uploaded yet — answer based on the prompt to continue the demo."}
+                    ? "Fichier audio disponible."
+                    : "Aucun fichier audio — répondez à partir de la consigne."}
                 </p>
               </div>
             )}
@@ -348,7 +393,7 @@ function StudentExamRunner() {
                 <Textarea
                   className="min-h-40"
                   value={answerValue(localAnswers[current.id])}
-                  placeholder="Write your answer…"
+                  placeholder="Saisissez votre réponse…"
                   onChange={(e) => {
                     const value = e.target.value;
                     setLocalAnswers((prev) => ({ ...prev, [current.id]: value }));
@@ -368,14 +413,14 @@ function StudentExamRunner() {
                   disabled={index === 0}
                   onClick={() => setIndex((v) => v - 1)}
                 >
-                  Previous
+                  Précédent
                 </Button>
                 <Button
                   variant="outline"
                   disabled={index >= questions.length - 1}
                   onClick={() => setIndex((v) => v + 1)}
                 >
-                  Next
+                  Suivant
                 </Button>
               </div>
               <div className="flex gap-2">
@@ -389,7 +434,7 @@ function StudentExamRunner() {
                   }}
                 >
                   <Flag className="size-4" />
-                  {flagged[current?.id ?? ""] ? "Flagged" : "Flag"}
+                  {flagged[current?.id ?? ""] ? "Marquée" : "Marquer"}
                 </Button>
                 <Button
                   disabled={submitExam.isPending}
@@ -397,14 +442,14 @@ function StudentExamRunner() {
                     if (!session.attemptId) return;
                     submitExam.mutate(session.attemptId, {
                       onSuccess: () => {
-                        toast.success("Exam submitted");
+                        toast.success("Examen envoyé");
                         navigate("exam-result");
                       },
                       onError: (err) => toast.error(err.message),
                     });
                   }}
                 >
-                  Submit
+                  Envoyer
                 </Button>
               </div>
             </div>
@@ -412,7 +457,7 @@ function StudentExamRunner() {
 
           <Surface className="h-fit p-4">
             <p className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              Navigator
+              Navigation
             </p>
             <div className="grid grid-cols-5 gap-2 sm:grid-cols-4 lg:grid-cols-3">
               {questions.map((q, i) => {
@@ -440,7 +485,9 @@ function StudentExamRunner() {
                 );
               })}
             </div>
-            {saveAnswer.isPending && <p className="mt-3 text-xs text-muted-foreground">Saving…</p>}
+            {saveAnswer.isPending && (
+              <p className="mt-3 text-xs text-muted-foreground">Enregistrement…</p>
+            )}
           </Surface>
         </div>
       </div>
@@ -462,8 +509,8 @@ function StudentExamResult() {
       isError={resultQuery.isError}
       error={resultQuery.error}
       isEmpty={!resultQuery.data}
-      emptyTitle="Result unavailable"
-      emptyMessage="Submit an exam to see your score."
+      emptyTitle="Résultat indisponible"
+      emptyMessage="Envoyez un examen pour voir votre score."
       onRetry={() => void resultQuery.refetch()}
     >
       <div className="mx-auto max-w-4xl">
@@ -473,7 +520,7 @@ function StudentExamResult() {
           className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground"
         >
           <ArrowLeft className="size-4" />
-          Exams
+          Examens blancs
         </button>
         <section className="grid items-center gap-8 rounded-2xl bg-primary p-8 text-primary-foreground md:grid-cols-[auto_1fr] md:p-12">
           <div className="grid size-36 place-items-center rounded-full border-4 border-primary-foreground/20">
@@ -481,15 +528,15 @@ function StudentExamResult() {
           </div>
           <div>
             <p className="text-xs tracking-wide uppercase text-primary-foreground/70">
-              Your result
+              Votre résultat
             </p>
             <h1 className="mt-2 font-display text-3xl md:text-4xl">
-              {resultQuery.data?.passed ? "Passed" : "Needs improvement"}
+              {resultQuery.data?.passed ? "Réussi" : "À améliorer"}
             </h1>
             <p className="mt-3 max-w-lg text-sm leading-6 text-primary-foreground/75">
               {resultQuery.data?.exam?.title} · {resultQuery.data?.correct}/
-              {resultQuery.data?.totalObjective} objective items correct. Writing/speaking may await
-              teacher review.
+              {resultQuery.data?.totalObjective} questions objectives correctes. L’écrit et l’oral
+              peuvent attendre une correction du professeur.
             </p>
           </div>
         </section>
@@ -497,11 +544,13 @@ function StudentExamResult() {
         <div className="mt-10 grid gap-8 md:grid-cols-2">
           <div>
             <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-              Performance by skill
+              Résultats par compétence
             </h2>
             <div className="mt-5 space-y-4">
               {Object.keys(skills).length === 0 && (
-                <p className="text-sm text-muted-foreground">No skill breakdown yet.</p>
+                <p className="text-sm text-muted-foreground">
+                  Aucun détail par compétence pour le moment.
+                </p>
               )}
               {Object.entries(skills).map(([skill, value]) => {
                 const pct = value.max > 0 ? Math.round((value.score / value.max) * 100) : 0;
@@ -527,14 +576,14 @@ function StudentExamResult() {
           <div className="space-y-5">
             <div>
               <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                Next focus
+                Prochaine étape
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Review weaker objective skills, then practice writing with your teacher feedback
-                when available.
+                Revenez sur les compétences les plus faibles, puis entraînez-vous à l’écrit avec les
+                retours de votre professeur.
               </p>
             </div>
-            <Button onClick={() => navigate("courses")}>Continue learning</Button>
+            <Button onClick={() => navigate("courses")}>Continuer les cours</Button>
           </div>
         </div>
       </div>
@@ -546,14 +595,14 @@ export function StaffExamsPage() {
   const examsQuery = useAllExams();
   return (
     <>
-      <PageHeader title="Exams" subtitle="Assessments available to your classes." />
+      <PageHeader title="Examens blancs" subtitle="Examens publiés pour vos groupes." />
       <QueryState
         isLoading={examsQuery.isLoading}
         isError={examsQuery.isError}
         error={examsQuery.error}
         isEmpty={!examsQuery.data?.length}
-        emptyTitle="No exams"
-        emptyMessage="Admin can publish mock exams for each level."
+        emptyTitle="Aucun examen"
+        emptyMessage="L’administration publie les examens blancs par niveau ou par groupe."
         onRetry={() => void examsQuery.refetch()}
       >
         <div className="space-y-3">
@@ -565,10 +614,16 @@ export function StaffExamsPage() {
               <div>
                 <h2 className="font-semibold">{exam.title}</h2>
                 <p className="text-sm text-muted-foreground">
-                  {exam.level?.code} · {exam.duration_minutes} min · pass {exam.pass_percentage}%
+                  {exam.level?.code} · {exam.duration_minutes} min · seuil {exam.pass_percentage} %
                 </p>
               </div>
-              <Status tone={exam.status === "published" ? "green" : "amber"}>{exam.status}</Status>
+              <Status tone={exam.status === "published" ? "green" : "amber"}>
+                {exam.status === "published"
+                  ? "Publié"
+                  : exam.status === "draft"
+                    ? "Brouillon"
+                    : "Archivé"}
+              </Status>
             </Surface>
           ))}
         </div>
@@ -583,10 +638,22 @@ export function DirectorExamsPage() {
   const classesQuery = useClasses();
   const createExam = useCreateExam();
   const publishExam = usePublishExam();
+  const archiveExam = useArchiveExam();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [instructions, setInstructions] = useState("");
   const [levelId, setLevelId] = useState("");
   const [classId, setClassId] = useState("");
+  const [startsAt, setStartsAt] = useState("");
+  const [duration, setDuration] = useState("60");
+  const [attachment, setAttachment] = useState<AttachmentDraft>({
+    kind: "pdf",
+    url: "",
+    file: null,
+  });
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const classesForLevel = (classesQuery.data ?? []).filter(
     (c) => !levelId || c.levelId === levelId,
@@ -595,9 +662,9 @@ export function DirectorExamsPage() {
   return (
     <>
       <PageHeader
-        title="Gestion des examens"
-        subtitle="Créer, publier et gérer les évaluations de l’académie."
-        action={<Button onClick={() => setOpen(true)}>+ Créer un examen</Button>}
+        title="Examens blancs"
+        subtitle="Ciblez un niveau entier ou un groupe de ce niveau."
+        action={<Button onClick={() => setOpen(true)}>+ Créer un examen blanc</Button>}
       />
       <QueryState
         isLoading={examsQuery.isLoading}
@@ -605,40 +672,73 @@ export function DirectorExamsPage() {
         error={examsQuery.error}
         isEmpty={!examsQuery.data?.length}
         emptyTitle="Aucun examen"
-        emptyMessage="Créez un examen pour un niveau CECR."
+        emptyMessage="Créez un examen blanc pour un niveau ou un groupe."
         onRetry={() => void examsQuery.refetch()}
       >
         <div className="space-y-3">
           {examsQuery.data?.map((exam) => (
-            <Surface
-              className="flex flex-wrap items-center justify-between gap-3 p-5"
-              key={exam.id}
-            >
-              <div>
-                <h2 className="font-semibold">{exam.title}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {exam.level?.code} · {exam.duration_minutes} min ·{" "}
-                  {exam.is_mock ? "Blanc" : "Officiel"}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Status tone={exam.status === "published" ? "green" : "amber"}>
-                  {exam.status === "published" ? "Publié" : "Brouillon"}
-                </Status>
-                {exam.status !== "published" && (
+            <Surface className="p-5" key={exam.id}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="font-semibold">{exam.title}</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {exam.level?.code}{" "}
+                    {exam.class?.name ? `· ${exam.class.name}` : "· Niveau entier"} ·{" "}
+                    {exam.duration_minutes} min
+                    {exam.starts_at ? ` · ${formatFrDate(exam.starts_at)}` : ""}
+                    {` · ${MEDIA_KIND_LABELS[exam.content_kind]}`}
+                  </p>
+                  {exam.instructions || exam.description ? (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {exam.instructions || exam.description}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Status tone={exam.status === "published" ? "green" : "amber"}>
+                    {exam.status === "published" ? "Publié" : "Brouillon"}
+                  </Status>
+                  {(exam.content_url || exam.storage_path) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        void ExamService.getExamMaterialUrl(exam)
+                          .then((url) => window.open(url, "_blank", "noopener,noreferrer"))
+                          .catch((err: Error) => toast.error(err.message));
+                      }}
+                    >
+                      Ouvrir
+                    </Button>
+                  )}
+                  {exam.status !== "published" && (
+                    <Button
+                      size="sm"
+                      disabled={publishExam.isPending}
+                      onClick={() =>
+                        publishExam.mutate(exam.id, {
+                          onSuccess: () => toast.success("Examen publié"),
+                          onError: (err) => toast.error(err.message),
+                        })
+                      }
+                    >
+                      Publier
+                    </Button>
+                  )}
                   <Button
                     size="sm"
-                    disabled={publishExam.isPending}
-                    onClick={() =>
-                      publishExam.mutate(exam.id, {
-                        onSuccess: () => toast.success("Examen publié"),
+                    variant="outline"
+                    onClick={() => {
+                      if (!window.confirm(`Supprimer l’examen « ${exam.title} » ?`)) return;
+                      archiveExam.mutate(exam.id, {
+                        onSuccess: () => toast.success("Examen archivé"),
                         onError: (err) => toast.error(err.message),
-                      })
-                    }
+                      });
+                    }}
                   >
-                    Publier
+                    Supprimer
                   </Button>
-                )}
+                </div>
               </div>
             </Surface>
           ))}
@@ -647,73 +747,153 @@ export function DirectorExamsPage() {
 
       {open && (
         <div className="mobile-modal">
-          <Surface className="mobile-modal-panel space-y-4">
-            <h2 className="text-lg font-semibold">Créer un examen</h2>
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Titre de l’examen"
+          <Surface className="mobile-modal-panel max-h-[90dvh] space-y-4 overflow-y-auto">
+            <h2 className="text-lg font-semibold">Créer un examen blanc</h2>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titre" />
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Description (facultative)"
             />
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={levelId}
-              onChange={(e) => {
-                setLevelId(e.target.value);
-                setClassId("");
-              }}
-            >
-              <option value="">Choisir le niveau</option>
-              {(levelsQuery.data ?? []).map((level) => (
-                <option key={level.id} value={level.id}>
-                  {level.code} · {level.name}
-                </option>
-              ))}
-            </select>
-            {classesForLevel.length > 0 && (
+            <Textarea
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              placeholder="Consignes"
+            />
+            <label className="block text-sm">
+              Niveau
               <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={levelId}
+                onChange={(e) => {
+                  setLevelId(e.target.value);
+                  setClassId("");
+                }}
+              >
+                <option value="">Choisir le niveau</option>
+                {(levelsQuery.data ?? []).map((level) => (
+                  <option key={level.id} value={level.id}>
+                    {level.code} · {level.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm">
+              Groupe (facultatif)
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={classId}
                 onChange={(e) => setClassId(e.target.value)}
+                disabled={!levelId}
               >
-                <option value="">Groupe (facultatif)</option>
+                <option value="">Tout le niveau</option>
                 {classesForLevel.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
                   </option>
                 ))}
               </select>
-            )}
+            </label>
+            <label className="block text-sm">
+              Date et heure de début
+              <Input
+                className="mt-1"
+                type="datetime-local"
+                value={startsAt}
+                onChange={(e) => setStartsAt(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm">
+              Durée (minutes)
+              <Input
+                className="mt-1"
+                type="number"
+                min={5}
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+              />
+            </label>
+            <ContentAttachmentUploader
+              kinds={["pdf", "document", "image", "link"]}
+              value={attachment}
+              onChange={setAttachment}
+              disabled={saving}
+              uploading={saving}
+              error={formError}
+              requiredFileWhenNew={false}
+            />
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setOpen(false)}>
                 Annuler
               </Button>
               <Button
-                disabled={!title.trim() || !levelId || createExam.isPending}
+                disabled={!title.trim() || !levelId || saving || createExam.isPending}
                 onClick={() => {
-                  createExam.mutate(
-                    {
-                      title: title.trim(),
-                      levelId,
-                      ...(classId
-                        ? {
-                            description: `Groupe : ${(classesQuery.data ?? []).find((c) => c.id === classId)?.name ?? classId}`,
-                          }
-                        : {}),
-                    },
-                    {
-                      onSuccess: () => {
-                        toast.success("Examen créé en brouillon");
-                        setOpen(false);
-                        setTitle("");
-                        setLevelId("");
-                        setClassId("");
-                      },
-                      onError: (err) => toast.error(err.message),
-                    },
-                  );
+                  void (async () => {
+                    setFormError(null);
+                    const kind = attachment.kind as MediaKind;
+                    if (kind === "link" && attachment.url && !isValidHttpUrl(attachment.url)) {
+                      setFormError("Saisissez une URL valide.");
+                      return;
+                    }
+                    if (attachment.file) {
+                      const fileError = validateFileForKind(attachment.file, kind);
+                      if (fileError) {
+                        setFormError(fileError);
+                        return;
+                      }
+                    }
+                    setSaving(true);
+                    try {
+                      let storageBucket: string | null = null;
+                      let storagePath: string | null = null;
+                      let mimeType: string | null = null;
+                      if (attachment.file && kind !== "link") {
+                        const uploaded = await ExamService.uploadExamMaterial(attachment.file);
+                        storageBucket = uploaded.storageBucket;
+                        storagePath = uploaded.storagePath;
+                        mimeType = uploaded.mimeType;
+                      }
+                      await createExam.mutateAsync({
+                        title: title.trim(),
+                        levelId,
+                        classId: classId || null,
+                        ...(description.trim() ? { description: description.trim() } : {}),
+                        ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
+                        durationMinutes: Number(duration) || 60,
+                        startsAt: startsAt ? new Date(startsAt).toISOString() : null,
+                        endsAt: startsAt
+                          ? new Date(
+                              new Date(startsAt).getTime() + (Number(duration) || 60) * 60_000,
+                            ).toISOString()
+                          : null,
+                        contentKind: kind,
+                        contentUrl: kind === "link" ? attachment.url.trim() || null : null,
+                        storageBucket,
+                        storagePath,
+                        mimeType,
+                        isMock: true,
+                        status: "published",
+                      });
+                      toast.success("Examen blanc publié");
+                      setOpen(false);
+                      setTitle("");
+                      setDescription("");
+                      setInstructions("");
+                      setLevelId("");
+                      setClassId("");
+                      setStartsAt("");
+                      setDuration("60");
+                      setAttachment({ kind: "pdf", url: "", file: null });
+                    } catch (err) {
+                      setFormError(err instanceof Error ? err.message : "Création impossible");
+                    } finally {
+                      setSaving(false);
+                    }
+                  })();
                 }}
               >
-                Créer
+                Publier
               </Button>
             </div>
           </Surface>

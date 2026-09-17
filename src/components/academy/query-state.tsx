@@ -6,8 +6,8 @@ export function QueryState({
   isError,
   error,
   isEmpty,
-  emptyTitle = "Nothing here yet",
-  emptyMessage = "Data will appear once records are available.",
+  emptyTitle = "Rien pour le moment",
+  emptyMessage = "Les données apparaîtront dès que des enregistrements seront disponibles.",
   emptyAction,
   onRetry,
   children,
@@ -35,16 +35,16 @@ export function QueryState({
   if (isError) {
     return (
       <div className="rounded-2xl border border-alert/20 bg-alert-soft/60 p-8">
-        <h3 className="text-base font-semibold text-foreground">Unable to load this view</h3>
+        <h3 className="text-base font-semibold text-foreground">Impossible de charger cette vue</h3>
         <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-          Something went wrong while fetching data. You can retry in a moment.
+          Un problème est survenu lors du chargement. Vous pouvez réessayer dans un instant.
         </p>
         {error?.message && (
-          <p className="mt-3 text-xs text-muted-foreground/80">Reference: request failed</p>
+          <p className="mt-3 text-xs text-muted-foreground/80">Référence : requête en échec</p>
         )}
         {onRetry && (
           <Button className="mt-5" variant="outline" onClick={onRetry}>
-            Try again
+            Réessayer
           </Button>
         )}
       </div>

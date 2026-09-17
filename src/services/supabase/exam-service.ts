@@ -29,6 +29,7 @@ export type ExamDetail = Exam & {
 
 export type ExamListItem = Exam & {
   level: { id: string; code: string; name: string } | null;
+  class: { id: string; name: string } | null;
   question_count?: number;
 };
 
@@ -61,7 +62,9 @@ export const SupabaseExamService = {
   async listPublished(): Promise<ExamListItem[]> {
     const { data, error } = await requireClient()
       .from("exams")
-      .select("*, level:levels!exams_level_id_fkey ( id, code, name )")
+      .select(
+        "*, level:levels!exams_level_id_fkey ( id, code, name ), class:classes!exams_class_id_fkey ( id, name )",
+      )
       .eq("status", "published")
       .order("published_at", { ascending: false });
     if (error) throw error;
@@ -71,7 +74,9 @@ export const SupabaseExamService = {
   async listAll(): Promise<ExamListItem[]> {
     const { data, error } = await requireClient()
       .from("exams")
-      .select("*, level:levels!exams_level_id_fkey ( id, code, name )")
+      .select(
+        "*, level:levels!exams_level_id_fkey ( id, code, name ), class:classes!exams_class_id_fkey ( id, name )",
+      )
       .neq("status", "archived")
       .order("created_at", { ascending: false });
     if (error) throw error;
@@ -118,26 +123,80 @@ export const SupabaseExamService = {
   async createExam(input: {
     title: string;
     description?: string;
+    instructions?: string;
     levelId: string;
+    classId?: string | null;
     durationMinutes?: number;
     passPercentage?: number;
     isMock?: boolean;
+    startsAt?: string | null;
+    endsAt?: string | null;
+    contentKind?: Database["public"]["Enums"]["media_content_kind"];
+    contentUrl?: string | null;
+    storageBucket?: string | null;
+    storagePath?: string | null;
+    mimeType?: string | null;
+    status?: ExamStatus;
   }) {
+    const status = input.status ?? "draft";
     const { data, error } = await requireClient()
       .from("exams")
       .insert({
         title: input.title,
         description: input.description ?? null,
+        instructions: input.instructions ?? null,
         level_id: input.levelId,
+        class_id: input.classId ?? null,
         duration_minutes: input.durationMinutes ?? 30,
         pass_percentage: input.passPercentage ?? 60,
         is_mock: input.isMock ?? true,
-        status: "draft",
+        starts_at: input.startsAt ?? null,
+        ends_at: input.endsAt ?? null,
+        content_kind: input.contentKind ?? "pdf",
+        content_url: input.contentUrl ?? null,
+        storage_bucket: input.storageBucket ?? null,
+        storage_path: input.storagePath ?? null,
+        mime_type: input.mimeType ?? null,
+        status,
+        published_at: status === "published" ? new Date().toISOString() : null,
       })
       .select("*")
       .single();
     if (error) throw error;
     return data;
+  },
+
+  async uploadExamMaterial(file: File) {
+    const supabase = requireClient();
+    const ext = file.name.split(".").pop() ?? "bin";
+    const path = `mock-exams/${crypto.randomUUID()}.${ext}`;
+    const uploadOptions = file.type
+      ? { upsert: false as const, contentType: file.type }
+      : { upsert: false as const };
+    const { error } = await supabase.storage
+      .from("course-materials")
+      .upload(path, file, uploadOptions);
+    if (error) throw error;
+    return {
+      storageBucket: "course-materials" as const,
+      storagePath: path,
+      mimeType: file.type || null,
+    };
+  },
+
+  async getExamMaterialUrl(
+    exam: Pick<Exam, "content_url" | "storage_bucket" | "storage_path">,
+    expiresIn = 3600,
+  ) {
+    if (exam.content_url) return exam.content_url;
+    if (!exam.storage_bucket || !exam.storage_path) {
+      throw new Error("Aucun document disponible");
+    }
+    const { data, error } = await requireClient()
+      .storage.from(exam.storage_bucket)
+      .createSignedUrl(exam.storage_path, expiresIn);
+    if (error) throw error;
+    return data.signedUrl;
   },
 
   async updateExam(id: string, patch: Database["public"]["Tables"]["exams"]["Update"]) {
@@ -248,6 +307,7 @@ export const SupabaseExamService = {
         ? {
             ...exam,
             level: exam.level,
+            class: null,
           }
         : null,
       percentage,

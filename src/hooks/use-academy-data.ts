@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
+import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import {
   AssignmentService,
   AttendanceService,
@@ -20,6 +22,7 @@ import {
   SubscriptionService,
   TeacherService,
 } from "@/services/academy-services";
+import { SupabaseAssignmentService } from "@/services/supabase/assignment-service";
 import type { Json } from "@/types/database";
 import type { Database } from "@/types/database";
 
@@ -142,13 +145,8 @@ export function useCreateEnrollment() {
 export function useUpdateClass() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      id,
-      patch,
-    }: {
-      id: string;
-      patch: Parameters<typeof ClassService.update>[1];
-    }) => ClassService.update(id, patch),
+    mutationFn: ({ id, patch }: { id: string; patch: Parameters<typeof ClassService.update>[1] }) =>
+      ClassService.update(id, patch),
     onSuccess: async (klass) => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: queryKeys.classes.all }),
@@ -286,6 +284,15 @@ export function useAssignments(classId?: string) {
   });
 }
 
+export function useAssignmentRows(classId?: string) {
+  return useQuery({
+    queryKey: classId
+      ? [...queryKeys.assignments.byClass(classId), "rows"]
+      : [...queryKeys.assignments.all, "rows"],
+    queryFn: () => SupabaseAssignmentService.list(classId),
+  });
+}
+
 export function useCreateLesson() {
   const qc = useQueryClient();
   return useMutation({
@@ -321,10 +328,8 @@ export function useCreateCourse() {
 export function useUpdateCourse() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: {
-      id: string;
-      patch: Parameters<typeof CourseService.updateCourse>[1];
-    }) => CourseService.updateCourse(input.id, input.patch),
+    mutationFn: (input: { id: string; patch: Parameters<typeof CourseService.updateCourse>[1] }) =>
+      CourseService.updateCourse(input.id, input.patch),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: queryKeys.courses.all });
     },
@@ -337,6 +342,27 @@ export function useArchiveCourse() {
     mutationFn: (id: string) => CourseService.archiveCourse(id),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: queryKeys.courses.all });
+    },
+  });
+}
+
+export function useDeleteCourse() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => CourseService.deleteCourse(id),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.courses.all });
+      await qc.invalidateQueries({ queryKey: queryKeys.courses.modules });
+    },
+  });
+}
+
+export function useArchiveAssignment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => AssignmentService.archive(id),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.assignments.all });
     },
   });
 }
@@ -367,7 +393,9 @@ export function useCreateAssignment() {
     mutationFn: AssignmentService.create,
     onSuccess: async (_data, vars) => {
       await qc.invalidateQueries({ queryKey: queryKeys.assignments.all });
-      await qc.invalidateQueries({ queryKey: queryKeys.assignments.byClass(vars.classId) });
+      if (vars.classId) {
+        await qc.invalidateQueries({ queryKey: queryKeys.assignments.byClass(vars.classId) });
+      }
     },
   });
 }
@@ -424,12 +452,14 @@ export function useSaveAttendance() {
       records: Array<{ studentId: string; mark: "present" | "absent" | "late" | "excused" }>;
     }) => {
       const existing = await AttendanceService.listSessions(input.classId);
-      const session = existing.find((item) => item.session_date === input.sessionDate) ?? await AttendanceService.openSession({
-        classId: input.classId,
-        sessionDate: input.sessionDate,
-        ...(input.teacherId !== undefined ? { teacherId: input.teacherId } : {}),
-        ...(input.createdBy !== undefined ? { createdBy: input.createdBy } : {}),
-      });
+      const session =
+        existing.find((item) => item.session_date === input.sessionDate) ??
+        (await AttendanceService.openSession({
+          classId: input.classId,
+          sessionDate: input.sessionDate,
+          ...(input.teacherId !== undefined ? { teacherId: input.teacherId } : {}),
+          ...(input.createdBy !== undefined ? { createdBy: input.createdBy } : {}),
+        }));
       await AttendanceService.saveRecords(session.id, input.records);
       return session;
     },
@@ -540,6 +570,19 @@ export function usePublishExam() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => ExamService.publishExam(id),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.exams.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.exams.published }),
+      ]);
+    },
+  });
+}
+
+export function useArchiveExam() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => ExamService.archiveExam(id),
     onSuccess: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: queryKeys.exams.all }),
@@ -747,12 +790,29 @@ export function useLiveSessions(classId?: string) {
   });
 }
 
+export function useLiveSessionsRealtime() {
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const supabase = getSupabase();
+    const channel = supabase
+      .channel("live-sessions-switch")
+      .on("postgres_changes", { event: "*", schema: "public", table: "live_sessions" }, () => {
+        void qc.invalidateQueries({ queryKey: queryKeys.liveSessions.all });
+      })
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [qc]);
+}
+
 export function useLiveSession(id: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.liveSessions.detail(id ?? ""),
     queryFn: () => LiveSessionService.get(id!),
     enabled: Boolean(id),
-    refetchInterval: 10_000,
+    refetchInterval: 8_000,
   });
 }
 
@@ -774,6 +834,32 @@ export function useUpdateLiveSessionStatus() {
   return useMutation({
     mutationFn: (input: { id: string; status: LiveSessionStatus }) =>
       LiveSessionService.updateStatus(input.id, input.status),
+    onSuccess: async (session) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.liveSessions.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.liveSessions.detail(session.id) }),
+      ]);
+    },
+  });
+}
+
+export function useCreateEmergencyZoom() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => LiveSessionService.createEmergencyZoom(id),
+    onSuccess: async (result) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.liveSessions.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.liveSessions.detail(result.session.id) }),
+      ]);
+    },
+  });
+}
+
+export function useRevertLiveSessionToJitsi() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => LiveSessionService.revertToJitsi(id),
     onSuccess: async (session) => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: queryKeys.liveSessions.all }),

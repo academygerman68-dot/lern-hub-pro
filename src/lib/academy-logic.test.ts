@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { authenticate, isPageForRole, isRole, scoreExam } from "./academy-logic";
+import {
+  authenticate,
+  isPageForRole,
+  isRole,
+  isStudentRestrictedAllowedPage,
+  scoreExam,
+  STUDENT_RESTRICTED_MESSAGE,
+} from "./academy-logic";
 
 describe("authenticate", () => {
   it("accepts demo student credentials", () => {
@@ -30,5 +37,24 @@ describe("page guards", () => {
     expect(isRole("director")).toBe(true);
     expect(isPageForRole("student", "calendar")).toBe(true);
     expect(isPageForRole("student", "audit")).toBe(false);
+  });
+});
+
+describe("restricted student access", () => {
+  it("keeps profile, dashboard, payments and messages", () => {
+    expect(isStudentRestrictedAllowedPage("dashboard")).toBe(true);
+    expect(isStudentRestrictedAllowedPage("profile")).toBe(true);
+    expect(isStudentRestrictedAllowedPage("payments")).toBe(true);
+    expect(isStudentRestrictedAllowedPage("messages")).toBe(true);
+  });
+
+  it("blocks academic modules but keeps professional resources", () => {
+    expect(isStudentRestrictedAllowedPage("courses")).toBe(false);
+    expect(isStudentRestrictedAllowedPage("materials")).toBe(true);
+    expect(isStudentRestrictedAllowedPage("assignments")).toBe(false);
+    expect(isStudentRestrictedAllowedPage("exams")).toBe(false);
+    expect(isStudentRestrictedAllowedPage("live")).toBe(false);
+    expect(isStudentRestrictedAllowedPage("progress")).toBe(false);
+    expect(STUDENT_RESTRICTED_MESSAGE).toContain("restreint");
   });
 });

@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, Eye, EyeOff, GraduationCap, Loader2, Shield, UserRound } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  GraduationCap,
+  Loader2,
+  Shield,
+  UserRound,
+} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -20,6 +29,7 @@ import { AuthError } from "@/services/supabase/auth-service";
 import type { Role } from "@/types/academy";
 import { useAcademy } from "./academy-context";
 import { AuthShell, GoogleIcon } from "./auth-shell";
+import { LoginShell } from "./login-shell";
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -35,7 +45,13 @@ function authErrorMessage(
   mode: "signin" | "signup" | "resend",
 ): string {
   const code =
-    error instanceof AuthError ? error.code : error instanceof Error ? error.message : "";
+    error instanceof AuthError
+      ? error.code
+      : error && typeof error === "object" && "code" in error && typeof error.code === "string"
+        ? error.code
+        : error instanceof Error
+          ? error.message
+          : "";
   switch (code) {
     case "EMAIL_NOT_CONFIRMED":
       return l(
@@ -127,7 +143,7 @@ export function Login() {
   const [mode, setMode] = useState<"signin" | "signup" | "check-email">("signin");
   const [pendingEmail, setPendingEmail] = useState("");
   const [show, setShow] = useState(false);
-  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [loginError, setLoginError] = useState<unknown>(null);
   const [loading, setLoading] = useState<"form" | "google" | Role | "resend" | "test" | null>(null);
   const [activeTestEmail, setActiveTestEmail] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -194,11 +210,13 @@ export function Login() {
   };
 
   const onLogin = loginForm.handleSubmit(async (values) => {
+    setLoginError(null);
     setLoading("form");
     try {
       const user = await AuthService.login(values.email, values.password);
       signIn(user);
     } catch (error) {
+      setLoginError(error);
       toast.error(authErrorMessage(error, l, "signin"));
       setLoading(null);
     }
@@ -299,14 +317,19 @@ export function Login() {
     );
   }
 
+  const Shell = mode === "signin" ? LoginShell : AuthShell;
   return (
-    <AuthShell
-      title={mode === "signin" ? t("login.title") : l("Créer un compte", "إنشاء حساب")}
+    <Shell
+      title={
+        mode === "signin"
+          ? l("Heureux de vous retrouver.", "سعداء بعودتك.")
+          : l("Créer un compte", "إنشاء حساب")
+      }
       subtitle={
         mode === "signin"
           ? l(
-              "Choisissez un profil pour tester, ou connectez-vous avec votre compte.",
-              "اختر ملفًا للاختبار، أو سجّل الدخول بحسابك.",
+              "Connectez-vous pour poursuivre votre parcours avec German Academy.",
+              "سجّل دخولك لمواصلة رحلتك مع German Academy.",
             )
           : l(
               "Inscription étudiant uniquement. Les comptes professeur / direction sont créés par l’administration.",
@@ -314,207 +337,163 @@ export function Login() {
             )
       }
     >
-      <div
-        className="mb-6 inline-flex rounded-lg border border-border p-1"
-        role="group"
-        aria-label={l("Mode de connexion", "طريقة الدخول")}
-      >
-        {(
-          [
-            ["signin", l("Se connecter", "تسجيل الدخول")],
-            ["signup", l("Créer un compte", "إنشاء حساب")],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setMode(value)}
-            className={`rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-              mode === value
-                ? "bg-soft-blue text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+      {mode === "signup" && (
+        <div
+          className="mb-6 inline-flex rounded-lg border border-border p-1"
+          role="group"
+          aria-label={l("Mode de connexion", "طريقة الدخول")}
+        >
+          {(
+            [
+              ["signin", l("Se connecter", "تسجيل الدخول")],
+              ["signup", l("Créer un compte", "إنشاء حساب")],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setMode(value)}
+              className={`rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                mode === value
+                  ? "bg-soft-blue text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {mode === "signin" && (
+        <>
+          <form
+            className="gla-login-form"
+            onSubmit={onLogin}
+            noValidate
+            aria-busy={loading === "form"}
           >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {mode === "signin" && testLoginAllowed ? (
-        <>
-          <QuickRoleSections
-            loading={loading === "test"}
-            activeEmail={activeTestEmail}
-            onEnter={(account) => void enterTestAccount(account)}
-            l={l}
-          />
-
-          <div className="my-6 flex items-center gap-3">
-            <span className="h-px flex-1 bg-border" />
-            <span className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-              {l("ou compte personnel", "أو حساب شخصي")}
-            </span>
-            <span className="h-px flex-1 bg-border" />
-          </div>
-
-          {!showEmailForm ? (
-            <div className="space-y-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 w-full"
-                disabled={loading !== null}
-                onClick={() => setShowEmailForm(true)}
-              >
-                {l("E-mail et mot de passe", "البريد وكلمة المرور")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 w-full gap-2"
-                disabled={loading !== null || !isSupabaseConfigured}
-                onClick={() => void google()}
-              >
-                <GoogleIcon />
-                {loading === "google"
-                  ? l("Redirection…", "جارٍ التحويل…")
-                  : l("Continuer avec Google", "المتابعة بواسطة جوجل")}
-              </Button>
-            </div>
-          ) : (
-            <form className="space-y-4" onSubmit={onLogin} noValidate>
-              <label className="block text-sm font-medium">
-                {t("login.email")}
-                <Input
-                  className="mt-2 h-11"
-                  type="email"
-                  autoComplete="email"
-                  {...loginForm.register("email")}
-                />
-                {loginForm.formState.errors.email ? (
-                  <p className="mt-1 text-xs text-alert">
-                    {loginForm.formState.errors.email.message}
-                  </p>
-                ) : null}
-              </label>
-              <label className="block text-sm font-medium">
-                <span className="flex items-center justify-between">
-                  {t("login.password")}
-                  <Link to="/auth/forgot-password" className="text-xs font-medium text-primary">
-                    {t("login.forgot")}
-                  </Link>
-                </span>
-                <div className="relative mt-2">
-                  <Input
-                    className="h-11 pr-11"
-                    type={show ? "text" : "password"}
-                    autoComplete="current-password"
-                    {...loginForm.register("password")}
-                  />
-                  <button
-                    type="button"
-                    className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
-                    onClick={() => setShow((value) => !value)}
-                    aria-label={show ? "Hide password" : "Show password"}
-                  >
-                    {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </button>
-                </div>
-                {loginForm.formState.errors.password ? (
-                  <p className="mt-1 text-xs text-alert">
-                    {loginForm.formState.errors.password.message}
-                  </p>
-                ) : null}
-              </label>
-              <Button className="h-11 w-full" disabled={loading !== null}>
-                {loading === "form" ? t("login.signing") : t("login.submit")}
-                <ArrowRight className="size-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-10 w-full"
-                onClick={() => setShowEmailForm(false)}
-              >
-                {l("Retour aux profils", "العودة إلى الملفات")}
-              </Button>
-            </form>
-          )}
-        </>
-      ) : null}
-
-      {mode === "signin" && !testLoginAllowed ? (
-        <>
-          <form className="space-y-4" onSubmit={onLogin} noValidate>
-            <label className="block text-sm font-medium">
-              {t("login.email")}
+            {loginError !== null && (
+              <div className="gla-login-error gla-login-error-banner" role="alert">
+                <AlertCircle size={16} aria-hidden="true" />
+                <span>{authErrorMessage(loginError, l, "signin")}</span>
+              </div>
+            )}
+            <div className="gla-login-field">
+              <label htmlFor="gla-login-email">{l("Adresse e-mail", "البريد الإلكتروني")}</label>
               <Input
-                className="mt-2 h-11"
+                id="gla-login-email"
+                className="gla-login-input"
                 type="email"
                 autoComplete="email"
+                inputMode="email"
+                placeholder={l("vous@exemple.com", "name@example.com")}
+                dir="ltr"
+                aria-invalid={Boolean(loginForm.formState.errors.email)}
+                aria-describedby={loginForm.formState.errors.email ? "gla-email-error" : undefined}
                 {...loginForm.register("email")}
               />
-              {loginForm.formState.errors.email ? (
-                <p className="mt-1 text-xs text-alert">
-                  {loginForm.formState.errors.email.message}
+              {loginForm.formState.errors.email && (
+                <p id="gla-email-error" className="gla-login-error" role="alert">
+                  {l("Saisissez une adresse e-mail valide.", "أدخل بريدًا إلكترونيًا صالحًا.")}
                 </p>
-              ) : null}
-            </label>
-            <label className="block text-sm font-medium">
-              <span className="flex items-center justify-between">
-                {t("login.password")}
-                <Link to="/auth/forgot-password" className="text-xs font-medium text-primary">
-                  {t("login.forgot")}
-                </Link>
-              </span>
-              <div className="relative mt-2">
+              )}
+            </div>
+            <div className="gla-login-field">
+              <label htmlFor="gla-login-password">{l("Mot de passe", "كلمة المرور")}</label>
+              <div className="gla-login-input-wrap">
                 <Input
-                  className="h-11 pr-11"
+                  id="gla-login-password"
+                  className="gla-login-input gla-login-password"
                   type={show ? "text" : "password"}
                   autoComplete="current-password"
+                  placeholder={l("Votre mot de passe", "كلمة المرور الخاصة بك")}
+                  aria-invalid={Boolean(loginForm.formState.errors.password)}
+                  aria-describedby={
+                    loginForm.formState.errors.password ? "gla-password-error" : undefined
+                  }
                   {...loginForm.register("password")}
                 />
                 <button
                   type="button"
-                  className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
+                  className="gla-login-eye"
                   onClick={() => setShow((value) => !value)}
-                  aria-label={show ? "Hide password" : "Show password"}
+                  aria-controls="gla-login-password"
+                  aria-pressed={show}
+                  aria-label={
+                    show
+                      ? l("Masquer le mot de passe", "إخفاء كلمة المرور")
+                      : l("Afficher le mot de passe", "إظهار كلمة المرور")
+                  }
                 >
-                  {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  {show ? (
+                    <EyeOff size={17} aria-hidden="true" />
+                  ) : (
+                    <Eye size={17} aria-hidden="true" />
+                  )}
                 </button>
               </div>
-              {loginForm.formState.errors.password ? (
-                <p className="mt-1 text-xs text-alert">
-                  {loginForm.formState.errors.password.message}
+              {loginForm.formState.errors.password && (
+                <p id="gla-password-error" className="gla-login-error" role="alert">
+                  {l("Saisissez votre mot de passe.", "أدخل كلمة المرور.")}
                 </p>
-              ) : null}
-            </label>
-            <Button className="h-11 w-full" disabled={loading !== null}>
-              {loading === "form" ? t("login.signing") : t("login.submit")}
-              <ArrowRight className="size-4" />
+              )}
+              <div className="gla-login-forgot">
+                <Link to="/auth/forgot-password">
+                  {l("Mot de passe oublié ?", "نسيت كلمة المرور؟")}
+                </Link>
+              </div>
+            </div>
+            <Button className="gla-login-submit" type="submit" disabled={loading !== null}>
+              {loading === "form" ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                  <span role="status">{l("Connexion en cours…", "جارٍ تسجيل الدخول…")}</span>
+                </>
+              ) : (
+                <>
+                  {l("Se connecter", "تسجيل الدخول")}
+                  <ArrowRight size={16} aria-hidden="true" />
+                </>
+              )}
             </Button>
           </form>
-          <div className="my-6 flex items-center gap-3">
-            <span className="h-px flex-1 bg-border" />
-            <span className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-              {l("ou", "أو")}
-            </span>
-            <span className="h-px flex-1 bg-border" />
-          </div>
+          <div className="gla-login-divider">{l("ou continuer avec", "أو المتابعة بواسطة")}</div>
           <Button
             type="button"
             variant="outline"
-            className="h-11 w-full gap-2"
+            className="gla-login-google"
             disabled={loading !== null || !isSupabaseConfigured}
             onClick={() => void google()}
           >
-            <GoogleIcon />
+            {loading === "google" ? (
+              <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <GoogleIcon />
+            )}
             {loading === "google"
               ? l("Redirection…", "جارٍ التحويل…")
               : l("Continuer avec Google", "المتابعة بواسطة جوجل")}
           </Button>
+          <p className="gla-login-register">
+            {l("Vous découvrez l’académie ?", "جديد في الأكاديمية؟")}
+            <button type="button" disabled={loading !== null} onClick={() => setMode("signup")}>
+              {l("Créer un compte", "إنشاء حساب")}
+            </button>
+          </p>
+          {testLoginAllowed && (
+            <details className="gla-login-tests">
+              <summary>{l("Accès de démonstration", "الدخول التجريبي")}</summary>
+              <QuickRoleSections
+                loading={loading !== null}
+                activeEmail={activeTestEmail}
+                onEnter={(account) => void enterTestAccount(account)}
+                l={l}
+              />
+            </details>
+          )}
         </>
-      ) : null}
+      )}
 
       {mode === "signup" ? (
         <>
@@ -687,7 +666,9 @@ export function Login() {
         </div>
       ) : null}
 
-      <p className="mt-8 text-center text-xs text-muted-foreground">{t("login.footer")}</p>
-    </AuthShell>
+      {mode !== "signin" && (
+        <p className="mt-8 text-center text-xs text-muted-foreground">{t("login.footer")}</p>
+      )}
+    </Shell>
   );
 }

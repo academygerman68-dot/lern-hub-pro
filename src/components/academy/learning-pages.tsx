@@ -297,10 +297,7 @@ export function DirectorCoursesPage() {
                       let url: string | null = contentKind === "link" ? contentUrl.trim() : null;
 
                       if (file && contentKind !== "none" && contentKind !== "link") {
-                        const uploaded = await CourseService.uploadCourseMaterial(
-                          file,
-                          user?.id ?? null,
-                        );
+                        const uploaded = await CourseService.uploadCourseMaterial(file);
                         storageBucket = uploaded.storageBucket;
                         storagePath = uploaded.storagePath;
                         mimeType = uploaded.mimeType;
@@ -921,10 +918,10 @@ export function TeacherAssignmentsPage() {
 
   return (
     <>
-      <PageHeader title="Assignments" subtitle="Publish real class assignments to Supabase." />
+      <PageHeader title="Devoirs" subtitle="Publiez des devoirs pour vos groupes." />
       <Surface className="mb-5 space-y-3 p-5">
         <Input
-          placeholder="Assignment title"
+          placeholder="Titre du devoir"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
@@ -933,7 +930,7 @@ export function TeacherAssignmentsPage() {
           value={classId}
           onChange={(e) => setClassId(e.target.value)}
         >
-          <option value="">Select class</option>
+          <option value="">Choisir le groupe</option>
           {(classesQuery.data ?? []).map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
@@ -946,10 +943,17 @@ export function TeacherAssignmentsPage() {
           disabled={!title.trim() || !instructions.trim() || !classId || create.isPending || (!!dueAt && new Date(dueAt).getTime() <= Date.now())}
           onClick={() => {
             create.mutate(
-              { classId, title: title.trim(), instructions: instructions.trim(), dueAt: dueAt ? new Date(dueAt).toISOString() : null, status: "published" },
+              {
+                classId,
+                levelId: classesQuery.data?.find((c) => c.id === classId)?.levelId ?? "",
+                title: title.trim(),
+                instructions: instructions.trim(),
+                dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+                status: "published",
+              },
               {
                 onSuccess: () => {
-                  toast.success("Assignment published");
+                  toast.success("Devoir publié");
                   setTitle(""); setInstructions(""); setDueAt("");
                   void listQuery.refetch();
                 },
@@ -958,7 +962,7 @@ export function TeacherAssignmentsPage() {
             );
           }}
         >
-          Create & publish
+          Créer et publier
         </Button>
       </Surface>
       <QueryState
@@ -966,8 +970,8 @@ export function TeacherAssignmentsPage() {
         isError={listQuery.isError}
         error={listQuery.error}
         isEmpty={!listQuery.data?.length}
-        emptyTitle="No assignments"
-        emptyMessage="Create an assignment for a class."
+        emptyTitle="Aucun devoir"
+        emptyMessage="Créez un devoir pour un groupe."
         onRetry={() => void listQuery.refetch()}
       >
         <div className="space-y-3">
@@ -976,7 +980,7 @@ export function TeacherAssignmentsPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h2 className="font-semibold">{item.title}</h2>
-                  <p className="text-sm text-muted-foreground">Due {item.due}</p>
+                  <p className="text-sm text-muted-foreground">Limite {item.due}</p>
                 </div>
                 <Button variant="outline" onClick={() => setGradingId(gradingId === item.id ? null : item.id)}>{gradingId === item.id ? "Fermer les remises" : "Voir et corriger les remises"}</Button>
               </div>
@@ -1124,10 +1128,7 @@ export function DirectorAssignmentsPage() {
                       let attachmentBucket: string | null = null;
                       let attachmentPath: string | null = null;
                       if (file) {
-                        const uploaded = await AssignmentService.uploadAttachment(
-                          file,
-                          user?.id ?? null,
-                        );
+                        const uploaded = await AssignmentService.uploadAttachment(file);
                         attachmentBucket = uploaded.attachmentBucket;
                         attachmentPath = uploaded.attachmentPath;
                       }
@@ -1138,6 +1139,7 @@ export function DirectorAssignmentsPage() {
                       const desc = descParts.join("\n");
                       await create.mutateAsync({
                         classId,
+                        levelId: selectedClass?.levelId ?? "",
                         title: title.trim(),
                         ...(desc ? { description: desc } : {}),
                         ...(description.trim() ? { instructions: description.trim() } : {}),

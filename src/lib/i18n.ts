@@ -19,7 +19,7 @@ const fr = {
   "nav.learning": "Apprentissage",
   "nav.live": "Direct",
   "nav.assignments": "Devoirs",
-  "nav.exams": "Examens",
+  "nav.exams": "Examens blancs",
   "nav.progress": "Progression",
   "nav.payments": "Paiements",
   "nav.messages": "Messages",

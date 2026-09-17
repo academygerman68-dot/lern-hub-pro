@@ -151,10 +151,25 @@ export const SupabaseCurriculumService = {
     return this.updateCourse(id, { status: "archived" });
   },
 
-  async uploadCourseMaterial(file: File, createdBy?: string | null) {
+  async deleteCourse(id: string) {
+    const supabase = requireClient();
+    const { data: course, error: readError } = await supabase
+      .from("courses")
+      .select("storage_bucket, storage_path")
+      .eq("id", id)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (course?.storage_bucket && course.storage_path) {
+      await supabase.storage.from(course.storage_bucket).remove([course.storage_path]);
+    }
+    const { error } = await supabase.from("courses").delete().eq("id", id);
+    if (error) throw error;
+  },
+
+  async uploadCourseMaterial(file: File, folder = "courses") {
     const supabase = requireClient();
     const ext = file.name.split(".").pop() ?? "bin";
-    const path = `${createdBy ?? "staff"}/${crypto.randomUUID()}.${ext}`;
+    const path = `${folder}/${crypto.randomUUID()}.${ext}`;
     const uploadOptions = file.type
       ? { upsert: false as const, contentType: file.type }
       : { upsert: false as const };
