@@ -1,5 +1,12 @@
 export type VideoProvider = "jitsi" | "zoom";
 
+export type LiveJoinTargetLike = {
+  provider: VideoProvider | string;
+  url: string | null;
+  room: string | null;
+  start_url: string | null;
+};
+
 export function isZoomActive(provider: string | null | undefined) {
   return provider === "zoom";
 }
@@ -66,4 +73,51 @@ export function isValidZoomMeetingUrl(value: string) {
 
 export function openExternalMeeting(url: string) {
   window.open(url, "_blank", "noopener,noreferrer");
+}
+
+/** True when the session window is over (status or end time + grace). */
+export function isLiveSessionExpired(
+  session: {
+    status: string;
+    starts_at: string;
+    ends_at?: string | null;
+  },
+  now = Date.now(),
+  graceMs = 15 * 60_000,
+) {
+  if (session.status === "completed" || session.status === "cancelled") return true;
+  const start = new Date(session.starts_at).getTime();
+  const end = session.ends_at
+    ? new Date(session.ends_at).getTime()
+    : start + 2 * 3600_000;
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return true;
+  return now > end + graceMs;
+}
+
+/** Resolve Zoom start/join URL for the current viewer. */
+export function zoomHrefForViewer(target: LiveJoinTargetLike, isStaff: boolean) {
+  return isStaff ? target.start_url || target.url : target.url;
+}
+
+/**
+ * Join a live session via the joinTarget RPC first.
+ * Zoom opens externally; Jitsi delegates to onJitsi. Never mounts Jitsi for Zoom.
+ */
+export async function joinLiveSession(
+  sessionId: string,
+  options: {
+    isStaff: boolean;
+    onJitsi: (id: string) => void;
+    resolveTarget: (id: string) => Promise<LiveJoinTargetLike>;
+  },
+): Promise<"zoom" | "jitsi"> {
+  const target = await options.resolveTarget(sessionId);
+  if (target.provider === "zoom") {
+    const href = zoomHrefForViewer(target, options.isStaff);
+    if (!href) throw new Error("La réunion Zoom n’est pas encore prête.");
+    openExternalMeeting(href);
+    return "zoom";
+  }
+  options.onJitsi(sessionId);
+  return "jitsi";
 }

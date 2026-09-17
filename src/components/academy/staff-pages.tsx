@@ -1,22 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   useClassRoster,
+  useClassSchedules,
   useClasses,
   useCreateClass,
   useCreateEnrollment,
   useCreateTeacher,
   useEnrollmentsByClass,
+  useGenerateMonthSessions,
   useLevels,
+  usePendingProfiles,
   useRemoveEnrollment,
+  useReplaceClassSchedules,
   useSetProfileStatus,
   useStudents,
   useTeachers,
   useUpdateClass,
 } from "@/hooks/use-academy-data";
+import { WEEKDAY_OPTIONS } from "@/services/supabase/class-schedule-service";
 import type { AccountStatus, AcademyPage, Level, Student } from "@/types/academy";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
@@ -28,6 +33,7 @@ import {
   DirectorReports,
   DirectorSettings,
   Messages,
+  RecordingsPage,
   TeacherProfile,
 } from "./student-extra";
 import {
@@ -46,6 +52,11 @@ import { FinancePages } from "./finance-pages";
 import { useClassSelection } from "./class-selection";
 import { AuditPage } from "./workflow-pages";
 
+function trimTime(value: string | null | undefined) {
+  if (!value) return "21:00";
+  return value.slice(0, 5);
+}
+
 export function TeacherPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   const { page: contextPage } = useAcademy();
   const page = pageProp ?? contextPage;
@@ -59,6 +70,7 @@ export function TeacherPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "exams") return <StaffExamsPage />;
   if (page === "live" || page === "meeting")
     return <LiveClassesPage meeting={page === "meeting"} />;
+  if (page === "recordings") return <RecordingsPage />;
   if (page === "messages") return <Messages />;
   if (page === "profile") return <TeacherProfile />;
   return <PremiumTeacherDashboard />;
@@ -218,6 +230,7 @@ export function DirectorPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "calendar") return <CalendarPage />;
   if (page === "live" || page === "meeting")
     return <LiveClassesPage meeting={page === "meeting"} />;
+  if (page === "recordings") return <RecordingsPage />;
   if (page === "messages") return <Messages />;
   if (page === "reports") return <DirectorReports />;
   if (page === "settings") return <DirectorSettings />;
@@ -226,6 +239,8 @@ export function DirectorPages({ page: pageProp }: { page?: AcademyPage } = {}) {
 
 function accountStatusLabel(status: AccountStatus) {
   switch (status) {
+    case "pending":
+      return "En attente";
     case "restricted":
       return "Restreint";
     case "suspended":
@@ -241,6 +256,7 @@ function accountStatusTone(status: AccountStatus): "green" | "amber" | "red" | "
   switch (status) {
     case "active":
       return "green";
+    case "pending":
     case "restricted":
       return "amber";
     case "suspended":
@@ -301,6 +317,7 @@ function Students() {
   const [classId, setClassId] = useState("");
   const [confirmStatus, setConfirmStatus] = useState<AccountStatus | null>(null);
 
+  const pendingQuery = usePendingProfiles();
   const studentsQuery = useStudents(query);
   const allStudents = useStudents();
   const classesQuery = useClasses();
@@ -325,6 +342,16 @@ function Students() {
     ),
   ).sort();
 
+  const applyPendingStatus = (profileId: string, status: AccountStatus, label: string) => {
+    setProfileStatus.mutate(
+      { profileId, status },
+      {
+        onSuccess: () => toast.success(label),
+        onError: (err) => toast.error(adminActionError(err)),
+      },
+    );
+  };
+
   const applyStatus = (status: AccountStatus) => {
     if (!detail?.profileId) return;
     setProfileStatus.mutate(
@@ -347,6 +374,64 @@ function Students() {
         subtitle={`${filtered.length} apprenant${filtered.length > 1 ? "s" : ""} dans l’académie.`}
         action={<Button onClick={() => setEnrollmentOpen(true)}>+ Inscrire dans un groupe</Button>}
       />
+
+      {(pendingQuery.data?.length ?? 0) > 0 && (
+        <Surface className="mb-5 space-y-3 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-semibold">Comptes en attente de validation</h2>
+            <Status tone="amber">{pendingQuery.data?.length ?? 0}</Status>
+          </div>
+          <div className="space-y-2">
+            {pendingQuery.data?.map((profile) => (
+              <div
+                key={profile.id}
+                className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="font-medium">
+                    {profile.first_name} {profile.last_name}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {profile.email}
+                    {profile.phone ? ` · ${profile.phone}` : ""}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    disabled={setProfileStatus.isPending}
+                    onClick={() =>
+                      applyPendingStatus(profile.id, "active", "Compte accepté · actif")
+                    }
+                  >
+                    Accepter
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={setProfileStatus.isPending}
+                    onClick={() =>
+                      applyPendingStatus(profile.id, "archived", "Compte refusé · archivé")
+                    }
+                  >
+                    Refuser
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={setProfileStatus.isPending}
+                    onClick={() =>
+                      applyPendingStatus(profile.id, "suspended", "Compte suspendu")
+                    }
+                  >
+                    Suspendre
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Surface>
+      )}
 
       {enrollmentOpen && (
         <div className="mobile-modal">
@@ -408,8 +493,13 @@ function Students() {
                   enroll.mutate(
                     { studentId, classId },
                     {
-                      onSuccess: () => {
-                        toast.success("Inscription enregistrée");
+                      onSuccess: (result) => {
+                        const moved = result.movedFromClassNames ?? [];
+                        toast.success(
+                          moved.length > 0
+                            ? `Inscription enregistrée (retiré de ${moved.join(", ")})`
+                            : "Inscription enregistrée",
+                        );
                         setEnrollmentOpen(false);
                         setStudentId("");
                         setClassId("");
@@ -479,6 +569,7 @@ function Students() {
         >
           <option value="">Tous les statuts</option>
           <option value="active">Actif</option>
+          <option value="pending">En attente</option>
           <option value="restricted">Restreint</option>
           <option value="suspended">Suspendu</option>
           <option value="archived">Archivé</option>
@@ -697,6 +788,8 @@ function Classes() {
   const updateClass = useUpdateClass();
   const createEnrollment = useCreateEnrollment();
   const removeEnrollment = useRemoveEnrollment();
+  const replaceSchedules = useReplaceClassSchedules();
+  const generateMonth = useGenerateMonthSessions();
 
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -707,12 +800,24 @@ function Classes() {
   const [schedule, setSchedule] = useState("");
   const [room, setRoom] = useState("");
   const [addStudentId, setAddStudentId] = useState("");
+  const [weekdayDraft, setWeekdayDraft] = useState<number[]>([]);
+  const [startTimeDraft, setStartTimeDraft] = useState("21:00");
+  const [endTimeDraft, setEndTimeDraft] = useState("23:00");
 
   const rosterQuery = useClassRoster(selectedId);
   const enrollmentsQuery = useEnrollmentsByClass(selectedId);
+  const schedulesQuery = useClassSchedules(selectedId);
   const levelOptions = levelsQuery.data ?? [];
   const teacherOptions = teachersQuery.data ?? [];
   const selected = classesQuery.data?.find((item) => item.id === selectedId) ?? null;
+
+  useEffect(() => {
+    const rows = schedulesQuery.data ?? [];
+    if (!selectedId || schedulesQuery.isLoading) return;
+    setWeekdayDraft(rows.map((r) => r.weekday));
+    setStartTimeDraft(trimTime(rows[0]?.start_time) || "21:00");
+    setEndTimeDraft(trimTime(rows[0]?.end_time) || "23:00");
+  }, [selectedId, schedulesQuery.data, schedulesQuery.isLoading]);
 
   const resetForm = () => {
     setName("");
@@ -745,6 +850,51 @@ function Classes() {
       (e) => e.student_id === studentId && e.status === "active",
     );
     return row?.id;
+  };
+
+  const toggleWeekday = (day: number) => {
+    setWeekdayDraft((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort(),
+    );
+  };
+
+  const saveSchedules = (weekdays: number[]) => {
+    if (!selected) return;
+    replaceSchedules.mutate(
+      {
+        classId: selected.id,
+        weekdays,
+        startTime: startTimeDraft,
+        endTime: endTimeDraft,
+      },
+      {
+        onSuccess: () => {
+          toast.success(
+            weekdays.length === 0 ? "Créneaux retirés" : "Créneaux du groupe mis à jour",
+          );
+          if (weekdays.length > 0) {
+            const now = new Date();
+            generateMonth.mutate(
+              {
+                classId: selected.id,
+                year: now.getFullYear(),
+                month: now.getMonth() + 1,
+              },
+              {
+                onSuccess: (count) =>
+                  toast.success(
+                    typeof count === "number"
+                      ? `${count} séance(s) du mois générée(s)`
+                      : "Séances du mois régénérées",
+                  ),
+                onError: (err) => toast.error(adminActionError(err)),
+              },
+            );
+          }
+        },
+        onError: (err) => toast.error(adminActionError(err)),
+      },
+    );
   };
 
   return (
@@ -840,7 +990,7 @@ function Classes() {
               ))}
             </select>
             <Input
-              placeholder="Horaires"
+              placeholder="Horaires (libellé libre, optionnel)"
               value={schedule}
               onChange={(e) => setSchedule(e.target.value)}
             />
@@ -952,6 +1102,80 @@ function Classes() {
               </select>
             </label>
 
+            <div className="space-y-3 rounded-md border border-border p-3">
+              <div>
+                <h3 className="text-sm font-semibold">Créneaux hebdomadaires</h3>
+                <p className="text-xs text-muted-foreground">
+                  Sélectionnez les jours du groupe, ou retirez tous les créneaux.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {WEEKDAY_OPTIONS.map((day) => {
+                  const active = weekdayDraft.includes(day.value);
+                  return (
+                    <Button
+                      key={day.value}
+                      type="button"
+                      size="sm"
+                      variant={active ? "default" : "outline"}
+                      onClick={() => toggleWeekday(day.value)}
+                    >
+                      {day.label}
+                    </Button>
+                  );
+                })}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs text-muted-foreground">
+                  Début
+                  <Input
+                    className="mt-1"
+                    type="time"
+                    value={startTimeDraft}
+                    onChange={(e) => setStartTimeDraft(e.target.value)}
+                  />
+                </label>
+                <label className="text-xs text-muted-foreground">
+                  Fin
+                  <Input
+                    className="mt-1"
+                    type="time"
+                    value={endTimeDraft}
+                    onChange={(e) => setEndTimeDraft(e.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  disabled={
+                    weekdayDraft.length === 0 ||
+                    replaceSchedules.isPending ||
+                    generateMonth.isPending
+                  }
+                  onClick={() => saveSchedules(weekdayDraft)}
+                >
+                  Enregistrer les créneaux
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={replaceSchedules.isPending}
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        "Retirer tous les créneaux hebdomadaires de ce groupe ?",
+                      )
+                    ) {
+                      return;
+                    }
+                    setWeekdayDraft([]);
+                    saveSchedules([]);
+                  }}
+                >
+                  Retirer les créneaux
+                </Button>
+              </div>
+            </div>
+
             <div className="flex flex-wrap gap-2">
               <select
                 className="h-10 min-w-48 flex-1 rounded-md border border-input bg-background px-3 text-sm"
@@ -964,6 +1188,9 @@ function Classes() {
                   .map((student) => (
                     <option key={student.id} value={student.id}>
                       {student.lastName} {student.firstName}
+                      {student.className && student.className !== "—"
+                        ? ` · actuel : ${student.className}`
+                        : ""}
                     </option>
                   ))}
               </select>
@@ -973,8 +1200,13 @@ function Classes() {
                   createEnrollment.mutate(
                     { studentId: addStudentId, classId: selected.id },
                     {
-                      onSuccess: () => {
-                        toast.success("Étudiant ajouté au groupe");
+                      onSuccess: (result) => {
+                        const moved = result.movedFromClassNames ?? [];
+                        toast.success(
+                          moved.length > 0
+                            ? `Étudiant ajouté (retiré de ${moved.join(", ")})`
+                            : "Étudiant ajouté au groupe",
+                        );
                         setAddStudentId("");
                       },
                       onError: (err) => toast.error(adminActionError(err)),
@@ -1014,7 +1246,7 @@ function Classes() {
                         <td>{student.level}</td>
                         <td>
                           <Button
-                            variant="outline"
+                            variant="destructive"
                             size="sm"
                             disabled={removeEnrollment.isPending}
                             onClick={() => {

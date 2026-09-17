@@ -215,4 +215,73 @@ export const SupabaseLiveSessionService = {
     if (error) throw error;
     return data as LiveSessionListItem;
   },
+
+  async generateMonthSessions(classId: string, year: number, month: number) {
+    if (!classId) throw new Error("Le groupe est obligatoire.");
+    if (!Number.isInteger(year) || year < 2000) throw new Error("Année invalide.");
+    if (!Number.isInteger(month) || month < 1 || month > 12) throw new Error("Mois invalide.");
+    const { data, error } = await requireClient().rpc("generate_class_month_sessions", {
+      p_class_id: classId,
+      p_year: year,
+      p_month: month,
+    });
+    if (error) throw error;
+    return typeof data === "number" ? data : Number(data ?? 0);
+  },
+
+  async listParticipants(sessionId: string) {
+    const { data, error } = await requireClient()
+      .from("live_session_participants")
+      .select(
+        `
+        session_id,
+        profile_id,
+        added_by,
+        created_at,
+        profile:profiles!live_session_participants_profile_id_fkey (
+          id, first_name, last_name, email
+        )
+      `,
+      )
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  async addParticipant(sessionId: string, profileId: string, addedBy?: string | null) {
+    const { data, error } = await requireClient()
+      .from("live_session_participants")
+      .upsert(
+        {
+          session_id: sessionId,
+          profile_id: profileId,
+          added_by: addedBy ?? null,
+        },
+        { onConflict: "session_id,profile_id" },
+      )
+      .select(
+        `
+        session_id,
+        profile_id,
+        added_by,
+        created_at,
+        profile:profiles!live_session_participants_profile_id_fkey (
+          id, first_name, last_name, email
+        )
+      `,
+      )
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async removeParticipant(sessionId: string, profileId: string) {
+    const { error } = await requireClient()
+      .from("live_session_participants")
+      .delete()
+      .eq("session_id", sessionId)
+      .eq("profile_id", profileId);
+    if (error) throw error;
+  },
 };

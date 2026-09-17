@@ -33,7 +33,7 @@ describe("jitsi-config", () => {
     expect(() => validateLiveSessionSchedule("2026-09-16T15:00:00Z", null)).not.toThrow();
   });
 
-  it("opens student access 15 minutes before the meeting", () => {
+  it("blocks students until the créneau starts", () => {
     const startsAt = "2026-09-16T12:00:00.000Z";
     expect(
       getLiveSessionJoinState({
@@ -41,7 +41,7 @@ describe("jitsi-config", () => {
         endsAt: "2026-09-16T14:00:00.000Z",
         status: "scheduled",
         isStaff: false,
-        now: new Date("2026-09-16T11:44:59.000Z").getTime(),
+        now: new Date("2026-09-16T11:59:59.000Z").getTime(),
       }).reason,
     ).toBe("too_early");
     expect(
@@ -50,7 +50,7 @@ describe("jitsi-config", () => {
         endsAt: "2026-09-16T14:00:00.000Z",
         status: "scheduled",
         isStaff: false,
-        now: new Date("2026-09-16T11:45:00.000Z").getTime(),
+        now: new Date("2026-09-16T12:00:00.000Z").getTime(),
       }).allowed,
     ).toBe(true);
   });

@@ -26,7 +26,7 @@ const tokenErrors: Record<string, string> = {
   JAAS_SIGNING_FAILED: "La clé privée JaaS configurée dans Supabase est invalide.",
   SESSION_ACCESS_DENIED: "Vous n’êtes pas autorisé à rejoindre cette séance.",
   SESSION_CLOSED: "Cette séance est terminée ou annulée.",
-  SESSION_TOO_EARLY: "La salle ouvre 15 minutes avant le début de la séance.",
+  SESSION_TOO_EARLY: "La réunion n’est accessible qu’à partir de l’heure de début du créneau.",
   SESSION_ENDED: "La période d’accès à cette séance est terminée.",
   PROFILE_INACTIVE: "Votre compte n’est pas actif.",
   STUDENT_RECORD_MISSING: "Votre dossier étudiant est introuvable.",

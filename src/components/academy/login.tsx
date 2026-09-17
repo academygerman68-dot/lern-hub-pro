@@ -165,7 +165,6 @@ export function Login() {
       phone: "",
       password: "",
       confirmPassword: "",
-      role: "student",
     },
   });
 
@@ -230,8 +229,7 @@ export function Login() {
         password: values.password,
         firstName: values.firstName,
         lastName: values.lastName,
-        role: values.role,
-        ...(values.phone?.trim() ? { phone: values.phone.trim() } : {}),
+        phone: values.phone.trim(),
       });
       if ("needsEmailConfirmation" in result) {
         setPendingEmail(result.email);
@@ -498,37 +496,12 @@ export function Login() {
       {mode === "signup" ? (
         <>
           <form className="space-y-4" onSubmit={onSignup} noValidate>
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">{l("Type de compte", "نوع الحساب")}</legend>
-              <div className="grid gap-2 sm:grid-cols-3">
-                {(
-                  [
-                    ["student", "Étudiant", "طالب"],
-                    ["teacher", "Professeur", "أستاذ"],
-                    ["admin", "Admin", "إدارة"],
-                  ] as const
-                ).map(([value, fr, ar]) => {
-                  const selected = signupForm.watch("role") === value;
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      className={`rounded-lg border px-3 py-2.5 text-left text-sm transition ${
-                        selected
-                          ? "border-primary bg-primary/5 font-medium text-foreground"
-                          : "border-border bg-background text-muted-foreground hover:border-primary/40"
-                      }`}
-                      onClick={() => signupForm.setValue("role", value, { shouldValidate: true })}
-                    >
-                      {l(fr, ar)}
-                    </button>
-                  );
-                })}
-              </div>
-              {signupForm.formState.errors.role ? (
-                <p className="text-xs text-alert">{signupForm.formState.errors.role.message}</p>
-              ) : null}
-            </fieldset>
+            <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              {l(
+                "Inscription étudiant. Votre compte sera activé après validation par l’administration.",
+                "تسجيل طالب. سيتم تفعيل حسابك بعد موافقة الإدارة.",
+              )}
+            </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block text-sm font-medium">
                 {l("Prénom", "الاسم")}
@@ -571,22 +544,20 @@ export function Login() {
                 </p>
               ) : null}
             </label>
-            {signupForm.watch("role") === "student" ? (
-              <label className="block text-sm font-medium">
-                {l("Téléphone", "الهاتف")}
-                <Input
-                  className="mt-2 h-11"
-                  type="tel"
-                  autoComplete="tel"
-                  {...signupForm.register("phone")}
-                />
-                {signupForm.formState.errors.phone ? (
-                  <p className="mt-1 text-xs text-alert">
-                    {signupForm.formState.errors.phone.message}
-                  </p>
-                ) : null}
-              </label>
-            ) : null}
+            <label className="block text-sm font-medium">
+              {l("Téléphone", "الهاتف")}
+              <Input
+                className="mt-2 h-11"
+                type="tel"
+                autoComplete="tel"
+                {...signupForm.register("phone")}
+              />
+              {signupForm.formState.errors.phone ? (
+                <p className="mt-1 text-xs text-alert">
+                  {signupForm.formState.errors.phone.message}
+                </p>
+              ) : null}
+            </label>
             <label className="block text-sm font-medium">
               {t("login.password")}
               <Input

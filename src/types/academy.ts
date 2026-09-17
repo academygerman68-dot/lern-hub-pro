@@ -2,7 +2,7 @@ export type Role = "student" | "teacher" | "director";
 export type SubscriptionStatus = "ACTIVE" | "PAST_DUE" | "SUSPENDED";
 export type Locale = "fr" | "ar";
 export type Level = "A1" | "A2" | "B1" | "B2";
-export type AccountStatus = "active" | "restricted" | "suspended" | "archived";
+export type AccountStatus = "active" | "pending" | "restricted" | "suspended" | "archived";
 
 export const STUDENT_PAGES = [
   "dashboard",
@@ -20,6 +20,7 @@ export const STUDENT_PAGES = [
   "progress",
   "payments",
   "messages",
+  "recordings",
   "profile",
 ] as const;
 
@@ -36,6 +37,7 @@ export const TEACHER_PAGES = [
   "live",
   "meeting",
   "messages",
+  "recordings",
   "profile",
 ] as const;
 
@@ -58,6 +60,7 @@ export const DIRECTOR_PAGES = [
   "live",
   "meeting",
   "messages",
+  "recordings",
   "reports",
   "settings",
   "audit",

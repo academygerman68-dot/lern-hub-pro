@@ -32,6 +32,7 @@ export type MeetingRecording = {
   title: string;
   storage_bucket: string;
   storage_path: string | null;
+  external_url: string | null;
   duration_seconds: number | null;
   file_size: number | null;
   mime_type: string | null;

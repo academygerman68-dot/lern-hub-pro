@@ -72,13 +72,75 @@ export const SupabaseEnrollmentService = {
     status?: EnrollmentStatus;
     startDate?: string | null;
     endDate?: string | null;
-  }): Promise<EnrollmentRecord> {
+  }): Promise<EnrollmentRecord & { movedFromClassNames: string[] }> {
     const supabase = requireClient();
+    const today = new Date().toISOString().slice(0, 10);
+
+    // One active group at a time: withdraw other active enrollments first.
+    const { data: previous, error: previousError } = await supabase
+      .from("enrollments")
+      .select(
+        `
+        id,
+        class:classes!enrollments_class_id_fkey ( id, name )
+      `,
+      )
+      .eq("student_id", input.studentId)
+      .eq("status", "active")
+      .neq("class_id", input.classId);
+    if (previousError) throw previousError;
+
+    const movedFromClassNames = (previous ?? [])
+      .map((row) => {
+        const cls = row.class as { id: string; name: string } | null;
+        return cls?.name ?? null;
+      })
+      .filter((name): name is string => Boolean(name));
+
+    if ((previous ?? []).length > 0) {
+      const { error: withdrawError } = await supabase
+        .from("enrollments")
+        .update({ status: "withdrawn", end_date: today })
+        .eq("student_id", input.studentId)
+        .eq("status", "active")
+        .neq("class_id", input.classId);
+      if (withdrawError) throw withdrawError;
+    }
+
+    // Re-activate if the student was previously in this class.
+    const { data: existingSame } = await supabase
+      .from("enrollments")
+      .select("id")
+      .eq("student_id", input.studentId)
+      .eq("class_id", input.classId)
+      .maybeSingle();
+
+    if (existingSame?.id) {
+      const { data, error } = await supabase
+        .from("enrollments")
+        .update({
+          status: input.status ?? "active",
+          start_date: input.startDate ?? today,
+          end_date: null,
+        })
+        .eq("id", existingSame.id)
+        .select(
+          `
+          *,
+          student:students!enrollments_student_id_fkey ( id, student_code ),
+          class:classes!enrollments_class_id_fkey ( id, name )
+        `,
+        )
+        .single();
+      if (error) throw error;
+      return { ...(data as EnrollmentRecord), movedFromClassNames };
+    }
+
     const payload: EnrollmentInsert = {
       student_id: input.studentId,
       class_id: input.classId,
       status: input.status ?? "active",
-      start_date: input.startDate ?? null,
+      start_date: input.startDate ?? today,
       end_date: input.endDate ?? null,
     };
     const { data, error } = await supabase
@@ -93,7 +155,7 @@ export const SupabaseEnrollmentService = {
       )
       .single();
     if (error) throw error;
-    return data as EnrollmentRecord;
+    return { ...(data as EnrollmentRecord), movedFromClassNames };
   },
 
   async updateStatus(id: string, status: EnrollmentStatus, endDate?: string | null) {

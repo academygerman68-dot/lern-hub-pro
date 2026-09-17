@@ -11,7 +11,7 @@ const cors = {
 };
 const jsonHeaders = { ...cors, "Cache-Control": "no-store", "Content-Type": "application/json" };
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const earlyJoinSeconds = 15 * 60;
+const earlyJoinSeconds = 0;
 const lateJoinSeconds = 15 * 60;
 const defaultDurationSeconds = 2 * 60 * 60;
 

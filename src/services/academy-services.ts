@@ -4,6 +4,7 @@ import { SupabaseCurriculumService } from "@/services/supabase/curriculum-servic
 import { SupabaseExamService } from "@/services/supabase/exam-service";
 import { SupabaseLibraryService } from "@/services/supabase/library-service";
 import { SupabaseEnrollmentService } from "@/services/supabase/enrollment-service";
+import { SupabaseClassScheduleService } from "@/services/supabase/class-schedule-service";
 import { SupabaseStudentService } from "@/services/supabase/student-service";
 import { SupabaseTeacherService } from "@/services/supabase/teacher-service";
 import { SupabaseClassService } from "@/services/supabase/class-service";
@@ -76,7 +77,6 @@ export const AuthService = {
     password: string;
     firstName: string;
     lastName: string;
-    role?: "student" | "teacher" | "admin";
     phone?: string;
   }): Promise<SessionUser | { needsEmailConfirmation: true; email: string }> {
     if (!isSupabaseConfigured) {
@@ -181,9 +181,16 @@ export const StudentService = {
 };
 
 export const ProfileService = {
+  async listPendingProfiles() {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseProfileService.listPendingProfiles();
+  },
   async setProfileStatus(profileId: string, status: AccountStatus) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseProfileService.setProfileStatus(profileId, status);
+  },
+  async setStatus(profileId: string, status: AccountStatus) {
+    return this.setProfileStatus(profileId, status);
   },
 };
 
@@ -381,6 +388,17 @@ export const EnrollmentService = {
   async suspend(id: string) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseEnrollmentService.suspend(id);
+  },
+};
+
+export const ClassScheduleService = {
+  async listByClass(classId: string) {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseClassScheduleService.listByClass(classId);
+  },
+  async replaceForClass(input: Parameters<typeof SupabaseClassScheduleService.replaceForClass>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseClassScheduleService.replaceForClass(input);
   },
 };
 
@@ -795,5 +813,21 @@ export const LiveSessionService = {
   async revertToJitsi(id: string) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseLiveSessionService.revertToJitsi(id);
+  },
+  async generateMonthSessions(classId: string, year: number, month: number) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseLiveSessionService.generateMonthSessions(classId, year, month);
+  },
+  async listParticipants(sessionId: string) {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseLiveSessionService.listParticipants(sessionId);
+  },
+  async addParticipant(sessionId: string, profileId: string, addedBy?: string | null) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseLiveSessionService.addParticipant(sessionId, profileId, addedBy);
+  },
+  async removeParticipant(sessionId: string, profileId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseLiveSessionService.removeParticipant(sessionId, profileId);
   },
 };

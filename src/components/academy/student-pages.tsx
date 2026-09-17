@@ -1,14 +1,20 @@
 import { PremiumProfile } from "./premium-screens";
 import { StudentLessonPage, AssignmentWorkflow } from "./workflow-pages";
 import { PremiumStudentDashboard } from "./dashboards";
-import { CalendarPage, Messages, Progress } from "./student-extra";
+import { CalendarPage, Messages, Progress, RecordingsPage } from "./student-extra";
 import { MaterialsLibraryPage, StudentLearningPage } from "./academic-pages";
 import { StudentExamsPage } from "./exam-pages";
 import { LiveClassesPage } from "./live-pages";
 import { StudentPaymentsPage } from "./finance-pages";
 import { useAcademy } from "./academy-context";
 import type { AcademyPage } from "@/types/academy";
-import { isStudentRestrictedAllowedPage, STUDENT_RESTRICTED_MESSAGE } from "@/lib/academy-logic";
+import {
+  isStudentPendingAllowedPage,
+  isStudentRestrictedAllowedPage,
+  STUDENT_PENDING_MESSAGE,
+  STUDENT_RESTRICTED_MESSAGE,
+} from "@/lib/academy-logic";
+import { Surface } from "./primitives";
 
 function RestrictedAccessNotice() {
   return (
@@ -21,9 +27,32 @@ function RestrictedAccessNotice() {
   );
 }
 
+function PendingAccountPage() {
+  return (
+    <Surface className="mx-auto max-w-xl space-y-4 p-8 text-center">
+      <p className="text-xs font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+        Validation
+      </p>
+      <h1 className="font-display text-2xl font-medium">Compte en attente de validation</h1>
+      <p className="text-sm leading-6 text-muted-foreground">{STUDENT_PENDING_MESSAGE}</p>
+      <p className="text-sm text-muted-foreground">
+        Vous pouvez consulter votre profil. Les cours, devoirs, examens et réunions restent
+        bloqués jusqu’à l’acceptation par un administrateur.
+      </p>
+    </Surface>
+  );
+}
+
 export function StudentPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   const { page: contextPage, profile } = useAcademy();
   const page = pageProp ?? contextPage;
+
+  if (profile?.status === "pending") {
+    if (!isStudentPendingAllowedPage(page) || page === "dashboard") {
+      return <PendingAccountPage />;
+    }
+  }
+
   if (profile?.status === "restricted" && !isStudentRestrictedAllowedPage(page)) {
     return <RestrictedAccessNotice />;
   }
@@ -33,6 +62,7 @@ export function StudentPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "live" || page === "meeting")
     return <LiveClassesPage meeting={page === "meeting"} />;
   if (page === "calendar") return <CalendarPage />;
+  if (page === "recordings") return <RecordingsPage />;
   if (page === "assignments" || page === "assignment-detail")
     return <AssignmentWorkflow detail={page === "assignment-detail"} />;
   if (page === "exams" || page === "mock-exam" || page === "exam-result")

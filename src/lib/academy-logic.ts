@@ -49,8 +49,18 @@ export const STUDENT_RESTRICTED_ALLOWED_PAGES = [
 export const STUDENT_RESTRICTED_MESSAGE =
   "Votre accès à cette fonctionnalité est actuellement restreint. Veuillez contacter l’administration.";
 
+/** Pending accounts may only open the dashboard and profile until validated. */
+export const STUDENT_PENDING_ALLOWED_PAGES = ["dashboard", "profile"] as const;
+
+export const STUDENT_PENDING_MESSAGE =
+  "Votre compte est en attente de validation par l’administration. L’accès aux cours et outils pédagogiques sera ouvert après acceptation.";
+
 export function isStudentRestrictedAllowedPage(page: string): boolean {
   return (STUDENT_RESTRICTED_ALLOWED_PAGES as readonly string[]).includes(page);
+}
+
+export function isStudentPendingAllowedPage(page: string): boolean {
+  return (STUDENT_PENDING_ALLOWED_PAGES as readonly string[]).includes(page);
 }
 
 export function authenticate(email: string, password: string): SessionUser | null {

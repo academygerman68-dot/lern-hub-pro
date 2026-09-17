@@ -26,9 +26,31 @@ export type MessageListItem = Message & {
   } | null;
 };
 
+const MESSAGE_ATTACHMENT_BUCKET = "message-attachments";
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
 function requireClient() {
   if (!isSupabaseConfigured) throw new Error("SUPABASE_NOT_CONFIGURED");
   return getSupabase();
+}
+
+function sanitizeFileName(name: string) {
+  return name.replace(/[^\w.\-()+ ]+/g, "_").slice(0, 120);
+}
+
+function validateAttachment(file: File) {
+  if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
+    throw new Error("Pièce jointe non autorisée (PDF, JPG, PNG ou WebP uniquement).");
+  }
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    throw new Error("Pièce jointe trop volumineuse (max 10 Mo).");
+  }
 }
 
 const CONVERSATION_SELECT = `
@@ -41,6 +63,11 @@ const CONVERSATION_SELECT = `
       id, first_name, last_name, email
     )
   )
+`;
+
+const MESSAGE_SELECT = `
+  *,
+  sender:profiles!messages_sender_id_fkey ( id, first_name, last_name )
 `;
 
 export const SupabaseMessagingService = {
@@ -71,37 +98,110 @@ export const SupabaseMessagingService = {
     return data ?? [];
   },
 
+  async addMember(conversationId: string, profileId: string, role = "member") {
+    const { data, error } = await requireClient()
+      .from("conversation_members")
+      .upsert(
+        {
+          conversation_id: conversationId,
+          profile_id: profileId,
+          role,
+        },
+        { onConflict: "conversation_id,profile_id" },
+      )
+      .select(
+        `
+        profile_id,
+        role,
+        joined_at,
+        profile:profiles!conversation_members_profile_id_fkey (
+          id, first_name, last_name, email
+        )
+      `,
+      )
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async removeMember(conversationId: string, profileId: string) {
+    const { error } = await requireClient()
+      .from("conversation_members")
+      .delete()
+      .eq("conversation_id", conversationId)
+      .eq("profile_id", profileId);
+    if (error) throw error;
+  },
+
   async listMessages(conversationId: string): Promise<MessageListItem[]> {
     const { data, error } = await requireClient()
       .from("messages")
-      .select(
-        `
-        *,
-        sender:profiles!messages_sender_id_fkey ( id, first_name, last_name )
-      `,
-      )
+      .select(MESSAGE_SELECT)
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });
     if (error) throw error;
     return (data as MessageListItem[] | null) ?? [];
   },
 
-  async sendMessage(input: { conversationId: string; body: string; senderId: string }) {
+  async getAttachmentSignedUrl(message: MessageListItem, expiresIn = 300) {
+    if (!message.attachment_path || !message.attachment_bucket) {
+      throw new Error("Aucune pièce jointe.");
+    }
+    const { data, error } = await requireClient()
+      .storage.from(message.attachment_bucket)
+      .createSignedUrl(message.attachment_path, expiresIn);
+    if (error) throw error;
+    return data.signedUrl;
+  },
+
+  async sendMessage(input: {
+    conversationId: string;
+    body: string;
+    senderId: string;
+    file?: File | null;
+  }) {
     const body = input.body.trim();
-    if (!body) throw new Error("Le message ne peut pas être vide.");
+    const file = input.file ?? null;
+    if (!body && !file) throw new Error("Le message ne peut pas être vide.");
+
+    let attachment:
+      | {
+          attachment_bucket: string;
+          attachment_path: string;
+          attachment_name: string;
+          attachment_mime: string;
+          attachment_size: number;
+        }
+      | undefined;
+
+    if (file) {
+      validateAttachment(file);
+      const path = `${input.senderId}/${crypto.randomUUID()}-${sanitizeFileName(file.name)}`;
+      const { error: uploadError } = await requireClient()
+        .storage.from(MESSAGE_ATTACHMENT_BUCKET)
+        .upload(path, file, {
+          contentType: file.type,
+          upsert: false,
+        });
+      if (uploadError) throw uploadError;
+      attachment = {
+        attachment_bucket: MESSAGE_ATTACHMENT_BUCKET,
+        attachment_path: path,
+        attachment_name: file.name,
+        attachment_mime: file.type,
+        attachment_size: file.size,
+      };
+    }
+
     const { data, error } = await requireClient()
       .from("messages")
       .insert({
         conversation_id: input.conversationId,
         sender_id: input.senderId,
-        body,
+        body: body || (file ? file.name : ""),
+        ...(attachment ?? {}),
       })
-      .select(
-        `
-        *,
-        sender:profiles!messages_sender_id_fkey ( id, first_name, last_name )
-      `,
-      )
+      .select(MESSAGE_SELECT)
       .single();
     if (error) throw error;
     await requireClient()

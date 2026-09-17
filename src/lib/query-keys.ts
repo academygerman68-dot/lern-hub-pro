@@ -12,6 +12,7 @@ export const queryKeys = {
     all: ["classes"] as const,
     detail: (id: string) => ["classes", id] as const,
     roster: (id: string) => ["classes", id, "roster"] as const,
+    schedules: (id: string) => ["classes", id, "schedules"] as const,
   },
   enrollments: {
     all: ["enrollments"] as const,
@@ -30,6 +31,12 @@ export const queryKeys = {
     all: ["conversations"] as const,
     messages: (id: string) => ["conversations", id, "messages"] as const,
     members: (id: string) => ["conversations", id, "members"] as const,
+  },
+  profiles: {
+    pending: ["profiles", "pending"] as const,
+  },
+  liveSessionParticipants: {
+    bySession: (id: string) => ["live-session-participants", id] as const,
   },
   assignments: {
     all: ["assignments"] as const,

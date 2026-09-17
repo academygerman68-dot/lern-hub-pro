@@ -128,7 +128,14 @@ export function toLevel(code: string | null | undefined): Level {
 }
 
 export function toAccountStatus(status: ProfileStatus | null | undefined): AccountStatus {
-  if (status === "restricted" || status === "suspended" || status === "archived") return status;
+  if (
+    status === "pending" ||
+    status === "restricted" ||
+    status === "suspended" ||
+    status === "archived"
+  ) {
+    return status;
+  }
   return "active";
 }
 

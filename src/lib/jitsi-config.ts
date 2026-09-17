@@ -76,7 +76,8 @@ export function validateLiveSessionSchedule(startsAt: string, endsAt?: string | 
   }
 }
 
-export const LIVE_SESSION_EARLY_JOIN_MS = 15 * 60_000;
+/** Students cannot join before the créneau starts (no early window). */
+export const LIVE_SESSION_EARLY_JOIN_MS = 0;
 export const LIVE_SESSION_LATE_JOIN_MS = 15 * 60_000;
 export const LIVE_SESSION_DEFAULT_DURATION_MS = 2 * 60 * 60_000;
 
@@ -102,7 +103,8 @@ export function getLiveSessionJoinState(input: {
   }
 
   if (input.isStaff) return { allowed: true, reason: "allowed" };
-  if (now < start - LIVE_SESSION_EARLY_JOIN_MS) {
+  // Students may join only once the créneau has started (no early access).
+  if (now < start) {
     return { allowed: false, reason: "too_early" };
   }
   if (now > end + LIVE_SESSION_LATE_JOIN_MS) {

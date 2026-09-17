@@ -8,6 +8,7 @@ import {
   AccessService,
   ClassService,
   CourseService,
+  ClassScheduleService,
   EnrollmentService,
   ExamService,
   LibraryService,
@@ -125,18 +126,40 @@ export function useArchiveClass() {
   });
 }
 
+export function useClassSchedules(classId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.classes.schedules(classId ?? ""),
+    queryFn: () => ClassScheduleService.listByClass(classId!),
+    enabled: Boolean(classId),
+  });
+}
+
+export function useReplaceClassSchedules() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ClassScheduleService.replaceForClass,
+    onSuccess: async (_data, vars) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.classes.schedules(vars.classId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.classes.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.classes.detail(vars.classId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.liveSessions.all }),
+      ]);
+    },
+  });
+}
+
 export function useCreateEnrollment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: EnrollmentService.create,
     onSuccess: async (_data, vars) => {
+      // Invalidate all class rosters: student may have been moved from another group.
       await Promise.all([
         qc.invalidateQueries({ queryKey: queryKeys.enrollments.all }),
-        qc.invalidateQueries({ queryKey: queryKeys.enrollments.byClass(vars.classId) }),
-        qc.invalidateQueries({ queryKey: queryKeys.enrollments.byStudent(vars.studentId) }),
         qc.invalidateQueries({ queryKey: queryKeys.classes.all }),
         qc.invalidateQueries({ queryKey: queryKeys.students.all }),
-        qc.invalidateQueries({ queryKey: queryKeys.classes.roster(vars.classId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.enrollments.byStudent(vars.studentId) }),
       ]);
     },
   });
@@ -190,16 +213,24 @@ export function useSetProfileStatus() {
       status,
     }: {
       profileId: string;
-      status: "active" | "restricted" | "suspended" | "archived";
+      status: "active" | "pending" | "restricted" | "suspended" | "archived";
     }) => ProfileService.setProfileStatus(profileId, status),
     onSuccess: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: queryKeys.students.all }),
         qc.invalidateQueries({ queryKey: queryKeys.teachers.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.profiles.pending }),
         qc.invalidateQueries({ queryKey: ["students"] }),
         qc.invalidateQueries({ queryKey: ["teachers"] }),
       ]);
     },
+  });
+}
+
+export function usePendingProfiles() {
+  return useQuery({
+    queryKey: queryKeys.profiles.pending,
+    queryFn: () => ProfileService.listPendingProfiles(),
   });
 }
 
@@ -437,6 +468,34 @@ export function useCreateClassConversation() {
     mutationFn: MessagingService.createClassConversation,
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: queryKeys.conversations.all });
+    },
+  });
+}
+
+export function useAddConversationMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { conversationId: string; profileId: string; role?: string }) =>
+      MessagingService.addMember(input.conversationId, input.profileId, input.role ?? "member"),
+    onSuccess: async (_data, vars) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.conversations.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.conversations.members(vars.conversationId) }),
+      ]);
+    },
+  });
+}
+
+export function useRemoveConversationMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { conversationId: string; profileId: string }) =>
+      MessagingService.removeMember(input.conversationId, input.profileId),
+    onSuccess: async (_data, vars) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.conversations.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.conversations.members(vars.conversationId) }),
+      ]);
     },
   });
 }
@@ -724,6 +783,26 @@ export function useRecordings(classId?: string) {
   });
 }
 
+export function useCreateRecordingFromUrl() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: RecordingService.createFromExternalUrl,
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.recordings.all });
+    },
+  });
+}
+
+export function useUploadRecording() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: RecordingService.uploadRecording,
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.recordings.all });
+    },
+  });
+}
+
 export function useSubscriptions() {
   return useQuery({
     queryKey: queryKeys.subscriptions.all,
@@ -865,6 +944,51 @@ export function useRevertLiveSessionToJitsi() {
         qc.invalidateQueries({ queryKey: queryKeys.liveSessions.all }),
         qc.invalidateQueries({ queryKey: queryKeys.liveSessions.detail(session.id) }),
       ]);
+    },
+  });
+}
+
+export function useGenerateMonthSessions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { classId: string; year: number; month: number }) =>
+      LiveSessionService.generateMonthSessions(input.classId, input.year, input.month),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.liveSessions.all });
+    },
+  });
+}
+
+export function useLiveSessionParticipants(sessionId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.liveSessionParticipants.bySession(sessionId ?? ""),
+    queryFn: () => LiveSessionService.listParticipants(sessionId!),
+    enabled: Boolean(sessionId),
+  });
+}
+
+export function useAddLiveSessionParticipant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { sessionId: string; profileId: string; addedBy?: string | null }) =>
+      LiveSessionService.addParticipant(input.sessionId, input.profileId, input.addedBy),
+    onSuccess: async (_data, vars) => {
+      await qc.invalidateQueries({
+        queryKey: queryKeys.liveSessionParticipants.bySession(vars.sessionId),
+      });
+    },
+  });
+}
+
+export function useRemoveLiveSessionParticipant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { sessionId: string; profileId: string }) =>
+      LiveSessionService.removeParticipant(input.sessionId, input.profileId),
+    onSuccess: async (_data, vars) => {
+      await qc.invalidateQueries({
+        queryKey: queryKeys.liveSessionParticipants.bySession(vars.sessionId),
+      });
     },
   });
 }

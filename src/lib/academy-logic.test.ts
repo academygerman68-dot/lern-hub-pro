@@ -3,8 +3,10 @@ import {
   authenticate,
   isPageForRole,
   isRole,
+  isStudentPendingAllowedPage,
   isStudentRestrictedAllowedPage,
   scoreExam,
+  STUDENT_PENDING_MESSAGE,
   STUDENT_RESTRICTED_MESSAGE,
 } from "./academy-logic";
 
@@ -56,5 +58,15 @@ describe("restricted student access", () => {
     expect(isStudentRestrictedAllowedPage("live")).toBe(false);
     expect(isStudentRestrictedAllowedPage("progress")).toBe(false);
     expect(STUDENT_RESTRICTED_MESSAGE).toContain("restreint");
+  });
+});
+
+describe("pending student access", () => {
+  it("allows only dashboard and profile", () => {
+    expect(isStudentPendingAllowedPage("dashboard")).toBe(true);
+    expect(isStudentPendingAllowedPage("profile")).toBe(true);
+    expect(isStudentPendingAllowedPage("payments")).toBe(false);
+    expect(isStudentPendingAllowedPage("live")).toBe(false);
+    expect(STUDENT_PENDING_MESSAGE).toContain("attente");
   });
 });

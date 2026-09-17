@@ -16,19 +16,32 @@ import { LEAD_TEACHER } from "@/data/demo-accounts";
 import { queryKeys } from "@/lib/query-keys";
 import { getLiveSessionJoinState } from "@/lib/jitsi-config";
 import { setLiveSessionId } from "@/lib/live-class-session";
-import { openExternalMeeting, videoProviderLabel } from "@/lib/live-meeting";
-import { AssignmentService, CourseService, LiveSessionService } from "@/services/academy-services";
+import { openExternalMeeting, joinLiveSession, videoProviderLabel, liveStatusLabel, formatLiveTime, isLiveSessionExpired } from "@/lib/live-meeting";
+import {
+  AssignmentService,
+  CourseService,
+  LiveSessionService,
+  MessagingService,
+  RecordingService,
+} from "@/services/academy-services";
 import { SettingsService } from "@/services/supabase/settings-service";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  useAddConversationMember,
   useClasses,
   useConversationMessages,
   useConversations,
   useCreateClassConversation,
+  useCreateRecordingFromUrl,
   useLiveSessions,
   useLiveSessionsRealtime,
   useMyExamAttempts,
+  useRecordings,
+  useRemoveConversationMember,
   useSendMessage,
+  useStudents,
+  useTeachers,
+  useUploadRecording,
 } from "@/hooks/use-academy-data";
 import { Metric, PageHeader, ProgressLine, Status, Surface } from "./primitives";
 import { useAcademy } from "./academy-context";
@@ -105,6 +118,8 @@ export function CalendarPage() {
   const { navigate, role } = useAcademy();
   useLiveSessionsRealtime();
   const sessionsQuery = useLiveSessions();
+  const classesQuery = useClasses();
+  const teachersQuery = useTeachers();
   const [view, setView] = useState<"week" | "month">("week");
   const [anchor, setAnchor] = useState(() => {
     const d = new Date();
@@ -112,8 +127,18 @@ export function CalendarPage() {
     return d;
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [classFilter, setClassFilter] = useState("");
+  const [teacherFilter, setTeacherFilter] = useState("");
 
-  const sessions = useMemo(() => sessionsQuery.data ?? [], [sessionsQuery.data]);
+  const sessions = useMemo(() => {
+    const now = Date.now();
+    return (sessionsQuery.data ?? []).filter((s) => {
+      if (isLiveSessionExpired(s, now)) return false;
+      if (classFilter && s.class_id !== classFilter) return false;
+      if (teacherFilter && s.teacher_id !== teacherFilter) return false;
+      return true;
+    });
+  }, [sessionsQuery.data, classFilter, teacherFilter]);
   const selected = sessions.find((s) => s.id === selectedId) ?? null;
 
   const weekStart = useMemo(() => {
@@ -189,15 +214,14 @@ export function CalendarPage() {
   const joinFromCalendar = async () => {
     if (!selected) return;
     try {
-      const target = await LiveSessionService.joinTarget(selected.id);
-      if (target.provider === "zoom") {
-        const href = isStaff ? target.start_url || target.url : target.url;
-        if (!href) throw new Error("La réunion Zoom n’est pas encore prête.");
-        openExternalMeeting(href);
-        return;
-      }
-      setLiveSessionId(selected.id);
-      navigate("meeting");
+      await joinLiveSession(selected.id, {
+        isStaff,
+        onJitsi: (id) => {
+          setLiveSessionId(id);
+          navigate("meeting");
+        },
+        resolveTarget: (id) => LiveSessionService.joinTarget(id),
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Ouverture impossible");
     }
@@ -207,7 +231,7 @@ export function CalendarPage() {
     <>
       <PageHeader
         title="Calendrier"
-        subtitle="Sessions en direct : groupe, niveau et professeur."
+        subtitle="Planning des cours en direct : heure, groupe, professeur, statut."
         action={
           <div className="flex flex-wrap gap-2">
             <Button
@@ -216,7 +240,8 @@ export function CalendarPage() {
               onClick={() =>
                 setAnchor((prev) => {
                   const d = new Date(prev);
-                  d.setDate(d.getDate() - (view === "week" ? 7 : 30));
+                  if (view === "week") d.setDate(d.getDate() - 7);
+                  else d.setMonth(d.getMonth() - 1);
                   return d;
                 })
               }
@@ -243,7 +268,8 @@ export function CalendarPage() {
               onClick={() =>
                 setAnchor((prev) => {
                   const d = new Date(prev);
-                  d.setDate(d.getDate() + (view === "week" ? 7 : 30));
+                  if (view === "week") d.setDate(d.getDate() + 7);
+                  else d.setMonth(d.getMonth() + 1);
                   return d;
                 })
               }
@@ -253,6 +279,32 @@ export function CalendarPage() {
           </div>
         }
       />
+      <div className="mb-4 flex flex-wrap gap-2">
+        <select
+          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          value={classFilter}
+          onChange={(e) => setClassFilter(e.target.value)}
+        >
+          <option value="">Tous les groupes</option>
+          {(classesQuery.data ?? []).map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          value={teacherFilter}
+          onChange={(e) => setTeacherFilter(e.target.value)}
+        >
+          <option value="">Tous les professeurs</option>
+          {(teachersQuery.data ?? []).map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+      </div>
       <QueryState
         isLoading={sessionsQuery.isLoading}
         isError={sessionsQuery.isError}
@@ -283,10 +335,9 @@ export function CalendarPage() {
                       >
                         <strong className="block text-xs">{session.title}</strong>
                         <p className="mt-1 text-[11px] text-muted-foreground">
-                          {formatRange(session.starts_at, session.ends_at)}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {session.class?.name ?? "—"} · {session.class?.level?.code ?? "—"}
+                          {formatLiveTime(session.starts_at)} · {session.class?.name ?? "—"} ·{" "}
+                          {teacherName(session)} · {liveStatusLabel(session.status)} /{" "}
+                          {videoProviderLabel(session.video_provider, true)}
                         </p>
                       </button>
                     ))}
@@ -323,7 +374,8 @@ export function CalendarPage() {
                           className="block w-full truncate rounded bg-secondary px-1 py-0.5 text-[10px]"
                           onClick={() => setSelectedId(session.id)}
                         >
-                          {session.title}
+                          {formatLiveTime(session.starts_at)} · {session.class?.name ?? "—"} ·{" "}
+                          {liveStatusLabel(session.status)}
                         </button>
                       ))}
                       {items.length > 3 && (
@@ -345,6 +397,11 @@ export function CalendarPage() {
             <p className="text-sm text-muted-foreground">
               {formatRange(selected.starts_at, selected.ends_at)} ·{" "}
               {new Date(selected.starts_at).toLocaleDateString("fr-FR")}
+            </p>
+            <p className="text-sm">
+              {formatLiveTime(selected.starts_at)} · {selected.class?.name ?? "—"} ·{" "}
+              {teacherName(selected)} · {liveStatusLabel(selected.status)} /{" "}
+              {videoProviderLabel(selected.video_provider, true)}
             </p>
             <p className="text-sm">
               Groupe : <strong>{selected.class?.name ?? "—"}</strong>
@@ -376,6 +433,11 @@ export function CalendarPage() {
                     ? "Terminée"
                     : "Annulée"}
             </p>
+            {joinState && !joinState.allowed && !isStaff && joinState.reason === "too_early" && (
+              <p className="text-sm text-amber-700">
+                Accès possible uniquement à partir de l’heure de début du créneau.
+              </p>
+            )}
             <div className="flex justify-end gap-2">
               {(selected.status === "scheduled" || selected.status === "live") && (
                 <Button
@@ -587,14 +649,21 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
   const { role, user } = useAcademy();
   const conversationsQuery = useConversations();
   const classesQuery = useClasses();
+  const studentsQuery = useStudents();
+  const teachersQuery = useTeachers();
   const createConversation = useCreateClassConversation();
   const sendMessage = useSendMessage();
+  const addMember = useAddConversationMember();
+  const removeMember = useRemoveConversationMember();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [text, setText] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
   const [classId, setClassId] = useState("");
   const [convName, setConvName] = useState("");
   const [includeTeacher, setIncludeTeacher] = useState(true);
+  const [addProfileId, setAddProfileId] = useState("");
 
   const conversations = useMemo(() => conversationsQuery.data ?? [], [conversationsQuery.data]);
   const active = conversations.find((c) => c.id === activeId) ?? conversations[0] ?? null;
@@ -609,6 +678,30 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
     const count = c.members?.length ?? 0;
     return `${count} membre${count === 1 ? "" : "s"}`;
   };
+
+  const openAttachment = async (messageId: string) => {
+    const message = (messagesQuery.data ?? []).find((m) => m.id === messageId);
+    if (!message?.attachment_path) return;
+    try {
+      const url = await MessagingService.getAttachmentSignedUrl(message);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Téléchargement impossible");
+    }
+  };
+
+  const candidateProfiles = useMemo(() => {
+    const students = (studentsQuery.data ?? []).map((s) => ({
+      id: s.profileId,
+      label: `${s.firstName} ${s.lastName} · étudiant`,
+    }));
+    const teachers = (teachersQuery.data ?? []).map((t) => ({
+      id: t.profileId,
+      label: `${t.firstName} ${t.lastName} · professeur`,
+    }));
+    const existing = new Set((active?.members ?? []).map((m) => m.profile_id));
+    return [...students, ...teachers].filter((p) => p.id && !existing.has(p.id));
+  }, [studentsQuery.data, teachersQuery.data, active?.members]);
 
   return (
     <>
@@ -660,21 +753,32 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
           {active ? (
             <>
               <div className="border-b p-4">
-                <strong>{active.name}</strong>
-                {active.class?.name && (
-                  <small className="ml-2 text-muted-foreground">{active.class.name}</small>
-                )}
-                {(active.members?.length ?? 0) > 0 && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {(active.members ?? [])
-                      .slice(0, 6)
-                      .map((m) =>
-                        m.profile ? `${m.profile.first_name} ${m.profile.last_name}`.trim() : "—",
-                      )
-                      .join(", ")}
-                    {(active.members?.length ?? 0) > 6 ? "…" : ""}
-                  </p>
-                )}
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <strong>{active.name}</strong>
+                    {active.class?.name && (
+                      <small className="ml-2 text-muted-foreground">{active.class.name}</small>
+                    )}
+                    {(active.members?.length ?? 0) > 0 && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {(active.members ?? [])
+                          .slice(0, 6)
+                          .map((m) =>
+                            m.profile
+                              ? `${m.profile.first_name} ${m.profile.last_name}`.trim()
+                              : "—",
+                          )
+                          .join(", ")}
+                        {(active.members?.length ?? 0) > 6 ? "…" : ""}
+                      </p>
+                    )}
+                  </div>
+                  {role === "director" && (
+                    <Button size="sm" variant="outline" onClick={() => setMembersOpen(true)}>
+                      Gérer les membres
+                    </Button>
+                  )}
+                </div>
               </div>
               <div className="flex-1 space-y-3 overflow-y-auto p-5">
                 {(messagesQuery.data ?? []).map((message) => {
@@ -682,6 +786,7 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
                   const senderName = message.sender
                     ? `${message.sender.first_name} ${message.sender.last_name}`.trim()
                     : "—";
+                  const isImage = Boolean(message.attachment_mime?.startsWith("image/"));
                   return (
                     <div
                       key={message.id}
@@ -692,7 +797,20 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
                       {!mine && (
                         <p className="mb-1 text-[11px] font-medium opacity-80">{senderName}</p>
                       )}
-                      {message.body}
+                      {message.body ? <p>{message.body}</p> : null}
+                      {message.attachment_path ? (
+                        <button
+                          type="button"
+                          className={`mt-2 block text-left text-xs underline ${
+                            mine ? "text-primary-foreground/90" : "text-primary"
+                          }`}
+                          onClick={() => void openAttachment(message.id)}
+                        >
+                          {isImage
+                            ? `Image · ${message.attachment_name ?? "aperçu"}`
+                            : `PDF · ${message.attachment_name ?? "fichier"}`}
+                        </button>
+                      ) : null}
                       <p
                         className={`mt-1 text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}
                       >
@@ -706,32 +824,55 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
                 )}
               </div>
               <form
-                className="flex gap-2 border-t p-4"
+                className="space-y-2 border-t p-4"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  if (!text.trim() || !activeConversationId || !user?.id) return;
+                  if ((!text.trim() && !file) || !activeConversationId || !user?.id) return;
                   sendMessage.mutate(
                     {
                       conversationId: activeConversationId,
                       body: text.trim(),
                       senderId: user.id,
+                      file,
                     },
                     {
-                      onSuccess: () => setText(""),
+                      onSuccess: () => {
+                        setText("");
+                        setFile(null);
+                      },
                       onError: (err) => toast.error(err.message),
                     },
                   );
                 }}
               >
-                <Input
-                  value={text}
-                  onChange={(event) => setText(event.target.value)}
-                  placeholder="Écrire un message…"
-                  disabled={!user?.id}
-                />
-                <Button size="icon" disabled={sendMessage.isPending || !text.trim()}>
-                  <Send />
-                </Button>
+                {file ? (
+                  <p className="text-xs text-muted-foreground">
+                    Pièce jointe : {file.name}{" "}
+                    <button type="button" className="underline" onClick={() => setFile(null)}>
+                      retirer
+                    </button>
+                  </p>
+                ) : null}
+                <div className="flex gap-2">
+                  <Input
+                    value={text}
+                    onChange={(event) => setText(event.target.value)}
+                    placeholder="Écrire un message…"
+                    disabled={!user?.id}
+                  />
+                  <label className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-md border border-input bg-background hover:bg-muted">
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="application/pdf,image/jpeg,image/png,image/webp"
+                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    />
+                    <Upload className="size-4" />
+                  </label>
+                  <Button size="icon" disabled={sendMessage.isPending || (!text.trim() && !file)}>
+                    <Send />
+                  </Button>
+                </div>
               </form>
             </>
           ) : (
@@ -802,6 +943,75 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
                 }}
               >
                 Créer
+              </Button>
+            </div>
+          </Surface>
+        </div>
+      )}
+
+      {membersOpen && role === "director" && active && (
+        <div className="mobile-modal">
+          <Surface className="mobile-modal-panel space-y-4">
+            <h2 className="text-lg font-semibold">Membres · {active.name}</h2>
+            <div className="max-h-48 space-y-2 overflow-y-auto">
+              {(active.members ?? []).map((m) => (
+                <div key={m.profile_id} className="flex items-center justify-between gap-2 text-sm">
+                  <span>
+                    {m.profile
+                      ? `${m.profile.first_name} ${m.profile.last_name}`.trim()
+                      : m.profile_id}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={removeMember.isPending}
+                    onClick={() =>
+                      removeMember.mutate(
+                        { conversationId: active.id, profileId: m.profile_id },
+                        {
+                          onSuccess: () => toast.success("Membre retiré"),
+                          onError: (err) => toast.error(err.message),
+                        },
+                      )
+                    }
+                  >
+                    Retirer
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={addProfileId}
+              onChange={(e) => setAddProfileId(e.target.value)}
+            >
+              <option value="">Ajouter un membre</option>
+              {candidateProfiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setMembersOpen(false)}>
+                Fermer
+              </Button>
+              <Button
+                disabled={!addProfileId || addMember.isPending}
+                onClick={() =>
+                  addMember.mutate(
+                    { conversationId: active.id, profileId: addProfileId, role: "member" },
+                    {
+                      onSuccess: () => {
+                        toast.success("Membre ajouté");
+                        setAddProfileId("");
+                      },
+                      onError: (err) => toast.error(err.message),
+                    },
+                  )
+                }
+              >
+                Ajouter
               </Button>
             </div>
           </Surface>
@@ -954,6 +1164,213 @@ export function DirectorAssignments() {
           </tbody>
         </table>
       </Surface>
+    </>
+  );
+}
+
+export function RecordingsPage() {
+  const { role, user } = useAcademy();
+  const isStaff = role === "director" || role === "teacher";
+  const classesQuery = useClasses();
+  const sessionsQuery = useLiveSessions();
+  const recordingsQuery = useRecordings();
+  const createFromUrl = useCreateRecordingFromUrl();
+  const uploadRecording = useUploadRecording();
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [externalUrl, setExternalUrl] = useState("");
+  const [classId, setClassId] = useState("");
+  const [sessionId, setSessionId] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [mode, setMode] = useState<"link" | "upload">("link");
+
+  const pastSessions = useMemo(
+    () =>
+      (sessionsQuery.data ?? []).filter(
+        (s) =>
+          s.status === "completed" && (!classId || s.class_id === classId),
+      ),
+    [sessionsQuery.data, classId],
+  );
+
+  const openRecording = async (id: string) => {
+    const row = (recordingsQuery.data ?? []).find((r) => r.id === id);
+    if (!row) return;
+    try {
+      const url = await RecordingService.getPlayUrl(row);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lecture impossible");
+    }
+  };
+
+  return (
+    <>
+      <PageHeader
+        title="Rediffusions"
+        subtitle="Enregistrements des cours — visibles uniquement pour le groupe concerné."
+        action={
+          isStaff ? (
+            <Button onClick={() => setOpen(true)}>+ Ajouter une rediffusion</Button>
+          ) : undefined
+        }
+      />
+      <QueryState
+        isLoading={recordingsQuery.isLoading}
+        isError={recordingsQuery.isError}
+        error={recordingsQuery.error}
+        isEmpty={!recordingsQuery.data?.length}
+        emptyTitle="Aucune rediffusion"
+        emptyMessage={
+          isStaff
+            ? "Attachez un lien ou un fichier à une séance terminée."
+            : "Les rediffusions de votre groupe apparaîtront ici."
+        }
+        onRetry={() => void recordingsQuery.refetch()}
+      >
+        <div className="space-y-3">
+          {(recordingsQuery.data ?? []).map((row) => (
+            <Surface key={row.id} className="flex flex-wrap items-center justify-between gap-3 p-5">
+              <div>
+                <h2 className="font-semibold">{row.title}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {row.external_url ? "Lien externe" : "Fichier uploadé"} ·{" "}
+                  {new Date(row.created_at).toLocaleDateString("fr-FR")}
+                </p>
+              </div>
+              <Button onClick={() => void openRecording(row.id)}>
+                {row.external_url ? "Ouvrir" : "Lire / télécharger"}
+              </Button>
+            </Surface>
+          ))}
+        </div>
+      </QueryState>
+
+      {open && isStaff && (
+        <div className="mobile-modal">
+          <Surface className="mobile-modal-panel space-y-4">
+            <h2 className="text-lg font-semibold">Nouvelle rediffusion</h2>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant={mode === "link" ? "default" : "outline"}
+                onClick={() => setMode("link")}
+              >
+                Lien externe
+              </Button>
+              <Button
+                size="sm"
+                variant={mode === "upload" ? "default" : "outline"}
+                onClick={() => setMode("upload")}
+              >
+                Upload
+              </Button>
+            </div>
+            <Input placeholder="Titre" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={classId}
+              onChange={(e) => {
+                setClassId(e.target.value);
+                setSessionId("");
+              }}
+            >
+              <option value="">Groupe</option>
+              {(classesQuery.data ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} · {c.level}
+                </option>
+              ))}
+            </select>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={sessionId}
+              onChange={(e) => setSessionId(e.target.value)}
+            >
+              <option value="">Séance (optionnel)</option>
+              {pastSessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title} · {new Date(s.starts_at).toLocaleDateString("fr-FR")}
+                </option>
+              ))}
+            </select>
+            {mode === "link" ? (
+              <Input
+                placeholder="https://…"
+                value={externalUrl}
+                onChange={(e) => setExternalUrl(e.target.value)}
+              />
+            ) : (
+              <Input
+                type="file"
+                accept="video/*,audio/*,application/pdf"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                Annuler
+              </Button>
+              <Button
+                disabled={
+                  !title.trim() ||
+                  !classId ||
+                  createFromUrl.isPending ||
+                  uploadRecording.isPending ||
+                  (mode === "link" ? !externalUrl.trim() : !file) ||
+                  !user?.id
+                }
+                onClick={() => {
+                  if (mode === "link") {
+                    createFromUrl.mutate(
+                      {
+                        title: title.trim(),
+                        externalUrl: externalUrl.trim(),
+                        classId,
+                        liveSessionId: sessionId || null,
+                        createdBy: user?.id ?? null,
+                      },
+                      {
+                        onSuccess: () => {
+                          toast.success("Rediffusion ajoutée");
+                          setOpen(false);
+                          setTitle("");
+                          setExternalUrl("");
+                          setSessionId("");
+                        },
+                        onError: (err) => toast.error(err.message),
+                      },
+                    );
+                    return;
+                  }
+                  if (!file || !user?.id) return;
+                  uploadRecording.mutate(
+                    {
+                      title: title.trim(),
+                      file,
+                      classId,
+                      liveSessionId: sessionId || null,
+                      createdBy: user.id,
+                    },
+                    {
+                      onSuccess: () => {
+                        toast.success("Rediffusion uploadée");
+                        setOpen(false);
+                        setTitle("");
+                        setFile(null);
+                        setSessionId("");
+                      },
+                      onError: (err) => toast.error(err.message),
+                    },
+                  );
+                }}
+              >
+                Enregistrer
+              </Button>
+            </div>
+          </Surface>
+        </div>
+      )}
     </>
   );
 }

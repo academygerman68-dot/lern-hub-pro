@@ -12,6 +12,17 @@ function requireClient() {
 }
 
 export const SupabaseProfileService = {
+  async listPendingProfiles(): Promise<ProfileRow[]> {
+    const { data, error } = await requireClient()
+      .from("profiles")
+      .select("*")
+      .eq("status", "pending")
+      .eq("role", "student")
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as ProfileRow[];
+  },
+
   async setProfileStatus(profileId: string, status: AccountStatus): Promise<ProfileRow> {
     const supabase = requireClient();
     const { data, error } = await supabase.rpc("admin_set_profile_status", {
@@ -20,5 +31,10 @@ export const SupabaseProfileService = {
     });
     if (error) throw error;
     return data as ProfileRow;
+  },
+
+  /** Alias for admin queue actions. */
+  async setStatus(profileId: string, status: AccountStatus): Promise<ProfileRow> {
+    return this.setProfileStatus(profileId, status);
   },
 };

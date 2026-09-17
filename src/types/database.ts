@@ -423,6 +423,50 @@ export type Database = {
           },
         ];
       };
+      class_schedules: {
+        Row: {
+          class_id: string;
+          created_at: string;
+          end_time: string;
+          id: string;
+          start_time: string;
+          timezone: string;
+          title_template: string;
+          updated_at: string;
+          weekday: number;
+        };
+        Insert: {
+          class_id: string;
+          created_at?: string;
+          end_time: string;
+          id?: string;
+          start_time: string;
+          timezone?: string;
+          title_template?: string;
+          updated_at?: string;
+          weekday: number;
+        };
+        Update: {
+          class_id?: string;
+          created_at?: string;
+          end_time?: string;
+          id?: string;
+          start_time?: string;
+          timezone?: string;
+          title_template?: string;
+          updated_at?: string;
+          weekday?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "class_schedules_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       conversation_members: {
         Row: {
           conversation_id: string;
@@ -1405,6 +1449,49 @@ export type Database = {
           },
         ];
       };
+      live_session_participants: {
+        Row: {
+          added_by: string | null;
+          created_at: string;
+          profile_id: string;
+          session_id: string;
+        };
+        Insert: {
+          added_by?: string | null;
+          created_at?: string;
+          profile_id: string;
+          session_id: string;
+        };
+        Update: {
+          added_by?: string | null;
+          created_at?: string;
+          profile_id?: string;
+          session_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "live_session_participants_added_by_fkey";
+            columns: ["added_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "live_session_participants_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "live_session_participants_session_id_fkey";
+            columns: ["session_id"];
+            isOneToOne: false;
+            referencedRelation: "live_sessions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       meeting_recordings: {
         Row: {
           class_id: string | null;
@@ -1412,6 +1499,7 @@ export type Database = {
           created_by: string | null;
           duration_seconds: number | null;
           expires_at: string | null;
+          external_url: string | null;
           file_size: number | null;
           id: string;
           live_session_id: string | null;
@@ -1429,6 +1517,7 @@ export type Database = {
           created_by?: string | null;
           duration_seconds?: number | null;
           expires_at?: string | null;
+          external_url?: string | null;
           file_size?: number | null;
           id?: string;
           live_session_id?: string | null;
@@ -1446,6 +1535,7 @@ export type Database = {
           created_by?: string | null;
           duration_seconds?: number | null;
           expires_at?: string | null;
+          external_url?: string | null;
           file_size?: number | null;
           id?: string;
           live_session_id?: string | null;
@@ -1490,6 +1580,11 @@ export type Database = {
       };
       messages: {
         Row: {
+          attachment_bucket: string | null;
+          attachment_mime: string | null;
+          attachment_name: string | null;
+          attachment_path: string | null;
+          attachment_size: number | null;
           body: string;
           conversation_id: string;
           created_at: string;
@@ -1497,6 +1592,11 @@ export type Database = {
           sender_id: string;
         };
         Insert: {
+          attachment_bucket?: string | null;
+          attachment_mime?: string | null;
+          attachment_name?: string | null;
+          attachment_path?: string | null;
+          attachment_size?: number | null;
           body: string;
           conversation_id: string;
           created_at?: string;
@@ -1504,6 +1604,11 @@ export type Database = {
           sender_id: string;
         };
         Update: {
+          attachment_bucket?: string | null;
+          attachment_mime?: string | null;
+          attachment_name?: string | null;
+          attachment_path?: string | null;
+          attachment_size?: number | null;
           body?: string;
           conversation_id?: string;
           created_at?: string;
@@ -2165,6 +2270,14 @@ export type Database = {
         Args: { p_session_id: string };
         Returns: Json;
       };
+      generate_class_month_sessions: {
+        Args: {
+          p_class_id: string;
+          p_month: number;
+          p_year: number;
+        };
+        Returns: number;
+      };
       create_in_app_notification: {
         Args: {
           p_category?: string;
@@ -2515,7 +2628,7 @@ export type Database = {
       outbox_status: "queued" | "sent" | "failed" | "skipped";
       payment_proof_status: "pending" | "approved" | "rejected";
       payment_status: "pending" | "partial" | "paid" | "overdue" | "cancelled";
-      profile_status: "active" | "suspended" | "archived" | "restricted";
+      profile_status: "active" | "suspended" | "archived" | "restricted" | "pending";
       record_status: "active" | "inactive" | "archived";
       recording_status: "pending" | "ready" | "failed" | "unavailable";
       submission_status: "draft" | "submitted" | "graded" | "returned";
@@ -2690,7 +2803,7 @@ export const Constants = {
       outbox_status: ["queued", "sent", "failed", "skipped"],
       payment_proof_status: ["pending", "approved", "rejected"],
       payment_status: ["pending", "partial", "paid", "overdue", "cancelled"],
-      profile_status: ["active", "suspended", "archived", "restricted"],
+      profile_status: ["active", "suspended", "archived", "restricted", "pending"],
       record_status: ["active", "inactive", "archived"],
       recording_status: ["pending", "ready", "failed", "unavailable"],
       submission_status: ["draft", "submitted", "graded", "returned"],
