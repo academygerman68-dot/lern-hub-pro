@@ -722,7 +722,9 @@ export function PremiumStudent360() {
       { profileId: student.profileId, status },
       {
         onSuccess: () => {
-          toast.success(`Statut mis à jour · ${status === "active" ? "Actif" : status === "restricted" ? "Restreint" : "Suspendu"}`);
+          toast.success(
+            `Statut mis à jour · ${status === "active" ? "Actif" : status === "restricted" ? "Restreint" : "Suspendu"}`,
+          );
           setConfirmStatus(null);
           void studentQuery.refetch();
         },
@@ -904,9 +906,7 @@ export function PremiumStudent360() {
           <Eyebrow>Statut abonnement</Eyebrow>
           <CheckCircle2 className="mt-5 size-7 text-success" />
           <h2 className="mt-4 font-display text-2xl">{student.subscription}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Compte · {accountLabel}
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">Compte · {accountLabel}</p>
           <div className="mt-6 border-t border-success/15 pt-5">
             <small className="text-muted-foreground">Professeur</small>
             <strong className="mt-1 block">{student.teacherName || "—"}</strong>

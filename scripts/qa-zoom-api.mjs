@@ -79,13 +79,22 @@ async function main() {
   check(
     "Création Zoom automatique",
     !first.error && firstBody.ok === true,
-    first.error?.message ?? JSON.stringify({ ok: firstBody.ok, reused: firstBody.reused, error: firstBody.error }),
+    first.error?.message ??
+      JSON.stringify({ ok: firstBody.ok, reused: firstBody.reused, error: firstBody.error }),
   );
 
   const teacherJoin = await teacher.sb.rpc("live_session_join_target", { p_session_id: sessionId });
   const t = teacherJoin.data ?? {};
-  check("video_provider / joinTarget professeur = zoom", !teacherJoin.error && t.provider === "zoom", t.provider);
-  check("join_url reçu (professeur)", typeof t.url === "string" && t.url.includes("zoom."), summarizeUrl(t.url));
+  check(
+    "video_provider / joinTarget professeur = zoom",
+    !teacherJoin.error && t.provider === "zoom",
+    t.provider,
+  );
+  check(
+    "join_url reçu (professeur)",
+    typeof t.url === "string" && t.url.includes("zoom."),
+    summarizeUrl(t.url),
+  );
   check(
     "start_url reçu (professeur)",
     typeof t.start_url === "string" && t.start_url.includes("zoom."),
@@ -95,17 +104,26 @@ async function main() {
   const studentJoin = await student.sb.rpc("live_session_join_target", { p_session_id: sessionId });
   const s = studentJoin.data ?? {};
   check("Étudiant du groupe = zoom", !studentJoin.error && s.provider === "zoom", s.provider);
-  check("Étudiant reçoit join_url", typeof s.url === "string" && s.url.includes("zoom."), summarizeUrl(s.url));
+  check(
+    "Étudiant reçoit join_url",
+    typeof s.url === "string" && s.url.includes("zoom."),
+    summarizeUrl(s.url),
+  );
   check("Étudiant sans start_url", s.start_url == null, summarizeUrl(s.start_url));
 
-  const startSelect = await student.sb.from("live_sessions").select("zoom_start_url,zoom_password,zoom_join_url").eq("id", sessionId);
+  const startSelect = await student.sb
+    .from("live_sessions")
+    .select("zoom_start_url,zoom_password,zoom_join_url")
+    .eq("id", sessionId);
   check(
     "Colonnes hôte masquées en SELECT étudiant",
     Boolean(startSelect.error),
     startSelect.error?.message ?? "colonnes lisibles",
   );
 
-  const outsiderJoin = await outsider.sb.rpc("live_session_join_target", { p_session_id: sessionId });
+  const outsiderJoin = await outsider.sb.rpc("live_session_join_target", {
+    p_session_id: sessionId,
+  });
   check(
     "Étudiant hors groupe bloqué",
     Boolean(outsiderJoin.error),
@@ -127,7 +145,11 @@ async function main() {
   ]);
   const doubleOk = [a, b].every((item) => !item.error && item.data?.ok === true);
   const reused = [a, b].filter((item) => item.data?.reused === true).length;
-  check("Double clic : une seule réunion (réutilisation)", doubleOk && reused >= 1, `reused=${reused}`);
+  check(
+    "Double clic : une seule réunion (réutilisation)",
+    doubleOk && reused >= 1,
+    `reused=${reused}`,
+  );
 
   const { error: revertErr } = await teacher.sb
     .from("live_sessions")

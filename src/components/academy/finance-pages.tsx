@@ -76,7 +76,10 @@ function ProofReviewQueue() {
         >
           <div className="mt-4 divide-y">
             {pendingQuery.data?.map((proof) => (
-              <div key={proof.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <div
+                key={proof.id}
+                className="flex flex-wrap items-center justify-between gap-3 py-3"
+              >
                 <div>
                   <p className="font-medium">{studentLabel(proof)}</p>
                   <p className="text-sm text-muted-foreground">
@@ -235,7 +238,10 @@ export function FinancePages({ mode }: { mode: string }) {
   if (mode === "subscriptions") {
     return (
       <>
-        <PageHeader title="Abonnements" subtitle="Statut des abonnements étudiants depuis Supabase." />
+        <PageHeader
+          title="Abonnements"
+          subtitle="Statut des abonnements étudiants depuis Supabase."
+        />
         <QueryState
           isLoading={subscriptionsQuery.isLoading}
           isError={subscriptionsQuery.isError}

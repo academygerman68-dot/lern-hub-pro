@@ -117,7 +117,12 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
       if (!payload) {
         queryClient.clear();
         setLastScore(null);
-        for (const key of ["ga_active_exam_id", "ga_active_attempt_id", "ga_live_class_id", "ga_live_session_id"]) {
+        for (const key of [
+          "ga_active_exam_id",
+          "ga_active_attempt_id",
+          "ga_live_class_id",
+          "ga_live_session_id",
+        ]) {
           window.sessionStorage.removeItem(key);
         }
         clearSession();
@@ -134,7 +139,8 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
       setSession((prev) =>
         startSession(payload.sessionUser, {
           locale: nextLocale,
-          ...(prev?.user.id === payload.sessionUser.id && prev?.user.role === payload.sessionUser.role
+          ...(prev?.user.id === payload.sessionUser.id &&
+          prev?.user.role === payload.sessionUser.role
             ? {
                 page: prev.page,
                 invoices: prev.invoices,
@@ -187,10 +193,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
     (user: SessionUser) => {
       queryClient.clear();
       setLastScore(null);
-      const next = startSession(
-        user,
-        { locale },
-      );
+      const next = startSession(user, { locale });
       persist(next);
       go(user.role, "dashboard");
     },

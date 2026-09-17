@@ -87,6 +87,7 @@ export function LoginShell({
             </div>
             <div
               className="gla-login-levels"
+              role="group"
               dir="ltr"
               aria-label={l(
                 "Niveaux d’allemand : A1, A2, B1, B2",

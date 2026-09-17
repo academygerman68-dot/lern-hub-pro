@@ -142,7 +142,9 @@ export function DirectorCoursesPage() {
                     <Status tone={course.status === "published" ? "green" : "amber"}>
                       {course.status === "published" ? "Publié" : "Brouillon"}
                     </Status>
-                    {(course.content_kind !== "none" || course.content_url || course.storage_path) && (
+                    {(course.content_kind !== "none" ||
+                      course.content_url ||
+                      course.storage_path) && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -581,7 +583,9 @@ export function MaterialsLibraryPage() {
               value={levelCode}
               onChange={(e) => setLevelCode(e.target.value)}
             >
-              <option value="">{audience === "level" ? "Choisir le niveau" : "Niveau (facultatif)"}</option>
+              <option value="">
+                {audience === "level" ? "Choisir le niveau" : "Niveau (facultatif)"}
+              </option>
               {(levelsQuery.data ?? []).map((level) => (
                 <option key={level.id} value={level.code}>
                   {level.code}
@@ -763,15 +767,29 @@ export function TeacherAttendancePage() {
   const saveAttendance = useSaveAttendance();
   const today = new Date();
   const sessionDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  const existing = useQuery({ queryKey: ["attendance", primaryClass?.id, sessionDate], enabled: Boolean(primaryClass), queryFn: async () => {
-    const sessions = await SupabaseAttendanceService.listSessions(primaryClass!.id);
-    const session = sessions.find((s) => s.session_date === sessionDate);
-    return { session, records: session ? await SupabaseAttendanceService.listRecords(session.id) : [] };
-  } });
+  const existing = useQuery({
+    queryKey: ["attendance", primaryClass?.id, sessionDate],
+    enabled: Boolean(primaryClass),
+    queryFn: async () => {
+      const sessions = await SupabaseAttendanceService.listSessions(primaryClass!.id);
+      const session = sessions.find((s) => s.session_date === sessionDate);
+      return {
+        session,
+        records: session ? await SupabaseAttendanceService.listRecords(session.id) : [],
+      };
+    },
+  });
   const [marks, setMarks] = useState<Record<string, "present" | "absent" | "late" | "excused">>({});
 
   const roster = rosterQuery.data ?? [];
-  const effectiveMarks = Object.fromEntries(roster.map((s) => [s.id, marks[`${primaryClass?.id}:${sessionDate}:${s.id}`] ?? existing.data?.records.find((r) => r.student_id === s.id)?.mark ?? "present"]));
+  const effectiveMarks = Object.fromEntries(
+    roster.map((s) => [
+      s.id,
+      marks[`${primaryClass?.id}:${sessionDate}:${s.id}`] ??
+        existing.data?.records.find((r) => r.student_id === s.id)?.mark ??
+        "present",
+    ]),
+  );
   const counts = useMemo(() => {
     const values = roster.map((s) => effectiveMarks[s.id] ?? "present");
     return {
@@ -788,7 +806,15 @@ export function TeacherAttendancePage() {
         subtitle={primaryClass ? `${primaryClass.name} · Today` : "Select a class"}
         action={
           <Button
-            disabled={!primaryClass || saveAttendance.isPending || roster.length === 0 || existing.isPending || existing.isError || rosterQuery.isFetching || classesQuery.isError}
+            disabled={
+              !primaryClass ||
+              saveAttendance.isPending ||
+              roster.length === 0 ||
+              existing.isPending ||
+              existing.isError ||
+              rosterQuery.isFetching ||
+              classesQuery.isError
+            }
             onClick={() => {
               if (!primaryClass) return;
               saveAttendance.mutate(
@@ -801,7 +827,10 @@ export function TeacherAttendancePage() {
                   })),
                 },
                 {
-                  onSuccess: () => { toast.success("Attendance saved to database"); void existing.refetch(); },
+                  onSuccess: () => {
+                    toast.success("Attendance saved to database");
+                    void existing.refetch();
+                  },
                   onError: (err) => toast.error(err.message),
                 },
               );
@@ -824,7 +853,11 @@ export function TeacherAttendancePage() {
         </Surface>
       </div>
       <QueryState
-        isLoading={classesQuery.isLoading || rosterQuery.isLoading || (Boolean(primaryClass) && existing.isPending)}
+        isLoading={
+          classesQuery.isLoading ||
+          rosterQuery.isLoading ||
+          (Boolean(primaryClass) && existing.isPending)
+        }
         isError={classesQuery.isError || rosterQuery.isError || existing.isError}
         error={classesQuery.error ?? rosterQuery.error ?? existing.error}
         isEmpty={roster.length === 0}
@@ -840,8 +873,15 @@ export function TeacherAttendancePage() {
                   <Button
                     key={item}
                     size="sm"
-                    variant={(effectiveMarks[student.id] ?? "present") === item ? "default" : "outline"}
-                    onClick={() => setMarks((prev) => ({ ...prev, [`${primaryClass?.id}:${sessionDate}:${student.id}`]: item }))}
+                    variant={
+                      (effectiveMarks[student.id] ?? "present") === item ? "default" : "outline"
+                    }
+                    onClick={() =>
+                      setMarks((prev) => ({
+                        ...prev,
+                        [`${primaryClass?.id}:${sessionDate}:${student.id}`]: item,
+                      }))
+                    }
                   >
                     {item}
                   </Button>
@@ -894,7 +934,11 @@ export function StudentLearningPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 {module.courseTitle} · {module.lessons} lessons
               </p>
-              <Button className="mt-4" variant="outline" onClick={() => navigate("lesson", { moduleId: module.id })}>
+              <Button
+                className="mt-4"
+                variant="outline"
+                onClick={() => navigate("lesson", { moduleId: module.id })}
+              >
                 Open lessons
               </Button>
             </Surface>
@@ -937,10 +981,22 @@ export function TeacherAssignmentsPage() {
             </option>
           ))}
         </select>
-        <label className="block text-sm">Consignes<Textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} /></label>
-        <label className="block text-sm">Date limite (facultative)<Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} /></label>
+        <label className="block text-sm">
+          Consignes
+          <Textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} />
+        </label>
+        <label className="block text-sm">
+          Date limite (facultative)
+          <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
+        </label>
         <Button
-          disabled={!title.trim() || !instructions.trim() || !classId || create.isPending || (!!dueAt && new Date(dueAt).getTime() <= Date.now())}
+          disabled={
+            !title.trim() ||
+            !instructions.trim() ||
+            !classId ||
+            create.isPending ||
+            (!!dueAt && new Date(dueAt).getTime() <= Date.now())
+          }
           onClick={() => {
             create.mutate(
               {
@@ -954,7 +1010,9 @@ export function TeacherAssignmentsPage() {
               {
                 onSuccess: () => {
                   toast.success("Devoir publié");
-                  setTitle(""); setInstructions(""); setDueAt("");
+                  setTitle("");
+                  setInstructions("");
+                  setDueAt("");
                   void listQuery.refetch();
                 },
                 onError: (err) => toast.error(err.message),
@@ -982,9 +1040,16 @@ export function TeacherAssignmentsPage() {
                   <h2 className="font-semibold">{item.title}</h2>
                   <p className="text-sm text-muted-foreground">Limite {item.due}</p>
                 </div>
-                <Button variant="outline" onClick={() => setGradingId(gradingId === item.id ? null : item.id)}>{gradingId === item.id ? "Fermer les remises" : "Voir et corriger les remises"}</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setGradingId(gradingId === item.id ? null : item.id)}
+                >
+                  {gradingId === item.id ? "Fermer les remises" : "Voir et corriger les remises"}
+                </Button>
               </div>
-              {gradingId === item.id && item.classId && <AssignmentGrading assignmentId={item.id} classId={item.classId} />}
+              {gradingId === item.id && item.classId && (
+                <AssignmentGrading assignmentId={item.id} classId={item.classId} />
+              )}
             </Surface>
           ))}
         </div>
@@ -1077,11 +1142,7 @@ export function DirectorAssignmentsPage() {
                 Niveau : <strong>{selectedClass.level}</strong>
               </p>
             )}
-            <Input
-              placeholder="Titre"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
+            <Input placeholder="Titre" value={title} onChange={(e) => setTitle(e.target.value)} />
             <Textarea
               placeholder="Description / consignes"
               value={description}

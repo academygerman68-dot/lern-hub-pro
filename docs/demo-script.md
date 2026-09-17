@@ -4,9 +4,9 @@ Use seeded QA accounts (password documented in project seed / test login UI). Ne
 
 Typical pattern (confirm against your seed):
 
-| Role | Email (example) |
-|------|-----------------|
-| Admin | `admin@gla.academy` |
+| Role    | Email (example)       |
+| ------- | --------------------- |
+| Admin   | `admin@gla.academy`   |
 | Teacher | `teacher@gla.academy` |
 | Student | `student@gla.academy` |
 

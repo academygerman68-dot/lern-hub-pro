@@ -51,8 +51,7 @@ Le produit doit donner l’impression d’un véritable logiciel commercial prê
 
 ==================================================
 
-POSITIONNEMENT DU PRODUIT
-==================================================
+# POSITIONNEMENT DU PRODUIT
 
 Nom provisoire de l’application :
 

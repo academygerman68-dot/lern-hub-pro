@@ -12,11 +12,19 @@ export function useClassSelection() {
   const selector = (
     <label className="mb-5 block text-sm">
       Groupe
-      <select className="mt-1 block w-full rounded-md border bg-background p-2"
+      <select
+        className="mt-1 block w-full rounded-md border bg-background p-2"
         value={primaryClass?.id ?? ""}
-        onChange={(event) => navigate(page, { classId: event.target.value })}>
-        <option value="" disabled>Choisir un groupe</option>
-        {classesQuery.data?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        onChange={(event) => navigate(page, { classId: event.target.value })}
+      >
+        <option value="" disabled>
+          Choisir un groupe
+        </option>
+        {classesQuery.data?.map((item) => (
+          <option key={item.id} value={item.id}>
+            {item.name}
+          </option>
+        ))}
       </select>
     </label>
   );

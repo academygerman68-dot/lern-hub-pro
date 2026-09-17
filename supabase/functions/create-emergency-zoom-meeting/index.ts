@@ -82,7 +82,11 @@ async function zoomAccessToken(accountId: string, clientId: string, clientSecret
     reason?: string;
   };
   if (!response.ok || !payload.access_token) {
-    console.error("Zoom OAuth failed", response.status, payload.error ?? payload.reason ?? "unknown");
+    console.error(
+      "Zoom OAuth failed",
+      response.status,
+      payload.error ?? payload.reason ?? "unknown",
+    );
     throw new Error(response.status === 429 ? "ZOOM_ACCOUNT_LIMIT" : "ZOOM_OAUTH_FAILED");
   }
   return payload.access_token;
@@ -149,16 +153,19 @@ async function createZoomMeeting(
   };
 }
 
-async function waitForReady(
-  userClient: ReturnType<typeof createClient>,
-  sessionId: string,
-) {
+async function waitForReady(userClient: ReturnType<typeof createClient>, sessionId: string) {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     const { data, error } = await userClient.rpc("live_session_join_target", {
       p_session_id: sessionId,
     });
-    if (!error && data && typeof data === "object" && !Array.isArray(data) && data.provider === "zoom") {
+    if (
+      !error &&
+      data &&
+      typeof data === "object" &&
+      !Array.isArray(data) &&
+      data.provider === "zoom"
+    ) {
       return true;
     }
   }
@@ -175,14 +182,20 @@ Deno.serve(async (req) => {
   const hostUserId = readSecret("ZOOM_HOST_USER_ID");
   if (!accountId || !clientId || !clientSecret || !hostUserId) {
     console.error("Zoom Edge Function secrets are incomplete");
-    return respond(503, { error: "ZOOM_NOT_CONFIGURED", message: clientMessage("ZOOM_NOT_CONFIGURED") });
+    return respond(503, {
+      error: "ZOOM_NOT_CONFIGURED",
+      message: clientMessage("ZOOM_NOT_CONFIGURED"),
+    });
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
-    return respond(503, { error: "SUPABASE_NOT_CONFIGURED", message: clientMessage("SUPABASE_NOT_CONFIGURED") });
+    return respond(503, {
+      error: "SUPABASE_NOT_CONFIGURED",
+      message: clientMessage("SUPABASE_NOT_CONFIGURED"),
+    });
   }
 
   const authHeader = req.headers.get("Authorization");
@@ -216,7 +229,11 @@ Deno.serve(async (req) => {
     .select("id,class_id,title,starts_at,ends_at,status,video_provider")
     .eq("id", sessionId)
     .maybeSingle();
-  if (sessionError) return respond(500, { error: "SESSION_LOOKUP_FAILED", message: clientMessage("SESSION_LOOKUP_FAILED") });
+  if (sessionError)
+    return respond(500, {
+      error: "SESSION_LOOKUP_FAILED",
+      message: clientMessage("SESSION_LOOKUP_FAILED"),
+    });
   if (!session) return respond(403, { error: "FORBIDDEN" });
 
   if (profile.role === "teacher") {
@@ -237,14 +254,18 @@ Deno.serve(async (req) => {
     return respond(500, { error: "CLAIM_FAILED", message: clientMessage("CLAIM_FAILED") });
   }
 
-  const status = claim && typeof claim === "object" && !Array.isArray(claim) ? asString(claim.status) : "";
+  const status =
+    claim && typeof claim === "object" && !Array.isArray(claim) ? asString(claim.status) : "";
   if (status === "ready") {
     return respond(200, { ok: true, reused: true, provider: "zoom" });
   }
   if (status === "creating") {
     const ready = await waitForReady(userClient, sessionId);
     if (!ready) {
-      return respond(409, { error: "ZOOM_IN_PROGRESS", message: clientMessage("ZOOM_IN_PROGRESS") });
+      return respond(409, {
+        error: "ZOOM_IN_PROGRESS",
+        message: clientMessage("ZOOM_IN_PROGRESS"),
+      });
     }
     return respond(200, { ok: true, reused: true, provider: "zoom" });
   }
@@ -267,7 +288,11 @@ Deno.serve(async (req) => {
       : (classRow?.level as { code?: string } | null)?.code;
     const topic = `Lern Hub — ${level || "Cours"} — ${classRow?.name || session.title || "Groupe"}`;
 
-    const { data: tzRow } = await admin.from("app_settings").select("value").eq("key", "timezone").maybeSingle();
+    const { data: tzRow } = await admin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "timezone")
+      .maybeSingle();
     const timezone = parseTimezone(tzRow?.value);
     const startTime = formatZoomStart(session.starts_at, timezone);
     if (!startTime) throw new Error("ZOOM_CREATE_FAILED");

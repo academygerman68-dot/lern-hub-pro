@@ -75,7 +75,11 @@ async function main() {
     })
     .select("id, video_provider, meeting_room")
     .single();
-  check("Professeur crée la séance Jitsi", !createErr && created?.video_provider === "jitsi", createErr?.message);
+  check(
+    "Professeur crée la séance Jitsi",
+    !createErr && created?.video_provider === "jitsi",
+    createErr?.message,
+  );
 
   const teacherJoin = await joinTarget(teacher.sb, sessionId);
   check(
@@ -107,9 +111,16 @@ async function main() {
     .select("id, video_provider")
     .eq("id", sessionId)
     .single();
-  check("video_provider persisté = zoom", persisted?.video_provider === "zoom", persisted?.video_provider);
+  check(
+    "video_provider persisté = zoom",
+    persisted?.video_provider === "zoom",
+    persisted?.video_provider,
+  );
 
-  const { error: zoomColErr } = await student.sb.from("live_sessions").select("zoom_url").eq("id", sessionId);
+  const { error: zoomColErr } = await student.sb
+    .from("live_sessions")
+    .select("zoom_url")
+    .eq("id", sessionId);
   check(
     "Colonne zoom_url masquée en SELECT étudiant",
     Boolean(zoomColErr),
@@ -128,12 +139,20 @@ async function main() {
   const outsiderJoin = await joinTarget(outsider.sb, sessionId);
   check(
     "Étudiant hors groupe : accès Zoom refusé",
-    Boolean(outsiderJoin.error) && /SESSION_ACCESS_DENIED|not authorized|autorisé/i.test(outsiderJoin.error?.message ?? ""),
+    Boolean(outsiderJoin.error) &&
+      /SESSION_ACCESS_DENIED|not authorized|autorisé/i.test(outsiderJoin.error?.message ?? ""),
     outsiderJoin.error?.message ?? "accès accordé à tort",
   );
 
-  const { data: outsiderList } = await outsider.sb.from("live_sessions").select("id").eq("id", sessionId);
-  check("Étudiant hors groupe ne voit pas la séance", !outsiderList?.length, `rows=${outsiderList?.length ?? 0}`);
+  const { data: outsiderList } = await outsider.sb
+    .from("live_sessions")
+    .select("id")
+    .eq("id", sessionId);
+  check(
+    "Étudiant hors groupe ne voit pas la séance",
+    !outsiderList?.length,
+    `rows=${outsiderList?.length ?? 0}`,
+  );
 
   const adminJoin = await joinTarget(admin.sb, sessionId);
   check(
