@@ -296,7 +296,7 @@ export function DirectorCoursesPage() {
                       let storageBucket: string | null = null;
                       let storagePath: string | null = null;
                       let mimeType: string | null = null;
-                      let url: string | null = contentKind === "link" ? contentUrl.trim() : null;
+                      const url: string | null = contentKind === "link" ? contentUrl.trim() : null;
 
                       if (file && contentKind !== "none" && contentKind !== "link") {
                         const uploaded = await CourseService.uploadCourseMaterial(file);
@@ -903,9 +903,9 @@ export function StudentLearningPage() {
   if (accessQuery.data === false) {
     return (
       <>
-        <PageHeader title="My Courses" subtitle="Published curriculum from your academy." />
+        <PageHeader title="Mes cours" subtitle="Parcours publiés de votre académie." />
         <Surface className="space-y-3 p-6">
-          <h2 className="font-semibold">Access restricted</h2>
+          <h2 className="font-semibold">Accès restreint</h2>
           <p className="text-sm text-muted-foreground">
             An active subscription is required to open courses. Review your payments to renew.
           </p>
@@ -916,7 +916,7 @@ export function StudentLearningPage() {
   }
   return (
     <>
-      <PageHeader title="My Courses" subtitle="Published curriculum from your academy." />
+      <PageHeader title="Mes cours" subtitle="Parcours publiés de votre académie." />
       <QueryState
         isLoading={modulesQuery.isLoading}
         isError={modulesQuery.isError}
