@@ -170,7 +170,6 @@ export function mapStudent(row: StudentRow): Student {
     level: toLevel(row.level_code ?? levelFromClass),
     className: klass?.name ?? "—",
     progress: 0,
-    attendance: 0,
     average: 0,
     subscription: toUiSubscription(subscription?.status),
     firstName: profile?.first_name ?? "",

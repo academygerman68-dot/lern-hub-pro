@@ -42,9 +42,6 @@ export const queryKeys = {
     all: ["assignments"] as const,
     byClass: (classId: string) => ["assignments", "class", classId] as const,
   },
-  attendance: {
-    byClass: (classId: string) => ["attendance", "class", classId] as const,
-  },
   exams: {
     all: ["exams"] as const,
     published: ["exams", "published"] as const,

@@ -1,5 +1,4 @@
 import { SupabaseAssignmentService } from "@/services/supabase/assignment-service";
-import { SupabaseAttendanceService } from "@/services/supabase/attendance-service";
 import { SupabaseCurriculumService } from "@/services/supabase/curriculum-service";
 import { SupabaseExamService } from "@/services/supabase/exam-service";
 import { SupabaseLibraryService } from "@/services/supabase/library-service";
@@ -598,28 +597,6 @@ export const AssignmentService = {
   async listSubmissions(assignmentId: string) {
     if (!isSupabaseConfigured) return [];
     return SupabaseAssignmentService.listSubmissions(assignmentId);
-  },
-};
-
-export const AttendanceService = {
-  async openSession(input: Parameters<typeof SupabaseAttendanceService.openSession>[0]) {
-    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
-    return SupabaseAttendanceService.openSession(input);
-  },
-  async saveRecords(
-    sessionId: string,
-    records: Array<{
-      studentId: string;
-      mark: Database["public"]["Enums"]["attendance_mark"];
-      note?: string;
-    }>,
-  ) {
-    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
-    return SupabaseAttendanceService.saveRecords(sessionId, records);
-  },
-  async listSessions(classId: string) {
-    if (!isSupabaseConfigured) return [];
-    return SupabaseAttendanceService.listSessions(classId);
   },
 };
 

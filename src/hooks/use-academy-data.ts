@@ -4,7 +4,6 @@ import { queryKeys } from "@/lib/query-keys";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import {
   AssignmentService,
-  AttendanceService,
   AccessService,
   ClassService,
   CourseService,
@@ -496,34 +495,6 @@ export function useRemoveConversationMember() {
         qc.invalidateQueries({ queryKey: queryKeys.conversations.all }),
         qc.invalidateQueries({ queryKey: queryKeys.conversations.members(vars.conversationId) }),
       ]);
-    },
-  });
-}
-
-export function useSaveAttendance() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: {
-      classId: string;
-      teacherId?: string | null;
-      createdBy?: string | null;
-      sessionDate: string;
-      records: Array<{ studentId: string; mark: "present" | "absent" | "late" | "excused" }>;
-    }) => {
-      const existing = await AttendanceService.listSessions(input.classId);
-      const session =
-        existing.find((item) => item.session_date === input.sessionDate) ??
-        (await AttendanceService.openSession({
-          classId: input.classId,
-          sessionDate: input.sessionDate,
-          ...(input.teacherId !== undefined ? { teacherId: input.teacherId } : {}),
-          ...(input.createdBy !== undefined ? { createdBy: input.createdBy } : {}),
-        }));
-      await AttendanceService.saveRecords(session.id, input.records);
-      return session;
-    },
-    onSuccess: async (_data, vars) => {
-      await qc.invalidateQueries({ queryKey: queryKeys.attendance.byClass(vars.classId) });
     },
   });
 }

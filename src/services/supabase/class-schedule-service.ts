@@ -70,10 +70,7 @@ export const SupabaseClassScheduleService = {
     if (deleteError) throw deleteError;
 
     if (weekdays.length === 0) {
-      await client
-        .from("classes")
-        .update({ schedule_label: null })
-        .eq("id", classId);
+      await client.from("classes").update({ schedule_label: null }).eq("id", classId);
       return [];
     }
 

@@ -16,10 +16,7 @@ export const signupSchema = z
     firstName: z.string().trim().min(1, "Prénom requis.").max(80),
     lastName: z.string().trim().min(1, "Nom requis.").max(80),
     email: z.string().trim().email("Adresse e-mail invalide."),
-    phone: z
-      .string()
-      .trim()
-      .min(8, "Téléphone requis (au moins 8 caractères)."),
+    phone: z.string().trim().min(8, "Téléphone requis (au moins 8 caractères)."),
     password: passwordSchema,
     confirmPassword: z.string().min(1, "Confirmez le mot de passe."),
   })

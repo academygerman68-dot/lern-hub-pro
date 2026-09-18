@@ -180,12 +180,14 @@ export function PremiumTeacherDashboard() {
               <CalendarDays className="size-5 text-primary" />
             </div>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Button onClick={() => navigate("attendance")}>{l("Présence", "الحضور")}</Button>
-              <Button variant="outline" onClick={() => navigate("classes")}>
+              <Button onClick={() => navigate("classes")}>
                 {l("Ouvrir la classe", "فتح القسم")}
               </Button>
               <Button variant="outline" onClick={() => navigate("exams")}>
                 {l("Examens", "الامتحانات")}
+              </Button>
+              <Button variant="outline" onClick={() => navigate("assignments")}>
+                {l("Devoirs", "الواجبات")}
               </Button>
             </div>
           </div>
@@ -212,9 +214,9 @@ export function PremiumTeacherDashboard() {
               ClipboardCheck,
             ],
             [
-              l("Présence", "الحضور"),
-              l("Marquer la présence de la séance.", "تسجيل حضور الحصة."),
-              "attendance",
+              l("Cours en direct", "الحصص المباشرة"),
+              l("Lancer ou rejoindre une séance.", "بدء أو الانضمام إلى حصة."),
+              "live",
               CalendarDays,
             ],
             [

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search, UserCheck } from "lucide-react";
+import { Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,11 +41,7 @@ import {
   DirectorCoursesPage,
   MaterialsLibraryPage,
 } from "./academic-pages";
-import {
-  TeacherAssignmentsPage,
-  TeacherAttendancePage,
-  TeacherLessonManagerPage,
-} from "./learning-pages";
+import { TeacherAssignmentsPage, TeacherLessonManagerPage } from "./learning-pages";
 import { DirectorExamsPage, StaffExamsPage } from "./exam-pages";
 import { LiveClassesPage } from "./live-pages";
 import { FinancePages } from "./finance-pages";
@@ -64,7 +60,6 @@ export function TeacherPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "students") return <TeacherStudents />;
   if (page === "lessons") return <TeacherLessonManagerPage />;
   if (page === "assignments") return <TeacherAssignmentsPage />;
-  if (page === "attendance") return <TeacherAttendancePage />;
   if (page === "calendar") return <CalendarPage />;
   if (page === "materials") return <MaterialsLibraryPage />;
   if (page === "exams") return <StaffExamsPage />;
@@ -137,7 +132,6 @@ function TeacherStudents() {
 }
 
 function TeacherClass() {
-  const { navigate } = useAcademy();
   const { classesQuery, primaryClass, selector } = useClassSelection();
   const rosterQuery = useClassRoster(primaryClass?.id);
 
@@ -149,15 +143,6 @@ function TeacherClass() {
           primaryClass
             ? `${rosterQuery.data?.length ?? 0} étudiants · ${primaryClass.schedule} · ${primaryClass.teacher}`
             : "Groupes qui vous sont assignés"
-        }
-        action={
-          <Button
-            onClick={() => primaryClass && navigate("attendance", { classId: primaryClass.id })}
-            disabled={!primaryClass}
-          >
-            <UserCheck />
-            Faire l’appel
-          </Button>
         }
       />
       {selector}
@@ -178,7 +163,6 @@ function TeacherClass() {
             <thead>
               <tr>
                 <th>Étudiant</th>
-                <th>Présence</th>
                 <th>Progression</th>
                 <th>Moyenne</th>
                 <th>Statut</th>
@@ -193,7 +177,6 @@ function TeacherClass() {
                       {student.email || student.id}
                     </small>
                   </td>
-                  <td>{student.attendance || "—"}%</td>
                   <td>
                     <div className="w-28">
                       <ProgressLine value={student.progress} />
@@ -420,9 +403,7 @@ function Students() {
                     size="sm"
                     variant="ghost"
                     disabled={setProfileStatus.isPending}
-                    onClick={() =>
-                      applyPendingStatus(profile.id, "suspended", "Compte suspendu")
-                    }
+                    onClick={() => applyPendingStatus(profile.id, "suspended", "Compte suspendu")}
                   >
                     Suspendre
                   </Button>
@@ -1160,11 +1141,7 @@ function Classes() {
                   variant="outline"
                   disabled={replaceSchedules.isPending}
                   onClick={() => {
-                    if (
-                      !window.confirm(
-                        "Retirer tous les créneaux hebdomadaires de ce groupe ?",
-                      )
-                    ) {
+                    if (!window.confirm("Retirer tous les créneaux hebdomadaires de ce groupe ?")) {
                       return;
                     }
                     setWeekdayDraft([]);

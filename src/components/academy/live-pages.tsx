@@ -444,8 +444,8 @@ function LiveSessionLobby() {
           <Surface className="mobile-modal-panel space-y-4">
             <h2 className="text-lg font-semibold">Générer les séances du mois</h2>
             <p className="text-sm text-muted-foreground">
-              Crée automatiquement les cours récurrents (sans doublons) pour le mois en cours,
-              selon l’horaire du groupe.
+              Crée automatiquement les cours récurrents (sans doublons) pour le mois en cours, selon
+              l’horaire du groupe.
             </p>
             <select
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"

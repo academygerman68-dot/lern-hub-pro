@@ -1,8 +1,5 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useClassSelection } from "./class-selection";
+import { useState } from "react";
 import { AssignmentGrading } from "./workflow-pages";
-import { SupabaseAttendanceService } from "@/services/supabase/attendance-service";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +10,6 @@ import {
   useArchiveCourse,
   useArchiveLibraryItem,
   useClasses,
-  useClassRoster,
   useCourseModules,
   useCourses,
   useCreateAssignment,
@@ -23,7 +19,6 @@ import {
   useLevels,
   useLibrary,
   usePublishLesson,
-  useSaveAttendance,
   useUpdateCourse,
   useUploadLibraryItem,
 } from "@/hooks/use-academy-data";
@@ -757,144 +752,6 @@ export function MaterialsLibraryPage() {
         loading={preview?.loading}
         error={preview?.error}
       />
-    </>
-  );
-}
-
-export function TeacherAttendancePage() {
-  const { classesQuery, primaryClass, selector } = useClassSelection();
-  const rosterQuery = useClassRoster(primaryClass?.id);
-  const saveAttendance = useSaveAttendance();
-  const today = new Date();
-  const sessionDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  const existing = useQuery({
-    queryKey: ["attendance", primaryClass?.id, sessionDate],
-    enabled: Boolean(primaryClass),
-    queryFn: async () => {
-      const sessions = await SupabaseAttendanceService.listSessions(primaryClass!.id);
-      const session = sessions.find((s) => s.session_date === sessionDate);
-      return {
-        session,
-        records: session ? await SupabaseAttendanceService.listRecords(session.id) : [],
-      };
-    },
-  });
-  const [marks, setMarks] = useState<Record<string, "present" | "absent" | "late" | "excused">>({});
-
-  const roster = useMemo(() => rosterQuery.data ?? [], [rosterQuery.data]);
-  const effectiveMarks = useMemo(
-    () =>
-      Object.fromEntries(
-        roster.map((s) => [
-          s.id,
-          marks[`${primaryClass?.id}:${sessionDate}:${s.id}`] ??
-            existing.data?.records.find((r) => r.student_id === s.id)?.mark ??
-            "present",
-        ]),
-      ),
-    [existing.data?.records, marks, primaryClass?.id, roster, sessionDate],
-  );
-  const counts = useMemo(() => {
-    const values = roster.map((s) => effectiveMarks[s.id] ?? "present");
-    return {
-      present: values.filter((v) => v === "present").length,
-      late: values.filter((v) => v === "late").length,
-      absent: values.filter((v) => v === "absent").length,
-    };
-  }, [effectiveMarks, roster]);
-
-  return (
-    <>
-      <PageHeader
-        title="Attendance"
-        subtitle={primaryClass ? `${primaryClass.name} · Today` : "Select a class"}
-        action={
-          <Button
-            disabled={
-              !primaryClass ||
-              saveAttendance.isPending ||
-              roster.length === 0 ||
-              existing.isPending ||
-              existing.isError ||
-              rosterQuery.isFetching ||
-              classesQuery.isError
-            }
-            onClick={() => {
-              if (!primaryClass) return;
-              saveAttendance.mutate(
-                {
-                  classId: primaryClass.id,
-                  sessionDate,
-                  records: roster.map((student) => ({
-                    studentId: student.id,
-                    mark: effectiveMarks[student.id] ?? "present",
-                  })),
-                },
-                {
-                  onSuccess: () => {
-                    toast.success("Attendance saved to database");
-                    void existing.refetch();
-                  },
-                  onError: (err) => toast.error(err.message),
-                },
-              );
-            }}
-          >
-            Save attendance
-          </Button>
-        }
-      />
-      {selector}
-      <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <Surface className="p-4 text-sm">
-          Present <strong className="ml-2 text-lg">{counts.present}</strong>
-        </Surface>
-        <Surface className="p-4 text-sm">
-          Late <strong className="ml-2 text-lg">{counts.late}</strong>
-        </Surface>
-        <Surface className="p-4 text-sm">
-          Absent <strong className="ml-2 text-lg">{counts.absent}</strong>
-        </Surface>
-      </div>
-      <QueryState
-        isLoading={
-          classesQuery.isLoading ||
-          rosterQuery.isLoading ||
-          (Boolean(primaryClass) && existing.isPending)
-        }
-        isError={classesQuery.isError || rosterQuery.isError || existing.isError}
-        error={classesQuery.error ?? rosterQuery.error ?? existing.error}
-        isEmpty={roster.length === 0}
-        emptyTitle="No enrolled students"
-        emptyMessage="Enroll students in this class before taking attendance."
-      >
-        <Surface className="divide-y">
-          {roster.map((student) => (
-            <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center" key={student.id}>
-              <span className="flex-1 font-medium">{student.name}</span>
-              <div className="flex flex-wrap gap-2">
-                {(["present", "absent", "late", "excused"] as const).map((item) => (
-                  <Button
-                    key={item}
-                    size="sm"
-                    variant={
-                      (effectiveMarks[student.id] ?? "present") === item ? "default" : "outline"
-                    }
-                    onClick={() =>
-                      setMarks((prev) => ({
-                        ...prev,
-                        [`${primaryClass?.id}:${sessionDate}:${student.id}`]: item,
-                      }))
-                    }
-                  >
-                    {item}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </Surface>
-      </QueryState>
     </>
   );
 }

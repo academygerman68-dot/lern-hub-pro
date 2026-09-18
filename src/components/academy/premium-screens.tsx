@@ -485,9 +485,9 @@ export function LegacyPremiumTeacherDashboard() {
             <p className="text-sm text-muted-foreground">across three classes</p>
           </div>
           <div className="rounded-2xl border border-border p-6">
-            <Eyebrow>Attendance</Eyebrow>
-            <strong className="mt-3 block font-display text-4xl">91%</strong>
-            <p className="text-sm text-success">+2% this month</p>
+            <Eyebrow>Progression</Eyebrow>
+            <strong className="mt-3 block font-display text-4xl">78%</strong>
+            <p className="text-sm text-success">+3% this month</p>
           </div>
         </div>
       </section>
@@ -496,7 +496,7 @@ export function LegacyPremiumTeacherDashboard() {
           <Eyebrow>Students requiring attention</Eyebrow>
           <div className="mt-5 divide-y divide-border border-y border-border">
             {[
-              ["Lina Idrissi", "2 missed sessions", "Attendance"],
+              ["Lina Idrissi", "Writing score 58%", "Learning"],
               ["Omar Tazi", "Writing score 58%", "Learning"],
               ["Sara Bennis", "Assignment overdue", "Assignment"],
             ].map(([name, note, type]) => (
@@ -587,7 +587,6 @@ export function LegacyPremiumDirectorDashboard() {
         <div className="divide-y divide-border rounded-2xl border border-border px-7">
           {[
             ["Revenue", "184,500 MAD", "+6.2%"],
-            ["Attendance", "91%", "+2.0%"],
             ["Learning performance", "78%", "+3.4%"],
             ["Active classes", "16", "stable"],
           ].map(([label, value, trend]) => (
@@ -858,7 +857,7 @@ export function PremiumStudent360() {
       ) : null}
 
       <nav className="mt-9 flex gap-1 overflow-x-auto border-b border-border">
-        {["Aperçu", "Apprentissage", "Présence", "Devoirs", "Examens", "Paiements"].map((item) => (
+        {["Aperçu", "Apprentissage", "Devoirs", "Examens", "Paiements"].map((item) => (
           <button
             key={item}
             onClick={() => setTab(item)}
@@ -884,14 +883,10 @@ export function PremiumStudent360() {
                       : "Avancé"}
               </h2>
               <p className="mt-3 text-sm text-primary-foreground/60">{student.email}</p>
-              <div className="mt-7 grid grid-cols-3 gap-4 border-t border-primary-foreground/10 pt-6">
+              <div className="mt-7 grid grid-cols-2 gap-4 border-t border-primary-foreground/10 pt-6">
                 <div>
                   <strong className="block text-xl">{student.average || "—"}%</strong>
                   <small className="text-primary-foreground/55">moyenne</small>
-                </div>
-                <div>
-                  <strong className="block text-xl">{student.attendance || "—"}%</strong>
-                  <small className="text-primary-foreground/55">présence</small>
                 </div>
                 <div>
                   <strong className="block text-xl">{student.progress || "—"}%</strong>
@@ -916,9 +911,9 @@ export function PremiumStudent360() {
       <section className="mt-10 grid gap-9 lg:grid-cols-3">
         <div>
           <Eyebrow>{tab}</Eyebrow>
-          <strong className="mt-4 block font-display text-4xl">{student.attendance || "—"}%</strong>
+          <strong className="mt-4 block font-display text-4xl">{student.progress || "—"}%</strong>
           <p className="mt-2 text-sm text-muted-foreground">
-            Présence · groupe {student.className}
+            Progression · groupe {student.className}
           </p>
         </div>
         <div>

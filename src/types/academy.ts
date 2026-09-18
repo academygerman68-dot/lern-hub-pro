@@ -33,7 +33,6 @@ export const TEACHER_PAGES = [
   "materials",
   "assignments",
   "exams",
-  "attendance",
   "live",
   "meeting",
   "messages",
@@ -78,7 +77,6 @@ export interface Student {
   level: Level;
   className: string;
   progress: number;
-  attendance: number;
   average: number;
   subscription: SubscriptionStatus;
   firstName: string;

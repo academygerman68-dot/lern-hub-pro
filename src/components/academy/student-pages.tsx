@@ -36,8 +36,8 @@ function PendingAccountPage() {
       <h1 className="font-display text-2xl font-medium">Compte en attente de validation</h1>
       <p className="text-sm leading-6 text-muted-foreground">{STUDENT_PENDING_MESSAGE}</p>
       <p className="text-sm text-muted-foreground">
-        Vous pouvez consulter votre profil. Les cours, devoirs, examens et réunions restent
-        bloqués jusqu’à l’acceptation par un administrateur.
+        Vous pouvez consulter votre profil. Les cours, devoirs, examens et réunions restent bloqués
+        jusqu’à l’acceptation par un administrateur.
       </p>
     </Surface>
   );

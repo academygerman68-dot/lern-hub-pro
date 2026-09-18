@@ -16,7 +16,14 @@ import { LEAD_TEACHER } from "@/data/demo-accounts";
 import { queryKeys } from "@/lib/query-keys";
 import { getLiveSessionJoinState } from "@/lib/jitsi-config";
 import { setLiveSessionId } from "@/lib/live-class-session";
-import { openExternalMeeting, joinLiveSession, videoProviderLabel, liveStatusLabel, formatLiveTime, isLiveSessionExpired } from "@/lib/live-meeting";
+import {
+  openExternalMeeting,
+  joinLiveSession,
+  videoProviderLabel,
+  liveStatusLabel,
+  formatLiveTime,
+  isLiveSessionExpired,
+} from "@/lib/live-meeting";
 import {
   AssignmentService,
   CourseService,
@@ -1048,7 +1055,6 @@ export function DirectorReports() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Metric label="Croissance des inscriptions" value="+12" note="Nouveaux étudiants ce mois" />
         <Metric label="Revenus" value="184 500 MAD" note="+6,2 % vs mois précédent" />
-        <Metric label="Présence" value="91 %" note="Sur l’ensemble des groupes" />
         <Metric label="Taux de réussite" value="78 %" note="Examens blancs" />
         <Metric label="Factures en retard" value="12" note="14 400 MAD" />
         <Metric label="Charge professeurs" value="86 %" />
@@ -1187,8 +1193,7 @@ export function RecordingsPage() {
   const pastSessions = useMemo(
     () =>
       (sessionsQuery.data ?? []).filter(
-        (s) =>
-          s.status === "completed" && (!classId || s.class_id === classId),
+        (s) => s.status === "completed" && (!classId || s.class_id === classId),
       ),
     [sessionsQuery.data, classId],
   );

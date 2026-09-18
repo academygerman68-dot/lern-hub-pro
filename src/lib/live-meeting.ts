@@ -87,9 +87,7 @@ export function isLiveSessionExpired(
 ) {
   if (session.status === "completed" || session.status === "cancelled") return true;
   const start = new Date(session.starts_at).getTime();
-  const end = session.ends_at
-    ? new Date(session.ends_at).getTime()
-    : start + 2 * 3600_000;
+  const end = session.ends_at ? new Date(session.ends_at).getTime() : start + 2 * 3600_000;
   if (!Number.isFinite(start) || !Number.isFinite(end)) return true;
   return now > end + graceMs;
 }

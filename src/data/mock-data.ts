@@ -63,7 +63,6 @@ export const students: Student[] = names.map((name, i) => {
     level: levels[i] ?? "A1",
     className: `${levels[i] ?? "A1"}-G${(i % 2) + 1}`,
     progress: i === 0 ? 68 : 42 + ((i * 7) % 50),
-    attendance: i === 0 ? 94 : 79 + ((i * 3) % 20),
     average: i === 0 ? 81 : 64 + ((i * 5) % 29),
     subscription: i === 3 ? "SUSPENDED" : i === 7 ? "PAST_DUE" : "ACTIVE",
     firstName,
