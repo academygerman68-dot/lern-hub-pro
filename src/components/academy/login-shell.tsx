@@ -7,10 +7,12 @@ export function LoginShell({
   title,
   subtitle,
   children,
+  footer,
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
+  footer?: ReactNode;
 }) {
   const { locale, setLocale, l } = useAcademy();
   // Recreate localized DOM nodes so the legacy global localizer cannot restore
@@ -120,7 +122,10 @@ export function LoginShell({
           </div>
           <h2 id="gla-login-title">{title}</h2>
           {subtitle && <p className="gla-login-subtitle">{subtitle}</p>}
-          <div className="gla-login-content">{children}</div>
+          <div className="gla-login-content">
+            {children}
+            {footer}
+          </div>
         </section>
       </div>
 

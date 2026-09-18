@@ -92,3 +92,63 @@ export function scoreExam(answers: Record<number, number>): ExamScore {
     ],
   };
 }
+
+export type TeacherScope = {
+  classIds: Set<string>;
+  levelIds: Set<string>;
+  levelCodes: Set<string>;
+};
+
+export function isDirectorRole(role: Role | null | undefined) {
+  return role === "director";
+}
+
+export function buildTeacherScope(
+  classes: Array<{ id: string; levelId?: string | null; level?: string }>,
+): TeacherScope {
+  return {
+    classIds: new Set(classes.map((item) => item.id)),
+    levelIds: new Set(
+      classes.map((item) => item.levelId).filter((value): value is string => Boolean(value)),
+    ),
+    levelCodes: new Set(
+      classes.map((item) => item.level).filter((value): value is string => Boolean(value)),
+    ),
+  };
+}
+
+export function scopedClassOrLevelItemVisible(
+  item: {
+    class_id?: string | null;
+    classId?: string | null;
+    level_id?: string | null;
+    levelId?: string | null;
+    class?: { id: string } | null;
+    level?: { id: string } | null;
+  },
+  scope: TeacherScope,
+) {
+  const classId = item.class_id ?? item.classId ?? item.class?.id ?? null;
+  if (classId) return scope.classIds.has(classId);
+  const levelId = item.level_id ?? item.levelId ?? item.level?.id ?? null;
+  if (levelId) return scope.levelIds.has(levelId);
+  return false;
+}
+
+export function scopedLibraryItemVisible(
+  item: { audience: string; class_id?: string | null; level_code?: string | null },
+  scope: TeacherScope,
+) {
+  if (item.audience === "everyone") return true;
+  if (item.audience === "level") {
+    return Boolean(item.level_code && scope.levelCodes.has(item.level_code));
+  }
+  if (item.audience === "class") {
+    return Boolean(item.class_id && scope.classIds.has(item.class_id));
+  }
+  return false;
+}
+
+export function hideArchivedStatus<T extends { status?: string | null }>(items: T[]) {
+  return items.filter((item) => item.status !== "archived");
+}

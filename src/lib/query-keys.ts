@@ -50,6 +50,7 @@ export const queryKeys = {
     answers: (attemptId: string) => ["exams", "answers", attemptId] as const,
     result: (attemptId: string) => ["exams", "result", attemptId] as const,
     myAttempts: ["exams", "my-attempts"] as const,
+    allAttempts: ["exams", "all-attempts"] as const,
   },
   payments: {
     all: ["payments"] as const,

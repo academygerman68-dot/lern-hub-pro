@@ -29,6 +29,7 @@ import {
   openExternalMeeting,
   videoProviderLabel,
   zoomHrefForViewer,
+  zoomMeetingDurationMinutes,
 } from "@/lib/live-meeting";
 import { LiveSessionService } from "@/services/academy-services";
 import type { LiveSessionListItem } from "@/services/supabase/live-session-service";
@@ -81,6 +82,7 @@ function SessionCard({
   item,
   isStaff,
   onStart,
+  onEnd,
   onEmergency,
   onCopyZoom,
   onRevertJitsi,
@@ -88,11 +90,13 @@ function SessionCard({
   item: LiveSessionListItem;
   isStaff: boolean;
   onStart: () => void;
+  onEnd: () => void;
   onEmergency: () => void;
   onCopyZoom: () => void;
   onRevertJitsi: () => void;
 }) {
   const zoom = isZoomActive(item.video_provider);
+  const durationMin = zoomMeetingDurationMinutes(item.starts_at, item.ends_at);
   const joinState = getLiveSessionJoinState({
     startsAt: item.starts_at,
     endsAt: item.ends_at,
@@ -106,6 +110,7 @@ function SessionCard({
         ? "Cette séance est fermée."
         : null;
   const canAct = item.status === "scheduled" || item.status === "live";
+  const joinLabel = isStaff ? (item.status === "live" ? "Rejoindre" : "Démarrer") : "Rejoindre";
 
   return (
     <Surface className="p-5">
@@ -116,23 +121,24 @@ function SessionCard({
         <div className="min-w-0 flex-1 space-y-1">
           <h2 className="text-lg font-semibold">{item.title}</h2>
           <p className="text-sm text-muted-foreground">
-            Groupe {item.class?.name ?? "—"} · Niveau {item.class?.level?.code ?? "—"}
-            {isStaff ? "" : ` · ${teacherLabel(item)}`}
+            Professeur : <strong className="text-foreground">{teacherLabel(item)}</strong>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Groupe : <strong className="text-foreground">{item.class?.name ?? "—"}</strong>
+            {item.class?.level?.code ? ` · Niveau ${item.class.level.code}` : ""}
           </p>
           <p className="text-sm text-muted-foreground">
             {formatLiveDate(item.starts_at)} · {formatLiveTime(item.starts_at)}
             {item.ends_at ? ` – ${formatLiveTime(item.ends_at)}` : ""}
+            {" · "}
+            {durationMin} min
           </p>
-          {isStaff && (
-            <>
-              <p className="text-sm">
-                Mode : <strong>En ligne</strong>
-              </p>
-              <p className="text-sm">
-                Visioconférence : <strong>{videoProviderLabel(item.video_provider, zoom)}</strong>
-              </p>
-            </>
-          )}
+          <p className="text-sm text-muted-foreground">
+            Visioconférence :{" "}
+            <strong className="text-foreground">
+              {videoProviderLabel(item.video_provider, zoom)}
+            </strong>
+          </p>
           {!joinState.allowed && unavailableLabel ? (
             <p className="text-xs text-muted-foreground">{unavailableLabel}</p>
           ) : null}
@@ -147,12 +153,13 @@ function SessionCard({
             <>
               <Button onClick={onStart} disabled={!joinState.allowed && !isStaff}>
                 <Video className="size-4" />
-                {isStaff
-                  ? zoom
-                    ? "Démarrer la réunion Zoom"
-                    : "Démarrer la réunion"
-                  : "Rejoindre le cours"}
+                {joinLabel}
               </Button>
+              {isStaff && item.status === "live" && (
+                <Button variant="outline" onClick={onEnd}>
+                  Terminer
+                </Button>
+              )}
               {isStaff && !zoom && (
                 <Button variant="outline" onClick={onEmergency}>
                   Réunion d’urgence Zoom
@@ -234,6 +241,16 @@ function LiveSessionLobby() {
     }
   };
 
+  const endSession = (session: LiveSessionListItem) => {
+    updateStatus.mutate(
+      { id: session.id, status: "completed" },
+      {
+        onSuccess: () => toast.success("Séance terminée"),
+        onError: (err) => toast.error(err.message),
+      },
+    );
+  };
+
   const copyZoom = async (id: string) => {
     try {
       const target = await LiveSessionService.joinTarget(id);
@@ -290,27 +307,27 @@ function LiveSessionLobby() {
         }
       />
 
-      <Surface className="mb-4 p-4 text-sm">
-        <p className="font-medium">
-          {recordingProvider.data?.configured
-            ? recordingProvider.data.message
-            : "Enregistrement non configuré"}
-        </p>
-        {recordingProvider.data?.configured && (recordingsQuery.data?.length ?? 0) > 0 && (
-          <ul className="mt-3 space-y-2">
-            {recordingsQuery.data
-              ?.filter((r) => r.status === "ready")
-              .map((r) => (
-                <li key={r.id} className="flex justify-between gap-2">
-                  <span>{r.title}</span>
-                  <span className="text-muted-foreground">
-                    {r.duration_seconds ? `${Math.round(r.duration_seconds / 60)} min` : "—"}
-                  </span>
-                </li>
-              ))}
-          </ul>
-        )}
-      </Surface>
+      {recordingProvider.data?.configured ? (
+        <Surface className="mb-4 p-4 text-sm">
+          <p className="font-medium">{recordingProvider.data.message}</p>
+          {(recordingsQuery.data?.length ?? 0) > 0 && (
+            <ul className="mt-3 space-y-2">
+              {recordingsQuery.data
+                ?.filter((r) => r.status === "ready")
+                .map((r) => (
+                  <li key={r.id} className="flex justify-between gap-2">
+                    <span>{r.title}</span>
+                    <span className="text-muted-foreground">
+                      {r.duration_seconds ? `${Math.round(r.duration_seconds / 60)} min` : "—"}
+                    </span>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </Surface>
+      ) : (
+        <p className="mb-4 text-xs text-muted-foreground">Enregistrement non configuré</p>
+      )}
 
       <QueryState
         isLoading={sessionsQuery.isLoading}
@@ -337,6 +354,7 @@ function LiveSessionLobby() {
                   item={item}
                   isStaff={isStaff}
                   onStart={() => void startSession(item)}
+                  onEnd={() => endSession(item)}
                   onEmergency={() => setConfirmZoomId(item.id)}
                   onCopyZoom={() => void copyZoom(item.id)}
                   onRevertJitsi={() => setConfirmJitsiId(item.id)}
@@ -357,6 +375,7 @@ function LiveSessionLobby() {
                   item={item}
                   isStaff={isStaff}
                   onStart={() => void startSession(item)}
+                  onEnd={() => endSession(item)}
                   onEmergency={() => setConfirmZoomId(item.id)}
                   onCopyZoom={() => void copyZoom(item.id)}
                   onRevertJitsi={() => setConfirmJitsiId(item.id)}
@@ -371,7 +390,11 @@ function LiveSessionLobby() {
         <div className="mobile-modal">
           <Surface className="mobile-modal-panel space-y-4">
             <h2 className="text-lg font-semibold">Réunion exceptionnelle</h2>
-            <Input placeholder="Titre" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Input
+              placeholder="Cours allemand"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
             <select
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={classId}

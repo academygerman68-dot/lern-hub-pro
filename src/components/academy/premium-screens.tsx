@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Area,
   AreaChart,
@@ -32,8 +33,19 @@ import { Button } from "@/components/ui/button";
 import { LEAD_TEACHER } from "@/data/demo-accounts";
 import { modules } from "@/data/mock-data";
 import { initials } from "@/lib/academy-logic";
-import { useSetProfileStatus, useStudent, useStudents } from "@/hooks/use-academy-data";
+import {
+  useEnrollmentsByStudent,
+  usePayments,
+  usePublishedExams,
+  useSetProfileStatus,
+  useStudent,
+  useStudents,
+} from "@/hooks/use-academy-data";
+import { queryKeys } from "@/lib/query-keys";
+import { AssignmentService, AuthService } from "@/services/academy-services";
+import type { Student } from "@/types/academy";
 import { useAcademy } from "./academy-context";
+import { paymentStatusLabel } from "./finance-pages";
 import { StudentExamsPage } from "./exam-pages";
 import { QueryState } from "./query-state";
 import { Eyebrow, PremiumHeader, Ring, SkillBars, Status } from "./premium-kit";
@@ -686,16 +698,47 @@ export function LegacyPremiumDirectorDashboard() {
   );
 }
 
+function subscriptionLabel(status: Student["subscription"]) {
+  if (status === "ACTIVE") return "Actif";
+  if (status === "PAST_DUE") return "En retard";
+  if (status === "SUSPENDED") return "Suspendu";
+  return status;
+}
+
 export function PremiumStudent360() {
   const { navigate, selectedStudentId, role } = useAcademy();
   const [tab, setTab] = useState("Aperçu");
   const [confirmStatus, setConfirmStatus] = useState<"active" | "restricted" | "suspended" | null>(
     null,
   );
+  const [resettingPassword, setResettingPassword] = useState(false);
   const studentQuery = useStudent(selectedStudentId);
+  const enrollmentsQuery = useEnrollmentsByStudent(selectedStudentId);
+  const paymentsQuery = usePayments(selectedStudentId ?? undefined);
+  const examsQuery = usePublishedExams();
   const setProfileStatus = useSetProfileStatus();
   const student = studentQuery.data ?? null;
   const isDirector = role === "director";
+  const assignmentsQuery = useQuery({
+    queryKey: student?.classId
+      ? queryKeys.assignments.byClass(student.classId)
+      : (["assignments", "student360", "none"] as const),
+    queryFn: () => AssignmentService.list(student!.classId!),
+    enabled: Boolean(student?.classId),
+  });
+
+  const activeEnrollment = (enrollmentsQuery.data ?? []).find((row) => row.status === "active");
+  const enrollmentDate = activeEnrollment?.start_date ?? activeEnrollment?.created_at ?? null;
+  const relevantExams = useMemo(() => {
+    const rows = examsQuery.data ?? [];
+    if (!student) return rows;
+    return rows.filter(
+      (exam) =>
+        !exam.level?.code ||
+        exam.level.code === student.level ||
+        (exam.class_id && exam.class_id === student.classId),
+    );
+  }, [examsQuery.data, student]);
 
   const accountTone =
     student?.accountStatus === "active"
@@ -730,6 +773,19 @@ export function PremiumStudent360() {
         onError: (err) => toast.error(err.message),
       },
     );
+  };
+
+  const requestPasswordReset = async (email: string) => {
+    if (!email.trim()) return;
+    setResettingPassword(true);
+    try {
+      await AuthService.requestReset(email.trim());
+      toast.success("Lien de réinitialisation envoyé.");
+    } catch {
+      toast.error("Impossible d'envoyer le lien de réinitialisation.");
+    } finally {
+      setResettingPassword(false);
+    }
   };
 
   if (studentQuery.isLoading || studentQuery.isError || !student) {
@@ -790,6 +846,15 @@ export function PremiumStudent360() {
           {student.phone ? (
             <Button variant="outline" asChild>
               <a href={`tel:${student.phone}`}>Appeler</a>
+            </Button>
+          ) : null}
+          {student.email ? (
+            <Button
+              variant="outline"
+              disabled={resettingPassword}
+              onClick={() => void requestPasswordReset(student.email)}
+            >
+              Réinitialiser le mot de passe
             </Button>
           ) : null}
         </div>
@@ -857,7 +922,7 @@ export function PremiumStudent360() {
       ) : null}
 
       <nav className="mt-9 flex gap-1 overflow-x-auto border-b border-border">
-        {["Aperçu", "Apprentissage", "Devoirs", "Examens", "Paiements"].map((item) => (
+        {["Aperçu", "Devoirs", "Examens", "Paiements"].map((item) => (
           <button
             key={item}
             onClick={() => setTab(item)}
@@ -867,78 +932,192 @@ export function PremiumStudent360() {
           </button>
         ))}
       </nav>
-      <section className="mt-9 grid gap-6 xl:grid-cols-[1.35fr_.65fr]">
-        <div className="rounded-2xl bg-brand p-8 text-primary-foreground">
-          <Eyebrow>Progression</Eyebrow>
-          <div className="mt-5 grid items-center gap-8 sm:grid-cols-[1fr_auto]">
+
+      {tab === "Aperçu" && (
+        <>
+          <section className="mt-6 grid gap-4 rounded-2xl border border-border bg-card p-6 text-sm sm:grid-cols-2 lg:grid-cols-3">
             <div>
-              <h2 className="font-display text-4xl">
-                {student.level} ·{" "}
-                {student.level === "A1"
-                  ? "Fondations"
-                  : student.level === "A2"
-                    ? "Intermédiaire"
-                    : student.level === "B1"
-                      ? "Indépendant"
-                      : "Avancé"}
-              </h2>
-              <p className="mt-3 text-sm text-primary-foreground/60">{student.email}</p>
-              <div className="mt-7 grid grid-cols-2 gap-4 border-t border-primary-foreground/10 pt-6">
+              <small className="text-muted-foreground">Identité</small>
+              <p className="mt-1 font-medium">
+                {student.lastName} {student.firstName}
+              </p>
+            </div>
+            <div>
+              <small className="text-muted-foreground">Niveau</small>
+              <p className="mt-1 font-medium">{student.level}</p>
+            </div>
+            <div>
+              <small className="text-muted-foreground">Groupe</small>
+              <p className="mt-1 font-medium">{student.className || "—"}</p>
+            </div>
+            <div>
+              <small className="text-muted-foreground">Professeur</small>
+              <p className="mt-1 font-medium">{student.teacherName || "—"}</p>
+            </div>
+            <div>
+              <small className="text-muted-foreground">Statut compte</small>
+              <p className="mt-1 font-medium">{accountLabel}</p>
+            </div>
+            <div>
+              <small className="text-muted-foreground">Abonnement</small>
+              <p className="mt-1 font-medium">{subscriptionLabel(student.subscription)}</p>
+            </div>
+            <div>
+              <small className="text-muted-foreground">Inscription</small>
+              <p className="mt-1 font-medium">
+                {enrollmentDate ? new Date(enrollmentDate).toLocaleDateString("fr-FR") : "—"}
+              </p>
+            </div>
+          </section>
+          <section className="mt-6 grid gap-6 xl:grid-cols-[1.35fr_.65fr]">
+            <div className="rounded-2xl bg-brand p-8 text-primary-foreground">
+              <Eyebrow>Progression</Eyebrow>
+              <div className="mt-5 grid items-center gap-8 sm:grid-cols-[1fr_auto]">
                 <div>
-                  <strong className="block text-xl">{student.average || "—"}%</strong>
-                  <small className="text-primary-foreground/55">moyenne</small>
+                  <h2 className="font-display text-4xl">{student.level}</h2>
+                  <div className="mt-7 grid grid-cols-2 gap-4 border-t border-primary-foreground/10 pt-6">
+                    <div>
+                      <strong className="block text-xl">{student.average || "—"}%</strong>
+                      <small className="text-primary-foreground/55">moyenne</small>
+                    </div>
+                    <div>
+                      <strong className="block text-xl">{student.progress || "—"}%</strong>
+                      <small className="text-primary-foreground/55">progression</small>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <strong className="block text-xl">{student.progress || "—"}%</strong>
-                  <small className="text-primary-foreground/55">progression</small>
-                </div>
+                <Ring value={student.progress} dark size={150} />
               </div>
             </div>
-            <Ring value={student.progress} dark size={150} />
-          </div>
-        </div>
-        <div className="rounded-2xl bg-success-soft p-7">
-          <Eyebrow>Statut abonnement</Eyebrow>
-          <CheckCircle2 className="mt-5 size-7 text-success" />
-          <h2 className="mt-4 font-display text-2xl">{student.subscription}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Compte · {accountLabel}</p>
-          <div className="mt-6 border-t border-success/15 pt-5">
-            <small className="text-muted-foreground">Professeur</small>
-            <strong className="mt-1 block">{student.teacherName || "—"}</strong>
-          </div>
-        </div>
-      </section>
-      <section className="mt-10 grid gap-9 lg:grid-cols-3">
-        <div>
-          <Eyebrow>{tab}</Eyebrow>
-          <strong className="mt-4 block font-display text-4xl">{student.progress || "—"}%</strong>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Progression · groupe {student.className}
-          </p>
-        </div>
-        <div>
-          <Eyebrow>Coordonnées</Eyebrow>
-          <div className="mt-4 space-y-3 text-sm">
-            <p>
-              <span className="text-muted-foreground">Nom</span>
-              <br />
-              {student.lastName} {student.firstName}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Téléphone</span>
-              <br />
-              {student.phone || "—"}
-            </p>
-          </div>
-        </div>
-        <div>
-          <Eyebrow>Parcours</Eyebrow>
-          <h2 className="mt-4 font-display text-2xl">{student.level}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {student.className} · {student.teacherName || "Sans professeur"}
-          </p>
-        </div>
-      </section>
+            <div className="rounded-2xl bg-success-soft p-7">
+              <Eyebrow>Statut abonnement</Eyebrow>
+              <CheckCircle2 className="mt-5 size-7 text-success" />
+              <h2 className="mt-4 font-display text-2xl">
+                {subscriptionLabel(student.subscription)}
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">Compte · {accountLabel}</p>
+              <div className="mt-6 border-t border-success/15 pt-5">
+                <small className="text-muted-foreground">Professeur</small>
+                <strong className="mt-1 block">{student.teacherName || "—"}</strong>
+              </div>
+            </div>
+          </section>
+        </>
+      )}
+
+      {tab === "Devoirs" && (
+        <section className="mt-6">
+          <QueryState
+            isLoading={assignmentsQuery.isLoading}
+            isError={assignmentsQuery.isError}
+            error={assignmentsQuery.error}
+            isEmpty={!student.classId || !(assignmentsQuery.data ?? []).length}
+            emptyTitle={student.classId ? "Aucun devoir" : "Aucun groupe assigné"}
+            emptyMessage={
+              student.classId
+                ? "Les devoirs publiés pour ce groupe apparaîtront ici."
+                : "Inscrivez l'étudiant dans un groupe pour voir ses devoirs."
+            }
+            onRetry={() => void assignmentsQuery.refetch()}
+          >
+            <div className="space-y-3">
+              {(assignmentsQuery.data ?? []).map((assignment) => (
+                <Surface
+                  key={assignment.id}
+                  className="flex flex-wrap items-center justify-between gap-3 p-4"
+                >
+                  <div>
+                    <p className="font-medium">{assignment.title}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Échéance · {assignment.due}
+                    </p>
+                  </div>
+                  <Status tone={assignment.status === "Publié" ? "green" : "amber"}>
+                    {assignment.status}
+                  </Status>
+                </Surface>
+              ))}
+            </div>
+          </QueryState>
+        </section>
+      )}
+
+      {tab === "Examens" && (
+        <section className="mt-6">
+          <QueryState
+            isLoading={examsQuery.isLoading}
+            isError={examsQuery.isError}
+            error={examsQuery.error}
+            isEmpty={!relevantExams.length}
+            emptyTitle="Aucun examen publié"
+            emptyMessage="Les examens blancs publiés pour ce niveau apparaîtront ici."
+            onRetry={() => void examsQuery.refetch()}
+          >
+            <div className="space-y-3">
+              {relevantExams.map((exam) => (
+                <Surface
+                  key={exam.id}
+                  className="flex flex-wrap items-center justify-between gap-3 p-4"
+                >
+                  <div>
+                    <p className="font-medium">{exam.title}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {exam.level?.code ?? "—"}
+                      {exam.class?.name ? ` · ${exam.class.name}` : ""}
+                    </p>
+                  </div>
+                  <Status tone="blue">Publié</Status>
+                </Surface>
+              ))}
+            </div>
+          </QueryState>
+        </section>
+      )}
+
+      {tab === "Paiements" && (
+        <section className="mt-6">
+          <QueryState
+            isLoading={paymentsQuery.isLoading}
+            isError={paymentsQuery.isError}
+            error={paymentsQuery.error}
+            isEmpty={!(paymentsQuery.data ?? []).length}
+            emptyTitle="Aucun paiement"
+            emptyMessage="L'historique des paiements de cet étudiant apparaîtra ici."
+            onRetry={() => void paymentsQuery.refetch()}
+          >
+            <div className="space-y-3">
+              {(paymentsQuery.data ?? []).map((payment) => (
+                <Surface
+                  key={payment.id}
+                  className="flex flex-wrap items-center justify-between gap-3 p-4"
+                >
+                  <div>
+                    <p className="font-medium">
+                      {Number(payment.amount).toLocaleString("fr-FR")} MAD
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {payment.due_date
+                        ? `Échéance · ${new Date(payment.due_date).toLocaleDateString("fr-FR")}`
+                        : new Date(payment.created_at).toLocaleDateString("fr-FR")}
+                    </p>
+                  </div>
+                  <Status
+                    tone={
+                      payment.status === "overdue"
+                        ? "red"
+                        : payment.status === "paid"
+                          ? "green"
+                          : "amber"
+                    }
+                  >
+                    {paymentStatusLabel(payment.status)}
+                  </Status>
+                </Surface>
+              ))}
+            </div>
+          </QueryState>
+        </section>
+      )}
 
       {confirmStatus && (
         <div className="mobile-modal">

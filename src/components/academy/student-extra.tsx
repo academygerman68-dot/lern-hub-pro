@@ -9,10 +9,22 @@ import {
   Upload,
   Video,
 } from "lucide-react";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LEAD_TEACHER } from "@/data/demo-accounts";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { queryKeys } from "@/lib/query-keys";
 import { getLiveSessionJoinState } from "@/lib/jitsi-config";
 import { setLiveSessionId } from "@/lib/live-class-session";
@@ -23,6 +35,8 @@ import {
   liveStatusLabel,
   formatLiveTime,
   isLiveSessionExpired,
+  isZoomActive,
+  zoomMeetingDurationMinutes,
 } from "@/lib/live-meeting";
 import {
   AssignmentService,
@@ -32,9 +46,12 @@ import {
   RecordingService,
 } from "@/services/academy-services";
 import { SettingsService } from "@/services/supabase/settings-service";
+import { PeoplePicker } from "./people-picker";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useAddConversationMember,
+  useAllExamAttempts,
+  useAssignments,
   useClasses,
   useConversationMessages,
   useConversations,
@@ -42,7 +59,9 @@ import {
   useCreateRecordingFromUrl,
   useLiveSessions,
   useLiveSessionsRealtime,
+  useUpdateLiveSessionStatus,
   useMyExamAttempts,
+  usePayments,
   useRecordings,
   useRemoveConversationMember,
   useSendMessage,
@@ -50,9 +69,67 @@ import {
   useTeachers,
   useUploadRecording,
 } from "@/hooks/use-academy-data";
+import type { ClassDetail } from "@/lib/academy-mappers";
+import type { Student } from "@/types/academy";
 import { Metric, PageHeader, ProgressLine, Status, Surface } from "./primitives";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
+
+type PeriodDays = 30 | 90 | 365;
+
+function settingString(
+  map: Record<string, unknown> | undefined,
+  key: string,
+  fallback = "",
+): string {
+  const value = map?.[key];
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (typeof value === "boolean") return value ? "true" : "false";
+  return fallback;
+}
+
+function formatMoney(amount: number, currency: string) {
+  const code = currency.trim() || "MAD";
+  try {
+    return new Intl.NumberFormat("fr-FR", {
+      style: "currency",
+      currency: code,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${Math.round(amount).toLocaleString("fr-FR")} ${code}`;
+  }
+}
+
+function withinPeriod(iso: string | null | undefined, cutoff: Date) {
+  if (!iso) return false;
+  return new Date(iso).getTime() >= cutoff.getTime();
+}
+
+function studentMatchesFilters(
+  student: Student,
+  classes: ClassDetail[],
+  filters: { level: string; classId: string; teacherId: string },
+) {
+  if (filters.level && student.level !== filters.level) return false;
+  if (filters.classId && student.classId !== filters.classId) return false;
+  if (filters.teacherId) {
+    const klass = classes.find((item) => item.id === student.classId);
+    if (klass?.teacherId !== filters.teacherId) return false;
+  }
+  return true;
+}
+
+function classMatchesFilters(
+  klass: ClassDetail,
+  filters: { level: string; classId: string; teacherId: string },
+) {
+  if (filters.level && klass.level !== filters.level) return false;
+  if (filters.classId && klass.id !== filters.classId) return false;
+  if (filters.teacherId && klass.teacherId !== filters.teacherId) return false;
+  return true;
+}
 
 export function Materials() {
   const [type, setType] = useState("All");
@@ -127,6 +204,7 @@ export function CalendarPage() {
   const sessionsQuery = useLiveSessions();
   const classesQuery = useClasses();
   const teachersQuery = useTeachers();
+  const updateStatus = useUpdateLiveSessionStatus();
   const [view, setView] = useState<"week" | "month">("week");
   const [anchor, setAnchor] = useState(() => {
     const d = new Date();
@@ -229,9 +307,18 @@ export function CalendarPage() {
         },
         resolveTarget: (id) => LiveSessionService.joinTarget(id),
       });
+      if (isStaff && selected.status === "scheduled") {
+        updateStatus.mutate({ id: selected.id, status: "live" });
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Ouverture impossible");
     }
+  };
+
+  const sessionMetaLine = (session: (typeof sessions)[number]) => {
+    const duration = zoomMeetingDurationMinutes(session.starts_at, session.ends_at);
+    const zoom = isZoomActive(session.video_provider);
+    return `${formatRange(session.starts_at, session.ends_at)} · ${session.class?.name ?? "—"} · ${teacherName(session)} · ${videoProviderLabel(session.video_provider, zoom)} · ${liveStatusLabel(session.status)} · ${duration} min`;
   };
 
   return (
@@ -341,10 +428,8 @@ export function CalendarPage() {
                         onClick={() => setSelectedId(session.id)}
                       >
                         <strong className="block text-xs">{session.title}</strong>
-                        <p className="mt-1 text-[11px] text-muted-foreground">
-                          {formatLiveTime(session.starts_at)} · {session.class?.name ?? "—"} ·{" "}
-                          {teacherName(session)} · {liveStatusLabel(session.status)} /{" "}
-                          {videoProviderLabel(session.video_provider, true)}
+                        <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                          {sessionMetaLine(session)}
                         </p>
                       </button>
                     ))}
@@ -381,8 +466,8 @@ export function CalendarPage() {
                           className="block w-full truncate rounded bg-secondary px-1 py-0.5 text-[10px]"
                           onClick={() => setSelectedId(session.id)}
                         >
-                          {formatLiveTime(session.starts_at)} · {session.class?.name ?? "—"} ·{" "}
-                          {liveStatusLabel(session.status)}
+                          {formatRange(session.starts_at, session.ends_at)} ·{" "}
+                          {session.class?.name ?? "—"} · {liveStatusLabel(session.status)}
                         </button>
                       ))}
                       {items.length > 3 && (
@@ -399,47 +484,42 @@ export function CalendarPage() {
 
       {selected && (
         <div className="mobile-modal">
-          <Surface className="mobile-modal-panel space-y-3">
-            <h2 className="text-lg font-semibold">{selected.title}</h2>
-            <p className="text-sm text-muted-foreground">
-              {formatRange(selected.starts_at, selected.ends_at)} ·{" "}
-              {new Date(selected.starts_at).toLocaleDateString("fr-FR")}
-            </p>
-            <p className="text-sm">
-              {formatLiveTime(selected.starts_at)} · {selected.class?.name ?? "—"} ·{" "}
-              {teacherName(selected)} · {liveStatusLabel(selected.status)} /{" "}
-              {videoProviderLabel(selected.video_provider, true)}
-            </p>
-            <p className="text-sm">
-              Groupe : <strong>{selected.class?.name ?? "—"}</strong>
-            </p>
-            <p className="text-sm">
-              Niveau : <strong>{selected.class?.level?.code ?? "—"}</strong>
-            </p>
-            <p className="text-sm">
-              Professeur : <strong>{teacherName(selected)}</strong>
-            </p>
-            <p className="text-sm">
-              Mode : <strong>En ligne</strong>
-            </p>
-            {isStaff && (
-              <p className="text-sm">
-                Visioconférence :{" "}
-                <strong>
-                  {videoProviderLabel(selected.video_provider, selected.video_provider === "zoom")}
-                </strong>
-              </p>
-            )}
-            <p className="text-sm text-muted-foreground">
-              Statut :{" "}
-              {selected.status === "live"
-                ? "En direct"
-                : selected.status === "scheduled"
-                  ? "Planifiée"
-                  : selected.status === "completed"
-                    ? "Terminée"
-                    : "Annulée"}
-            </p>
+          <Surface className="mobile-modal-panel space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="text-lg font-semibold">{selected.title}</h2>
+              <Status
+                tone={
+                  selected.status === "live"
+                    ? "green"
+                    : selected.status === "scheduled"
+                      ? "amber"
+                      : "red"
+                }
+              >
+                {liveStatusLabel(selected.status)}
+              </Status>
+            </div>
+            <dl className="text-sm">
+              <div className="grid grid-cols-[minmax(0,7rem)_1fr] gap-x-3 gap-y-2">
+                <dt className="text-muted-foreground">Date</dt>
+                <dd>{new Date(selected.starts_at).toLocaleDateString("fr-FR")}</dd>
+                <dt className="text-muted-foreground">Horaire</dt>
+                <dd>{formatRange(selected.starts_at, selected.ends_at)}</dd>
+                <dt className="text-muted-foreground">Durée</dt>
+                <dd>{zoomMeetingDurationMinutes(selected.starts_at, selected.ends_at)} min</dd>
+                <dt className="text-muted-foreground">Groupe</dt>
+                <dd>{selected.class?.name ?? "—"}</dd>
+                <dt className="text-muted-foreground">Professeur</dt>
+                <dd>{teacherName(selected)}</dd>
+                <dt className="text-muted-foreground">Visioconférence</dt>
+                <dd>
+                  {videoProviderLabel(
+                    selected.video_provider,
+                    isZoomActive(selected.video_provider),
+                  )}
+                </dd>
+              </div>
+            </dl>
             {joinState && !joinState.allowed && !isStaff && joinState.reason === "too_early" && (
               <p className="text-sm text-amber-700">
                 Accès possible uniquement à partir de l’heure de début du créneau.
@@ -451,7 +531,7 @@ export function CalendarPage() {
                   onClick={() => void joinFromCalendar()}
                   disabled={Boolean(joinState && !joinState.allowed && !isStaff)}
                 >
-                  Rejoindre le cours
+                  {isStaff ? (selected.status === "live" ? "Rejoindre" : "Démarrer") : "Rejoindre"}
                 </Button>
               )}
               <Button variant="outline" onClick={() => setSelectedId(null)}>
@@ -656,8 +736,6 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
   const { role, user } = useAcademy();
   const conversationsQuery = useConversations();
   const classesQuery = useClasses();
-  const studentsQuery = useStudents();
-  const teachersQuery = useTeachers();
   const createConversation = useCreateClassConversation();
   const sendMessage = useSendMessage();
   const addMember = useAddConversationMember();
@@ -697,18 +775,10 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
     }
   };
 
-  const candidateProfiles = useMemo(() => {
-    const students = (studentsQuery.data ?? []).map((s) => ({
-      id: s.profileId,
-      label: `${s.firstName} ${s.lastName} · étudiant`,
-    }));
-    const teachers = (teachersQuery.data ?? []).map((t) => ({
-      id: t.profileId,
-      label: `${t.firstName} ${t.lastName} · professeur`,
-    }));
-    const existing = new Set((active?.members ?? []).map((m) => m.profile_id));
-    return [...students, ...teachers].filter((p) => p.id && !existing.has(p.id));
-  }, [studentsQuery.data, teachersQuery.data, active?.members]);
+  const memberProfileIds = useMemo(
+    () => (active?.members ?? []).map((member) => member.profile_id),
+    [active?.members],
+  );
 
   return (
     <>
@@ -960,45 +1030,55 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
         <div className="mobile-modal">
           <Surface className="mobile-modal-panel space-y-4">
             <h2 className="text-lg font-semibold">Membres · {active.name}</h2>
-            <div className="max-h-48 space-y-2 overflow-y-auto">
-              {(active.members ?? []).map((m) => (
-                <div key={m.profile_id} className="flex items-center justify-between gap-2 text-sm">
-                  <span>
-                    {m.profile
-                      ? `${m.profile.first_name} ${m.profile.last_name}`.trim()
-                      : m.profile_id}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={removeMember.isPending}
-                    onClick={() =>
-                      removeMember.mutate(
-                        { conversationId: active.id, profileId: m.profile_id },
-                        {
-                          onSuccess: () => toast.success("Membre retiré"),
-                          onError: (err) => toast.error(err.message),
-                        },
-                      )
-                    }
-                  >
-                    Retirer
-                  </Button>
-                </div>
-              ))}
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-muted-foreground">Membres actuels</h3>
+              <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-border p-2">
+                {(active.members ?? []).length === 0 ? (
+                  <p className="px-2 py-4 text-center text-sm text-muted-foreground">
+                    Aucun membre pour le moment.
+                  </p>
+                ) : (
+                  (active.members ?? []).map((m) => (
+                    <div
+                      key={m.profile_id}
+                      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                    >
+                      <span>
+                        {m.profile
+                          ? `${m.profile.first_name} ${m.profile.last_name}`.trim()
+                          : m.profile_id}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={removeMember.isPending}
+                        onClick={() =>
+                          removeMember.mutate(
+                            { conversationId: active.id, profileId: m.profile_id },
+                            {
+                              onSuccess: () => toast.success("Membre retiré"),
+                              onError: (err) => toast.error(err.message),
+                            },
+                          )
+                        }
+                      >
+                        Retirer
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={addProfileId}
-              onChange={(e) => setAddProfileId(e.target.value)}
-            >
-              <option value="">Ajouter un membre</option>
-              {candidateProfiles.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-muted-foreground">Ajouter un membre</h3>
+              <PeoplePicker
+                purpose="messaging"
+                selectedId={addProfileId}
+                excludeIds={memberProfileIds}
+                excludeKind="profile"
+                onSelect={setAddProfileId}
+              />
+            </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setMembersOpen(false)}>
                 Fermer
@@ -1029,56 +1109,629 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
 }
 
 export function TeacherProfile() {
+  const { user } = useAcademy();
+  const teachersQuery = useTeachers();
+  const classesQuery = useClasses();
+  const sessionsQuery = useLiveSessions();
+  const assignmentsQuery = useAssignments();
+
+  const me = (teachersQuery.data ?? []).find(
+    (teacher) => teacher.email.toLowerCase() === (user?.email ?? "").toLowerCase(),
+  );
+  const myClasses = (classesQuery.data ?? []).filter((item) => item.teacherId === me?.id);
+  const classIds = new Set(myClasses.map((item) => item.id));
+  const weekStart = useMemo(() => {
+    const d = new Date();
+    const day = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - day);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+  const weekEnd = useMemo(() => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + 7);
+    return d;
+  }, [weekStart]);
+  const sessionsThisWeek = (sessionsQuery.data ?? []).filter((session) => {
+    if (!classIds.has(session.class_id)) return false;
+    const start = new Date(session.starts_at);
+    return start >= weekStart && start < weekEnd && session.status !== "cancelled";
+  });
+  const publishedAssignments = (assignmentsQuery.data ?? []).filter(
+    (item) => (!item.classId || classIds.has(item.classId)) && item.status === "Publié",
+  );
+  const studentCount = myClasses.reduce((total, item) => total + item.size, 0);
+  const levels = me?.levels.length ? me.levels.join(" / ") : "—";
+
   return (
     <>
-      <PageHeader title={LEAD_TEACHER} subtitle="Faculty profile · A2 / B1" />
-      <div className="grid gap-5 lg:grid-cols-[20rem_1fr]">
-        <Surface className="p-6">
-          <h2 className="font-semibold">{LEAD_TEACHER}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">teacher@gla.academy</p>
-          <p className="mt-4 text-sm">Assigned classes: A2-G2, B1-G1</p>
-        </Surface>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Metric label="Students" value="42" />
-          <Metric label="Classes this week" value="6" />
-          <Metric label="Assignments to grade" value="8" icon={<CheckCircle2 />} />
+      <PageHeader
+        title={me?.name ?? user?.name ?? "Profil enseignant"}
+        subtitle={`Profil pédagogique · ${levels}`}
+      />
+      <QueryState
+        isLoading={teachersQuery.isLoading || classesQuery.isLoading}
+        isError={teachersQuery.isError || classesQuery.isError}
+        error={(teachersQuery.error ?? classesQuery.error) as Error | null}
+        isEmpty={!me}
+        emptyTitle="Profil introuvable"
+        emptyMessage="Votre fiche enseignant n’a pas encore été créée par l’administration."
+        onRetry={() => {
+          void teachersQuery.refetch();
+          void classesQuery.refetch();
+        }}
+      >
+        <div className="grid gap-5 lg:grid-cols-[20rem_1fr]">
+          <Surface className="p-6">
+            <h2 className="font-semibold">{me?.name}</h2>
+            <p className="mt-2 text-sm text-muted-foreground">{me?.email || "—"}</p>
+            {me?.phone ? <p className="mt-2 text-sm text-muted-foreground">{me.phone}</p> : null}
+            <p className="mt-4 text-sm">
+              {myClasses.length
+                ? `Groupes assignés : ${myClasses.map((item) => item.name).join(", ")}`
+                : "Aucun groupe assigné"}
+            </p>
+          </Surface>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Metric label="Étudiants" value={String(studentCount)} />
+            <Metric label="Séances cette semaine" value={String(sessionsThisWeek.length)} />
+            <Metric
+              label="Devoirs publiés"
+              value={String(publishedAssignments.length)}
+              icon={<CheckCircle2 />}
+            />
+          </div>
         </div>
-      </div>
+      </QueryState>
     </>
   );
 }
 
 export function DirectorReports() {
+  const studentsQuery = useStudents();
+  const paymentsQuery = usePayments();
+  const classesQuery = useClasses();
+  const teachersQuery = useTeachers();
+  const attemptsQuery = useAllExamAttempts();
+  const assignmentsQuery = useAssignments();
+  const sessionsQuery = useLiveSessions();
+
+  const [periodDays, setPeriodDays] = useState<PeriodDays>(90);
+  const [levelFilter, setLevelFilter] = useState("");
+  const [classFilter, setClassFilter] = useState("");
+  const [teacherFilter, setTeacherFilter] = useState("");
+
+  const cutoff = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - periodDays);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, [periodDays]);
+
+  const filters = useMemo(
+    () => ({ level: levelFilter, classId: classFilter, teacherId: teacherFilter }),
+    [levelFilter, classFilter, teacherFilter],
+  );
+
+  const classes = classesQuery.data ?? [];
+  const students = studentsQuery.data ?? [];
+  const filteredStudents = useMemo(
+    () => students.filter((student) => studentMatchesFilters(student, classes, filters)),
+    [students, classes, filters],
+  );
+  const filteredStudentIds = useMemo(
+    () => new Set(filteredStudents.map((student) => student.id)),
+    [filteredStudents],
+  );
+
+  const filteredPayments = useMemo(() => {
+    return (paymentsQuery.data ?? []).filter((payment) => {
+      if (!filteredStudentIds.has(payment.student_id)) return false;
+      return withinPeriod(payment.created_at, cutoff);
+    });
+  }, [paymentsQuery.data, filteredStudentIds, cutoff]);
+
+  const filteredAttempts = useMemo(() => {
+    return (attemptsQuery.data ?? []).filter((attempt) => {
+      if (!filteredStudentIds.has(attempt.student_id)) return false;
+      const submittedAt = attempt.submitted_at ?? attempt.started_at;
+      return withinPeriod(submittedAt, cutoff);
+    });
+  }, [attemptsQuery.data, filteredStudentIds, cutoff]);
+
+  const currency = useMemo(() => {
+    const sample = paymentsQuery.data?.[0];
+    return sample?.currency?.trim() || "MAD";
+  }, [paymentsQuery.data]);
+
+  const paymentStats = useMemo(() => {
+    const expected = filteredPayments.reduce((acc, row) => acc + Number(row.amount ?? 0), 0);
+    const collected = filteredPayments.reduce((acc, row) => {
+      if (row.status === "paid") {
+        return acc + Number(row.amount_paid ?? row.amount ?? 0);
+      }
+      return acc + Number(row.amount_paid ?? 0);
+    }, 0);
+    const paidCount = filteredPayments.filter((row) => row.status === "paid").length;
+    const overdueCount = filteredPayments.filter((row) => row.status === "overdue").length;
+    return { expected, collected, paidCount, overdueCount };
+  }, [filteredPayments]);
+
+  const hasCreatedAt = filteredStudents.some((student) => Boolean(student.createdAt));
+
+  const enrollmentChart = useMemo(() => {
+    if (hasCreatedAt) {
+      const buckets = new Map<string, number>();
+      for (const student of filteredStudents) {
+        if (!student.createdAt || !withinPeriod(student.createdAt, cutoff)) continue;
+        const weekStart = new Date(student.createdAt);
+        const day = (weekStart.getDay() + 6) % 7;
+        weekStart.setDate(weekStart.getDate() - day);
+        const label = weekStart.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+        buckets.set(label, (buckets.get(label) ?? 0) + 1);
+      }
+      return Array.from(buckets.entries())
+        .map(([label, count]) => ({ label, count }))
+        .slice(-12);
+    }
+    const levels = ["A1", "A2", "B1", "B2"] as const;
+    return levels.map((level) => ({
+      label: level,
+      count: filteredStudents.filter((student) => student.level === level).length,
+    }));
+  }, [filteredStudents, hasCreatedAt, cutoff]);
+
+  const revenueChart = useMemo(() => {
+    const buckets = new Map<string, { collected: number; expected: number }>();
+    for (const payment of filteredPayments) {
+      const label = new Date(payment.created_at).toLocaleDateString("fr-FR", {
+        month: "short",
+        year: "2-digit",
+      });
+      const current = buckets.get(label) ?? { collected: 0, expected: 0 };
+      current.expected += Number(payment.amount ?? 0);
+      if (payment.status === "paid") {
+        current.collected += Number(payment.amount_paid ?? payment.amount ?? 0);
+      } else {
+        current.collected += Number(payment.amount_paid ?? 0);
+      }
+      buckets.set(label, current);
+    }
+    return Array.from(buckets.entries()).map(([label, values]) => ({
+      label,
+      collected: Math.round(values.collected),
+      expected: Math.round(values.expected),
+    }));
+  }, [filteredPayments]);
+
+  const examByLevel = useMemo(() => {
+    const levels = ["A1", "B1"] as const;
+    return levels.map((level) => {
+      const rows = filteredAttempts.filter((attempt) => {
+        const examLevel = attempt.exam?.level?.code;
+        const studentLevel = attempt.student?.level_code;
+        return examLevel === level || studentLevel === level;
+      });
+      if (!rows.length) return { level, average: null, count: 0 };
+      const average = Math.round(
+        rows.reduce((acc, row) => acc + Number(row.percentage ?? 0), 0) / rows.length,
+      );
+      return { level, average, count: rows.length };
+    });
+  }, [filteredAttempts]);
+
+  const progressionByLevel = useMemo(() => {
+    const levels = ["A1", "A2", "B1", "B2"] as const;
+    const studentBest = new Map<string, number>();
+    for (const attempt of filteredAttempts) {
+      const pct = Number(attempt.percentage ?? 0);
+      const prev = studentBest.get(attempt.student_id) ?? 0;
+      if (pct > prev) studentBest.set(attempt.student_id, pct);
+    }
+    return levels.map((level) => {
+      const levelStudents = filteredStudents.filter((student) => student.level === level);
+      if (!levelStudents.length) return { level, average: 0, count: 0 };
+      const scores = levelStudents
+        .map((student) => studentBest.get(student.id))
+        .filter((value): value is number => value != null);
+      const average =
+        scores.length > 0
+          ? Math.round(scores.reduce((acc, value) => acc + value, 0) / scores.length)
+          : 0;
+      return { level, average, count: levelStudents.length };
+    });
+  }, [filteredAttempts, filteredStudents]);
+
+  const groupPerformance = useMemo(() => {
+    const studentBest = new Map<string, number>();
+    for (const attempt of filteredAttempts) {
+      const pct = Number(attempt.percentage ?? 0);
+      const prev = studentBest.get(attempt.student_id) ?? 0;
+      if (pct > prev) studentBest.set(attempt.student_id, pct);
+    }
+    const assignmentCounts = new Map<string, number>();
+    for (const assignment of assignmentsQuery.data ?? []) {
+      if (!assignment.classId) continue;
+      assignmentCounts.set(assignment.classId, (assignmentCounts.get(assignment.classId) ?? 0) + 1);
+    }
+    return classes
+      .filter((klass) => classMatchesFilters(klass, filters))
+      .map((klass) => {
+        const roster = filteredStudents.filter((student) => student.classId === klass.id);
+        const scores = roster
+          .map((student) => studentBest.get(student.id))
+          .filter((value): value is number => value != null);
+        const avgProgress =
+          scores.length > 0
+            ? Math.round(scores.reduce((acc, value) => acc + value, 0) / scores.length)
+            : null;
+        const liveCount = (sessionsQuery.data ?? []).filter(
+          (session) => session.class_id === klass.id && withinPeriod(session.starts_at, cutoff),
+        ).length;
+        return {
+          id: klass.id,
+          name: klass.name,
+          level: klass.level,
+          size: roster.length || klass.size,
+          teacher: klass.teacher,
+          schedule: klass.schedule,
+          avgProgress,
+          assignments: assignmentCounts.get(klass.id) ?? 0,
+          liveSessions: liveCount,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+  }, [
+    classes,
+    filters,
+    filteredStudents,
+    filteredAttempts,
+    assignmentsQuery.data,
+    sessionsQuery.data,
+    cutoff,
+  ]);
+
+  const isLoading =
+    studentsQuery.isLoading ||
+    paymentsQuery.isLoading ||
+    classesQuery.isLoading ||
+    attemptsQuery.isLoading;
+
+  const isError =
+    studentsQuery.isError || paymentsQuery.isError || classesQuery.isError || attemptsQuery.isError;
+
+  const firstError =
+    studentsQuery.error ?? paymentsQuery.error ?? classesQuery.error ?? attemptsQuery.error ?? null;
+
+  const retryAll = () => {
+    void studentsQuery.refetch();
+    void paymentsQuery.refetch();
+    void classesQuery.refetch();
+    void attemptsQuery.refetch();
+    void assignmentsQuery.refetch();
+    void sessionsQuery.refetch();
+  };
+
+  const hasExamData = filteredAttempts.length > 0;
+
   return (
     <>
-      <PageHeader title="Rapports" subtitle="Indicateurs de performance de l’académie." />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Metric label="Croissance des inscriptions" value="+12" note="Nouveaux étudiants ce mois" />
-        <Metric label="Revenus" value="184 500 MAD" note="+6,2 % vs mois précédent" />
-        <Metric label="Taux de réussite" value="78 %" note="Examens blancs" />
-        <Metric label="Factures en retard" value="12" note="14 400 MAD" />
-        <Metric label="Charge professeurs" value="86 %" />
+      <PageHeader
+        title="Rapports"
+        subtitle="Indicateurs calculés à partir des données Supabase — filtres appliqués côté client."
+      />
+      <div className="mb-5 flex flex-wrap gap-2">
+        <select
+          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          value={periodDays}
+          onChange={(event) => setPeriodDays(Number(event.target.value) as PeriodDays)}
+        >
+          <option value={30}>30 jours</option>
+          <option value={90}>90 jours</option>
+          <option value={365}>365 jours</option>
+        </select>
+        <select
+          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          value={levelFilter}
+          onChange={(event) => setLevelFilter(event.target.value)}
+        >
+          <option value="">Tous les niveaux</option>
+          {["A1", "A2", "B1", "B2"].map((level) => (
+            <option key={level} value={level}>
+              {level}
+            </option>
+          ))}
+        </select>
+        <select
+          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          value={classFilter}
+          onChange={(event) => setClassFilter(event.target.value)}
+        >
+          <option value="">Tous les groupes</option>
+          {classes.map((klass) => (
+            <option key={klass.id} value={klass.id}>
+              {klass.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          value={teacherFilter}
+          onChange={(event) => setTeacherFilter(event.target.value)}
+        >
+          <option value="">Tous les professeurs</option>
+          {(teachersQuery.data ?? []).map((teacher) => (
+            <option key={teacher.id} value={teacher.id}>
+              {teacher.name}
+            </option>
+          ))}
+        </select>
       </div>
+
+      <QueryState
+        isLoading={isLoading}
+        isError={isError}
+        error={firstError}
+        isEmpty={!filteredStudents.length && !filteredPayments.length}
+        emptyTitle="Aucune donnée sur la période"
+        emptyMessage="Élargissez la période ou retirez les filtres pour afficher les indicateurs."
+        onRetry={retryAll}
+      >
+        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Metric
+            label="Étudiants filtrés"
+            value={String(filteredStudents.length)}
+            note={`Sur ${students.length} inscrits`}
+          />
+          <Metric
+            label="Revenus encaissés"
+            value={formatMoney(paymentStats.collected, currency)}
+            note={`Attendu : ${formatMoney(paymentStats.expected, currency)}`}
+          />
+          <Metric
+            label="Paiements réglés"
+            value={String(paymentStats.paidCount)}
+            note={`${paymentStats.overdueCount} en retard`}
+          />
+          <Metric
+            label="Tentatives d’examens"
+            value={String(filteredAttempts.length)}
+            note={hasExamData ? "Soumis ou corrigés" : "Aucune tentative"}
+          />
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-2">
+          <Surface className="p-5">
+            <h2 className="font-semibold">
+              {hasCreatedAt ? "Tendance des inscriptions" : "Répartition par niveau"}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {hasCreatedAt
+                ? `Nouveaux étudiants sur ${periodDays} jours`
+                : "Effectifs par niveau (dates d’inscription indisponibles)"}
+            </p>
+            <div className="mt-4 h-52">
+              {enrollmentChart.length ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={enrollmentChart}>
+                    <CartesianGrid vertical={false} stroke="var(--border)" />
+                    <XAxis dataKey="label" axisLine={false} tickLine={false} fontSize={11} />
+                    <YAxis allowDecimals={false} width={32} fontSize={11} />
+                    <Tooltip formatter={(value: number) => [value, "Étudiants"]} />
+                    <Area
+                      dataKey="count"
+                      type="monotone"
+                      stroke="var(--primary)"
+                      fill="var(--secondary)"
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="grid h-full place-items-center text-sm text-muted-foreground">
+                  Aucune inscription sur la période.
+                </p>
+              )}
+            </div>
+          </Surface>
+
+          <Surface className="p-5">
+            <h2 className="font-semibold">Revenus encaissés vs attendus</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Paiements sur la période sélectionnée
+            </p>
+            <div className="mt-4 h-52">
+              {revenueChart.length ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={revenueChart}>
+                    <CartesianGrid vertical={false} stroke="var(--border)" />
+                    <XAxis dataKey="label" axisLine={false} tickLine={false} fontSize={11} />
+                    <YAxis hide />
+                    <Tooltip
+                      formatter={(value: number, name: string) => [
+                        formatMoney(value, currency),
+                        name === "collected" ? "Encaissé" : "Attendu",
+                      ]}
+                    />
+                    <Bar
+                      dataKey="expected"
+                      fill="var(--muted)"
+                      radius={[3, 3, 0, 0]}
+                      maxBarSize={28}
+                    />
+                    <Bar
+                      dataKey="collected"
+                      fill="var(--primary)"
+                      radius={[3, 3, 0, 0]}
+                      maxBarSize={28}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="grid h-full place-items-center text-sm text-muted-foreground">
+                  Aucun paiement sur la période.
+                </p>
+              )}
+            </div>
+          </Surface>
+
+          <Surface className="p-5">
+            <h2 className="font-semibold">Paiements réglés vs en retard</h2>
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <div className="rounded-lg border bg-secondary/40 p-4 text-center">
+                <p className="text-3xl font-semibold text-primary">{paymentStats.paidCount}</p>
+                <p className="mt-1 text-sm text-muted-foreground">Réglés</p>
+              </div>
+              <div className="rounded-lg border bg-secondary/40 p-4 text-center">
+                <p className="text-3xl font-semibold text-destructive">
+                  {paymentStats.overdueCount}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">En retard</p>
+              </div>
+            </div>
+          </Surface>
+
+          <Surface className="p-5">
+            <h2 className="font-semibold">Résultats examens A1 vs B1</h2>
+            {hasExamData ? (
+              <div className="mt-4 space-y-4">
+                {examByLevel.map((row) => (
+                  <div key={row.level}>
+                    <div className="mb-1 flex justify-between text-sm">
+                      <span>{row.level}</span>
+                      <strong>{row.average != null ? `${row.average} %` : "—"}</strong>
+                    </div>
+                    <ProgressLine value={row.average ?? 0} />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {row.count} tentative{row.count === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-6 text-sm text-muted-foreground">
+                Aucune tentative d’examen soumise pour les filtres actuels.
+              </p>
+            )}
+          </Surface>
+
+          <Surface className="p-5 xl:col-span-2">
+            <h2 className="font-semibold">Progression moyenne par niveau</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Moyenne des meilleurs scores d’examens par étudiant
+            </p>
+            <div className="mt-4 h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={progressionByLevel}>
+                  <CartesianGrid vertical={false} stroke="var(--border)" />
+                  <XAxis dataKey="level" axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} width={32} fontSize={11} />
+                  <Tooltip formatter={(value: number) => [`${value} %`, "Progression moyenne"]} />
+                  <Bar
+                    dataKey="average"
+                    fill="var(--primary)"
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={40}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Surface>
+        </div>
+
+        <Surface className="mt-5 overflow-x-auto p-5">
+          <h2 className="font-semibold">Performance par groupe</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Taille, professeur, horaire, progression moyenne et activité
+          </p>
+          <table className="data-table mt-4">
+            <thead>
+              <tr>
+                <th>Groupe</th>
+                <th>Niveau</th>
+                <th>Effectif</th>
+                <th>Professeur</th>
+                <th>Horaire</th>
+                <th>Progression moyenne</th>
+                <th>Devoirs</th>
+                <th>Cours live</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groupPerformance.length ? (
+                groupPerformance.map((row) => (
+                  <tr key={row.id}>
+                    <td className="font-medium">{row.name}</td>
+                    <td>{row.level}</td>
+                    <td>{row.size}</td>
+                    <td>{row.teacher}</td>
+                    <td>{row.schedule}</td>
+                    <td>{row.avgProgress != null ? `${row.avgProgress} %` : "—"}</td>
+                    <td>{row.assignments}</td>
+                    <td>{row.liveSessions}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={8} className="text-center text-muted-foreground">
+                    Aucun groupe ne correspond aux filtres.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </Surface>
+      </QueryState>
     </>
   );
 }
 
 export function DirectorSettings() {
   const qc = useQueryClient();
+  const { user, profile } = useAcademy();
   const mapQuery = useQuery({
     queryKey: queryKeys.branding.settings,
     queryFn: () => SettingsService.getMap(),
   });
+
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [academyEmail, setAcademyEmail] = useState("");
+  const [academyPhone, setAcademyPhone] = useState("");
+  const [academyAddress, setAcademyAddress] = useState("");
+  const [timezone, setTimezone] = useState("Africa/Casablanca");
+  const [currency, setCurrency] = useState("MAD");
+  const [defaultCapacity, setDefaultCapacity] = useState("20");
+  const [courseDuration, setCourseDuration] = useState("90");
+  const [meetingProvider, setMeetingProvider] = useState("jitsi");
+  const [defaultPrice, setDefaultPrice] = useState("1200");
+  const [paymentDueDay, setPaymentDueDay] = useState("1");
+  const [notifyEmail, setNotifyEmail] = useState(true);
+  const [notifyWhatsapp, setNotifyWhatsapp] = useState(false);
+  const [notifyInApp, setNotifyInApp] = useState(true);
+  const [defaultLanguage, setDefaultLanguage] = useState("fr");
 
   useEffect(() => {
     const map = mapQuery.data;
     if (!map) return;
-    if (typeof map["academy_name"] === "string") setName(map["academy_name"]);
-    if (typeof map["academy_tagline"] === "string") setTagline(map["academy_tagline"]);
-    if (typeof map["logo_url"] === "string") setLogoUrl(map["logo_url"]);
+    setName(settingString(map, "academy_name", ""));
+    setTagline(settingString(map, "academy_tagline", ""));
+    setLogoUrl(settingString(map, "logo_url", ""));
+    setAcademyEmail(settingString(map, "support_email", ""));
+    setAcademyPhone(settingString(map, "support_phone", ""));
+    setAcademyAddress(settingString(map, "academy_address", ""));
+    setTimezone(settingString(map, "timezone", "Africa/Casablanca"));
+    setCurrency(settingString(map, "currency", "MAD"));
+    setDefaultCapacity(settingString(map, "default_class_capacity", "20"));
+    setCourseDuration(settingString(map, "default_course_duration_minutes", "90"));
+    setMeetingProvider(settingString(map, "default_meeting_provider", "jitsi"));
+    setDefaultPrice(settingString(map, "default_payment_amount", "1200"));
+    setPaymentDueDay(settingString(map, "payment_due_day", "1"));
+    setNotifyEmail(settingString(map, "notifications_email_enabled", "true") === "true");
+    setNotifyWhatsapp(settingString(map, "notifications_whatsapp_enabled", "false") === "true");
+    setNotifyInApp(settingString(map, "notifications_in_app_enabled", "true") === "true");
+    setDefaultLanguage(settingString(map, "default_language", "fr"));
   }, [mapQuery.data]);
 
   const save = useMutation({
@@ -1086,10 +1739,33 @@ export function DirectorSettings() {
       await SettingsService.upsertPublic("academy_name", name);
       await SettingsService.upsertPublic("academy_tagline", tagline);
       await SettingsService.upsertPublic("logo_url", logoUrl || null);
+      await SettingsService.upsertPublic("support_email", academyEmail || null);
+      await SettingsService.upsertPublic("support_phone", academyPhone || null);
+      await SettingsService.upsertPublic("academy_address", academyAddress || null);
+      await SettingsService.upsertPublic("timezone", timezone);
+      await SettingsService.upsertPublic("currency", currency);
+      await SettingsService.upsertPublic("default_class_capacity", defaultCapacity);
+      await SettingsService.upsertPublic("default_course_duration_minutes", courseDuration);
+      await SettingsService.upsertPublic("default_meeting_provider", meetingProvider);
+      await SettingsService.upsertPublic("default_payment_amount", defaultPrice);
+      await SettingsService.upsertPublic("payment_due_day", paymentDueDay);
+      await SettingsService.upsertPublic(
+        "notifications_email_enabled",
+        notifyEmail ? "true" : "false",
+      );
+      await SettingsService.upsertPublic(
+        "notifications_whatsapp_enabled",
+        notifyWhatsapp ? "true" : "false",
+      );
+      await SettingsService.upsertPublic(
+        "notifications_in_app_enabled",
+        notifyInApp ? "true" : "false",
+      );
+      await SettingsService.upsertPublic("default_language", defaultLanguage);
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: queryKeys.branding.settings });
-      toast.success("Identité du centre mise à jour");
+      toast.success("Paramètres enregistrés");
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -1098,42 +1774,258 @@ export function DirectorSettings() {
     <>
       <PageHeader
         title="Paramètres"
-        subtitle="Identité publique, accès et canaux de notification."
+        subtitle="Configuration de l’académie, de la pédagogie et des notifications."
       />
-      <Surface className="mb-6 space-y-4 p-6">
-        <h2 className="font-semibold">Identité du centre</h2>
-        <label className="block text-sm">
-          Nom
-          <Input className="mt-1" value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label className="block text-sm">
-          Slogan
-          <Input className="mt-1" value={tagline} onChange={(e) => setTagline(e.target.value)} />
-        </label>
-        <label className="block text-sm">
-          URL du logo (ou chemin public)
-          <Input className="mt-1" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} />
-        </label>
-        <Button disabled={save.isPending} onClick={() => save.mutate()}>
-          Enregistrer
-        </Button>
-      </Surface>
-      <Surface className="space-y-5 p-6">
-        <div>
-          <h2 className="font-semibold">Politique d’accès</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            ACTIVE : accès complet. PAST DUE : avertissement. SUSPENDED : cours, live et examens
-            bloqués ; paiements, profil et assistance restent ouverts.
-          </p>
+      <QueryState
+        isLoading={mapQuery.isLoading}
+        isError={mapQuery.isError}
+        error={mapQuery.error}
+        isEmpty={false}
+        onRetry={() => void mapQuery.refetch()}
+      >
+        <Tabs defaultValue="profil" className="space-y-5">
+          <TabsList className="flex h-auto flex-wrap gap-1">
+            <TabsTrigger value="profil">Profil</TabsTrigger>
+            <TabsTrigger value="academie">Académie</TabsTrigger>
+            <TabsTrigger value="pedagogie">Pédagogie</TabsTrigger>
+            <TabsTrigger value="reunions">Réunions</TabsTrigger>
+            <TabsTrigger value="paiements">Paiements</TabsTrigger>
+            <TabsTrigger value="notifications">Notifications</TabsTrigger>
+            <TabsTrigger value="apparence">Apparence</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="profil">
+            <Surface className="space-y-4 p-6">
+              <h2 className="font-semibold">Votre profil</h2>
+              <label className="block text-sm">
+                Nom
+                <Input className="mt-1" value={user?.name ?? ""} readOnly />
+              </label>
+              <label className="block text-sm">
+                E-mail
+                <Input className="mt-1" value={user?.email ?? ""} readOnly />
+              </label>
+              <label className="block text-sm">
+                Téléphone
+                <Input className="mt-1" value={profile?.phone ?? "—"} readOnly />
+              </label>
+              <p className="text-sm text-muted-foreground">
+                Contactez le support pour modifier l’e-mail ou le numéro de téléphone de votre
+                compte.
+              </p>
+            </Surface>
+          </TabsContent>
+
+          <TabsContent value="academie">
+            <Surface className="space-y-4 p-6">
+              <h2 className="font-semibold">Identité du centre</h2>
+              <label className="block text-sm">
+                Nom public
+                <Input className="mt-1" value={name} onChange={(e) => setName(e.target.value)} />
+              </label>
+              <label className="block text-sm">
+                Slogan
+                <Input
+                  className="mt-1"
+                  value={tagline}
+                  onChange={(e) => setTagline(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                URL du logo
+                <Input
+                  className="mt-1"
+                  value={logoUrl}
+                  onChange={(e) => setLogoUrl(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                E-mail de contact
+                <Input
+                  className="mt-1"
+                  type="email"
+                  value={academyEmail}
+                  onChange={(e) => setAcademyEmail(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                Téléphone
+                <Input
+                  className="mt-1"
+                  value={academyPhone}
+                  onChange={(e) => setAcademyPhone(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                Adresse
+                <Input
+                  className="mt-1"
+                  value={academyAddress}
+                  onChange={(e) => setAcademyAddress(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                Fuseau horaire
+                <Input
+                  className="mt-1"
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                Devise
+                <Input
+                  className="mt-1"
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                />
+              </label>
+            </Surface>
+          </TabsContent>
+
+          <TabsContent value="pedagogie">
+            <Surface className="space-y-4 p-6">
+              <h2 className="font-semibold">Pédagogie</h2>
+              <label className="block text-sm">
+                Capacité par défaut d’un groupe
+                <Input
+                  className="mt-1"
+                  type="number"
+                  min={1}
+                  value={defaultCapacity}
+                  onChange={(e) => setDefaultCapacity(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                Durée d’un cours (minutes)
+                <Input
+                  className="mt-1"
+                  type="number"
+                  min={15}
+                  value={courseDuration}
+                  onChange={(e) => setCourseDuration(e.target.value)}
+                />
+              </label>
+            </Surface>
+          </TabsContent>
+
+          <TabsContent value="reunions">
+            <Surface className="space-y-4 p-6">
+              <h2 className="font-semibold">Réunions en ligne</h2>
+              <label className="block text-sm">
+                Fournisseur par défaut
+                <select
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={meetingProvider}
+                  onChange={(e) => setMeetingProvider(e.target.value)}
+                >
+                  <option value="jitsi">Jitsi</option>
+                  <option value="zoom">Zoom</option>
+                </select>
+              </label>
+              <p className="text-sm text-muted-foreground">
+                Ce réglage s’applique aux nouvelles séances planifiées. Zoom peut être activé en
+                urgence depuis le calendrier des cours live.
+              </p>
+            </Surface>
+          </TabsContent>
+
+          <TabsContent value="paiements">
+            <Surface className="space-y-4 p-6">
+              <h2 className="font-semibold">Paiements</h2>
+              <label className="block text-sm">
+                Montant mensuel par défaut
+                <Input
+                  className="mt-1"
+                  type="number"
+                  min={0}
+                  value={defaultPrice}
+                  onChange={(e) => setDefaultPrice(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                Devise
+                <Input
+                  className="mt-1"
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                Jour d’échéance (du mois)
+                <Input
+                  className="mt-1"
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={paymentDueDay}
+                  onChange={(e) => setPaymentDueDay(e.target.value)}
+                />
+              </label>
+            </Surface>
+          </TabsContent>
+
+          <TabsContent value="notifications">
+            <Surface className="space-y-5 p-6">
+              <h2 className="font-semibold">Notifications</h2>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">E-mail</p>
+                  <p className="text-xs text-muted-foreground">
+                    Rappels et confirmations par e-mail
+                  </p>
+                </div>
+                <Switch checked={notifyEmail} onCheckedChange={setNotifyEmail} />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">WhatsApp</p>
+                  <p className="text-xs text-muted-foreground">
+                    Messages WhatsApp si le canal est activé
+                  </p>
+                </div>
+                <Switch checked={notifyWhatsapp} onCheckedChange={setNotifyWhatsapp} />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">Dans l’application</p>
+                  <p className="text-xs text-muted-foreground">
+                    Notifications visibles dans l’espace académie
+                  </p>
+                </div>
+                <Switch checked={notifyInApp} onCheckedChange={setNotifyInApp} />
+              </div>
+            </Surface>
+          </TabsContent>
+
+          <TabsContent value="apparence">
+            <Surface className="space-y-4 p-6">
+              <h2 className="font-semibold">Apparence</h2>
+              <label className="block text-sm">
+                Langue par défaut
+                <select
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={defaultLanguage}
+                  onChange={(e) => setDefaultLanguage(e.target.value)}
+                >
+                  <option value="fr">Français</option>
+                  <option value="ar">Arabe</option>
+                </select>
+              </label>
+              <p className="text-sm text-muted-foreground">
+                Chaque utilisateur peut changer la langue depuis la barre de navigation. La langue
+                par défaut s’applique aux nouveaux comptes et aux visiteurs.
+              </p>
+            </Surface>
+          </TabsContent>
+        </Tabs>
+
+        <div className="mt-4 flex justify-end">
+          <Button disabled={save.isPending} onClick={() => save.mutate()}>
+            Enregistrer les paramètres
+          </Button>
         </div>
-        <div>
-          <h2 className="font-semibold">Canaux externes</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            E-mail / WhatsApp : voir adaptateurs non configurés tant que les secrets Edge ne sont
-            pas définis. Les notifications in-app restent toujours disponibles.
-          </p>
-        </div>
-      </Surface>
+      </QueryState>
     </>
   );
 }
@@ -1145,15 +2037,15 @@ export function DirectorAssignments() {
   });
   return (
     <>
-      <PageHeader title="Assignments" subtitle="Academy-wide homework pipeline." />
+      <PageHeader title="Devoirs" subtitle="Suivi des devoirs publiés dans toute l’académie." />
       <Surface className="overflow-x-auto">
         <table className="data-table">
           <thead>
             <tr>
-              <th>Assignment</th>
-              <th>Student</th>
-              <th>Status</th>
-              <th>Grade</th>
+              <th>Devoir</th>
+              <th>Étudiant</th>
+              <th>Statut</th>
+              <th>Note</th>
             </tr>
           </thead>
           <tbody>

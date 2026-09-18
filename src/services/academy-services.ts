@@ -646,6 +646,10 @@ export const ExamService = {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseExamService.listMyAttempts(examId);
   },
+  async listAllAttempts() {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.listAllAttempts();
+  },
   async createExam(input: Parameters<typeof SupabaseExamService.createExam>[0]) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseExamService.createExam(input);

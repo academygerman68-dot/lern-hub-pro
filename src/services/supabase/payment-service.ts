@@ -3,7 +3,31 @@ import type { Database } from "@/types/database";
 
 type Payment = Database["public"]["Tables"]["student_payments"]["Row"];
 type PaymentStatus = Database["public"]["Enums"]["payment_status"];
+type DiscountType = "percent" | "fixed" | null;
 type Subscription = Database["public"]["Tables"]["student_subscriptions"]["Row"];
+
+export function computeFinalAmount(
+  initialAmount: number,
+  discountType?: DiscountType,
+  discountValue = 0,
+): number {
+  if (!discountType || discountValue <= 0) return initialAmount;
+  if (discountType === "percent") {
+    return Math.max(0, initialAmount * (1 - discountValue / 100));
+  }
+  return Math.max(0, initialAmount - discountValue);
+}
+
+function resolvePaymentStatus(
+  finalAmount: number,
+  amountPaid: number,
+  explicit?: PaymentStatus,
+): PaymentStatus {
+  if (explicit) return explicit;
+  if (amountPaid >= finalAmount && finalAmount > 0) return "paid";
+  if (amountPaid > 0) return "partial";
+  return "pending";
+}
 
 export type PaymentListItem = Payment & {
   student?: {
@@ -78,7 +102,11 @@ export const SupabasePaymentService = {
 
   async create(input: {
     studentId: string;
-    amount: number;
+    amount?: number;
+    initialAmount?: number;
+    discountType?: DiscountType;
+    discountValue?: number;
+    amountPaid?: number;
     currency?: string;
     dueDate?: string | null;
     paymentMethod?: string | null;
@@ -87,17 +115,29 @@ export const SupabasePaymentService = {
     status?: PaymentStatus;
     createdBy?: string | null;
   }) {
+    const initialAmount = input.initialAmount ?? input.amount ?? 0;
+    const discountType = input.discountType ?? null;
+    const discountValue = input.discountValue ?? 0;
+    const finalAmount =
+      input.amount ?? computeFinalAmount(initialAmount, discountType, discountValue);
+    const amountPaid = input.amountPaid ?? 0;
+    const status = resolvePaymentStatus(finalAmount, amountPaid, input.status);
+
     const { data, error } = await requireClient()
       .from("student_payments")
       .insert({
         student_id: input.studentId,
-        amount: input.amount,
+        initial_amount: initialAmount,
+        discount_type: discountType,
+        discount_value: discountValue,
+        amount: finalAmount,
+        amount_paid: amountPaid,
         currency: input.currency ?? "MAD",
         due_date: input.dueDate ?? null,
         payment_method: input.paymentMethod ?? null,
         reference: input.reference ?? null,
         notes: input.notes ?? null,
-        status: input.status ?? "pending",
+        status,
         created_by: input.createdBy ?? null,
       })
       .select(PAYMENT_SELECT)

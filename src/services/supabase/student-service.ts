@@ -10,6 +10,7 @@ const STUDENT_SELECT = `
   id,
   student_code,
   level_code,
+  created_at,
   status,
   notes,
   profile:profiles!students_profile_id_fkey (

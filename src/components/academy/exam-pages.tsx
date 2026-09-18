@@ -31,6 +31,12 @@ import {
   validateFileForKind,
   type MediaKind,
 } from "@/lib/academic-content";
+import {
+  buildTeacherScope,
+  hideArchivedStatus,
+  isDirectorRole,
+  scopedClassOrLevelItemVisible,
+} from "@/lib/academy-logic";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
@@ -592,21 +598,36 @@ function StudentExamResult() {
 }
 
 export function StaffExamsPage() {
+  const { role } = useAcademy();
+  const classesQuery = useClasses();
   const examsQuery = useAllExams();
+  const teacherScope = useMemo(
+    () => buildTeacherScope(classesQuery.data ?? []),
+    [classesQuery.data],
+  );
+  const exams = useMemo(() => {
+    return hideArchivedStatus(examsQuery.data ?? []).filter(
+      (exam) => isDirectorRole(role) || scopedClassOrLevelItemVisible(exam, teacherScope),
+    );
+  }, [examsQuery.data, role, teacherScope]);
+
   return (
     <>
       <PageHeader title="Examens blancs" subtitle="Examens publiés pour vos groupes." />
       <QueryState
-        isLoading={examsQuery.isLoading}
-        isError={examsQuery.isError}
-        error={examsQuery.error}
-        isEmpty={!examsQuery.data?.length}
+        isLoading={examsQuery.isLoading || classesQuery.isLoading}
+        isError={examsQuery.isError || classesQuery.isError}
+        error={(examsQuery.error ?? classesQuery.error) as Error | null}
+        isEmpty={!exams.length}
         emptyTitle="Aucun examen"
-        emptyMessage="L’administration publie les examens blancs par niveau ou par groupe."
-        onRetry={() => void examsQuery.refetch()}
+        emptyMessage="Les examens blancs de vos groupes apparaîtront ici."
+        onRetry={() => {
+          void examsQuery.refetch();
+          void classesQuery.refetch();
+        }}
       >
         <div className="space-y-3">
-          {examsQuery.data?.map((exam) => (
+          {exams.map((exam) => (
             <Surface
               className="flex flex-wrap items-center justify-between gap-3 p-5"
               key={exam.id}
@@ -633,12 +654,18 @@ export function StaffExamsPage() {
 }
 
 export function DirectorExamsPage() {
+  const { role } = useAcademy();
   const examsQuery = useAllExams();
   const levelsQuery = useLevels();
   const classesQuery = useClasses();
   const createExam = useCreateExam();
   const publishExam = usePublishExam();
   const archiveExam = useArchiveExam();
+  const isTeacher = role === "teacher";
+  const teacherScope = useMemo(
+    () => buildTeacherScope(classesQuery.data ?? []),
+    [classesQuery.data],
+  );
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -658,6 +685,26 @@ export function DirectorExamsPage() {
   const classesForLevel = (classesQuery.data ?? []).filter(
     (c) => !levelId || c.levelId === levelId,
   );
+  const exams = useMemo(() => {
+    return hideArchivedStatus(examsQuery.data ?? []).filter(
+      (exam) => isDirectorRole(role) || scopedClassOrLevelItemVisible(exam, teacherScope),
+    );
+  }, [examsQuery.data, role, teacherScope]);
+
+  useEffect(() => {
+    if (!isTeacher || classId || !levelId) return;
+    const firstClass = classesForLevel[0];
+    if (firstClass) setClassId(firstClass.id);
+  }, [isTeacher, classId, levelId, classesForLevel]);
+
+  useEffect(() => {
+    if (!isTeacher || classId) return;
+    const firstClass = classesQuery.data?.[0];
+    if (firstClass) {
+      setLevelId(firstClass.levelId ?? "");
+      setClassId(firstClass.id);
+    }
+  }, [isTeacher, classId, classesQuery.data]);
 
   return (
     <>
@@ -670,13 +717,17 @@ export function DirectorExamsPage() {
         isLoading={examsQuery.isLoading}
         isError={examsQuery.isError}
         error={examsQuery.error}
-        isEmpty={!examsQuery.data?.length}
+        isEmpty={!exams.length}
         emptyTitle="Aucun examen"
-        emptyMessage="Créez un examen blanc pour un niveau ou un groupe."
+        emptyMessage={
+          isTeacher
+            ? "Aucun examen blanc pour vos groupes pour le moment."
+            : "Créez un examen blanc pour un niveau ou un groupe."
+        }
         onRetry={() => void examsQuery.refetch()}
       >
         <div className="space-y-3">
-          {examsQuery.data?.map((exam) => (
+          {exams.map((exam) => (
             <Surface className="p-5" key={exam.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -771,11 +822,13 @@ export function DirectorExamsPage() {
                 }}
               >
                 <option value="">Choisir le niveau</option>
-                {(levelsQuery.data ?? []).map((level) => (
-                  <option key={level.id} value={level.id}>
-                    {level.code} · {level.name}
-                  </option>
-                ))}
+                {(levelsQuery.data ?? [])
+                  .filter((level) => isDirectorRole(role) || teacherScope.levelIds.has(level.id))
+                  .map((level) => (
+                    <option key={level.id} value={level.id}>
+                      {level.code} · {level.name}
+                    </option>
+                  ))}
               </select>
             </label>
             <label className="block text-sm">
@@ -786,7 +839,7 @@ export function DirectorExamsPage() {
                 onChange={(e) => setClassId(e.target.value)}
                 disabled={!levelId}
               >
-                <option value="">Tout le niveau</option>
+                <option value="">{isTeacher ? "Choisir le groupe" : "Tout le niveau"}</option>
                 {classesForLevel.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}

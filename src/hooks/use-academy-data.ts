@@ -553,6 +553,13 @@ export function useMyExamAttempts() {
   });
 }
 
+export function useAllExamAttempts() {
+  return useQuery({
+    queryKey: queryKeys.exams.allAttempts,
+    queryFn: () => ExamService.listAllAttempts(),
+  });
+}
+
 export function useStartExam() {
   const qc = useQueryClient();
   return useMutation({

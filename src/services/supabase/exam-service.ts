@@ -288,6 +288,38 @@ export const SupabaseExamService = {
     return data ?? [];
   },
 
+  async listAllAttempts(): Promise<
+    Array<
+      ExamAttempt & {
+        exam: { level: { code: string } | null } | null;
+        student: { level_code: string | null } | null;
+      }
+    >
+  > {
+    const { data, error } = await requireClient()
+      .from("exam_attempts")
+      .select(
+        `
+        *,
+        exam:exams!exam_attempts_exam_id_fkey (
+          level:levels!exams_level_id_fkey ( code )
+        ),
+        student:students!exam_attempts_student_id_fkey (
+          level_code
+        )
+      `,
+      )
+      .in("status", ["submitted", "graded"])
+      .order("submitted_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as Array<
+      ExamAttempt & {
+        exam: { level: { code: string } | null } | null;
+        student: { level_code: string | null } | null;
+      }
+    >;
+  },
+
   async getResult(attemptId: string): Promise<ExamResultView> {
     const attempt = await this.getAttempt(attemptId);
     if (!attempt) throw new Error("ATTEMPT_NOT_FOUND");

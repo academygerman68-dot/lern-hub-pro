@@ -1953,11 +1953,15 @@ export type Database = {
       student_payments: {
         Row: {
           amount: number;
+          amount_paid: number;
           created_at: string;
           created_by: string | null;
           currency: string;
+          discount_type: string | null;
+          discount_value: number;
           due_date: string | null;
           id: string;
+          initial_amount: number | null;
           invoice_id: string | null;
           notes: string | null;
           payment_date: string | null;
@@ -1969,11 +1973,15 @@ export type Database = {
         };
         Insert: {
           amount: number;
+          amount_paid?: number;
           created_at?: string;
           created_by?: string | null;
           currency?: string;
+          discount_type?: string | null;
+          discount_value?: number;
           due_date?: string | null;
           id?: string;
+          initial_amount?: number | null;
           invoice_id?: string | null;
           notes?: string | null;
           payment_date?: string | null;
@@ -1985,11 +1993,15 @@ export type Database = {
         };
         Update: {
           amount?: number;
+          amount_paid?: number;
           created_at?: string;
           created_by?: string | null;
           currency?: string;
+          discount_type?: string | null;
+          discount_value?: number;
           due_date?: string | null;
           id?: string;
+          initial_amount?: number | null;
           invoice_id?: string | null;
           notes?: string | null;
           payment_date?: string | null;
@@ -2400,11 +2412,15 @@ export type Database = {
         Args: { p_payment_id: string };
         Returns: {
           amount: number;
+          amount_paid: number;
           created_at: string;
           created_by: string | null;
           currency: string;
+          discount_type: string | null;
+          discount_value: number;
           due_date: string | null;
           id: string;
+          initial_amount: number | null;
           invoice_id: string | null;
           notes: string | null;
           payment_date: string | null;
@@ -2425,11 +2441,15 @@ export type Database = {
         Args: { p_payment_id: string };
         Returns: {
           amount: number;
+          amount_paid: number;
           created_at: string;
           created_by: string | null;
           currency: string;
+          discount_type: string | null;
+          discount_value: number;
           due_date: string | null;
           id: string;
+          initial_amount: number | null;
           invoice_id: string | null;
           notes: string | null;
           payment_date: string | null;
@@ -2627,7 +2647,7 @@ export type Database = {
       notification_status: "unread" | "read" | "archived";
       outbox_status: "queued" | "sent" | "failed" | "skipped";
       payment_proof_status: "pending" | "approved" | "rejected";
-      payment_status: "pending" | "partial" | "paid" | "overdue" | "cancelled";
+      payment_status: "pending" | "partial" | "paid" | "overdue" | "cancelled" | "suspended";
       profile_status: "active" | "suspended" | "archived" | "restricted" | "pending";
       record_status: "active" | "inactive" | "archived";
       recording_status: "pending" | "ready" | "failed" | "unavailable";
@@ -2802,7 +2822,7 @@ export const Constants = {
       notification_status: ["unread", "read", "archived"],
       outbox_status: ["queued", "sent", "failed", "skipped"],
       payment_proof_status: ["pending", "approved", "rejected"],
-      payment_status: ["pending", "partial", "paid", "overdue", "cancelled"],
+      payment_status: ["pending", "partial", "paid", "overdue", "cancelled", "suspended"],
       profile_status: ["active", "suspended", "archived", "restricted", "pending"],
       record_status: ["active", "inactive", "archived"],
       recording_status: ["pending", "ready", "failed", "unavailable"],

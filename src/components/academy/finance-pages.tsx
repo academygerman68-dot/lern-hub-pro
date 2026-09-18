@@ -15,10 +15,15 @@ import {
   useSubscriptions,
 } from "@/hooks/use-academy-data";
 import { PaymentProofService } from "@/services/academy-services";
+import { computeFinalAmount } from "@/services/supabase/payment-service";
+import type { Database } from "@/types/database";
 import { useAcademy } from "./academy-context";
 import { DocumentViewer } from "./document-viewer";
 import { QueryState } from "./query-state";
 import { Metric, PageHeader, Status, Surface } from "./primitives";
+
+type PaymentStatus = Database["public"]["Enums"]["payment_status"];
+type PaymentRow = NonNullable<ReturnType<typeof usePayments>["data"]>[number];
 
 function studentLabel(row: {
   student?: {
@@ -37,14 +42,41 @@ function paymentTone(status: string): "green" | "amber" | "red" {
   return "red";
 }
 
-function proofStatusLabel(status: string) {
+export function paymentMethodLabel(method: string | null | undefined) {
+  if (method === "cash") return "Espèces";
+  if (method === "bank_transfer") return "Virement bancaire";
+  if (method === "card") return "Carte";
+  if (method === "mobile_money") return "Espèces mobile";
+  return method ?? "—";
+}
+
+export function paymentStatusLabel(status: string) {
   if (status === "pending") return "En attente";
-  if (status === "approved" || status === "paid") return "Confirmé";
-  if (status === "rejected") return "Refusé";
+  if (status === "paid" || status === "approved") return "Confirmé";
   if (status === "partial") return "Partiel";
   if (status === "overdue") return "En retard";
   if (status === "cancelled") return "Annulé";
+  if (status === "suspended") return "Suspendu";
+  if (status === "rejected") return "Refusé";
   return status;
+}
+
+function proofStatusLabel(status: string) {
+  return paymentStatusLabel(status);
+}
+
+function formatDiscount(row: PaymentRow) {
+  if (!row.discount_type || Number(row.discount_value) <= 0) return "—";
+  if (row.discount_type === "percent") return `${Number(row.discount_value)} %`;
+  return `${Number(row.discount_value).toLocaleString("fr-FR")} MAD`;
+}
+
+function paymentInitial(row: PaymentRow) {
+  return Number(row.initial_amount ?? row.amount);
+}
+
+function paymentRemaining(row: PaymentRow) {
+  return Math.max(0, Number(row.amount) - Number(row.amount_paid ?? 0));
 }
 
 function ProofReviewQueue() {
@@ -209,8 +241,22 @@ export function FinancePages({ mode }: { mode: string }) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [studentId, setStudentId] = useState("");
-  const [amount, setAmount] = useState("1200");
+  const [initialAmount, setInitialAmount] = useState("1200");
+  const [discountMode, setDiscountMode] = useState<"none" | "percent" | "fixed">("none");
+  const [discountValue, setDiscountValue] = useState("");
+  const [amountPaid, setAmountPaid] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [reference, setReference] = useState("");
+  const [note, setNote] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("pending");
   const [dueDate, setDueDate] = useState("");
+
+  const computedFinal = useMemo(() => {
+    const initial = Number(initialAmount) || 0;
+    const discount = Number(discountValue) || 0;
+    const type = discountMode === "none" ? null : discountMode;
+    return computeFinalAmount(initial, type, discount);
+  }, [initialAmount, discountMode, discountValue]);
 
   const filtered = useMemo(() => {
     let rows = paymentsQuery.data ?? [];
@@ -225,15 +271,34 @@ export function FinancePages({ mode }: { mode: string }) {
     return rows;
   }, [paymentsQuery.data, search, statusFilter]);
 
-  const counts = useMemo(() => {
+  const stats = useMemo(() => {
     const rows = paymentsQuery.data ?? [];
+    const expected = rows.reduce((acc, r) => acc + Number(r.amount), 0);
+    const collected = rows.reduce((acc, r) => acc + Number(r.amount_paid ?? 0), 0);
+    const paidTotal = rows
+      .filter((r) => r.status === "paid")
+      .reduce((acc, r) => acc + Number(r.amount_paid ?? r.amount), 0);
     return {
-      paid: rows.filter((r) => r.status === "paid").length,
-      pending: rows.filter((r) => r.status === "pending" || r.status === "partial").length,
+      expected,
+      collected,
+      paidTotal,
       overdue: rows.filter((r) => r.status === "overdue").length,
-      total: rows.reduce((acc, r) => acc + Number(r.amount), 0),
+      partial: rows.filter((r) => r.status === "partial").length,
     };
   }, [paymentsQuery.data]);
+
+  const resetCreateForm = () => {
+    setStudentId("");
+    setInitialAmount("1200");
+    setDiscountMode("none");
+    setDiscountValue("");
+    setAmountPaid("");
+    setPaymentMethod("cash");
+    setReference("");
+    setNote("");
+    setPaymentStatus("pending");
+    setDueDate("");
+  };
 
   if (mode === "subscriptions") {
     return (
@@ -299,10 +364,13 @@ export function FinancePages({ mode }: { mode: string }) {
       />
       <ProofReviewQueue />
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Montant total" value={`${counts.total.toLocaleString()} MAD`} />
-        <Metric label="Confirmés" value={String(counts.paid)} />
-        <Metric label="En attente" value={String(counts.pending)} />
-        <Metric label="En retard" value={String(counts.overdue)} />
+        <Metric label="Total encaissé" value={`${stats.paidTotal.toLocaleString("fr-FR")} MAD`} />
+        <Metric label="En retard" value={String(stats.overdue)} />
+        <Metric label="Partiels" value={String(stats.partial)} />
+        <Metric
+          label="Attendu vs encaissé"
+          value={`${stats.expected.toLocaleString("fr-FR")} / ${stats.collected.toLocaleString("fr-FR")} MAD`}
+        />
       </div>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row">
@@ -319,9 +387,11 @@ export function FinancePages({ mode }: { mode: string }) {
         >
           <option value="all">Tous les statuts</option>
           <option value="pending">En attente</option>
+          <option value="partial">Partiel</option>
           <option value="paid">Confirmé</option>
           <option value="overdue">En retard</option>
           <option value="cancelled">Annulé</option>
+          <option value="suspended">Suspendu</option>
         </select>
       </div>
 
@@ -341,14 +411,20 @@ export function FinancePages({ mode }: { mode: string }) {
                 <div className="min-w-0">
                   <p className="truncate font-semibold">{studentLabel(row)}</p>
                   <p className="text-sm text-muted-foreground">
-                    {Number(row.amount).toLocaleString()} {row.currency}
+                    Final {Number(row.amount).toLocaleString("fr-FR")} {row.currency}
                   </p>
                 </div>
-                <Status tone={paymentTone(row.status)}>{row.status}</Status>
+                <Status tone={paymentTone(row.status)}>{paymentStatusLabel(row.status)}</Status>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                <span>Initial : {paymentInitial(row).toLocaleString("fr-FR")}</span>
+                <span>Remise : {formatDiscount(row)}</span>
+                <span>Payé : {Number(row.amount_paid ?? 0).toLocaleString("fr-FR")}</span>
+                <span>Reste : {paymentRemaining(row).toLocaleString("fr-FR")}</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Due {row.due_date ?? "—"}
-                {row.payment_method ? ` · ${row.payment_method}` : ""}
+                Échéance {row.due_date ?? "—"}
+                {row.payment_method ? ` · ${paymentMethodLabel(row.payment_method)}` : ""}
               </p>
               <div className="flex flex-wrap gap-2">
                 {row.status === "pending" && (
@@ -376,9 +452,11 @@ export function FinancePages({ mode }: { mode: string }) {
             <thead>
               <tr>
                 <th>Étudiant</th>
-                <th>Montant</th>
-                <th>Échéance</th>
-                <th>Payé le</th>
+                <th>Montant initial</th>
+                <th>Remise</th>
+                <th>Final</th>
+                <th>Payé</th>
+                <th>Reste</th>
                 <th>Méthode</th>
                 <th>Statut</th>
                 <th>Actions</th>
@@ -389,13 +467,21 @@ export function FinancePages({ mode }: { mode: string }) {
                 <tr key={row.id}>
                   <td className="font-medium">{studentLabel(row)}</td>
                   <td>
-                    {Number(row.amount).toLocaleString()} {row.currency}
+                    {paymentInitial(row).toLocaleString("fr-FR")} {row.currency}
                   </td>
-                  <td>{row.due_date ?? "—"}</td>
-                  <td>{row.payment_date ?? "—"}</td>
-                  <td>{row.payment_method ?? "—"}</td>
+                  <td>{formatDiscount(row)}</td>
                   <td>
-                    <Status tone={paymentTone(row.status)}>{proofStatusLabel(row.status)}</Status>
+                    {Number(row.amount).toLocaleString("fr-FR")} {row.currency}
+                  </td>
+                  <td>
+                    {Number(row.amount_paid ?? 0).toLocaleString("fr-FR")} {row.currency}
+                  </td>
+                  <td>
+                    {paymentRemaining(row).toLocaleString("fr-FR")} {row.currency}
+                  </td>
+                  <td>{paymentMethodLabel(row.payment_method)}</td>
+                  <td>
+                    <Status tone={paymentTone(row.status)}>{paymentStatusLabel(row.status)}</Status>
                   </td>
                   <td className="space-x-1 whitespace-nowrap">
                     {row.status === "pending" && (
@@ -443,50 +529,150 @@ export function FinancePages({ mode }: { mode: string }) {
         <div className="mobile-modal">
           <Surface className="mobile-modal-panel space-y-4">
             <h2 className="text-lg font-semibold">Enregistrer un paiement</h2>
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={studentId}
-              onChange={(e) => setStudentId(e.target.value)}
-            >
-              <option value="">Choisir un étudiant</option>
-              {(studentsQuery.data ?? []).map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} · {s.email}
-                </option>
-              ))}
-            </select>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Montant"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <label className="block text-sm">
+              Étudiant
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={studentId}
+                onChange={(e) => setStudentId(e.target.value)}
+              >
+                <option value="">Choisir un étudiant</option>
+                {(studentsQuery.data ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} · {s.email}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm">
+              Montant initial (MAD)
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={initialAmount}
+                onChange={(e) => setInitialAmount(e.target.value)}
+                className="mt-1"
+              />
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm">
+                Type de remise
+                <select
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={discountMode}
+                  onChange={(e) => setDiscountMode(e.target.value as "none" | "percent" | "fixed")}
+                >
+                  <option value="none">Aucune</option>
+                  <option value="percent">Pourcentage (%)</option>
+                  <option value="fixed">Montant fixe (MAD)</option>
+                </select>
+              </label>
+              <label className="block text-sm">
+                Valeur remise
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  disabled={discountMode === "none"}
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                  className="mt-1"
+                />
+              </label>
+            </div>
+            <div className="rounded-md bg-muted/50 px-3 py-2 text-sm">
+              Montant final :{" "}
+              <span className="font-semibold">{computedFinal.toLocaleString("fr-FR")} MAD</span>
+            </div>
+            <label className="block text-sm">
+              Montant payé (MAD)
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={amountPaid}
+                onChange={(e) => setAmountPaid(e.target.value)}
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-sm">
+              Méthode de paiement
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+              >
+                <option value="cash">Espèces</option>
+                <option value="bank_transfer">Virement bancaire</option>
+                <option value="card">Carte</option>
+                <option value="mobile_money">Espèces mobile</option>
+              </select>
+            </label>
+            <label className="block text-sm">
+              Référence
+              <Input
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-sm">
+              Note
+              <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1" />
+            </label>
+            <label className="block text-sm">
+              Statut
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={paymentStatus}
+                onChange={(e) => setPaymentStatus(e.target.value as PaymentStatus)}
+              >
+                <option value="pending">En attente</option>
+                <option value="partial">Partiel</option>
+                <option value="paid">Confirmé</option>
+                <option value="overdue">En retard</option>
+                <option value="cancelled">Annulé</option>
+                <option value="suspended">Suspendu</option>
+              </select>
+            </label>
+            <label className="block text-sm">
+              Échéance
+              <Input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="mt-1"
+              />
+            </label>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setCreateOpen(false)}>
                 Annuler
               </Button>
               <Button
-                disabled={!studentId || !amount || createPayment.isPending}
+                disabled={!studentId || !initialAmount || createPayment.isPending}
                 onClick={() => {
+                  const discountType = discountMode === "none" ? null : discountMode;
                   createPayment.mutate(
                     {
                       studentId,
-                      amount: Number(amount),
+                      initialAmount: Number(initialAmount),
+                      discountType,
+                      discountValue: discountMode === "none" ? 0 : Number(discountValue) || 0,
+                      amount: computedFinal,
+                      amountPaid: Number(amountPaid) || 0,
                       currency: "MAD",
                       dueDate: dueDate || null,
-                      paymentMethod: "cash",
-                      status: "pending",
+                      paymentMethod,
+                      reference: reference || null,
+                      notes: note || null,
+                      status: paymentStatus,
                     },
                     {
                       onSuccess: () => {
                         toast.success("Paiement enregistré");
                         setCreateOpen(false);
-                        setStudentId("");
-                        setAmount("1200");
-                        setDueDate("");
+                        resetCreateForm();
                       },
                       onError: (err) => toast.error(err.message),
                     },

@@ -21,6 +21,7 @@ import {
   useTeachers,
   useUpdateClass,
 } from "@/hooks/use-academy-data";
+import { AuthService } from "@/services/academy-services";
 import { WEEKDAY_OPTIONS } from "@/services/supabase/class-schedule-service";
 import type { AccountStatus, AcademyPage, Level, Student } from "@/types/academy";
 import { useAcademy } from "./academy-context";
@@ -46,6 +47,7 @@ import { DirectorExamsPage, StaffExamsPage } from "./exam-pages";
 import { LiveClassesPage } from "./live-pages";
 import { FinancePages } from "./finance-pages";
 import { useClassSelection } from "./class-selection";
+import { PeoplePicker } from "./people-picker";
 import { AuditPage } from "./workflow-pages";
 
 function trimTime(value: string | null | undefined) {
@@ -134,6 +136,10 @@ function TeacherStudents() {
 function TeacherClass() {
   const { classesQuery, primaryClass, selector } = useClassSelection();
   const rosterQuery = useClassRoster(primaryClass?.id);
+  const enrolled = rosterQuery.data?.length ?? primaryClass?.size ?? 0;
+  const capacity = primaryClass?.capacity ?? 0;
+  const remaining = Math.max(0, capacity - enrolled);
+  const isFull = capacity > 0 && enrolled >= capacity;
 
   return (
     <>
@@ -141,15 +147,16 @@ function TeacherClass() {
         title={primaryClass?.name ?? "Mon groupe"}
         subtitle={
           primaryClass
-            ? `${rosterQuery.data?.length ?? 0} étudiants · ${primaryClass.schedule} · ${primaryClass.teacher}`
+            ? `${enrolled}/${capacity} inscrits · ${remaining} place${remaining !== 1 ? "s" : ""} restante${remaining !== 1 ? "s" : ""} · ${primaryClass.schedule} · ${primaryClass.teacher}`
             : "Groupes qui vous sont assignés"
         }
+        action={isFull ? <Status tone="red">Complet</Status> : undefined}
       />
       {selector}
       <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <Metric label="Inscrits" value={String(rosterQuery.data?.length ?? "—")} />
-        <Metric label="Niveau" value={primaryClass?.level ?? "—"} />
-        <Metric label="Salle" value={primaryClass?.room ?? "—"} />
+        <Metric label="Inscrits" value={String(enrolled || "—")} />
+        <Metric label="Capacité" value={capacity ? String(capacity) : "—"} />
+        <Metric label="Places restantes" value={capacity ? String(remaining) : "—"} />
       </div>
       <QueryState
         isLoading={classesQuery.isLoading || rosterQuery.isLoading}
@@ -299,6 +306,7 @@ function Students() {
   const [studentId, setStudentId] = useState("");
   const [classId, setClassId] = useState("");
   const [confirmStatus, setConfirmStatus] = useState<AccountStatus | null>(null);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   const pendingQuery = usePendingProfiles();
   const studentsQuery = useStudents(query);
@@ -348,6 +356,19 @@ function Students() {
         onError: (err) => toast.error(adminActionError(err)),
       },
     );
+  };
+
+  const requestPasswordReset = async (email: string) => {
+    if (!email.trim()) return;
+    setResettingPassword(true);
+    try {
+      await AuthService.requestReset(email.trim());
+      toast.success("Lien de réinitialisation envoyé.");
+    } catch {
+      toast.error("Impossible d'envoyer le lien de réinitialisation.");
+    } finally {
+      setResettingPassword(false);
+    }
   };
 
   return (
@@ -419,25 +440,11 @@ function Students() {
           <Surface className="mobile-modal-panel space-y-4">
             <h2 className="font-semibold">Inscrire un étudiant dans un groupe</h2>
             <QueryState
-              isLoading={allStudents.isLoading || classesQuery.isLoading}
-              isError={allStudents.isError || classesQuery.isError}
-              error={allStudents.error ?? classesQuery.error}
+              isLoading={classesQuery.isLoading}
+              isError={classesQuery.isError}
+              error={classesQuery.error}
             >
-              <label className="block text-sm">
-                Étudiant
-                <select
-                  className="mt-1 w-full rounded-md border bg-background p-2"
-                  value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
-                >
-                  <option value="">Choisir un étudiant</option>
-                  {allStudents.data?.map((student) => (
-                    <option key={student.id} value={student.id}>
-                      {student.lastName} {student.firstName} · {student.email}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <PeoplePicker purpose="enrollment" selectedId={studentId} onSelect={setStudentId} />
               <label className="block text-sm">
                 Groupe
                 <select
@@ -463,13 +470,7 @@ function Students() {
                 Annuler
               </Button>
               <Button
-                disabled={
-                  !studentId ||
-                  !classId ||
-                  enroll.isPending ||
-                  allStudents.isError ||
-                  classesQuery.isError
-                }
+                disabled={!studentId || !classId || enroll.isPending || classesQuery.isError}
                 onClick={() =>
                   enroll.mutate(
                     { studentId, classId },
@@ -705,6 +706,15 @@ function Students() {
               >
                 Fiche 360°
               </Button>
+              {detail.email ? (
+                <Button
+                  variant="outline"
+                  disabled={resettingPassword}
+                  onClick={() => void requestPasswordReset(detail.email)}
+                >
+                  Réinitialiser le mot de passe
+                </Button>
+              ) : null}
               <Button
                 variant="outline"
                 disabled={detail.accountStatus === "active" || setProfileStatus.isPending}
@@ -764,7 +774,6 @@ function Classes() {
   const classesQuery = useClasses();
   const levelsQuery = useLevels();
   const teachersQuery = useTeachers();
-  const studentsQuery = useStudents();
   const createClass = useCreateClass();
   const updateClass = useUpdateClass();
   const createEnrollment = useCreateEnrollment();
@@ -779,7 +788,6 @@ function Classes() {
   const [levelId, setLevelId] = useState("");
   const [teacherId, setTeacherId] = useState("");
   const [schedule, setSchedule] = useState("");
-  const [room, setRoom] = useState("");
   const [addStudentId, setAddStudentId] = useState("");
   const [weekdayDraft, setWeekdayDraft] = useState<number[]>([]);
   const [startTimeDraft, setStartTimeDraft] = useState("21:00");
@@ -805,7 +813,6 @@ function Classes() {
     setLevelId("");
     setTeacherId("");
     setSchedule("");
-    setRoom("");
     setEditingId(null);
   };
 
@@ -822,7 +829,6 @@ function Classes() {
     setLevelId(item.levelId ?? "");
     setTeacherId(item.teacherId ?? "");
     setSchedule(item.schedule === "—" ? "" : item.schedule);
-    setRoom(item.room === "—" ? "" : item.room);
     setOpen(true);
   };
 
@@ -900,13 +906,18 @@ function Classes() {
               key={item.id}
               onClick={() => setSelectedId(item.id)}
             >
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-2">
                 <span className="grid size-10 place-items-center rounded-md bg-secondary font-semibold text-primary">
                   {item.level}
                 </span>
-                <Status tone={item.status === "active" ? "green" : "amber"}>
-                  {classStatusLabel(item.status)}
-                </Status>
+                <div className="flex flex-wrap justify-end gap-2">
+                  {item.capacity > 0 && item.size >= item.capacity && (
+                    <Status tone="red">Complet</Status>
+                  )}
+                  <Status tone={item.status === "active" ? "green" : "amber"}>
+                    {classStatusLabel(item.status)}
+                  </Status>
+                </div>
               </div>
               <h2 className="mt-4 text-lg font-semibold">{item.name}</h2>
               <div className="mt-3 space-y-2 text-sm text-muted-foreground">
@@ -914,9 +925,12 @@ function Classes() {
                   Professeur : <strong className="text-foreground">{item.teacher}</strong>
                 </p>
                 <p>
-                  {item.size}/{item.capacity} étudiants · {item.schedule}
+                  {item.size}/{item.capacity} inscrits · {Math.max(0, item.capacity - item.size)}{" "}
+                  place
+                  {Math.max(0, item.capacity - item.size) !== 1 ? "s" : ""} restante
+                  {Math.max(0, item.capacity - item.size) !== 1 ? "s" : ""}
                 </p>
-                <p>{item.room}</p>
+                <p>{item.schedule}</p>
               </div>
               <div className="mt-4">
                 <Button
@@ -975,7 +989,6 @@ function Classes() {
               value={schedule}
               onChange={(e) => setSchedule(e.target.value)}
             />
-            <Input placeholder="Salle" value={room} onChange={(e) => setRoom(e.target.value)} />
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
@@ -1000,7 +1013,6 @@ function Classes() {
                           level_id: levelId,
                           teacher_id: teacherId || null,
                           schedule_label: schedule || null,
-                          room: room || null,
                         },
                       },
                       {
@@ -1020,7 +1032,6 @@ function Classes() {
                       levelId,
                       teacherId: teacherId || null,
                       scheduleLabel: schedule || null,
-                      room: room || null,
                       status: "active",
                     },
                     {
@@ -1153,46 +1164,38 @@ function Classes() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <select
-                className="h-10 min-w-48 flex-1 rounded-md border border-input bg-background px-3 text-sm"
-                value={addStudentId}
-                onChange={(e) => setAddStudentId(e.target.value)}
-              >
-                <option value="">Ajouter un étudiant…</option>
-                {studentsQuery.data
-                  ?.filter((s) => !(rosterQuery.data ?? []).some((r) => r.id === s.id))
-                  .map((student) => (
-                    <option key={student.id} value={student.id}>
-                      {student.lastName} {student.firstName}
-                      {student.className && student.className !== "—"
-                        ? ` · actuel : ${student.className}`
-                        : ""}
-                    </option>
-                  ))}
-              </select>
-              <Button
-                disabled={!addStudentId || createEnrollment.isPending}
-                onClick={() =>
-                  createEnrollment.mutate(
-                    { studentId: addStudentId, classId: selected.id },
-                    {
-                      onSuccess: (result) => {
-                        const moved = result.movedFromClassNames ?? [];
-                        toast.success(
-                          moved.length > 0
-                            ? `Étudiant ajouté (retiré de ${moved.join(", ")})`
-                            : "Étudiant ajouté au groupe",
-                        );
-                        setAddStudentId("");
+            <div className="space-y-3">
+              <PeoplePicker
+                purpose="enrollment"
+                selectedId={addStudentId}
+                excludeIds={(rosterQuery.data ?? []).map((student) => student.id)}
+                excludeKind="student"
+                onSelect={setAddStudentId}
+              />
+              <div className="flex justify-end">
+                <Button
+                  disabled={!addStudentId || createEnrollment.isPending}
+                  onClick={() =>
+                    createEnrollment.mutate(
+                      { studentId: addStudentId, classId: selected.id },
+                      {
+                        onSuccess: (result) => {
+                          const moved = result.movedFromClassNames ?? [];
+                          toast.success(
+                            moved.length > 0
+                              ? `Étudiant ajouté (retiré de ${moved.join(", ")})`
+                              : "Étudiant ajouté au groupe",
+                          );
+                          setAddStudentId("");
+                        },
+                        onError: (err) => toast.error(adminActionError(err)),
                       },
-                      onError: (err) => toast.error(adminActionError(err)),
-                    },
-                  )
-                }
-              >
-                Ajouter
-              </Button>
+                    )
+                  }
+                >
+                  Ajouter au groupe
+                </Button>
+              </div>
             </div>
 
             <QueryState
@@ -1395,11 +1398,16 @@ function Teachers() {
               onChange={(e) => setPhone(e.target.value)}
             />
             <Input
-              placeholder="Mot de passe temporaire"
+              placeholder="Mot de passe initial (min. 8 caractères)"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
             />
+            <p className="text-xs text-muted-foreground">
+              Le mot de passe n’est jamais réaffiché. Preférez ensuite « Réinitialiser le mot de
+              passe » depuis la fiche.
+            </p>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setOpen(false)}>
                 Annuler
@@ -1423,9 +1431,7 @@ function Teachers() {
                     },
                     {
                       onSuccess: () => {
-                        toast.success(
-                          "Professeur créé. Il peut se connecter avec le mot de passe temporaire.",
-                        );
+                        toast.success("Compte créé. Envoyez un lien de réinitialisation.");
                         setOpen(false);
                         setFirstName("");
                         setLastName("");

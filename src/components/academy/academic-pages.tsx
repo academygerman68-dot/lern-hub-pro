@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +30,14 @@ import {
   type CourseKind,
   type MediaKind,
 } from "@/lib/academic-content";
-import { STUDENT_RESTRICTED_MESSAGE } from "@/lib/academy-logic";
+import {
+  buildTeacherScope,
+  hideArchivedStatus,
+  isDirectorRole,
+  scopedClassOrLevelItemVisible,
+  scopedLibraryItemVisible,
+  STUDENT_RESTRICTED_MESSAGE,
+} from "@/lib/academy-logic";
 import { AssignmentService, CourseService, LibraryService } from "@/services/academy-services";
 import type { Database } from "@/types/database";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
@@ -90,12 +97,18 @@ function statusLabel(status: string) {
 }
 
 export function DirectorCoursesPage() {
+  const { role } = useAcademy();
+  const classesQuery = useClasses();
   const coursesQuery = useCourses();
   const levelsQuery = useLevels();
   const createCourse = useCreateCourse();
   const updateCourse = useUpdateCourse();
   const deleteCourse = useDeleteCourse();
   const { preview, setPreview, openLinkOrFile } = usePreview();
+  const teacherScope = useMemo(
+    () => buildTeacherScope(classesQuery.data ?? []),
+    [classesQuery.data],
+  );
   const [selectedLevelId, setSelectedLevelId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -110,11 +123,19 @@ export function DirectorCoursesPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [existingFile, setExistingFile] = useState(false);
 
-  const levels = levelsQuery.data ?? [];
+  const levels = useMemo(() => {
+    const all = levelsQuery.data ?? [];
+    if (isDirectorRole(role)) return all;
+    return all.filter((level) => teacherScope.levelIds.has(level.id));
+  }, [levelsQuery.data, role, teacherScope]);
   const selectedLevel = levels.find((level) => level.id === selectedLevelId) ?? null;
-  const courses = (coursesQuery.data ?? []).filter(
-    (course) => !selectedLevelId || course.level_id === selectedLevelId,
-  );
+  const courses = useMemo(() => {
+    return hideArchivedStatus(coursesQuery.data ?? []).filter(
+      (course) =>
+        (!selectedLevelId || course.level_id === selectedLevelId) &&
+        (isDirectorRole(role) || teacherScope.levelIds.has(course.level_id)),
+    );
+  }, [coursesQuery.data, selectedLevelId, role, teacherScope]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -177,7 +198,11 @@ export function DirectorCoursesPage() {
         >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {levels.map((level) => {
-              const count = (coursesQuery.data ?? []).filter((c) => c.level_id === level.id).length;
+              const count = hideArchivedStatus(coursesQuery.data ?? []).filter(
+                (course) =>
+                  course.level_id === level.id &&
+                  (isDirectorRole(role) || teacherScope.levelIds.has(course.level_id)),
+              ).length;
               return (
                 <button
                   key={level.id}
@@ -419,10 +444,17 @@ export function MaterialsLibraryPage() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const restricted = profile?.status === "restricted";
-  const filtered = (libraryQuery.data ?? []).filter((item) => item.domain === domainTab);
-  const classesForLevel = (classesQuery.data ?? []).filter(
-    (item) => !levelCode || item.level === levelCode,
+  const teacherScope = useMemo(
+    () => buildTeacherScope(classesQuery.data ?? []),
+    [classesQuery.data],
   );
+  const scopedClasses = classesQuery.data ?? [];
+  const filtered = useMemo(() => {
+    return (libraryQuery.data ?? [])
+      .filter((item) => item.domain === domainTab)
+      .filter((item) => isDirectorRole(role) || scopedLibraryItemVisible(item, teacherScope));
+  }, [libraryQuery.data, domainTab, role, teacherScope]);
+  const classesForLevel = scopedClasses.filter((item) => !levelCode || item.level === levelCode);
 
   return (
     <>
@@ -499,11 +531,15 @@ export function MaterialsLibraryPage() {
                 }}
               >
                 <option value="">Choisir le niveau</option>
-                {(levelsQuery.data ?? []).map((level) => (
-                  <option key={level.id} value={level.code}>
-                    {level.code} · {level.name}
-                  </option>
-                ))}
+                {(levelsQuery.data ?? [])
+                  .filter(
+                    (level) => isDirectorRole(role) || teacherScope.levelCodes.has(level.code),
+                  )
+                  .map((level) => (
+                    <option key={level.id} value={level.code}>
+                      {level.code} · {level.name}
+                    </option>
+                  ))}
               </select>
             </label>
           )}
@@ -739,13 +775,18 @@ export function StudentLearningPage() {
 }
 
 export function DirectorAssignmentsPage() {
-  const { user } = useAcademy();
+  const { user, role } = useAcademy();
   const classesQuery = useClasses();
   const levelsQuery = useLevels();
   const listQuery = useAssignmentRows();
   const create = useCreateAssignment();
   const archive = useArchiveAssignment();
   const { preview, setPreview, openLinkOrFile } = usePreview();
+  const isTeacher = role === "teacher";
+  const teacherScope = useMemo(
+    () => buildTeacherScope(classesQuery.data ?? []),
+    [classesQuery.data],
+  );
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -764,6 +805,23 @@ export function DirectorAssignmentsPage() {
   const classesForLevel = (classesQuery.data ?? []).filter(
     (item) => !levelId || item.levelId === levelId,
   );
+  const assignments = useMemo(() => {
+    return (listQuery.data ?? []).filter(
+      (row) => isDirectorRole(role) || scopedClassOrLevelItemVisible(row, teacherScope),
+    );
+  }, [listQuery.data, role, teacherScope]);
+
+  useEffect(() => {
+    if (!isTeacher || classId || !levelId) return;
+    const firstClass = classesForLevel[0];
+    if (firstClass) setClassId(firstClass.id);
+  }, [isTeacher, classId, levelId, classesForLevel]);
+
+  useEffect(() => {
+    if (!isTeacher || classId) return;
+    const firstClass = classesQuery.data?.[0];
+    if (firstClass) setClassId(firstClass.id);
+  }, [isTeacher, classId, classesQuery.data]);
 
   return (
     <>
@@ -776,13 +834,17 @@ export function DirectorAssignmentsPage() {
         isLoading={listQuery.isLoading}
         isError={listQuery.isError}
         error={listQuery.error}
-        isEmpty={!listQuery.data?.length}
+        isEmpty={!assignments.length}
         emptyTitle="Aucun devoir"
-        emptyMessage="Créez un devoir pour un niveau ou un groupe."
+        emptyMessage={
+          isTeacher
+            ? "Aucun devoir pour vos groupes pour le moment."
+            : "Créez un devoir pour un niveau ou un groupe."
+        }
         onRetry={() => void listQuery.refetch()}
       >
         <div className="space-y-3">
-          {listQuery.data?.map((row) => (
+          {assignments.map((row) => (
             <Surface className="p-5" key={row.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -855,11 +917,13 @@ export function DirectorAssignmentsPage() {
                 }}
               >
                 <option value="">Choisir le niveau</option>
-                {(levelsQuery.data ?? []).map((level) => (
-                  <option key={level.id} value={level.id}>
-                    {level.code} · {level.name}
-                  </option>
-                ))}
+                {(levelsQuery.data ?? [])
+                  .filter((level) => isDirectorRole(role) || teacherScope.levelIds.has(level.id))
+                  .map((level) => (
+                    <option key={level.id} value={level.id}>
+                      {level.code} · {level.name}
+                    </option>
+                  ))}
               </select>
             </label>
             <label className="block text-sm">
@@ -870,7 +934,7 @@ export function DirectorAssignmentsPage() {
                 onChange={(e) => setClassId(e.target.value)}
                 disabled={!levelId}
               >
-                <option value="">Tout le niveau</option>
+                <option value="">{isTeacher ? "Choisir le groupe" : "Tout le niveau"}</option>
                 {classesForLevel.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
@@ -910,7 +974,9 @@ export function DirectorAssignmentsPage() {
                 Annuler
               </Button>
               <Button
-                disabled={!title.trim() || !levelId || saving || create.isPending}
+                disabled={
+                  !title.trim() || !levelId || saving || create.isPending || (isTeacher && !classId)
+                }
                 onClick={() => {
                   void (async () => {
                     setFormError(null);

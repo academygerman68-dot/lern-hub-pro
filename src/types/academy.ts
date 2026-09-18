@@ -86,6 +86,7 @@ export interface Student {
   accountStatus: AccountStatus;
   teacherName?: string;
   classId?: string;
+  createdAt?: string;
 }
 
 export interface Teacher {

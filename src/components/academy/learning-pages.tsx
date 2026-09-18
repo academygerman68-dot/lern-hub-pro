@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AssignmentGrading } from "./workflow-pages";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,12 @@ import {
   useUpdateCourse,
   useUploadLibraryItem,
 } from "@/hooks/use-academy-data";
+import {
+  buildTeacherScope,
+  hideArchivedStatus,
+  isDirectorRole,
+  scopedLibraryItemVisible,
+} from "@/lib/academy-logic";
 import { CourseService, LibraryService, AssignmentService } from "@/services/academy-services";
 import type { Database } from "@/types/database";
 import { useAcademy } from "./academy-context";
@@ -30,9 +36,19 @@ import { QueryState } from "./query-state";
 import { PageHeader, Status, Surface } from "./primitives";
 
 export function DirectorCoursesPage() {
-  const { user } = useAcademy();
+  const { user, role } = useAcademy();
+  const classesQuery = useClasses();
   const coursesQuery = useCourses();
   const levelsQuery = useLevels();
+  const teacherScope = useMemo(
+    () => buildTeacherScope(classesQuery.data ?? []),
+    [classesQuery.data],
+  );
+  const visibleCourses = useMemo(() => {
+    return hideArchivedStatus(coursesQuery.data ?? []).filter(
+      (course) => isDirectorRole(role) || teacherScope.levelIds.has(course.level_id),
+    );
+  }, [coursesQuery.data, role, teacherScope]);
   const createCourse = useCreateCourse();
   const updateCourse = useUpdateCourse();
   const archiveCourse = useArchiveCourse();
@@ -104,13 +120,17 @@ export function DirectorCoursesPage() {
         isLoading={coursesQuery.isLoading}
         isError={coursesQuery.isError}
         error={coursesQuery.error}
-        isEmpty={!coursesQuery.data?.length}
+        isEmpty={!visibleCourses.length}
         emptyTitle="Aucun cours"
-        emptyMessage="Créez le premier cours pour un niveau."
+        emptyMessage={
+          role === "teacher"
+            ? "Aucun cours pour les niveaux de vos groupes."
+            : "Créez le premier cours pour un niveau."
+        }
         onRetry={() => void coursesQuery.refetch()}
       >
         <div className="space-y-3">
-          {coursesQuery.data?.map((course) => {
+          {visibleCourses.map((course) => {
             const moduleCount = (course.modules ?? []).length;
             const lessonCount = (course.modules ?? []).reduce(
               (acc, mod) =>
@@ -218,11 +238,13 @@ export function DirectorCoursesPage() {
               onChange={(e) => setLevelId(e.target.value)}
             >
               <option value="">Choisir le niveau</option>
-              {(levelsQuery.data ?? []).map((level) => (
-                <option key={level.id} value={level.id}>
-                  {level.code} · {level.name}
-                </option>
-              ))}
+              {(levelsQuery.data ?? [])
+                .filter((level) => isDirectorRole(role) || teacherScope.levelIds.has(level.id))
+                .map((level) => (
+                  <option key={level.id} value={level.id}>
+                    {level.code} · {level.name}
+                  </option>
+                ))}
             </select>
             <Input
               placeholder="Titre du cours"
@@ -360,29 +382,47 @@ export function DirectorCoursesPage() {
 }
 
 export function TeacherLessonManagerPage() {
+  const { role } = useAcademy();
+  const classesQuery = useClasses();
   const lessonsQuery = useLessons();
   const coursesQuery = useCourses();
   const createLesson = useCreateLesson();
   const publishLesson = usePublishLesson();
+  const teacherScope = useMemo(
+    () => buildTeacherScope(classesQuery.data ?? []),
+    [classesQuery.data],
+  );
+  const visibleCourses = useMemo(() => {
+    return hideArchivedStatus(coursesQuery.data ?? []).filter(
+      (course) => isDirectorRole(role) || teacherScope.levelIds.has(course.level_id),
+    );
+  }, [coursesQuery.data, role, teacherScope]);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [courseId, setCourseId] = useState("");
 
+  const lessonStatusLabel = (status: string) => {
+    if (status === "published") return "Publié";
+    if (status === "draft") return "Brouillon";
+    if (status === "archived") return "Archivé";
+    return status;
+  };
+
   return (
     <>
       <PageHeader
-        title="Lesson Manager"
-        subtitle="Create and publish lessons stored in Supabase."
-        action={<Button onClick={() => setOpen(true)}>+ Create lesson</Button>}
+        title="Gestion des leçons"
+        subtitle="Créez et publiez des leçons liées à vos cours."
+        action={<Button onClick={() => setOpen(true)}>+ Créer une leçon</Button>}
       />
       <QueryState
         isLoading={lessonsQuery.isLoading}
         isError={lessonsQuery.isError}
         error={lessonsQuery.error}
         isEmpty={!lessonsQuery.data?.length}
-        emptyTitle="No lessons"
-        emptyMessage="Create a lesson linked to a course unit."
+        emptyTitle="Aucune leçon"
+        emptyMessage="Créez une leçon liée à un cours de vos niveaux."
         onRetry={() => void lessonsQuery.refetch()}
       >
         <div className="space-y-3">
@@ -394,12 +434,12 @@ export function TeacherLessonManagerPage() {
               <div>
                 <h2 className="font-semibold">{lesson.title}</h2>
                 <p className="text-sm text-muted-foreground">
-                  {lesson.description ?? "No description"}
+                  {lesson.description ?? "Aucune description"}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <Status tone={lesson.status === "published" ? "green" : "amber"}>
-                  {lesson.status}
+                  {lessonStatusLabel(lesson.status)}
                 </Status>
                 {lesson.status !== "published" && (
                   <Button
@@ -407,12 +447,12 @@ export function TeacherLessonManagerPage() {
                     disabled={publishLesson.isPending}
                     onClick={() =>
                       publishLesson.mutate(lesson.id, {
-                        onSuccess: () => toast.success("Lesson published"),
+                        onSuccess: () => toast.success("Leçon publiée"),
                         onError: (err) => toast.error(err.message),
                       })
                     }
                   >
-                    Publish
+                    Publier
                   </Button>
                 )}
               </div>
@@ -424,32 +464,32 @@ export function TeacherLessonManagerPage() {
       {open && (
         <div className="mobile-modal">
           <Surface className="mobile-modal-panel space-y-4">
-            <h2 className="text-lg font-semibold">Create lesson</h2>
+            <h2 className="text-lg font-semibold">Créer une leçon</h2>
             <select
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={courseId}
               onChange={(e) => setCourseId(e.target.value)}
             >
-              <option value="">Select course</option>
-              {(coursesQuery.data ?? []).map((course) => (
+              <option value="">Choisir un cours</option>
+              {visibleCourses.map((course) => (
                 <option key={course.id} value={course.id}>
                   {course.level?.code} · {course.title}
                 </option>
               ))}
             </select>
             <Input
-              placeholder="Lesson title"
+              placeholder="Titre de la leçon"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
             <Textarea
-              placeholder="Markdown content"
+              placeholder="Contenu (Markdown)"
               value={content}
               onChange={(e) => setContent(e.target.value)}
             />
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setOpen(false)}>
-                Cancel
+                Annuler
               </Button>
               <Button
                 disabled={!title.trim() || !courseId || createLesson.isPending}
@@ -462,7 +502,7 @@ export function TeacherLessonManagerPage() {
                     },
                     {
                       onSuccess: () => {
-                        toast.success("Lesson created as draft");
+                        toast.success("Leçon créée en brouillon");
                         setOpen(false);
                         setTitle("");
                         setContent("");
@@ -473,7 +513,7 @@ export function TeacherLessonManagerPage() {
                   );
                 }}
               >
-                Create
+                Créer
               </Button>
             </div>
           </Surface>
@@ -508,7 +548,15 @@ export function MaterialsLibraryPage() {
     error: string | null;
   } | null>(null);
 
-  const filtered = (libraryQuery.data ?? []).filter((item) => item.domain === domainTab);
+  const teacherScope = useMemo(
+    () => buildTeacherScope(classesQuery.data ?? []),
+    [classesQuery.data],
+  );
+  const filtered = useMemo(() => {
+    return (libraryQuery.data ?? [])
+      .filter((item) => item.domain === domainTab)
+      .filter((item) => isDirectorRole(role) || scopedLibraryItemVisible(item, teacherScope));
+  }, [libraryQuery.data, domainTab, role, teacherScope]);
   const audienceLabel = { everyone: "Tout le monde", level: "Niveau", class: "Groupe" } as const;
   const domainLabel = { academic: "Académique", professional: "Professionnelle" } as const;
 
@@ -581,11 +629,13 @@ export function MaterialsLibraryPage() {
               <option value="">
                 {audience === "level" ? "Choisir le niveau" : "Niveau (facultatif)"}
               </option>
-              {(levelsQuery.data ?? []).map((level) => (
-                <option key={level.id} value={level.code}>
-                  {level.code}
-                </option>
-              ))}
+              {(levelsQuery.data ?? [])
+                .filter((level) => isDirectorRole(role) || teacherScope.levelCodes.has(level.code))
+                .map((level) => (
+                  <option key={level.id} value={level.code}>
+                    {level.code}
+                  </option>
+                ))}
             </select>
           )}
           {audience === "class" && (
@@ -768,9 +818,10 @@ export function StudentLearningPage() {
         <Surface className="space-y-3 p-6">
           <h2 className="font-semibold">Accès restreint</h2>
           <p className="text-sm text-muted-foreground">
-            An active subscription is required to open courses. Review your payments to renew.
+            Un abonnement actif est nécessaire pour ouvrir les cours. Consultez vos paiements pour
+            renouveler.
           </p>
-          <Button onClick={() => navigate("payments")}>Open payments</Button>
+          <Button onClick={() => navigate("payments")}>Mes paiements</Button>
         </Surface>
       </>
     );
@@ -783,8 +834,8 @@ export function StudentLearningPage() {
         isError={modulesQuery.isError}
         error={modulesQuery.error}
         isEmpty={!modulesQuery.data?.length}
-        emptyTitle="No published modules"
-        emptyMessage="Courses appear here once staff publishes curriculum."
+        emptyTitle="Aucun module publié"
+        emptyMessage="Les cours apparaîtront ici une fois publiés par l’équipe pédagogique."
         onRetry={() => void modulesQuery.refetch()}
       >
         <div className="grid gap-4 md:grid-cols-2">
@@ -793,14 +844,14 @@ export function StudentLearningPage() {
               <p className="text-xs font-medium text-muted-foreground uppercase">{module.level}</p>
               <h2 className="mt-2 text-lg font-semibold">{module.title}</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {module.courseTitle} · {module.lessons} lessons
+                {module.courseTitle} · {module.lessons} leçon{module.lessons !== 1 ? "s" : ""}
               </p>
               <Button
                 className="mt-4"
                 variant="outline"
                 onClick={() => navigate("lesson", { moduleId: module.id })}
               >
-                Open lessons
+                Ouvrir les leçons
               </Button>
             </Surface>
           ))}
@@ -818,8 +869,21 @@ export function TeacherAssignmentsPage() {
   const create = useCreateAssignment();
   const [title, setTitle] = useState("");
   const [classId, setClassId] = useState("");
-  const effectiveClassId = classId || classesQuery.data?.[0]?.id;
-  const listQuery = useAssignments(effectiveClassId);
+  const teacherScope = useMemo(
+    () => buildTeacherScope(classesQuery.data ?? []),
+    [classesQuery.data],
+  );
+  const listQuery = useAssignments();
+  const assignments = useMemo(() => {
+    return (listQuery.data ?? []).filter(
+      (item) => item.classId && teacherScope.classIds.has(item.classId),
+    );
+  }, [listQuery.data, teacherScope]);
+
+  useEffect(() => {
+    if (classId || !classesQuery.data?.[0]) return;
+    setClassId(classesQuery.data[0].id);
+  }, [classId, classesQuery.data]);
 
   return (
     <>
@@ -888,13 +952,13 @@ export function TeacherAssignmentsPage() {
         isLoading={listQuery.isLoading}
         isError={listQuery.isError}
         error={listQuery.error}
-        isEmpty={!listQuery.data?.length}
+        isEmpty={!assignments.length}
         emptyTitle="Aucun devoir"
-        emptyMessage="Créez un devoir pour un groupe."
+        emptyMessage="Créez un devoir pour l’un de vos groupes."
         onRetry={() => void listQuery.refetch()}
       >
         <div className="space-y-3">
-          {listQuery.data?.map((item) => (
+          {assignments.map((item) => (
             <Surface className="p-4" key={item.id}>
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -920,10 +984,15 @@ export function TeacherAssignmentsPage() {
 }
 
 export function DirectorAssignmentsPage() {
-  const { user } = useAcademy();
+  const { user, role } = useAcademy();
   const classesQuery = useClasses();
   const listQuery = useAssignments();
   const create = useCreateAssignment();
+  const isTeacher = role === "teacher";
+  const teacherScope = useMemo(
+    () => buildTeacherScope(classesQuery.data ?? []),
+    [classesQuery.data],
+  );
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -935,6 +1004,17 @@ export function DirectorAssignmentsPage() {
   const [saving, setSaving] = useState(false);
 
   const selectedClass = (classesQuery.data ?? []).find((c) => c.id === classId);
+  const assignments = useMemo(() => {
+    return (listQuery.data ?? []).filter(
+      (row) =>
+        isDirectorRole(role) || Boolean(row.classId && teacherScope.classIds.has(row.classId)),
+    );
+  }, [listQuery.data, role, teacherScope]);
+
+  useEffect(() => {
+    if (!isTeacher || classId || !classesQuery.data?.[0]) return;
+    setClassId(classesQuery.data[0].id);
+  }, [isTeacher, classId, classesQuery.data]);
 
   return (
     <>
@@ -947,9 +1027,13 @@ export function DirectorAssignmentsPage() {
         isLoading={listQuery.isLoading}
         isError={listQuery.isError}
         error={listQuery.error}
-        isEmpty={!listQuery.data?.length}
+        isEmpty={!assignments.length}
         emptyTitle="Aucun devoir"
-        emptyMessage="Créez un devoir pour un groupe."
+        emptyMessage={
+          isTeacher
+            ? "Aucun devoir pour vos groupes pour le moment."
+            : "Créez un devoir pour un groupe."
+        }
         onRetry={() => void listQuery.refetch()}
       >
         <Surface className="table-scroll">
@@ -962,7 +1046,7 @@ export function DirectorAssignmentsPage() {
               </tr>
             </thead>
             <tbody>
-              {listQuery.data?.map((row) => (
+              {assignments.map((row) => (
                 <tr key={row.id}>
                   <td className="font-medium">{row.title}</td>
                   <td>{row.due}</td>

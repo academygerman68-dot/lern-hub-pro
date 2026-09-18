@@ -26,6 +26,7 @@ export type StudentRow = {
   id: string;
   student_code: string | null;
   level_code: string | null;
+  created_at?: string;
   status: RecordStatus;
   notes: string | null;
   profile: ProfileLite | ProfileLite[] | null;
@@ -179,6 +180,7 @@ export function mapStudent(row: StudentRow): Student {
     accountStatus: toAccountStatus(profile?.status),
     ...(teacherProfile ? { teacherName: profileName(teacherProfile) } : {}),
     ...(klass?.id ? { classId: klass.id } : {}),
+    ...(row.created_at ? { createdAt: row.created_at } : {}),
   };
 }
 
