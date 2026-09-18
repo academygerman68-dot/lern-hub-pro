@@ -14,8 +14,20 @@ function requireClient() {
   return getSupabase();
 }
 
+export type ExamQuestionType = Database["public"]["Enums"]["exam_question_type"];
+export type ExamSkill = Database["public"]["Enums"]["exam_skill"];
+
 export type ExamQuestionWithOptions = ExamQuestion & {
   options: ExamOption[];
+};
+
+/** Staff-only view: includes the protected answer key. */
+export type ExamStructureQuestion = ExamQuestionWithOptions & {
+  answer_key: { correct_values: string[] } | null;
+};
+
+export type ExamStructureSection = ExamSection & {
+  questions: ExamStructureQuestion[];
 };
 
 export type ExamSectionWithQuestions = ExamSection & {
@@ -218,6 +230,142 @@ export const SupabaseExamService = {
     return this.updateExam(id, { status: "archived" });
   },
 
+  /** Authoring view of an exam: sections, questions, options and answer keys. */
+  async listExamStructure(examId: string): Promise<ExamStructureSection[]> {
+    const { data, error } = await requireClient()
+      .from("exam_sections")
+      .select(
+        `
+        *,
+        questions:exam_questions (
+          *,
+          options:exam_question_options ( * ),
+          answer_key:exam_answer_keys ( correct_values )
+        )
+      `,
+      )
+      .eq("exam_id", examId);
+    if (error) throw error;
+    const sections = (data as ExamStructureSection[] | null) ?? [];
+    return sections
+      .map((section) => ({
+        ...section,
+        questions: (section.questions ?? [])
+          .map((question) => ({
+            ...question,
+            options: (question.options ?? []).slice().sort((a, b) => a.sort_order - b.sort_order),
+          }))
+          .sort((a, b) => a.sort_order - b.sort_order),
+      }))
+      .sort((a, b) => a.sort_order - b.sort_order);
+  },
+
+  async createSection(input: {
+    examId: string;
+    title: string;
+    skill: ExamSkill;
+    description?: string | null;
+    sortOrder?: number;
+    maxScore?: number;
+  }): Promise<ExamSection> {
+    const { data, error } = await requireClient()
+      .from("exam_sections")
+      .insert({
+        exam_id: input.examId,
+        title: input.title,
+        skill: input.skill,
+        description: input.description ?? null,
+        sort_order: input.sortOrder ?? 0,
+        max_score: input.maxScore ?? 0,
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async createQuestion(input: {
+    sectionId: string;
+    type: ExamQuestionType;
+    prompt: string;
+    points?: number;
+    sortOrder?: number;
+  }): Promise<ExamQuestion> {
+    const { data, error } = await requireClient()
+      .from("exam_questions")
+      .insert({
+        section_id: input.sectionId,
+        type: input.type,
+        prompt: input.prompt,
+        points: input.points ?? 1,
+        sort_order: input.sortOrder ?? 0,
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async createOptions(
+    questionId: string,
+    options: Array<{ label: string; value: string; sortOrder?: number }>,
+  ): Promise<ExamOption[]> {
+    if (options.length === 0) return [];
+    const { data, error } = await requireClient()
+      .from("exam_question_options")
+      .insert(
+        options.map((option, index) => ({
+          question_id: questionId,
+          label: option.label,
+          value: option.value,
+          sort_order: option.sortOrder ?? index + 1,
+        })),
+      )
+      .select("*");
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  async setAnswerKey(questionId: string, correctValues: string[]) {
+    const { data, error } = await requireClient()
+      .from("exam_answer_keys")
+      .upsert(
+        { question_id: questionId, correct_values: correctValues },
+        { onConflict: "question_id" },
+      )
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  /** Keeps the section total aligned with the points of its questions. */
+  async syncSectionMaxScore(sectionId: string) {
+    const supabase = requireClient();
+    const { data, error } = await supabase
+      .from("exam_questions")
+      .select("points")
+      .eq("section_id", sectionId);
+    if (error) throw error;
+    const total = (data ?? []).reduce((sum, row) => sum + Number(row.points ?? 0), 0);
+    const { error: updateError } = await supabase
+      .from("exam_sections")
+      .update({ max_score: total })
+      .eq("id", sectionId);
+    if (updateError) throw updateError;
+    return total;
+  },
+
+  async deleteQuestion(questionId: string) {
+    const { error } = await requireClient().from("exam_questions").delete().eq("id", questionId);
+    if (error) throw error;
+  },
+
+  async deleteSection(sectionId: string) {
+    const { error } = await requireClient().from("exam_sections").delete().eq("id", sectionId);
+    if (error) throw error;
+  },
+
   async startAttempt(examId: string): Promise<ExamAttempt> {
     const { data, error } = await requireClient().rpc("start_exam_attempt", { p_exam_id: examId });
     if (error) throw error;
@@ -275,6 +423,61 @@ export const SupabaseExamService = {
     });
     if (error) throw error;
     return data as ExamAttempt;
+  },
+
+  async gradeWritingAnswer(input: {
+    attemptId: string;
+    questionId: string;
+    points: number;
+    comment?: string | null;
+  }): Promise<ExamAttempt> {
+    const { data, error } = await requireClient().rpc("grade_exam_writing_answer", {
+      p_attempt_id: input.attemptId,
+      p_question_id: input.questionId,
+      p_points: input.points,
+      p_comment: input.comment ?? null,
+    });
+    if (error) throw error;
+    return data as ExamAttempt;
+  },
+
+  async listAttemptsForExam(examId: string): Promise<
+    Array<
+      ExamAttempt & {
+        student: {
+          id: string;
+          profile: { first_name: string; last_name: string; email: string | null } | null;
+        } | null;
+      }
+    >
+  > {
+    const { data, error } = await requireClient()
+      .from("exam_attempts")
+      .select(
+        `
+        *,
+        student:students!exam_attempts_student_id_fkey (
+          id,
+          profile:profiles!students_profile_id_fkey (
+            first_name,
+            last_name,
+            email
+          )
+        )
+      `,
+      )
+      .eq("exam_id", examId)
+      .in("status", ["submitted", "graded", "expired"])
+      .order("submitted_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as Array<
+      ExamAttempt & {
+        student: {
+          id: string;
+          profile: { first_name: string; last_name: string; email: string | null } | null;
+        } | null;
+      }
+    >;
   },
 
   async listMyAttempts(examId?: string): Promise<ExamAttempt[]> {

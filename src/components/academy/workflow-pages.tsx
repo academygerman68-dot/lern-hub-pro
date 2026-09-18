@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useSearch } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { getSupabase } from "@/lib/supabase";
 import { useAcademicAccess, useCourses, useClassRoster } from "@/hooks/use-academy-data";
-import { formatFrDate, MEDIA_KIND_LABELS } from "@/lib/academic-content";
+import { formatFrDate, MEDIA_KIND_LABELS, validateFileForKind } from "@/lib/academic-content";
 import { setLiveSessionId } from "@/lib/live-class-session";
 import { openExternalMeeting } from "@/lib/live-meeting";
 import { AssignmentService, LiveSessionService } from "@/services/academy-services";
@@ -15,8 +15,9 @@ import { SupabaseAssignmentService as Assignments } from "@/services/supabase/as
 import { SupabaseLiveSessionService } from "@/services/supabase/live-session-service";
 import type { Database } from "@/types/database";
 import { useAcademy } from "./academy-context";
+import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { DocumentViewer } from "./document-viewer";
-import { PageHeader, Surface, Status } from "./primitives";
+import { PageHeader, Surface, Status, TableScroll } from "./primitives";
 import { QueryState } from "./query-state";
 
 type Assignment = Database["public"]["Tables"]["assignments"]["Row"];
@@ -338,25 +339,37 @@ function SubmissionForm({
   saved: () => Promise<unknown>;
 }) {
   const [text, setText] = useState(submission?.content_text ?? "");
+  const [attachment, setAttachment] = useState<AttachmentDraft>({
+    kind: "document",
+    url: "",
+    file: null,
+  });
+  const [formError, setFormError] = useState<string | null>(null);
   const closed =
     assignment.status !== "published" ||
     (assignment.due_at !== null && new Date(assignment.due_at).getTime() < Date.now());
   const locked = closed || submission?.status === "submitted" || submission?.status === "graded";
+  const hasFile = Boolean(submission?.file_path);
   const mutation = useMutation({
     mutationFn: () =>
       Assignments.upsertSubmission({
         assignmentId: assignment.id,
         studentId,
         contentText: text.trim(),
+        ...(attachment.file ? { file: attachment.file } : {}),
       }),
     onSuccess: async () => {
+      setAttachment({ kind: attachment.kind, url: "", file: null });
       await saved();
       toast.success("Devoir remis au professeur");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      setFormError(e.message);
+      toast.error(e.message);
+    },
   });
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {submission && <Status>{submissionStatusLabel(submission.status)}</Status>}
       {submission?.score != null && (
         <p>
@@ -375,19 +388,93 @@ function SubmissionForm({
           onChange={(e) => setText(e.target.value)}
         />
       </label>
+      {hasFile && submission && (
+        <SubmissionFileButton submission={submission} label="Mon fichier" />
+      )}
+      {!locked && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Fichier joint (facultatif)</p>
+          <ContentAttachmentUploader
+            kinds={["document", "pdf", "image"]}
+            value={attachment}
+            onChange={(next) => {
+              setFormError(null);
+              setAttachment(next);
+            }}
+            disabled={mutation.isPending}
+            uploading={mutation.isPending}
+            error={formError}
+            requiredFileWhenNew={false}
+            hasExistingFile={hasFile}
+            existingLabel="Un fichier est déjà déposé. Déposez-en un autre pour le remplacer."
+          />
+        </div>
+      )}
       {closed && (
         <p className="text-sm text-muted-foreground">La période de remise est terminée.</p>
       )}
       {!locked && (
-        <Button disabled={!text.trim() || mutation.isPending} onClick={() => mutation.mutate()}>
-          Remettre mon devoir
-        </Button>
+        <>
+          <p className="text-xs text-muted-foreground">
+            Une réponse écrite, un fichier, ou les deux : au moins un élément est requis.
+          </p>
+          <Button
+            disabled={(!text.trim() && !attachment.file) || mutation.isPending}
+            onClick={() => {
+              setFormError(null);
+              if (attachment.file) {
+                const fileError = validateFileForKind(attachment.file, attachment.kind);
+                if (fileError) {
+                  setFormError(fileError);
+                  return;
+                }
+              }
+              mutation.mutate();
+            }}
+          >
+            Remettre mon devoir
+          </Button>
+        </>
       )}
       {submission?.status === "submitted" && (
         <p>Votre réponse est enregistrée et attend une correction.</p>
       )}
     </div>
   );
+}
+
+function SubmissionFileButton({
+  submission,
+  label = "Télécharger le fichier",
+  size = "default",
+}: {
+  submission: Submission;
+  label?: string;
+  size?: "default" | "sm";
+}) {
+  const [loading, setLoading] = useState(false);
+  if (!submission.file_path) return null;
+  return (
+    <Button
+      variant="outline"
+      size={size}
+      disabled={loading}
+      onClick={() => {
+        setLoading(true);
+        void AssignmentService.getSubmissionFileUrl(submission)
+          .then((url) => window.open(url, "_blank", "noopener,noreferrer"))
+          .catch((err: Error) => toast.error(err.message))
+          .finally(() => setLoading(false));
+      }}
+    >
+      {label}
+    </Button>
+  );
+}
+
+function isLateSubmission(submission: Submission | null, dueAt: string | null | undefined) {
+  if (!submission?.submitted_at || !dueAt) return false;
+  return new Date(submission.submitted_at).getTime() > new Date(dueAt).getTime();
 }
 
 export function AssignmentGrading({
@@ -398,6 +485,7 @@ export function AssignmentGrading({
   classId: string;
 }) {
   const roster = useClassRoster(classId);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const query = useQuery({
     queryKey: ["submissions", assignmentId],
     queryFn: () => Assignments.listSubmissions(assignmentId),
@@ -407,21 +495,37 @@ export function AssignmentGrading({
     queryFn: async () => {
       const { data, error } = await getSupabase()
         .from("assignments")
-        .select("max_score")
+        .select("max_score, due_at")
         .eq("id", assignmentId)
         .single();
       if (error) throw error;
       return data;
     },
   });
+
+  const dueAt = assignmentQuery.data?.due_at ?? null;
+  const maxScore = assignmentQuery.data?.max_score ?? 100;
+  const rows = (roster.data ?? []).map((student) => {
+    const submission =
+      (query.data ?? []).find((s) => s.student_id === student.id && s.status !== "draft") ?? null;
+    return { student, submission, late: isLateSubmission(submission, dueAt) };
+  });
+  const counters = {
+    total: rows.length,
+    submitted: rows.filter((r) => r.submission).length,
+    missing: rows.filter((r) => !r.submission).length,
+    late: rows.filter((r) => r.late).length,
+    graded: rows.filter((r) => r.submission?.status === "graded").length,
+  };
+
   return (
     <QueryState
       isLoading={query.isLoading || assignmentQuery.isLoading || roster.isLoading}
       isError={query.isError || assignmentQuery.isError || roster.isError}
       error={query.error ?? assignmentQuery.error ?? roster.error}
-      isEmpty={!query.data?.length}
-      emptyTitle="Aucune remise"
-      emptyMessage="Les réponses des étudiants apparaîtront ici."
+      isEmpty={!rows.length}
+      emptyTitle="Aucun étudiant inscrit"
+      emptyMessage="Inscrivez des étudiants dans ce groupe pour suivre les remises."
       onRetry={() => {
         void query.refetch();
         void assignmentQuery.refetch();
@@ -429,17 +533,101 @@ export function AssignmentGrading({
       }}
     >
       <div className="mt-4 space-y-4">
-        {query.data
-          ?.filter((s) => s.status !== "draft")
-          .map((s) => (
-            <GradeForm
-              key={`${s.id}-${s.updated_at}`}
-              submission={s}
-              maxScore={assignmentQuery.data?.max_score ?? 100}
-              name={roster.data?.find((r) => r.id === s.student_id)?.name ?? "Étudiant"}
-              saved={() => query.refetch()}
-            />
-          ))}
+        <div>
+          <h3 className="font-semibold">Remises du devoir</h3>
+          <p className="text-sm text-muted-foreground">
+            Limite : {formatFrDate(dueAt)} · Note maximale : {maxScore}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Status tone="gray">{counters.total} inscrit(s)</Status>
+          <Status tone="green">{counters.submitted} remis</Status>
+          <Status tone="red">{counters.missing} non remis</Status>
+          <Status tone="amber">{counters.late} en retard</Status>
+          <Status tone="blue">{counters.graded} corrigé(s)</Status>
+        </div>
+        <TableScroll>
+          <table className="w-full min-w-[46rem] text-sm">
+            <thead className="text-left text-muted-foreground">
+              <tr className="border-b border-border">
+                <th className="p-3 font-medium">Étudiant</th>
+                <th className="p-3 font-medium">Remise</th>
+                <th className="p-3 font-medium">Date</th>
+                <th className="p-3 font-medium">Texte</th>
+                <th className="p-3 font-medium">Fichier</th>
+                <th className="p-3 font-medium">Note</th>
+                <th className="p-3 font-medium" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ student, submission, late }) => (
+                <Fragment key={student.id}>
+                  <tr className="border-b border-border align-middle">
+                    <td className="p-3">
+                      <p className="font-medium text-foreground">{student.name}</p>
+                      <p className="text-xs text-muted-foreground">{student.email}</p>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-1">
+                        {submission ? (
+                          <Status tone={submission.status === "graded" ? "blue" : "green"}>
+                            {submissionStatusLabel(submission.status)}
+                          </Status>
+                        ) : (
+                          <Status tone="red">Non remis</Status>
+                        )}
+                        {late && <Status tone="amber">En retard</Status>}
+                      </div>
+                    </td>
+                    <td className="p-3 text-muted-foreground">
+                      {formatFrDate(submission?.submitted_at)}
+                    </td>
+                    <td className="p-3 text-muted-foreground">
+                      {submission?.content_text?.trim() ? "Oui" : "—"}
+                    </td>
+                    <td className="p-3">
+                      {submission?.file_path ? (
+                        <SubmissionFileButton
+                          submission={submission}
+                          label="Télécharger"
+                          size="sm"
+                        />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      {submission?.score != null ? `${submission.score} / ${maxScore}` : "—"}
+                    </td>
+                    <td className="p-3 text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!submission}
+                        onClick={() => setExpanded(expanded === student.id ? null : student.id)}
+                      >
+                        {expanded === student.id ? "Fermer" : "Ouvrir"}
+                      </Button>
+                    </td>
+                  </tr>
+                  {expanded === student.id && submission && (
+                    <tr className="border-b border-border bg-muted/30">
+                      <td className="p-3" colSpan={7}>
+                        <GradeForm
+                          key={`${submission.id}-${submission.updated_at}`}
+                          submission={submission}
+                          maxScore={maxScore}
+                          name={student.name}
+                          saved={() => query.refetch()}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </TableScroll>
       </div>
     </QueryState>
   );
@@ -474,14 +662,19 @@ function GradeForm({
     onError: (e: Error) => toast.error(e.message),
   });
   return (
-    <div className="space-y-3 rounded-md border p-4">
-      <h3 className="font-semibold">
-        {name} · {submission.status}
-      </h3>
-      <p className="whitespace-pre-wrap">{submission.content_text || "Aucune réponse textuelle"}</p>
+    <div className="space-y-3">
+      <h3 className="font-semibold">{name}</h3>
+      <div>
+        <p className="text-sm text-muted-foreground">Réponse écrite</p>
+        <p className="whitespace-pre-wrap">
+          {submission.content_text || "Aucune réponse textuelle"}
+        </p>
+      </div>
+      {submission.file_path && <SubmissionFileButton submission={submission} size="sm" />}
       <label className="block text-sm">
         Note / {maxScore}
         <Input
+          className="mt-1"
           type="number"
           min={0}
           max={maxScore}
@@ -491,7 +684,7 @@ function GradeForm({
       </label>
       <label className="block text-sm">
         Retour au participant
-        <Textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} />
+        <Textarea className="mt-1" value={feedback} onChange={(e) => setFeedback(e.target.value)} />
       </label>
       <Button
         disabled={
@@ -503,7 +696,7 @@ function GradeForm({
         }
         onClick={() => save.mutate()}
       >
-        Enregistrer la correction
+        {submission.status === "graded" ? "Mettre à jour la correction" : "Marquer comme corrigé"}
       </Button>
     </div>
   );

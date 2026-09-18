@@ -1,6 +1,6 @@
 /** Phase-3 tables (keep in sync with supabase/migrations/20260916120000_*). */
 
-export type PaymentProofStatus = "pending" | "approved" | "rejected";
+export type PaymentProofStatus = "pending" | "approved" | "rejected" | "not_approved";
 export type RecordingStatus = "pending" | "ready" | "failed" | "unavailable";
 export type OutboxStatus = "queued" | "sent" | "failed" | "skipped";
 
@@ -15,11 +15,17 @@ export type PaymentProof = {
   declared_amount: number;
   operation_date: string;
   operation_reference: string | null;
+  payment_method?: string | null;
   status: PaymentProofStatus;
   student_note: string | null;
   admin_note: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  submitted_at?: string | null;
+  validation_deadline?: string | null;
+  admin_receipt_bucket?: string | null;
+  admin_receipt_path?: string | null;
+  admin_receipt_mime?: string | null;
   created_at: string;
   updated_at: string;
 };

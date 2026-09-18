@@ -71,7 +71,13 @@ export const SupabasePaymentProofService = {
   },
 
   async listPending() {
-    return this.list({ status: "pending" });
+    const { data, error } = await requireClient()
+      .from("payment_proofs")
+      .select(PROOF_SELECT)
+      .in("status", ["pending", "not_approved"])
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as PaymentProofListItem[];
   },
 
   async uploadAndSubmit(input: {
@@ -82,6 +88,7 @@ export const SupabasePaymentProofService = {
     operationDate: string;
     operationReference?: string | null;
     studentNote?: string | null;
+    paymentMethod?: string | null;
   }) {
     if (!ALLOWED_MIME.has(input.file.type)) {
       throw new Error("Type de fichier non autorisé (PDF, JPEG ou PNG uniquement).");
@@ -97,6 +104,8 @@ export const SupabasePaymentProofService = {
     const supabase = requireClient();
     const ext = input.file.name.split(".").pop()?.toLowerCase() || "bin";
     const path = `students/${input.studentId}/payment-proofs/${crypto.randomUUID()}.${ext}`;
+    const submittedAt = new Date();
+    const deadline = new Date(submittedAt.getTime() + 48 * 60 * 60 * 1000);
 
     const { error: uploadError } = await supabase.storage
       .from("documents")
@@ -118,14 +127,98 @@ export const SupabasePaymentProofService = {
         declared_amount: input.declaredAmount,
         operation_date: input.operationDate,
         operation_reference: input.operationReference?.trim() || null,
+        payment_method: input.paymentMethod?.trim() || null,
         status: "pending",
         student_note: input.studentNote ?? null,
+        submitted_at: submittedAt.toISOString(),
+        validation_deadline: deadline.toISOString(),
       })
       .select(PROOF_SELECT)
       .single();
     if (error) {
       await supabase.storage.from("documents").remove([path]);
       throw error;
+    }
+    return data as PaymentProofListItem;
+  },
+
+  async expireStale() {
+    const { data, error } = await requireClient().rpc("expire_stale_payment_proofs");
+    if (error) throw error;
+    return Number(data ?? 0);
+  },
+
+  async uploadAdminReceipt(proofId: string, file: File) {
+    if (!ALLOWED_MIME.has(file.type)) {
+      throw new Error("Type de fichier non autorisé (PDF, JPEG ou PNG uniquement).");
+    }
+    if (file.size > MAX_PROOF_BYTES) {
+      throw new Error("Fichier trop volumineux (max 10 Mo).");
+    }
+    const supabase = requireClient();
+    const existing = await this.getById(proofId);
+    const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
+    const path = `admin/payment-receipts/${proofId}/${crypto.randomUUID()}.${ext}`;
+    const { error: uploadError } = await supabase.storage.from("documents").upload(path, file, {
+      upsert: false,
+      contentType: file.type,
+    });
+    if (uploadError) throw uploadError;
+    const { data, error } = await supabase
+      .from("payment_proofs")
+      .update({
+        admin_receipt_bucket: "documents",
+        admin_receipt_path: path,
+        admin_receipt_mime: file.type,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", proofId)
+      .select(PROOF_SELECT)
+      .single();
+    if (error) {
+      await supabase.storage.from("documents").remove([path]);
+      throw error;
+    }
+    if (existing?.admin_receipt_path && existing.admin_receipt_bucket) {
+      await supabase.storage
+        .from(existing.admin_receipt_bucket)
+        .remove([existing.admin_receipt_path])
+        .catch(() => undefined);
+    }
+    return data as PaymentProofListItem;
+  },
+
+  async getById(proofId: string) {
+    const { data, error } = await requireClient()
+      .from("payment_proofs")
+      .select(PROOF_SELECT)
+      .eq("id", proofId)
+      .maybeSingle();
+    if (error) throw error;
+    return data as PaymentProofListItem | null;
+  },
+
+  async deleteAdminReceipt(proofId: string) {
+    const supabase = requireClient();
+    const existing = await this.getById(proofId);
+    if (!existing?.admin_receipt_path) return existing;
+    const { data, error } = await supabase
+      .from("payment_proofs")
+      .update({
+        admin_receipt_bucket: null,
+        admin_receipt_path: null,
+        admin_receipt_mime: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", proofId)
+      .select(PROOF_SELECT)
+      .single();
+    if (error) throw error;
+    if (existing.admin_receipt_bucket) {
+      await supabase.storage
+        .from(existing.admin_receipt_bucket)
+        .remove([existing.admin_receipt_path])
+        .catch(() => undefined);
     }
     return data as PaymentProofListItem;
   },
@@ -137,6 +230,20 @@ export const SupabasePaymentProofService = {
     const { data, error } = await requireClient()
       .storage.from(proof.storage_bucket)
       .createSignedUrl(proof.storage_path, expiresIn);
+    if (error) throw error;
+    return data.signedUrl;
+  },
+
+  async getAdminReceiptSignedUrl(
+    proof: Pick<PaymentProof, "admin_receipt_bucket" | "admin_receipt_path">,
+    expiresIn = 300,
+  ) {
+    if (!proof.admin_receipt_bucket || !proof.admin_receipt_path) {
+      throw new Error("Aucun reçu administratif.");
+    }
+    const { data, error } = await requireClient()
+      .storage.from(proof.admin_receipt_bucket)
+      .createSignedUrl(proof.admin_receipt_path, expiresIn);
     if (error) throw error;
     return data.signedUrl;
   },

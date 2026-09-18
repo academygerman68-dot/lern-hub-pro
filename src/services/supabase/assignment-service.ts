@@ -17,6 +17,8 @@ function requireClient() {
   return getSupabase();
 }
 
+const SUBMISSION_BUCKET = "course-materials";
+
 const ASSIGNMENT_SELECT = `
   *,
   level:levels!assignments_level_id_fkey ( id, code, name ),
@@ -145,22 +147,51 @@ export const SupabaseAssignmentService = {
     return data ?? [];
   },
 
+  async uploadSubmissionFile(input: { assignmentId: string; studentId: string; file: File }) {
+    const supabase = requireClient();
+    const ext = input.file.name.split(".").pop() ?? "bin";
+    const path = `submissions/${input.assignmentId}/${input.studentId}/${crypto.randomUUID()}.${ext}`;
+    const uploadOptions = input.file.type
+      ? { upsert: false as const, contentType: input.file.type }
+      : { upsert: false as const };
+    const { error } = await supabase.storage
+      .from(SUBMISSION_BUCKET)
+      .upload(path, input.file, uploadOptions);
+    if (error) throw error;
+    return { fileBucket: SUBMISSION_BUCKET, filePath: path };
+  },
+
+  /** Accepts a text answer, a file, or both — at least one is required. */
   async upsertSubmission(input: {
     assignmentId: string;
     studentId: string;
     contentText?: string;
+    file?: File;
     status?: SubmissionStatus;
   }) {
     const status = input.status ?? "submitted";
+    const text = input.contentText?.trim() ?? "";
+    if (!text && !input.file) {
+      throw new Error("Ajoutez une réponse écrite ou un fichier avant de remettre le devoir.");
+    }
+    const uploaded = input.file
+      ? await this.uploadSubmissionFile({
+          assignmentId: input.assignmentId,
+          studentId: input.studentId,
+          file: input.file,
+        })
+      : null;
     const { data, error } = await requireClient()
       .from("assignment_submissions")
       .upsert(
         {
           assignment_id: input.assignmentId,
           student_id: input.studentId,
-          content_text: input.contentText ?? null,
+          content_text: text || null,
           status,
           submitted_at: status === "submitted" ? new Date().toISOString() : null,
+          // Omitted when no new file so a previous upload is preserved.
+          ...(uploaded ? { file_bucket: uploaded.fileBucket, file_path: uploaded.filePath } : {}),
         },
         { onConflict: "assignment_id,student_id" },
       )
@@ -168,6 +199,20 @@ export const SupabaseAssignmentService = {
       .single();
     if (error) throw error;
     return data;
+  },
+
+  async getSubmissionFileUrl(
+    submission: Pick<Submission, "file_bucket" | "file_path">,
+    expiresIn = 3600,
+  ) {
+    if (!submission.file_bucket || !submission.file_path) {
+      throw new Error("Aucun fichier n’a été déposé pour cette remise.");
+    }
+    const { data, error } = await requireClient()
+      .storage.from(submission.file_bucket)
+      .createSignedUrl(submission.file_path, expiresIn);
+    if (error) throw error;
+    return data.signedUrl;
   },
 
   async grade(input: {

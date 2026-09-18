@@ -331,6 +331,9 @@ export function DirectorCoursesPage() {
               uploading={saving}
               error={formError}
               hasExistingFile={existingFile}
+              onClearExisting={() => {
+                setExistingFile(false);
+              }}
             />
             <div className="flex justify-end gap-2">
               <Button
@@ -362,8 +365,10 @@ export function DirectorCoursesPage() {
                       }
                     }
                     if (kind !== "link" && !attachment.file && !existingFile) {
-                      setFormError("Ajoutez un fichier.");
-                      return;
+                      if (!editingId) {
+                        setFormError("Ajoutez un fichier.");
+                        return;
+                      }
                     }
                     setSaving(true);
                     try {
@@ -393,6 +398,10 @@ export function DirectorCoursesPage() {
                           patch.storage_bucket = storageBucket;
                           patch.storage_path = storagePath;
                           patch.mime_type = mimeType;
+                        } else if (!existingFile && !attachment.file && kind !== "link") {
+                          patch.storage_bucket = null;
+                          patch.storage_path = null;
+                          patch.mime_type = null;
                         }
                         await updateCourse.mutateAsync({ id: editingId, patch });
                         toast.success("Cours mis à jour");

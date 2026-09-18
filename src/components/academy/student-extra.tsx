@@ -47,6 +47,7 @@ import {
 } from "@/services/academy-services";
 import { SettingsService } from "@/services/supabase/settings-service";
 import { DangerZoneAccountDeletion } from "./danger-zone-account-deletion";
+import { DocumentViewer } from "./document-viewer";
 import { PeoplePicker } from "./people-picker";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -58,6 +59,7 @@ import {
   useConversations,
   useCreateClassConversation,
   useCreateRecordingFromUrl,
+  useLevels,
   useLiveSessions,
   useLiveSessionsRealtime,
   useUpdateLiveSessionStatus,
@@ -199,7 +201,7 @@ export function Materials() {
   );
 }
 
-export function CalendarPage() {
+export function CalendarPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { navigate, role } = useAcademy();
   useLiveSessionsRealtime();
   const sessionsQuery = useLiveSessions();
@@ -322,58 +324,67 @@ export function CalendarPage() {
     return `${formatRange(session.starts_at, session.ends_at)} · ${session.class?.name ?? "—"} · ${teacherName(session)} · ${videoProviderLabel(session.video_provider, zoom)} · ${liveStatusLabel(session.status)} · ${duration} min`;
   };
 
+  const viewControls = (
+    <div className="flex flex-wrap gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() =>
+          setAnchor((prev) => {
+            const d = new Date(prev);
+            if (view === "week") d.setDate(d.getDate() - 7);
+            else d.setMonth(d.getMonth() - 1);
+            return d;
+          })
+        }
+      >
+        Précédent
+      </Button>
+      <Button
+        size="sm"
+        variant={view === "week" ? "default" : "outline"}
+        onClick={() => setView("week")}
+      >
+        Semaine
+      </Button>
+      <Button
+        size="sm"
+        variant={view === "month" ? "default" : "outline"}
+        onClick={() => setView("month")}
+      >
+        Mois
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() =>
+          setAnchor((prev) => {
+            const d = new Date(prev);
+            if (view === "week") d.setDate(d.getDate() + 7);
+            else d.setMonth(d.getMonth() + 1);
+            return d;
+          })
+        }
+      >
+        Suivant
+      </Button>
+    </div>
+  );
+
   return (
     <>
-      <PageHeader
-        title="Calendrier"
-        subtitle="Planning des cours en direct : heure, groupe, professeur, statut."
-        action={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                setAnchor((prev) => {
-                  const d = new Date(prev);
-                  if (view === "week") d.setDate(d.getDate() - 7);
-                  else d.setMonth(d.getMonth() - 1);
-                  return d;
-                })
-              }
-            >
-              Précédent
-            </Button>
-            <Button
-              size="sm"
-              variant={view === "week" ? "default" : "outline"}
-              onClick={() => setView("week")}
-            >
-              Semaine
-            </Button>
-            <Button
-              size="sm"
-              variant={view === "month" ? "default" : "outline"}
-              onClick={() => setView("month")}
-            >
-              Mois
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                setAnchor((prev) => {
-                  const d = new Date(prev);
-                  if (view === "week") d.setDate(d.getDate() + 7);
-                  else d.setMonth(d.getMonth() + 1);
-                  return d;
-                })
-              }
-            >
-              Suivant
-            </Button>
-          </div>
-        }
-      />
+      {embedded ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-sm font-medium">Planning intégré</h3>
+          {viewControls}
+        </div>
+      ) : (
+        <PageHeader
+          title="Calendrier"
+          subtitle="Planning des cours en direct : heure, groupe, professeur, statut."
+          action={viewControls}
+        />
+      )}
       <div className="mb-4 flex flex-wrap gap-2">
         <select
           className="h-10 rounded-md border border-input bg-background px-3 text-sm"
@@ -737,6 +748,7 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
   const { role, user } = useAcademy();
   const conversationsQuery = useConversations();
   const classesQuery = useClasses();
+  const levelsQuery = useLevels();
   const createConversation = useCreateClassConversation();
   const sendMessage = useSendMessage();
   const addMember = useAddConversationMember();
@@ -746,15 +758,33 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
   const [file, setFile] = useState<File | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [levelId, setLevelId] = useState("");
   const [classId, setClassId] = useState("");
   const [convName, setConvName] = useState("");
   const [includeTeacher, setIncludeTeacher] = useState(true);
   const [addProfileId, setAddProfileId] = useState("");
+  const [search, setSearch] = useState("");
+  const [preview, setPreview] = useState<{
+    title: string;
+    url: string | null;
+    mimeType: string | null;
+    loading: boolean;
+    error: string | null;
+  } | null>(null);
 
   const conversations = useMemo(() => conversationsQuery.data ?? [], [conversationsQuery.data]);
+  const filteredConversations = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return conversations;
+    return conversations.filter((c) => c.name.toLowerCase().includes(q));
+  }, [conversations, search]);
   const active = conversations.find((c) => c.id === activeId) ?? conversations[0] ?? null;
   const activeConversationId = active?.id ?? null;
   const messagesQuery = useConversationMessages(activeConversationId);
+  const classesForLevel = useMemo(
+    () => (classesQuery.data ?? []).filter((c) => !levelId || c.levelId === levelId),
+    [classesQuery.data, levelId],
+  );
 
   useEffect(() => {
     if (!activeId && conversations[0]?.id) setActiveId(conversations[0].id);
@@ -768,11 +798,31 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
   const openAttachment = async (messageId: string) => {
     const message = (messagesQuery.data ?? []).find((m) => m.id === messageId);
     if (!message?.attachment_path) return;
+    const title = message.attachment_name ?? "Pièce jointe";
+    setPreview({
+      title,
+      url: null,
+      mimeType: message.attachment_mime ?? null,
+      loading: true,
+      error: null,
+    });
     try {
       const url = await MessagingService.getAttachmentSignedUrl(message);
-      window.open(url, "_blank", "noopener,noreferrer");
+      setPreview({
+        title,
+        url,
+        mimeType: message.attachment_mime ?? null,
+        loading: false,
+        error: null,
+      });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Téléchargement impossible");
+      setPreview({
+        title,
+        url: null,
+        mimeType: message.attachment_mime ?? null,
+        loading: false,
+        error: err instanceof Error ? err.message : "Aperçu impossible",
+      });
     }
   };
 
@@ -796,20 +846,28 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
       />
       <Surface className="grid min-h-[560px] overflow-hidden md:grid-cols-[17rem_1fr]">
         <aside className="border-r p-3">
+          <Input
+            className="mb-3"
+            placeholder="Rechercher une conversation…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
           <QueryState
             isLoading={conversationsQuery.isLoading}
             isError={conversationsQuery.isError}
             error={conversationsQuery.error}
-            isEmpty={!conversations.length}
+            isEmpty={!filteredConversations.length}
             emptyTitle="Aucune conversation"
             emptyMessage={
-              role === "director"
-                ? "Créez une conversation à partir d’un groupe."
-                : "Vous n’êtes membre d’aucune conversation."
+              search.trim()
+                ? "Aucune conversation ne correspond à votre recherche."
+                : role === "director"
+                  ? "Créez une conversation à partir d’un groupe."
+                  : "Vous n’êtes membre d’aucune conversation."
             }
             onRetry={() => void conversationsQuery.refetch()}
           >
-            {conversations.map((item) => (
+            {filteredConversations.map((item) => (
               <button
                 className={`mb-1 w-full rounded-md p-3 text-left text-sm ${
                   item.id === activeConversationId ? "bg-secondary text-primary" : "hover:bg-muted"
@@ -965,22 +1023,44 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
         <div className="mobile-modal">
           <Surface className="mobile-modal-panel space-y-4">
             <h2 className="text-lg font-semibold">Conversation de groupe</h2>
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={classId}
-              onChange={(e) => {
-                setClassId(e.target.value);
-                const cls = (classesQuery.data ?? []).find((c) => c.id === e.target.value);
-                if (cls && !convName) setConvName(cls.name);
-              }}
-            >
-              <option value="">Choisir le groupe</option>
-              {(classesQuery.data ?? []).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name} · {item.level}
-                </option>
-              ))}
-            </select>
+            <label className="block text-sm">
+              Niveau
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={levelId}
+                onChange={(e) => {
+                  setLevelId(e.target.value);
+                  setClassId("");
+                }}
+              >
+                <option value="">Choisir le niveau</option>
+                {(levelsQuery.data ?? []).map((level) => (
+                  <option key={level.id} value={level.id}>
+                    {level.code} · {level.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm">
+              Groupe
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={classId}
+                disabled={!levelId}
+                onChange={(e) => {
+                  setClassId(e.target.value);
+                  const cls = classesForLevel.find((c) => c.id === e.target.value);
+                  if (cls && !convName) setConvName(cls.name);
+                }}
+              >
+                <option value="">Choisir le groupe</option>
+                {classesForLevel.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <Input
               placeholder="Nom de la conversation"
               value={convName}
@@ -995,7 +1075,15 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
               Inclure le professeur du groupe
             </label>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCreateOpen(false);
+                  setLevelId("");
+                  setClassId("");
+                  setConvName("");
+                }}
+              >
                 Annuler
               </Button>
               <Button
@@ -1011,6 +1099,7 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
                       onSuccess: (conv) => {
                         toast.success("Conversation créée");
                         setCreateOpen(false);
+                        setLevelId("");
                         setClassId("");
                         setConvName("");
                         setActiveId(conv.id);
@@ -1105,6 +1194,16 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
           </Surface>
         </div>
       )}
+
+      <DocumentViewer
+        open={Boolean(preview)}
+        onClose={() => setPreview(null)}
+        title={preview?.title ?? ""}
+        url={preview?.url ?? null}
+        mimeType={preview?.mimeType}
+        loading={preview?.loading}
+        error={preview?.error}
+      />
     </>
   );
 }

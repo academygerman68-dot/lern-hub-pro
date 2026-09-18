@@ -46,11 +46,13 @@ export const queryKeys = {
     all: ["exams"] as const,
     published: ["exams", "published"] as const,
     detail: (id: string) => ["exams", id] as const,
+    structure: (id: string) => ["exams", id, "structure"] as const,
     attempt: (id: string) => ["exams", "attempt", id] as const,
     answers: (attemptId: string) => ["exams", "answers", attemptId] as const,
     result: (attemptId: string) => ["exams", "result", attemptId] as const,
     myAttempts: ["exams", "my-attempts"] as const,
     allAttempts: ["exams", "all-attempts"] as const,
+    attemptsByExam: (examId: string) => ["exams", "attempts-by-exam", examId] as const,
   },
   payments: {
     all: ["payments"] as const,

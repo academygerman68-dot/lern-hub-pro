@@ -37,6 +37,7 @@ import { useAcademy } from "./academy-context";
 import { JitsiMeetingEmbed } from "./jitsi-meeting";
 import { QueryState } from "./query-state";
 import { PageHeader, Status, Surface } from "./primitives";
+import { CalendarPage } from "./student-extra";
 
 export function LiveClassesPage({ meeting }: { meeting: boolean }) {
   const accessQuery = useAcademicAccess();
@@ -57,6 +58,19 @@ export function LiveClassesPage({ meeting }: { meeting: boolean }) {
 
   if (meeting) return <LiveMeetingRoom />;
   return <LiveSessionLobby />;
+}
+
+/** Compact schedule strip reused above the live lobby (avoids duplicating calendar logic). */
+function LiveSchedulePanel() {
+  return (
+    <Surface className="mb-6 overflow-hidden p-5">
+      <h2 className="font-semibold">Planning des séances</h2>
+      <p className="mt-1 mb-4 text-sm text-muted-foreground">
+        Vue semaine et mois — groupe, professeur, horaire, provider, statut.
+      </p>
+      <CalendarPage embedded />
+    </Surface>
+  );
 }
 
 function teacherLabel(item: {
@@ -306,6 +320,7 @@ function LiveSessionLobby() {
           ) : undefined
         }
       />
+      <LiveSchedulePanel />
 
       {recordingProvider.data?.configured ? (
         <Surface className="mb-4 p-4 text-sm">

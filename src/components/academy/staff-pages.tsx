@@ -786,9 +786,13 @@ function Classes() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [name, setName] = useState("");
+  const [reference, setReference] = useState("");
   const [levelId, setLevelId] = useState("");
   const [teacherId, setTeacherId] = useState("");
   const [schedule, setSchedule] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
   const [addStudentId, setAddStudentId] = useState("");
   const [weekdayDraft, setWeekdayDraft] = useState<number[]>([]);
   const [startTimeDraft, setStartTimeDraft] = useState("21:00");
@@ -811,9 +815,13 @@ function Classes() {
 
   const resetForm = () => {
     setName("");
+    setReference("");
     setLevelId("");
     setTeacherId("");
     setSchedule("");
+    setStartDate("");
+    setEndDate("");
+    setFormError(null);
     setEditingId(null);
   };
 
@@ -827,10 +835,32 @@ function Classes() {
     if (!item) return;
     setEditingId(id);
     setName(item.name);
+    setReference(item.reference ?? "");
     setLevelId(item.levelId ?? "");
     setTeacherId(item.teacherId ?? "");
     setSchedule(item.schedule === "—" ? "" : item.schedule);
+    setStartDate(item.startDate ?? "");
+    setEndDate(item.endDate ?? "");
+    setFormError(null);
     setOpen(true);
+  };
+
+  const groupFormError = () => {
+    if (!reference.trim()) return "La référence du groupe est obligatoire.";
+    if (!name.trim()) return "Le nom du groupe est obligatoire.";
+    if (!levelId) return "Choisissez le niveau du groupe.";
+    if (startDate && endDate && endDate < startDate) {
+      return "La date de fin doit suivre la date de début.";
+    }
+    return null;
+  };
+
+  const saveGroupError = (err: unknown) => {
+    const message = err instanceof Error ? err.message : "";
+    if (message.includes("classes_reference_unique") || message.includes("duplicate key")) {
+      return "Cette référence de groupe est déjà utilisée.";
+    }
+    return adminActionError(err);
   };
 
   const enrollmentIdForStudent = (studentId: string) => {
@@ -923,7 +953,16 @@ function Classes() {
               <h2 className="mt-4 text-lg font-semibold">{item.name}</h2>
               <div className="mt-3 space-y-2 text-sm text-muted-foreground">
                 <p>
+                  Référence : <strong className="text-foreground">{item.reference ?? "—"}</strong>
+                </p>
+                <p>
+                  Niveau : <strong className="text-foreground">{item.level}</strong>
+                </p>
+                <p>
                   Professeur : <strong className="text-foreground">{item.teacher}</strong>
+                </p>
+                <p>
+                  Du {item.startDate ?? "—"} au {item.endDate ?? "—"}
                 </p>
                 <p>
                   {item.size}/{item.capacity} inscrits · {Math.max(0, item.capacity - item.size)}{" "}
@@ -956,40 +995,84 @@ function Classes() {
             <h2 className="text-lg font-semibold">
               {editingId ? "Modifier le groupe" : "Créer un groupe"}
             </h2>
-            <Input
-              placeholder="Nom du groupe"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={levelId}
-              onChange={(e) => setLevelId(e.target.value)}
-            >
-              <option value="">Choisir un niveau</option>
-              {levelOptions.map((level) => (
-                <option key={level.id} value={level.id}>
-                  {level.code} · {level.name}
-                </option>
-              ))}
-            </select>
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={teacherId}
-              onChange={(e) => setTeacherId(e.target.value)}
-            >
-              <option value="">Associer un professeur (optionnel)</option>
-              {teacherOptions.map((teacher) => (
-                <option key={teacher.id} value={teacher.id}>
-                  {teacher.name}
-                </option>
-              ))}
-            </select>
-            <Input
-              placeholder="Horaires (libellé libre, optionnel)"
-              value={schedule}
-              onChange={(e) => setSchedule(e.target.value)}
-            />
+            <label className="block text-sm">
+              Référence du groupe
+              <Input
+                className="mt-1"
+                placeholder="Ex. A1-SEP-2026"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm">
+              Niveau
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={levelId}
+                onChange={(e) => setLevelId(e.target.value)}
+              >
+                <option value="">Choisir un niveau</option>
+                {levelOptions.map((level) => (
+                  <option key={level.id} value={level.id}>
+                    {level.code} · {level.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm">
+              Groupe
+              <Input
+                className="mt-1"
+                placeholder="Nom du groupe"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm">
+              Professeur
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={teacherId}
+                onChange={(e) => setTeacherId(e.target.value)}
+              >
+                <option value="">Associer un professeur (optionnel)</option>
+                {teacherOptions.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm">
+                Date de début
+                <Input
+                  className="mt-1"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                Date de fin
+                <Input
+                  className="mt-1"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </label>
+            </div>
+            <label className="block text-sm">
+              Horaires
+              <Input
+                className="mt-1"
+                placeholder="Horaires (libellé libre, optionnel)"
+                value={schedule}
+                onChange={(e) => setSchedule(e.target.value)}
+              />
+            </label>
+            {formError && <p className="text-sm text-destructive">{formError}</p>}
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
@@ -1002,18 +1085,31 @@ function Classes() {
               </Button>
               <Button
                 disabled={
-                  !name.trim() || !levelId || createClass.isPending || updateClass.isPending
+                  !reference.trim() ||
+                  !name.trim() ||
+                  !levelId ||
+                  createClass.isPending ||
+                  updateClass.isPending
                 }
                 onClick={() => {
+                  const invalid = groupFormError();
+                  if (invalid) {
+                    setFormError(invalid);
+                    return;
+                  }
+                  setFormError(null);
                   if (editingId) {
                     updateClass.mutate(
                       {
                         id: editingId,
                         patch: {
                           name: name.trim(),
+                          reference: reference.trim(),
                           level_id: levelId,
                           teacher_id: teacherId || null,
                           schedule_label: schedule || null,
+                          start_date: startDate || null,
+                          end_date: endDate || null,
                         },
                       },
                       {
@@ -1022,7 +1118,11 @@ function Classes() {
                           setOpen(false);
                           resetForm();
                         },
-                        onError: (err) => toast.error(adminActionError(err)),
+                        onError: (err) => {
+                          const message = saveGroupError(err);
+                          setFormError(message);
+                          toast.error(message);
+                        },
                       },
                     );
                     return;
@@ -1030,9 +1130,12 @@ function Classes() {
                   createClass.mutate(
                     {
                       name: name.trim(),
+                      reference: reference.trim(),
                       levelId,
                       teacherId: teacherId || null,
                       scheduleLabel: schedule || null,
+                      startDate: startDate || null,
+                      endDate: endDate || null,
                       status: "active",
                     },
                     {
@@ -1041,7 +1144,11 @@ function Classes() {
                         setOpen(false);
                         resetForm();
                       },
-                      onError: (err) => toast.error(adminActionError(err)),
+                      onError: (err) => {
+                        const message = saveGroupError(err);
+                        setFormError(message);
+                        toast.error(message);
+                      },
                     },
                   );
                 }}

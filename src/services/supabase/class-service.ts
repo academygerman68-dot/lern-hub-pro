@@ -17,10 +17,13 @@ type ClassStatus = Database["public"]["Enums"]["class_status"];
 const CLASS_SELECT = `
   id,
   name,
+  reference,
   capacity,
   status,
   room,
   schedule_label,
+  start_date,
+  end_date,
   level:levels!classes_level_id_fkey (
     id,
     code,
@@ -87,6 +90,7 @@ export const SupabaseClassService = {
   async create(input: {
     name: string;
     levelId: string;
+    reference?: string | null;
     teacherId?: string | null;
     capacity?: number;
     room?: string | null;
@@ -99,6 +103,7 @@ export const SupabaseClassService = {
     const payload: ClassInsert = {
       name: input.name,
       level_id: input.levelId,
+      reference: input.reference ?? null,
       teacher_id: input.teacherId ?? null,
       capacity: input.capacity ?? 20,
       room: input.room ?? null,

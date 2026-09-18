@@ -560,6 +560,30 @@ export function useAllExamAttempts() {
   });
 }
 
+export function useExamAttemptsForExam(examId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.exams.attemptsByExam(examId ?? ""),
+    queryFn: () => ExamService.listAttemptsForExam(examId!),
+    enabled: Boolean(examId),
+  });
+}
+
+export function useGradeWritingAnswer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ExamService.gradeWritingAnswer,
+    onSuccess: async (attempt) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.exams.attempt(attempt.id) }),
+        qc.invalidateQueries({ queryKey: queryKeys.exams.answers(attempt.id) }),
+        qc.invalidateQueries({ queryKey: queryKeys.exams.result(attempt.id) }),
+        qc.invalidateQueries({ queryKey: queryKeys.exams.attemptsByExam(attempt.exam_id) }),
+        qc.invalidateQueries({ queryKey: queryKeys.exams.allAttempts }),
+      ]);
+    },
+  });
+}
+
 export function useStartExam() {
   const qc = useQueryClient();
   return useMutation({
@@ -753,6 +777,33 @@ export function useReviewPaymentProof() {
         qc.invalidateQueries({ queryKey: queryKeys.students.all }),
         qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
         qc.invalidateQueries({ queryKey: queryKeys.access.me }),
+      ]);
+    },
+  });
+}
+
+export function useUploadAdminReceipt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { proofId: string; file: File }) =>
+      PaymentProofService.uploadAdminReceipt(input.proofId, input.file),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.paymentProofs.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.paymentProofs.pending }),
+      ]);
+    },
+  });
+}
+
+export function useDeleteAdminReceipt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (proofId: string) => PaymentProofService.deleteAdminReceipt(proofId),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.paymentProofs.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.paymentProofs.pending }),
       ]);
     },
   });

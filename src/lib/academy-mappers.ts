@@ -89,10 +89,13 @@ export type TeacherRow = {
 export type ClassRow = {
   id: string;
   name: string;
+  reference?: string | null;
   capacity: number;
   status: ClassStatus;
   room: string | null;
   schedule_label: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
   level:
     | { id: string; code: string; name: string }
     | { id: string; code: string; name: string }[]
@@ -230,10 +233,13 @@ export function mapClass(row: ClassRow): AcademyClass {
 /** Richer class DTO for screens that need the real name + status. */
 export type ClassDetail = AcademyClass & {
   name: string;
+  reference: string | null;
   status: ClassStatus;
   capacity: number;
   teacherId: string | null;
   levelId: string | null;
+  startDate: string | null;
+  endDate: string | null;
 };
 
 export function mapClassDetail(row: ClassRow): ClassDetail {
@@ -243,9 +249,12 @@ export function mapClassDetail(row: ClassRow): ClassDetail {
   return {
     ...base,
     name: row.name,
+    reference: row.reference ?? null,
     status: row.status,
     capacity: row.capacity,
     teacherId: teacher?.id ?? null,
     levelId: level?.id ?? null,
+    startDate: row.start_date ?? null,
+    endDate: row.end_date ?? null,
   };
 }

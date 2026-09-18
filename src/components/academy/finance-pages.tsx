@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   useAcademicAccess,
   useCreatePayment,
+  useDeleteAdminReceipt,
   useMarkPaymentOverdue,
   usePaymentProofs,
   usePayments,
@@ -14,14 +15,25 @@ import {
   useStudents,
   useSubmitPaymentProof,
   useSubscriptions,
+  useUploadAdminReceipt,
 } from "@/hooks/use-academy-data";
 import { PaymentProofService } from "@/services/academy-services";
+import type { PaymentProofListItem } from "@/services/supabase/payment-proof-service";
 import { computeFinalAmount } from "@/services/supabase/payment-service";
 import type { Database } from "@/types/database";
 import { useAcademy } from "./academy-context";
+import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { DocumentViewer } from "./document-viewer";
 import { QueryState } from "./query-state";
 import { Metric, PageHeader, Status, Surface } from "./primitives";
+
+type DocPreview = {
+  title: string;
+  url: string | null;
+  mimeType: string | null;
+  loading: boolean;
+  error: string | null;
+};
 
 type PaymentStatus = Database["public"]["Enums"]["payment_status"];
 type PaymentRow = NonNullable<ReturnType<typeof usePayments>["data"]>[number];
@@ -63,6 +75,10 @@ export function paymentStatusLabel(status: string) {
 }
 
 function proofStatusLabel(status: string) {
+  if (status === "pending") return "En attente de validation";
+  if (status === "approved") return "Approuvé";
+  if (status === "rejected") return "Refusé";
+  if (status === "not_approved") return "Non approuvé (délai dépassé)";
   return paymentStatusLabel(status);
 }
 
@@ -86,23 +102,209 @@ function canRemindPayment(status: string) {
   );
 }
 
+async function forceDownloadUrl(url: string, filename: string) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("download_failed");
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename || "document";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
+function AdminReceiptActions({
+  proof,
+  onChanged,
+  onPreview,
+}: {
+  proof: PaymentProofListItem;
+  onChanged: () => void;
+  onPreview: (preview: DocPreview) => void;
+}) {
+  const uploadReceipt = useUploadAdminReceipt();
+  const deleteReceipt = useDeleteAdminReceipt();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const busy = uploadReceipt.isPending || deleteReceipt.isPending;
+  const hasReceipt = Boolean(proof.admin_receipt_path);
+
+  const openReceipt = async () => {
+    onPreview({
+      title: `Reçu admin · ${studentLabel(proof)}`,
+      url: null,
+      mimeType: proof.admin_receipt_mime ?? null,
+      loading: true,
+      error: null,
+    });
+    try {
+      const url = await PaymentProofService.getAdminReceiptSignedUrl(proof);
+      onPreview({
+        title: `Reçu admin · ${studentLabel(proof)}`,
+        url,
+        mimeType: proof.admin_receipt_mime ?? null,
+        loading: false,
+        error: null,
+      });
+    } catch (err) {
+      onPreview({
+        title: `Reçu admin · ${studentLabel(proof)}`,
+        url: null,
+        mimeType: proof.admin_receipt_mime ?? null,
+        loading: false,
+        error: err instanceof Error ? err.message : "Aperçu impossible",
+      });
+    }
+  };
+
+  const downloadReceipt = async () => {
+    try {
+      const url = await PaymentProofService.getAdminReceiptSignedUrl(proof);
+      await forceDownloadUrl(url, `recu-${proof.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Téléchargement impossible");
+    }
+  };
+
+  const onFile = (file: File | null) => {
+    if (!file) return;
+    uploadReceipt.mutate(
+      { proofId: proof.id, file },
+      {
+        onSuccess: () => {
+          toast.success(hasReceipt ? "Reçu remplacé" : "Reçu téléversé");
+          onChanged();
+        },
+        onError: (err) => toast.error(err.message),
+      },
+    );
+  };
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <input
+        ref={fileRef}
+        type="file"
+        className="hidden"
+        accept="application/pdf,image/jpeg,image/png"
+        onChange={(e) => {
+          onFile(e.target.files?.[0] ?? null);
+          e.target.value = "";
+        }}
+      />
+      <span className="text-xs text-muted-foreground">Reçu admin :</span>
+      {hasReceipt ? (
+        <>
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => void openReceipt()}>
+            Voir
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => void downloadReceipt()}
+          >
+            Télécharger
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => fileRef.current?.click()}
+          >
+            Remplacer
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => {
+              if (!window.confirm("Supprimer le reçu administratif ?")) return;
+              deleteReceipt.mutate(proof.id, {
+                onSuccess: () => {
+                  toast.success("Reçu supprimé");
+                  onChanged();
+                },
+                onError: (err) => toast.error(err.message),
+              });
+            }}
+          >
+            Supprimer
+          </Button>
+        </>
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={() => fileRef.current?.click()}
+        >
+          Joindre un reçu
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function ProofReviewQueue() {
   const pendingQuery = usePendingPaymentProofs();
+  const allProofsQuery = usePaymentProofs();
   const review = useReviewPaymentProof();
-  const [preview, setPreview] = useState<{
-    title: string;
-    url: string | null;
-    mimeType: string | null;
-    loading: boolean;
-    error: string | null;
-  } | null>(null);
+  const [preview, setPreview] = useState<DocPreview | null>(null);
+
+  const recentlyReviewed = useMemo(() => {
+    return (allProofsQuery.data ?? [])
+      .filter((p) => p.status === "approved" || p.status === "rejected")
+      .slice(0, 15);
+  }, [allProofsQuery.data]);
+
+  const refetchProofs = () => {
+    void pendingQuery.refetch();
+    void allProofsQuery.refetch();
+  };
+
+  const openStudentProof = (proof: PaymentProofListItem) => {
+    void (async () => {
+      setPreview({
+        title: `Justificatif · ${studentLabel(proof)}`,
+        url: null,
+        mimeType: proof.mime_type ?? null,
+        loading: true,
+        error: null,
+      });
+      try {
+        const url = await PaymentProofService.getSignedUrl(proof);
+        setPreview({
+          title: `Justificatif · ${studentLabel(proof)}`,
+          url,
+          mimeType: proof.mime_type ?? null,
+          loading: false,
+          error: null,
+        });
+      } catch (err) {
+        setPreview({
+          title: `Justificatif · ${studentLabel(proof)}`,
+          url: null,
+          mimeType: proof.mime_type ?? null,
+          loading: false,
+          error: err instanceof Error ? err.message : "Aperçu impossible",
+        });
+      }
+    })();
+  };
 
   return (
     <>
       <Surface className="mb-6 p-5">
         <h2 className="font-semibold">File des justificatifs</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Avis d’opération déposés par les étudiants. L’accès reste bloqué jusqu’à validation.
+          Avis d’opération à vérifier sous 48 heures. Au-delà, le statut passe à « non approuvé ».
         </p>
         <QueryState
           isLoading={pendingQuery.isLoading}
@@ -115,116 +317,132 @@ function ProofReviewQueue() {
         >
           <div className="mt-4 divide-y">
             {pendingQuery.data?.map((proof) => (
-              <div
-                key={proof.id}
-                className="flex flex-wrap items-center justify-between gap-3 py-3"
-              >
-                <div>
-                  <p className="font-medium">{studentLabel(proof)}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(proof.created_at).toLocaleString("fr-FR")}
-                    {proof.student_note ? ` · ${proof.student_note}` : ""}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Déclaré : {Number(proof.declared_amount).toLocaleString()}{" "}
-                    {proof.payment?.currency ?? "MAD"}
-                    {proof.payment
-                      ? ` · attendu : ${Number(proof.payment.amount).toLocaleString()} ${proof.payment.currency}`
-                      : ""}
-                    {` · opération du ${proof.operation_date}`}
-                    {proof.operation_reference ? ` · réf. ${proof.operation_reference}` : ""}
-                  </p>
-                  <Status tone="amber">{proofStatusLabel(proof.status)}</Status>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      void (async () => {
-                        setPreview({
-                          title: `Justificatif · ${studentLabel(proof)}`,
-                          url: null,
-                          mimeType: proof.mime_type ?? null,
-                          loading: true,
-                          error: null,
-                        });
-                        try {
-                          const url = await PaymentProofService.getSignedUrl(proof);
-                          setPreview({
-                            title: `Justificatif · ${studentLabel(proof)}`,
-                            url,
-                            mimeType: proof.mime_type ?? null,
-                            loading: false,
-                            error: null,
-                          });
-                        } catch (err) {
-                          setPreview({
-                            title: `Justificatif · ${studentLabel(proof)}`,
-                            url: null,
-                            mimeType: proof.mime_type ?? null,
-                            loading: false,
-                            error: err instanceof Error ? err.message : "Aperçu impossible",
-                          });
-                        }
-                      })();
-                    }}
-                  >
-                    Voir
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={review.isPending}
-                    onClick={() => {
-                      if (
-                        !window.confirm(
-                          "Confirmer ce justificatif et activer l’accès de l’étudiant ?",
+              <div key={proof.id} className="py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{studentLabel(proof)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(proof.created_at).toLocaleString("fr-FR")}
+                      {proof.student_note ? ` · ${proof.student_note}` : ""}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Déclaré : {Number(proof.declared_amount).toLocaleString()}{" "}
+                      {proof.payment?.currency ?? "MAD"}
+                      {proof.payment
+                        ? ` · attendu : ${Number(proof.payment.amount).toLocaleString()} ${proof.payment.currency}`
+                        : ""}
+                      {` · opération du ${proof.operation_date}`}
+                      {proof.operation_reference ? ` · réf. ${proof.operation_reference}` : ""}
+                    </p>
+                    <Status tone="amber">{proofStatusLabel(proof.status)}</Status>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => openStudentProof(proof)}>
+                      Voir
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={review.isPending}
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            "Confirmer ce justificatif et activer l’accès de l’étudiant ?",
+                          )
                         )
-                      )
-                        return;
-                      review.mutate(
-                        { proofId: proof.id, approve: true },
-                        {
-                          onSuccess: () => toast.success("Justificatif confirmé · accès rétabli"),
-                          onError: (err) => toast.error(err.message),
-                        },
-                      );
-                    }}
-                  >
-                    Confirmer
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={review.isPending}
-                    onClick={() => {
-                      const note = window.prompt("Motif du refus (obligatoire)");
-                      if (note === null) return;
-                      if (!note.trim()) {
-                        toast.error("Le motif du refus est obligatoire.");
-                        return;
-                      }
-                      review.mutate(
-                        {
-                          proofId: proof.id,
-                          approve: false,
-                          adminNote: note.trim(),
-                        },
-                        {
-                          onSuccess: () => toast.message("Justificatif refusé"),
-                          onError: (err) => toast.error(err.message),
-                        },
-                      );
-                    }}
-                  >
-                    Refuser
-                  </Button>
+                          return;
+                        review.mutate(
+                          { proofId: proof.id, approve: true },
+                          {
+                            onSuccess: () => {
+                              toast.success("Justificatif confirmé · accès rétabli");
+                              refetchProofs();
+                            },
+                            onError: (err) => toast.error(err.message),
+                          },
+                        );
+                      }}
+                    >
+                      Confirmer
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={review.isPending}
+                      onClick={() => {
+                        const note = window.prompt("Motif du refus (obligatoire)");
+                        if (note === null) return;
+                        if (!note.trim()) {
+                          toast.error("Le motif du refus est obligatoire.");
+                          return;
+                        }
+                        review.mutate(
+                          {
+                            proofId: proof.id,
+                            approve: false,
+                            adminNote: note.trim(),
+                          },
+                          {
+                            onSuccess: () => {
+                              toast.message("Justificatif refusé");
+                              refetchProofs();
+                            },
+                            onError: (err) => toast.error(err.message),
+                          },
+                        );
+                      }}
+                    >
+                      Refuser
+                    </Button>
+                  </div>
                 </div>
+                <AdminReceiptActions
+                  proof={proof}
+                  onChanged={refetchProofs}
+                  onPreview={setPreview}
+                />
               </div>
             ))}
           </div>
         </QueryState>
       </Surface>
+
+      {(recentlyReviewed.length > 0 || allProofsQuery.isLoading) && (
+        <Surface className="mb-6 p-5">
+          <h2 className="font-semibold">Récemment traités</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Justificatifs approuvés ou refusés — joignez ou gérez le reçu administratif.
+          </p>
+          <div className="mt-4 divide-y">
+            {recentlyReviewed.map((proof) => (
+              <div key={proof.id} className="py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{studentLabel(proof)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {proof.reviewed_at
+                        ? new Date(proof.reviewed_at).toLocaleString("fr-FR")
+                        : new Date(proof.created_at).toLocaleString("fr-FR")}
+                      {` · ${Number(proof.declared_amount).toLocaleString()} ${proof.payment?.currency ?? "MAD"}`}
+                    </p>
+                    <Status tone={proof.status === "approved" ? "green" : "red"}>
+                      {proofStatusLabel(proof.status)}
+                    </Status>
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={() => openStudentProof(proof)}>
+                    Voir justificatif
+                  </Button>
+                </div>
+                <AdminReceiptActions
+                  proof={proof}
+                  onChanged={refetchProofs}
+                  onPreview={setPreview}
+                />
+              </div>
+            ))}
+          </div>
+        </Surface>
+      )}
+
       <DocumentViewer
         open={Boolean(preview)}
         onClose={() => setPreview(null)}
@@ -740,9 +958,42 @@ export function StudentPaymentsPage() {
   const [declaredAmount, setDeclaredAmount] = useState("");
   const [operationDate, setOperationDate] = useState("");
   const [operationReference, setOperationReference] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
   const [note, setNote] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [attachment, setAttachment] = useState<AttachmentDraft>({
+    kind: "pdf",
+    url: "",
+    file: null,
+  });
+  const [preview, setPreview] = useState<DocPreview | null>(null);
   const accessBlocked = accessQuery.data === false;
+  const hasNotApproved = (proofsQuery.data ?? []).some((p) => p.status === "not_approved");
+
+  const openProofDoc = async (
+    title: string,
+    mime: string | null | undefined,
+    getUrl: () => Promise<string>,
+  ) => {
+    setPreview({
+      title,
+      url: null,
+      mimeType: mime ?? null,
+      loading: true,
+      error: null,
+    });
+    try {
+      const url = await getUrl();
+      setPreview({ title, url, mimeType: mime ?? null, loading: false, error: null });
+    } catch (err) {
+      setPreview({
+        title,
+        url: null,
+        mimeType: mime ?? null,
+        loading: false,
+        error: err instanceof Error ? err.message : "Aperçu impossible",
+      });
+    }
+  };
 
   return (
     <>
@@ -758,7 +1009,16 @@ export function StudentPaymentsPage() {
           </p>
         </Surface>
       )}
-      {!accessBlocked && (
+      {hasNotApproved && (
+        <Surface className="mb-6 border-destructive/40 bg-alert-soft p-6">
+          <h2 className="font-semibold">Paiement non approuvé</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Un justificatif n’a pas été validé dans le délai de 48 heures. Déposez un nouveau
+            justificatif ou contactez le support. Votre compte n’est pas supprimé.
+          </p>
+        </Surface>
+      )}
+      {!accessBlocked && !hasNotApproved && (
         <Surface className="mb-6 border-border bg-success-soft/40 p-6">
           <h2 className="font-semibold">Accès académique actif</h2>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -780,9 +1040,10 @@ export function StudentPaymentsPage() {
       </div>
 
       <Surface className="mb-6 p-5">
-        <h2 className="font-semibold">Déposer un avis d’opération</h2>
+        <h2 className="font-semibold">Déclarer un paiement</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          PDF, JPEG ou PNG · max 10 Mo. L’accès reste bloqué jusqu’à approbation administrative.
+          Déclarez le versement, joignez le justificatif (PDF/JPEG/PNG · max 10 Mo). Validation sous
+          48 heures.
         </p>
         <div className="mt-4 space-y-3">
           <label className="block text-sm">
@@ -804,6 +1065,20 @@ export function StudentPaymentsPage() {
                   {payment.due_date ?? "non définie"}
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="block text-sm">
+            Moyen de paiement
+            <select
+              className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+            >
+              <option value="bank_transfer">Virement</option>
+              <option value="cash">Espèces</option>
+              <option value="card">Carte</option>
+              <option value="mobile">Paiement mobile</option>
+              <option value="other">Autre</option>
             </select>
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -836,15 +1111,13 @@ export function StudentPaymentsPage() {
               className="mt-1"
             />
           </label>
-          <label className="block text-sm">
-            Fichier
-            <Input
-              type="file"
-              accept="application/pdf,image/jpeg,image/png"
-              className="mt-1"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-          </label>
+          <ContentAttachmentUploader
+            kinds={["pdf", "image"]}
+            value={attachment}
+            onChange={setAttachment}
+            disabled={submitProof.isPending}
+            uploading={submitProof.isPending}
+          />
           <label className="block text-sm">
             Note (optionnel)
             <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1" />
@@ -853,27 +1126,28 @@ export function StudentPaymentsPage() {
             disabled={
               !myStudent?.id ||
               !selectedPayment ||
-              !file ||
+              !attachment.file ||
               !operationDate ||
               Number(declaredAmount) <= 0 ||
               submitProof.isPending
             }
             onClick={() => {
-              if (!myStudent?.id || !file || !selectedPayment) return;
+              if (!myStudent?.id || !attachment.file || !selectedPayment) return;
               submitProof.mutate(
                 {
                   studentId: myStudent.id,
-                  file,
+                  file: attachment.file,
                   paymentId: selectedPayment.id,
                   declaredAmount: Number(declaredAmount),
                   operationDate,
                   operationReference: operationReference || null,
                   studentNote: note || null,
+                  paymentMethod,
                 },
                 {
                   onSuccess: () => {
-                    toast.success("Justificatif déposé — en attente de validation");
-                    setFile(null);
+                    toast.success("Justificatif déposé — en attente de validation (48 h)");
+                    setAttachment({ kind: "pdf", url: "", file: null });
                     setNote("");
                     setPaymentId("");
                     setDeclaredAmount("");
@@ -891,23 +1165,112 @@ export function StudentPaymentsPage() {
         {(proofsQuery.data?.length ?? 0) > 0 && (
           <div className="mt-6 divide-y border-t">
             {proofsQuery.data?.map((p) => (
-              <div key={p.id} className="flex items-center justify-between gap-3 py-3">
+              <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <div>
                   <p className="text-sm font-medium">
-                    {p.created_at.slice(0, 16).replace("T", " ")}
+                    {(p.submitted_at ?? p.created_at).slice(0, 16).replace("T", " ")}
                   </p>
                   <p className="text-xs text-muted-foreground">{p.student_note || "Sans note"}</p>
                   <p className="text-xs text-muted-foreground">
                     {Number(p.declared_amount).toLocaleString()} {p.payment?.currency ?? "MAD"} ·{" "}
                     {p.operation_date}
+                    {p.validation_deadline
+                      ? ` · limite validation ${p.validation_deadline.slice(0, 16).replace("T", " ")}`
+                      : ""}
                   </p>
                 </div>
-                <Status tone={paymentTone(p.status)}>{proofStatusLabel(p.status)}</Status>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() =>
+                      void openProofDoc(`Justificatif · ${p.operation_date}`, p.mime_type, () =>
+                        PaymentProofService.getSignedUrl(p),
+                      )
+                    }
+                  >
+                    Voir
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      void (async () => {
+                        try {
+                          const url = await PaymentProofService.getSignedUrl(p);
+                          await forceDownloadUrl(url, `justificatif-${p.id}`);
+                        } catch (err) {
+                          toast.error(
+                            err instanceof Error ? err.message : "Téléchargement impossible",
+                          );
+                        }
+                      })();
+                    }}
+                  >
+                    Télécharger
+                  </Button>
+                  {p.admin_receipt_path ? (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() =>
+                          void openProofDoc(
+                            `Reçu · ${p.operation_date}`,
+                            p.admin_receipt_mime,
+                            () => PaymentProofService.getAdminReceiptSignedUrl(p),
+                          )
+                        }
+                      >
+                        Voir reçu
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          void (async () => {
+                            try {
+                              const url = await PaymentProofService.getAdminReceiptSignedUrl(p);
+                              await forceDownloadUrl(url, `recu-${p.id}`);
+                            } catch (err) {
+                              toast.error(
+                                err instanceof Error ? err.message : "Téléchargement impossible",
+                              );
+                            }
+                          })();
+                        }}
+                      >
+                        Télécharger reçu
+                      </Button>
+                    </>
+                  ) : null}
+                  <Status
+                    tone={
+                      p.status === "approved"
+                        ? "green"
+                        : p.status === "not_approved" || p.status === "rejected"
+                          ? "red"
+                          : "amber"
+                    }
+                  >
+                    {proofStatusLabel(p.status)}
+                  </Status>
+                </div>
               </div>
             ))}
           </div>
         )}
       </Surface>
+
+      <DocumentViewer
+        open={Boolean(preview)}
+        onClose={() => setPreview(null)}
+        title={preview?.title ?? ""}
+        url={preview?.url ?? null}
+        mimeType={preview?.mimeType}
+        loading={preview?.loading}
+        error={preview?.error}
+      />
 
       <QueryState
         isLoading={studentsQuery.isLoading || paymentsQuery.isLoading}

@@ -13,7 +13,9 @@ import {
   useExam,
   useExamAnswers,
   useExamAttempt,
+  useExamAttemptsForExam,
   useExamResult,
+  useGradeWritingAnswer,
   useLevels,
   useMyExamAttempts,
   usePublishExam,
@@ -38,6 +40,7 @@ import {
   scopedClassOrLevelItemVisible,
 } from "@/lib/academy-logic";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
+import { ExamBuilder } from "./exam-builder";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
 import { PageHeader, Status, Surface } from "./primitives";
@@ -295,6 +298,29 @@ function StudentExamRunner() {
     });
   };
 
+  const writingText =
+    current &&
+    (current.type === "writing" || current.type === "text" || current.type === "speaking")
+      ? answerValue(localAnswers[current.id])
+      : "";
+  const writingWordCount = writingText.trim()
+    ? writingText.trim().split(/\s+/).filter(Boolean).length
+    : 0;
+
+  useEffect(() => {
+    if (!current || !session.attemptId) return;
+    if (current.type !== "writing" && current.type !== "text" && current.type !== "speaking") {
+      return;
+    }
+    const value = localAnswers[current.id];
+    if (value === undefined) return;
+    const timer = window.setTimeout(() => {
+      persist(current.id, value);
+    }, 800);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce local draft only
+  }, [current?.id, current?.type, writingText, session.attemptId]);
+
   if (!session.examId || !session.attemptId) {
     return (
       <Surface className="p-8 text-center">
@@ -396,19 +422,25 @@ function StudentExamRunner() {
               {(current?.type === "writing" ||
                 current?.type === "text" ||
                 current?.type === "speaking") && (
-                <Textarea
-                  className="min-h-40"
-                  value={answerValue(localAnswers[current.id])}
-                  placeholder="Saisissez votre réponse…"
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setLocalAnswers((prev) => ({ ...prev, [current.id]: value }));
-                  }}
-                  onBlur={() => {
-                    if (!current) return;
-                    persist(current.id, localAnswers[current.id] ?? "");
-                  }}
-                />
+                <div>
+                  <Textarea
+                    className="min-h-40"
+                    value={answerValue(localAnswers[current.id])}
+                    placeholder="Saisissez votre réponse…"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setLocalAnswers((prev) => ({ ...prev, [current.id]: value }));
+                    }}
+                    onBlur={() => {
+                      if (!current) return;
+                      persist(current.id, localAnswers[current.id] ?? "");
+                    }}
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {writingWordCount} mot{writingWordCount === 1 ? "" : "s"} · {writingText.length}{" "}
+                    caractère{writingText.length === 1 ? "" : "s"}
+                  </p>
+                </div>
               )}
             </div>
 
@@ -597,10 +629,217 @@ function StudentExamResult() {
   );
 }
 
+function ExamWritingGradingPanel({ examId }: { examId: string }) {
+  const attemptsQuery = useExamAttemptsForExam(examId);
+  const examQuery = useExam(examId);
+  const gradeWriting = useGradeWritingAnswer();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, { points: string; comment: string }>>({});
+
+  const writingQuestions = useMemo(() => {
+    return (examQuery.data?.sections ?? []).flatMap((section) =>
+      (section.questions ?? [])
+        .filter((q) => q.type === "writing" || q.type === "text" || q.type === "speaking")
+        .map((q) => ({ ...q, sectionTitle: section.title })),
+    );
+  }, [examQuery.data]);
+
+  const gradedAttempts = (attemptsQuery.data ?? []).filter(
+    (a) => a.status === "graded" && a.percentage != null,
+  );
+  const groupAverage =
+    gradedAttempts.length > 0
+      ? gradedAttempts.reduce((sum, a) => sum + Number(a.percentage ?? 0), 0) /
+        gradedAttempts.length
+      : null;
+
+  const answersQuery = useExamAnswers(expandedId);
+
+  useEffect(() => {
+    if (!answersQuery.data || !expandedId) return;
+    setDrafts((prev) => {
+      const next = { ...prev };
+      for (const answer of answersQuery.data) {
+        const key = `${expandedId}:${answer.question_id}`;
+        if (next[key]) continue;
+        next[key] = {
+          points: answer.points_awarded != null ? String(answer.points_awarded) : "",
+          comment: answer.teacher_comment ?? "",
+        };
+      }
+      return next;
+    });
+  }, [answersQuery.data, expandedId]);
+
+  const studentName = (attempt: NonNullable<typeof attemptsQuery.data>[number]) => {
+    const p = attempt.student?.profile;
+    if (!p) return "Étudiant";
+    const name = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim();
+    return name || p.email || "Étudiant";
+  };
+
+  const attemptStatusLabel = (status: string) => {
+    if (status === "submitted") return "à corriger";
+    if (status === "graded") return "corrigé";
+    if (status === "in_progress") return "en cours";
+    return status;
+  };
+
+  return (
+    <div className="mt-4 space-y-3 border-t pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold">Corrections écrites</h3>
+        {groupAverage != null && (
+          <p className="text-sm text-muted-foreground">
+            Moyenne groupe (corrigés) : {groupAverage.toFixed(1)} %
+          </p>
+        )}
+      </div>
+      <QueryState
+        isLoading={attemptsQuery.isLoading || examQuery.isLoading}
+        isError={attemptsQuery.isError || examQuery.isError}
+        error={(attemptsQuery.error ?? examQuery.error) as Error | null}
+        isEmpty={!attemptsQuery.data?.length}
+        emptyTitle="Aucune tentative"
+        emptyMessage="Les copies apparaîtront ici après envoi."
+        onRetry={() => {
+          void attemptsQuery.refetch();
+          void examQuery.refetch();
+        }}
+      >
+        <div className="space-y-2">
+          {(attemptsQuery.data ?? []).map((attempt) => {
+            const open = expandedId === attempt.id;
+            return (
+              <div key={attempt.id} className="rounded-md border border-border p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-medium">{studentName(attempt)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {attemptStatusLabel(attempt.status)}
+                      {attempt.percentage != null
+                        ? ` · ${Number(attempt.percentage).toFixed(1)} %`
+                        : ""}
+                      {attempt.score != null
+                        ? ` · ${Number(attempt.score)} / ${Number(attempt.max_score ?? 0)}`
+                        : ""}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={attempt.status === "in_progress"}
+                    onClick={() => setExpandedId((id) => (id === attempt.id ? null : attempt.id))}
+                  >
+                    {open ? "Masquer" : "Corriger"}
+                  </Button>
+                </div>
+                {open && (
+                  <div className="mt-3 space-y-4">
+                    {answersQuery.isLoading && (
+                      <p className="text-sm text-muted-foreground">Chargement des réponses…</p>
+                    )}
+                    {writingQuestions.length === 0 && !answersQuery.isLoading && (
+                      <p className="text-sm text-muted-foreground">
+                        Aucune question d’écriture sur cet examen.
+                      </p>
+                    )}
+                    {writingQuestions.map((question) => {
+                      const answer = (answersQuery.data ?? []).find(
+                        (row) => row.question_id === question.id,
+                      );
+                      const key = `${attempt.id}:${question.id}`;
+                      const draft = drafts[key] ?? {
+                        points: "",
+                        comment: "",
+                      };
+                      return (
+                        <div key={question.id} className="space-y-2 rounded-md bg-muted/40 p-3">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            {question.sectionTitle}
+                          </p>
+                          <p className="text-sm font-medium">{question.prompt}</p>
+                          <p className="whitespace-pre-wrap rounded-md border border-border bg-background p-3 text-sm">
+                            {answer ? answerValue(answer.answer) || "—" : "Pas de réponse"}
+                          </p>
+                          <div className="grid gap-2 sm:grid-cols-[8rem_1fr_auto]">
+                            <label className="block text-xs">
+                              Points (/{question.points})
+                              <Input
+                                className="mt-1"
+                                type="number"
+                                min={0}
+                                max={question.points}
+                                step="0.5"
+                                value={draft.points}
+                                onChange={(e) =>
+                                  setDrafts((prev) => ({
+                                    ...prev,
+                                    [key]: { ...draft, points: e.target.value },
+                                  }))
+                                }
+                              />
+                            </label>
+                            <label className="block text-xs">
+                              Commentaire
+                              <Input
+                                className="mt-1"
+                                value={draft.comment}
+                                onChange={(e) =>
+                                  setDrafts((prev) => ({
+                                    ...prev,
+                                    [key]: { ...draft, comment: e.target.value },
+                                  }))
+                                }
+                              />
+                            </label>
+                            <div className="flex items-end">
+                              <Button
+                                size="sm"
+                                disabled={gradeWriting.isPending || draft.points === ""}
+                                onClick={() => {
+                                  const points = Number(draft.points);
+                                  if (!Number.isFinite(points)) {
+                                    toast.error("Points invalides");
+                                    return;
+                                  }
+                                  gradeWriting.mutate(
+                                    {
+                                      attemptId: attempt.id,
+                                      questionId: question.id,
+                                      points,
+                                      comment: draft.comment.trim() || null,
+                                    },
+                                    {
+                                      onSuccess: () => toast.success("Note enregistrée"),
+                                      onError: (err) => toast.error(err.message),
+                                    },
+                                  );
+                                }}
+                              >
+                                Enregistrer
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </QueryState>
+    </div>
+  );
+}
+
 export function StaffExamsPage() {
   const { role } = useAcademy();
   const classesQuery = useClasses();
   const examsQuery = useAllExams();
+  const [gradingExamId, setGradingExamId] = useState<string | null>(null);
   const teacherScope = useMemo(
     () => buildTeacherScope(classesQuery.data ?? []),
     [classesQuery.data],
@@ -628,23 +867,33 @@ export function StaffExamsPage() {
       >
         <div className="space-y-3">
           {exams.map((exam) => (
-            <Surface
-              className="flex flex-wrap items-center justify-between gap-3 p-5"
-              key={exam.id}
-            >
-              <div>
-                <h2 className="font-semibold">{exam.title}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {exam.level?.code} · {exam.duration_minutes} min · seuil {exam.pass_percentage} %
-                </p>
+            <Surface className="p-5" key={exam.id}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="font-semibold">{exam.title}</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {exam.level?.code} · {exam.duration_minutes} min · seuil {exam.pass_percentage}{" "}
+                    %
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Status tone={exam.status === "published" ? "green" : "amber"}>
+                    {exam.status === "published"
+                      ? "Publié"
+                      : exam.status === "draft"
+                        ? "Brouillon"
+                        : "Archivé"}
+                  </Status>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setGradingExamId((id) => (id === exam.id ? null : exam.id))}
+                  >
+                    {gradingExamId === exam.id ? "Masquer corrections" : "Corrections"}
+                  </Button>
+                </div>
               </div>
-              <Status tone={exam.status === "published" ? "green" : "amber"}>
-                {exam.status === "published"
-                  ? "Publié"
-                  : exam.status === "draft"
-                    ? "Brouillon"
-                    : "Archivé"}
-              </Status>
+              {gradingExamId === exam.id ? <ExamWritingGradingPanel examId={exam.id} /> : null}
             </Surface>
           ))}
         </div>
@@ -666,6 +915,8 @@ export function DirectorExamsPage() {
     () => buildTeacherScope(classesQuery.data ?? []),
     [classesQuery.data],
   );
+  const [builderExamId, setBuilderExamId] = useState<string | null>(null);
+  const [gradingExamId, setGradingExamId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -753,6 +1004,20 @@ export function DirectorExamsPage() {
                   <Status tone={exam.status === "published" ? "green" : "amber"}>
                     {exam.status === "published" ? "Publié" : "Brouillon"}
                   </Status>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setBuilderExamId((id) => (id === exam.id ? null : exam.id))}
+                  >
+                    {builderExamId === exam.id ? "Masquer QCM" : "Éditer QCM"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setGradingExamId((id) => (id === exam.id ? null : exam.id))}
+                  >
+                    {gradingExamId === exam.id ? "Masquer corrections" : "Corrections"}
+                  </Button>
                   {(exam.content_url || exam.storage_path) && (
                     <Button
                       size="sm"
@@ -795,6 +1060,8 @@ export function DirectorExamsPage() {
                   </Button>
                 </div>
               </div>
+              {builderExamId === exam.id ? <ExamBuilder examId={exam.id} /> : null}
+              {gradingExamId === exam.id ? <ExamWritingGradingPanel examId={exam.id} /> : null}
             </Surface>
           ))}
         </div>

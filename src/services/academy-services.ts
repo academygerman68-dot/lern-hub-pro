@@ -275,10 +275,13 @@ export const ClassService = {
     return mockClasses.map((item) => ({
       ...item,
       name: item.id,
+      reference: null,
       status: "active" as ClassStatus,
       capacity: 20,
       teacherId: null,
       levelId: null,
+      startDate: null,
+      endDate: null,
     }));
   },
   async get(id: string) {
@@ -289,20 +292,26 @@ export const ClassService = {
     return {
       ...item,
       name: item.id,
+      reference: null,
       status: "active" as ClassStatus,
       capacity: 20,
       teacherId: null,
       levelId: null,
+      startDate: null,
+      endDate: null,
     };
   },
   async create(input: {
     name: string;
     levelId: string;
+    reference?: string | null;
     teacherId?: string | null;
     capacity?: number;
     room?: string | null;
     scheduleLabel?: string | null;
     status?: ClassStatus;
+    startDate?: string | null;
+    endDate?: string | null;
   }) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseClassService.create(input);
@@ -312,11 +321,14 @@ export const ClassService = {
     patch: {
       name?: string;
       level_id?: string;
+      reference?: string | null;
       teacher_id?: string | null;
       capacity?: number;
       room?: string | null;
       schedule_label?: string | null;
       status?: ClassStatus;
+      start_date?: string | null;
+      end_date?: string | null;
     },
   ) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
@@ -590,6 +602,12 @@ export const AssignmentService = {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseAssignmentService.upsertSubmission(input);
   },
+  async getSubmissionFileUrl(
+    submission: Parameters<typeof SupabaseAssignmentService.getSubmissionFileUrl>[0],
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseAssignmentService.getSubmissionFileUrl(submission);
+  },
   async grade(input: Parameters<typeof SupabaseAssignmentService.grade>[0]) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseAssignmentService.grade(input);
@@ -638,6 +656,14 @@ export const ExamService = {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseExamService.submitAttempt(attemptId);
   },
+  async gradeWritingAnswer(input: Parameters<typeof SupabaseExamService.gradeWritingAnswer>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.gradeWritingAnswer(input);
+  },
+  async listAttemptsForExam(examId: string) {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseExamService.listAttemptsForExam(examId);
+  },
   async getResult(attemptId: string) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseExamService.getResult(attemptId);
@@ -669,6 +695,41 @@ export const ExamService = {
   async archiveExam(id: string) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseExamService.archiveExam(id);
+  },
+  async listExamStructure(examId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.listExamStructure(examId);
+  },
+  async createSection(input: Parameters<typeof SupabaseExamService.createSection>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.createSection(input);
+  },
+  async createQuestion(input: Parameters<typeof SupabaseExamService.createQuestion>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.createQuestion(input);
+  },
+  async createOptions(
+    questionId: string,
+    options: Parameters<typeof SupabaseExamService.createOptions>[1],
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.createOptions(questionId, options);
+  },
+  async setAnswerKey(questionId: string, correctValues: string[]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.setAnswerKey(questionId, correctValues);
+  },
+  async syncSectionMaxScore(sectionId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.syncSectionMaxScore(sectionId);
+  },
+  async deleteQuestion(questionId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.deleteQuestion(questionId);
+  },
+  async deleteSection(sectionId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.deleteSection(sectionId);
   },
 };
 

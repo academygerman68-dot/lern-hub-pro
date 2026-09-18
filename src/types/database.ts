@@ -369,6 +369,7 @@ export type Database = {
           id: string;
           level_id: string;
           name: string;
+          reference: string | null;
           room: string | null;
           schedule_label: string | null;
           start_date: string | null;
@@ -384,6 +385,7 @@ export type Database = {
           id?: string;
           level_id: string;
           name: string;
+          reference?: string | null;
           room?: string | null;
           schedule_label?: string | null;
           start_date?: string | null;
@@ -399,6 +401,7 @@ export type Database = {
           id?: string;
           level_id?: string;
           name?: string;
+          reference?: string | null;
           room?: string | null;
           schedule_label?: string | null;
           start_date?: string | null;
@@ -688,6 +691,7 @@ export type Database = {
           is_correct: boolean | null;
           points_awarded: number | null;
           question_id: string;
+          teacher_comment: string | null;
           updated_at: string;
         };
         Insert: {
@@ -699,6 +703,7 @@ export type Database = {
           is_correct?: boolean | null;
           points_awarded?: number | null;
           question_id: string;
+          teacher_comment?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -710,6 +715,7 @@ export type Database = {
           is_correct?: boolean | null;
           points_awarded?: number | null;
           question_id?: string;
+          teacher_comment?: string | null;
           updated_at?: string;
         };
         Relationships: [
@@ -1826,6 +1832,9 @@ export type Database = {
       payment_proofs: {
         Row: {
           admin_note: string | null;
+          admin_receipt_bucket: string | null;
+          admin_receipt_mime: string | null;
+          admin_receipt_path: string | null;
           created_at: string;
           declared_amount: number;
           file_size: number | null;
@@ -1834,6 +1843,7 @@ export type Database = {
           operation_date: string;
           operation_reference: string | null;
           payment_id: string;
+          payment_method: string | null;
           reviewed_at: string | null;
           reviewed_by: string | null;
           status: Database["public"]["Enums"]["payment_proof_status"];
@@ -1841,10 +1851,15 @@ export type Database = {
           storage_path: string;
           student_id: string;
           student_note: string | null;
+          submitted_at: string | null;
           updated_at: string;
+          validation_deadline: string | null;
         };
         Insert: {
           admin_note?: string | null;
+          admin_receipt_bucket?: string | null;
+          admin_receipt_mime?: string | null;
+          admin_receipt_path?: string | null;
           created_at?: string;
           declared_amount: number;
           file_size?: number | null;
@@ -1853,6 +1868,7 @@ export type Database = {
           operation_date: string;
           operation_reference?: string | null;
           payment_id: string;
+          payment_method?: string | null;
           reviewed_at?: string | null;
           reviewed_by?: string | null;
           status?: Database["public"]["Enums"]["payment_proof_status"];
@@ -1860,10 +1876,15 @@ export type Database = {
           storage_path: string;
           student_id: string;
           student_note?: string | null;
+          submitted_at?: string | null;
           updated_at?: string;
+          validation_deadline?: string | null;
         };
         Update: {
           admin_note?: string | null;
+          admin_receipt_bucket?: string | null;
+          admin_receipt_mime?: string | null;
+          admin_receipt_path?: string | null;
           created_at?: string;
           declared_amount?: number;
           file_size?: number | null;
@@ -1872,6 +1893,7 @@ export type Database = {
           operation_date?: string;
           operation_reference?: string | null;
           payment_id?: string;
+          payment_method?: string | null;
           reviewed_at?: string | null;
           reviewed_by?: string | null;
           status?: Database["public"]["Enums"]["payment_proof_status"];
@@ -1879,7 +1901,9 @@ export type Database = {
           storage_path?: string;
           student_id?: string;
           student_note?: string | null;
+          submitted_at?: string | null;
           updated_at?: string;
+          validation_deadline?: string | null;
         };
         Relationships: [
           {
@@ -2597,6 +2621,35 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      grade_exam_writing_answer: {
+        Args: {
+          p_attempt_id: string;
+          p_question_id: string;
+          p_points: number;
+          p_comment?: string | null;
+        };
+        Returns: {
+          created_at: string;
+          exam_id: string;
+          expires_at: string;
+          id: string;
+          max_score: number | null;
+          percentage: number | null;
+          score: number | null;
+          skill_breakdown: Json;
+          started_at: string;
+          status: Database["public"]["Enums"]["exam_attempt_status"];
+          student_id: string;
+          submitted_at: string | null;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "exam_attempts";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       teacher_can_manage_assignment: {
         Args: { p_class_id: string; p_level_id: string };
         Returns: boolean;
@@ -2658,7 +2711,7 @@ export type Database = {
       notification_channel: "in_app" | "email" | "whatsapp";
       notification_status: "unread" | "read" | "archived";
       outbox_status: "queued" | "sent" | "failed" | "skipped";
-      payment_proof_status: "pending" | "approved" | "rejected";
+      payment_proof_status: "pending" | "approved" | "rejected" | "not_approved";
       payment_status: "pending" | "partial" | "paid" | "overdue" | "cancelled" | "suspended";
       profile_status: "active" | "suspended" | "archived" | "restricted" | "pending";
       record_status: "active" | "inactive" | "archived";
@@ -2833,7 +2886,7 @@ export const Constants = {
       notification_channel: ["in_app", "email", "whatsapp"],
       notification_status: ["unread", "read", "archived"],
       outbox_status: ["queued", "sent", "failed", "skipped"],
-      payment_proof_status: ["pending", "approved", "rejected"],
+      payment_proof_status: ["pending", "approved", "rejected", "not_approved"],
       payment_status: ["pending", "partial", "paid", "overdue", "cancelled", "suspended"],
       profile_status: ["active", "suspended", "archived", "restricted", "pending"],
       record_status: ["active", "inactive", "archived"],
