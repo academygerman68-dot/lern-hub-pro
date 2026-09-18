@@ -36,6 +36,7 @@ import {
   Messages,
   RecordingsPage,
   TeacherProfile,
+  AccountSettings,
 } from "./student-extra";
 import {
   DirectorAssignmentsPage,
@@ -70,6 +71,7 @@ export function TeacherPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "recordings") return <RecordingsPage />;
   if (page === "messages") return <Messages />;
   if (page === "profile") return <TeacherProfile />;
+  if (page === "settings") return <AccountSettings />;
   return <PremiumTeacherDashboard />;
 }
 

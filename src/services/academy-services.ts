@@ -693,6 +693,10 @@ export const PaymentService = {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabasePaymentService.markOverdue(paymentId);
   },
+  async remindStudent(paymentId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabasePaymentService.remindStudent(paymentId);
+  },
   /** Legacy renew button — does not fake activation. Use payment proofs or admin markPaid. */
   async pay(): Promise<never> {
     throw new Error(
@@ -737,6 +741,10 @@ export const AccessService = {
   async hasAcademicAccess(studentId: string) {
     if (!isSupabaseConfigured) return true;
     return SupabaseAccessService.hasAcademicAccess(studentId);
+  },
+  async recordFirstLogin() {
+    if (!isSupabaseConfigured) return null;
+    return SupabaseAccessService.recordFirstLogin();
   },
 };
 

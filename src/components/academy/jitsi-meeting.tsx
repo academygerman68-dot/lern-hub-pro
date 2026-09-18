@@ -20,10 +20,12 @@ type ConnectionState = "connecting" | "joined" | "left";
 type AuthorizationState = "loading" | "ready" | "error";
 
 const tokenErrors: Record<string, string> = {
-  JAAS_NOT_CONFIGURED: "Les secrets JaaS ne sont pas encore configurés dans Supabase.",
+  JAAS_NOT_CONFIGURED:
+    "Les réunions en ligne ne sont pas encore configurées. Contactez l’administration.",
   JAAS_KEY_ID_INVALID:
-    "JAAS_KEY_ID contient une clé publique au lieu de l’identifiant de clé affiché dans JaaS.",
-  JAAS_SIGNING_FAILED: "La clé privée JaaS configurée dans Supabase est invalide.",
+    "La configuration des réunions en ligne est incorrecte. Contactez l’administration.",
+  JAAS_SIGNING_FAILED:
+    "La configuration des réunions en ligne est invalide. Contactez l’administration.",
   SESSION_ACCESS_DENIED: "Vous n’êtes pas autorisé à rejoindre cette séance.",
   SESSION_CLOSED: "Cette séance est terminée ou annulée.",
   SESSION_TOO_EARLY: "La réunion n’est accessible qu’à partir de l’heure de début du créneau.",
@@ -53,17 +55,17 @@ async function fetchJaasAuthorization(
   sessionId: string,
   expectedAppId: string | null,
 ): Promise<{ jwt: string; roomName: string }> {
-  if (!isSupabaseConfigured) throw new Error("Supabase n’est pas configuré.");
+  if (!isSupabaseConfigured) throw new Error("Les réunions en ligne sont indisponibles pour le moment.");
   const { data, error } = await getSupabase().functions.invoke<{
     jwt?: string;
     roomName?: string;
   }>("jaas-token", { body: { sessionId } });
   if (error) throw new Error(await readFunctionError(error));
   if (!data?.jwt || !data.roomName) {
-    throw new Error("La fonction jaas-token n’a pas renvoyé une autorisation valide.");
+    throw new Error("Impossible d’ouvrir la réunion. Réessayez ou contactez l’administration.");
   }
   if (expectedAppId && !data.roomName.startsWith(`${expectedAppId}/`)) {
-    throw new Error("L’App ID JaaS du frontend ne correspond pas à JAAS_APP_ID dans Supabase.");
+    throw new Error("La configuration des réunions en ligne est incohérente. Contactez l’administration.");
   }
   return { jwt: data.jwt, roomName: data.roomName };
 }

@@ -37,6 +37,7 @@ import {
   useEnrollmentsByStudent,
   usePayments,
   usePublishedExams,
+  useRemindPayment,
   useSetProfileStatus,
   useStudent,
   useStudents,
@@ -715,6 +716,7 @@ export function PremiumStudent360() {
   const studentQuery = useStudent(selectedStudentId);
   const enrollmentsQuery = useEnrollmentsByStudent(selectedStudentId);
   const paymentsQuery = usePayments(selectedStudentId ?? undefined);
+  const remindPayment = useRemindPayment();
   const examsQuery = usePublishedExams();
   const setProfileStatus = useSetProfileStatus();
   const student = studentQuery.data ?? null;
@@ -1101,17 +1103,39 @@ export function PremiumStudent360() {
                         : new Date(payment.created_at).toLocaleDateString("fr-FR")}
                     </p>
                   </div>
-                  <Status
-                    tone={
-                      payment.status === "overdue"
-                        ? "red"
-                        : payment.status === "paid"
-                          ? "green"
-                          : "amber"
-                    }
-                  >
-                    {paymentStatusLabel(payment.status)}
-                  </Status>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Status
+                      tone={
+                        payment.status === "overdue"
+                          ? "red"
+                          : payment.status === "paid"
+                            ? "green"
+                            : "amber"
+                      }
+                    >
+                      {paymentStatusLabel(payment.status)}
+                    </Status>
+                    {isDirector &&
+                      payment.status !== "paid" &&
+                      payment.status !== "cancelled" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={remindPayment.isPending}
+                          onClick={() =>
+                            remindPayment.mutate(payment.id, {
+                              onSuccess: () => toast.success("Relance de paiement envoyée"),
+                              onError: (err) =>
+                                toast.error(
+                                  err instanceof Error ? err.message : "Relance impossible",
+                                ),
+                            })
+                          }
+                        >
+                          Relancer
+                        </Button>
+                      )}
+                  </div>
                 </Surface>
               ))}
             </div>
@@ -1208,8 +1232,9 @@ export function PremiumProfile() {
           </div>
         </div>
         <div className="rounded-2xl border border-border p-8 text-sm text-muted-foreground">
-          Les informations affichées proviennent de votre compte Supabase (profil et fiche
-          étudiant). L’accès aux cours dépend de la validation de votre abonnement.
+          Les informations affichées proviennent de votre profil académie et de votre fiche
+          étudiant. L’accès aux cours dépend de la régularisation de votre abonnement pour les mois
+          suivants la première connexion.
         </div>
       </section>
     </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Download, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Download, ExternalLink, X, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type DocumentViewerProps = {
@@ -22,6 +22,24 @@ function kindFromMime(mime?: string | null, title?: string) {
   return "other" as const;
 }
 
+async function forceDownload(url: string, filename: string) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("download_failed");
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename || "document";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
 export function DocumentViewer({
   open,
   onClose,
@@ -32,6 +50,7 @@ export function DocumentViewer({
   error,
 }: DocumentViewerProps) {
   const [zoom, setZoom] = useState(1);
+  const [downloading, setDownloading] = useState(false);
   const kind = kindFromMime(mimeType, title);
 
   useEffect(() => {
@@ -80,17 +99,40 @@ export function DocumentViewer({
             )}
             {url && (
               <Button size="sm" variant="outline" asChild className="hidden sm:inline-flex">
-                <a href={url} download target="_blank" rel="noreferrer">
-                  <Download className="size-4" />
-                  Télécharger
+                <a href={url} target="_blank" rel="noreferrer">
+                  <ExternalLink className="size-4" />
+                  Nouvel onglet
                 </a>
               </Button>
             )}
             {url && (
-              <Button size="icon" variant="outline" asChild className="sm:hidden">
-                <a href={url} download target="_blank" rel="noreferrer" aria-label="Télécharger">
-                  <Download className="size-4" />
-                </a>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={downloading}
+                className="hidden sm:inline-flex"
+                onClick={() => {
+                  setDownloading(true);
+                  void forceDownload(url, title).finally(() => setDownloading(false));
+                }}
+              >
+                <Download className="size-4" />
+                Télécharger
+              </Button>
+            )}
+            {url && (
+              <Button
+                size="icon"
+                variant="outline"
+                className="sm:hidden"
+                disabled={downloading}
+                aria-label="Télécharger"
+                onClick={() => {
+                  setDownloading(true);
+                  void forceDownload(url, title).finally(() => setDownloading(false));
+                }}
+              >
+                <Download className="size-4" />
               </Button>
             )}
             <Button size="icon" variant="ghost" onClick={onClose} aria-label="Fermer">
@@ -106,7 +148,24 @@ export function DocumentViewer({
             </div>
           )}
           {!loading && error && (
-            <div className="grid h-full place-items-center text-sm text-destructive">{error}</div>
+            <div className="grid h-full place-items-center gap-3 px-4 text-center">
+              <p className="text-sm text-destructive">{error}</p>
+              {url && (
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button asChild>
+                    <a href={url} target="_blank" rel="noreferrer">
+                      Ouvrir dans un nouvel onglet
+                    </a>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => void forceDownload(url, title)}
+                  >
+                    Télécharger
+                  </Button>
+                </div>
+              )}
+            </div>
           )}
           {!loading && !error && url && kind === "pdf" && (
             <iframe
@@ -130,13 +189,18 @@ export function DocumentViewer({
           {!loading && !error && url && kind === "other" && (
             <div className="grid h-full place-items-center gap-3 px-4 text-center">
               <p className="text-sm text-muted-foreground">
-                Aperçu indisponible pour ce type de fichier.
+                Aperçu indisponible pour ce type de fichier. Vous pouvez l’ouvrir ou le télécharger.
               </p>
-              <Button asChild>
-                <a href={url} target="_blank" rel="noreferrer">
-                  Ouvrir dans un nouvel onglet
-                </a>
-              </Button>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button asChild>
+                  <a href={url} target="_blank" rel="noreferrer">
+                    Consulter
+                  </a>
+                </Button>
+                <Button variant="outline" onClick={() => void forceDownload(url, title)}>
+                  Télécharger
+                </Button>
+              </div>
             </div>
           )}
         </div>

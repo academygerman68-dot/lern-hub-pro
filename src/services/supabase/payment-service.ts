@@ -33,7 +33,9 @@ export type PaymentListItem = Payment & {
   student?: {
     id: string;
     student_code: string | null;
+    profile_id?: string | null;
     profile: {
+      id?: string;
       first_name: string;
       last_name: string;
       email: string | null;
@@ -51,7 +53,9 @@ const PAYMENT_SELECT = `
   student:students (
     id,
     student_code,
+    profile_id,
     profile:profiles!students_profile_id_fkey (
+      id,
       first_name,
       last_name,
       email
@@ -162,6 +166,47 @@ export const SupabasePaymentService = {
     return data as Payment;
   },
 
+  /** Send an in-app payment reminder to the student. */
+  async remindStudent(paymentId: string) {
+    const payment = await this.get(paymentId);
+    if (!payment) throw new Error("Paiement introuvable.");
+    if (payment.status === "paid" || payment.status === "cancelled") {
+      throw new Error("Impossible de relancer un paiement déjà réglé ou annulé.");
+    }
+
+    const recipientId = payment.student?.profile?.id ?? payment.student?.profile_id ?? null;
+    if (!recipientId) throw new Error("Profil étudiant introuvable pour la relance.");
+
+    const remaining = Math.max(0, Number(payment.amount) - Number(payment.amount_paid ?? 0));
+    const due = payment.due_date
+      ? new Date(payment.due_date).toLocaleDateString("fr-FR")
+      : "à convenir";
+    const amountLabel = `${remaining.toLocaleString("fr-FR")} ${payment.currency}`;
+
+    const { data, error } = await requireClient().rpc("create_in_app_notification", {
+      p_recipient_id: recipientId,
+      p_title: "Relance de paiement",
+      p_message: `Merci de régulariser votre paiement. Reste dû : ${amountLabel}. Échéance : ${due}. Vous pouvez déposer un justificatif dans Paiements.`,
+      p_category: "payment",
+      p_link_page: "payments",
+      p_link_id: payment.id,
+    });
+    if (error) throw error;
+
+    const stamp = new Date().toLocaleString("fr-FR");
+    const noteLine = `Relance envoyée le ${stamp}`;
+    const nextNotes = payment.notes?.includes("Relance envoyée")
+      ? payment.notes.replace(/Relance envoyée le[^\n]*/i, noteLine)
+      : [payment.notes, noteLine].filter(Boolean).join("\n");
+
+    await requireClient()
+      .from("student_payments")
+      .update({ notes: nextNotes })
+      .eq("id", paymentId);
+
+    return data;
+  },
+
   async cancel(paymentId: string) {
     const { data, error } = await requireClient()
       .from("student_payments")
@@ -262,5 +307,12 @@ export const SupabaseAccessService = {
     });
     if (error) throw error;
     return Boolean(data);
+  },
+
+  /** Records first login and starts the free first-month window for approved students. */
+  async recordFirstLogin(): Promise<string | null> {
+    const { data, error } = await requireClient().rpc("record_student_first_login");
+    if (error) throw error;
+    return (data as string | null) ?? null;
   },
 };

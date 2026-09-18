@@ -44,13 +44,14 @@ export const STUDENT_RESTRICTED_ALLOWED_PAGES = [
   "payments",
   "messages",
   "materials",
+  "settings",
 ] as const;
 
 export const STUDENT_RESTRICTED_MESSAGE =
   "Votre accès à cette fonctionnalité est actuellement restreint. Veuillez contacter l’administration.";
 
 /** Pending accounts may only open the dashboard and profile until validated. */
-export const STUDENT_PENDING_ALLOWED_PAGES = ["dashboard", "profile"] as const;
+export const STUDENT_PENDING_ALLOWED_PAGES = ["dashboard", "profile", "settings"] as const;
 
 export const STUDENT_PENDING_MESSAGE =
   "Votre compte est en attente de validation par l’administration. L’accès aux cours et outils pédagogiques sera ouvert après acceptation.";

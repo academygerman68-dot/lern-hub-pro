@@ -1,7 +1,7 @@
 import { PremiumProfile } from "./premium-screens";
 import { StudentLessonPage, AssignmentWorkflow } from "./workflow-pages";
 import { PremiumStudentDashboard } from "./dashboards";
-import { CalendarPage, Messages, Progress, RecordingsPage } from "./student-extra";
+import { CalendarPage, Messages, Progress, RecordingsPage, AccountSettings } from "./student-extra";
 import { MaterialsLibraryPage, StudentLearningPage } from "./academic-pages";
 import { StudentExamsPage } from "./exam-pages";
 import { LiveClassesPage } from "./live-pages";
@@ -71,5 +71,6 @@ export function StudentPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "payments") return <StudentPaymentsPage />;
   if (page === "messages") return <Messages />;
   if (page === "profile") return <PremiumProfile />;
+  if (page === "settings") return <AccountSettings />;
   return <PremiumStudentDashboard />;
 }

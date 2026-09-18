@@ -88,6 +88,24 @@ function usePreview() {
   return { preview, setPreview, openLinkOrFile };
 }
 
+async function downloadFromUrl(url: string, filename: string) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Téléchargement impossible");
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename || "document";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
 function statusLabel(status: string) {
   if (status === "published" || status === "Open") return "Publié";
   if (status === "draft") return "Brouillon";
@@ -452,7 +470,10 @@ export function MaterialsLibraryPage() {
   const filtered = useMemo(() => {
     return (libraryQuery.data ?? [])
       .filter((item) => item.domain === domainTab)
-      .filter((item) => isDirectorRole(role) || scopedLibraryItemVisible(item, teacherScope));
+      .filter((item) => {
+        if (role === "student" || isDirectorRole(role)) return true;
+        return scopedLibraryItemVisible(item, teacherScope);
+      });
   }, [libraryQuery.data, domainTab, role, teacherScope]);
   const classesForLevel = scopedClasses.filter((item) => !levelCode || item.level === levelCode);
 
@@ -653,7 +674,7 @@ export function MaterialsLibraryPage() {
                     <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
                   ) : null}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     variant="outline"
                     size="sm"
@@ -663,8 +684,28 @@ export function MaterialsLibraryPage() {
                       )
                     }
                   >
-                    {item.content_kind === "link" ? "Ouvrir" : "Télécharger"}
+                    {item.content_kind === "link" ? "Ouvrir" : "Consulter"}
                   </Button>
+                  {item.content_kind !== "link" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        void (async () => {
+                          try {
+                            const url = await LibraryService.getSignedUrl(item);
+                            await downloadFromUrl(url, item.title);
+                          } catch (err) {
+                            toast.error(
+                              err instanceof Error ? err.message : "Téléchargement impossible",
+                            );
+                          }
+                        })()
+                      }
+                    >
+                      Télécharger
+                    </Button>
+                  )}
                   {role !== "student" && (
                     <Button
                       variant="outline"
@@ -712,7 +753,8 @@ export function StudentLearningPage() {
         <Surface className="space-y-3 p-6">
           <h2 className="font-semibold">Accès académique indisponible</h2>
           <p className="text-sm text-muted-foreground">
-            Un abonnement actif est nécessaire pour ouvrir les cours.
+            Votre mois d’essai est terminé ou votre paiement n’est plus à jour. Régularisez dans
+            Paiements pour rouvrir les cours.
           </p>
         </Surface>
       </>

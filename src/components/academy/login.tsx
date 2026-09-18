@@ -286,8 +286,8 @@ export function Login() {
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
             {l(
-              `Le lien doit ouvrir : ${confirmRedirect}. Si le mail ouvre localhost, ajoutez cette URL dans Supabase → Authentication → URL Configuration (Site URL + Redirect URLs).`,
-              `يجب أن يفتح الرابط: ${confirmRedirect}. إذا فتح localhost، أضف هذا العنوان في Supabase → Authentication → URL Configuration.`,
+              `Le lien doit ouvrir : ${confirmRedirect}. Si le mail ouvre une autre adresse, contactez l’administration pour corriger le lien de confirmation.`,
+              `يجب أن يفتح الرابط: ${confirmRedirect}. إذا فتح عنوانًا آخر، تواصل مع الإدارة لتصحيح رابط التأكيد.`,
             )}
           </p>
           <Button

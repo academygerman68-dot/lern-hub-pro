@@ -5,7 +5,7 @@ import { isDemoAuthAllowed } from "@/lib/auth-config";
 import { translate } from "@/lib/i18n";
 import type { Profile } from "@/lib/roles";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { AuthService } from "@/services/academy-services";
+import { AuthService, AccessService } from "@/services/academy-services";
 import {
   clearSession,
   loadSession,
@@ -14,6 +14,7 @@ import {
   type PersistedSession,
 } from "@/services/academy-store";
 import { SupabaseAuthService } from "@/services/supabase/auth-service";
+import { queryKeys } from "@/lib/query-keys";
 import type {
   AcademyPage,
   ExamScore,
@@ -62,6 +63,14 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
             setSession(next);
             setProfile(auth.profile);
             setLocaleState(nextLocale);
+            if (auth.profile.role === "student" && auth.profile.status === "active") {
+              void AccessService.recordFirstLogin()
+                .then(() => {
+                  void queryClient.invalidateQueries({ queryKey: queryKeys.access.me });
+                  void queryClient.invalidateQueries({ queryKey: queryKeys.subscriptions.all });
+                })
+                .catch(() => undefined);
+            }
           } else {
             clearSession();
             setSession(null);
@@ -151,6 +160,14 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
             : {}),
         }),
       );
+      if (payload.profile.role === "student" && payload.profile.status === "active") {
+        void AccessService.recordFirstLogin()
+          .then(() => {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.access.me });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.subscriptions.all });
+          })
+          .catch(() => undefined);
+      }
       setLocaleState(nextLocale);
 
       // Navigation is owned by login / OAuth callback / password-recovery handlers.

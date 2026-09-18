@@ -9,6 +9,7 @@ import {
   usePaymentProofs,
   usePayments,
   usePendingPaymentProofs,
+  useRemindPayment,
   useReviewPaymentProof,
   useStudents,
   useSubmitPaymentProof,
@@ -77,6 +78,10 @@ function paymentInitial(row: PaymentRow) {
 
 function paymentRemaining(row: PaymentRow) {
   return Math.max(0, Number(row.amount) - Number(row.amount_paid ?? 0));
+}
+
+function canRemindPayment(status: string) {
+  return status === "pending" || status === "partial" || status === "overdue" || status === "suspended";
 }
 
 function ProofReviewQueue() {
@@ -237,6 +242,7 @@ export function FinancePages({ mode }: { mode: string }) {
   const studentsQuery = useStudents();
   const createPayment = useCreatePayment();
   const markOverdue = useMarkPaymentOverdue();
+  const remindPayment = useRemindPayment();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [createOpen, setCreateOpen] = useState(false);
@@ -250,6 +256,13 @@ export function FinancePages({ mode }: { mode: string }) {
   const [note, setNote] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("pending");
   const [dueDate, setDueDate] = useState("");
+
+  const sendReminder = (row: PaymentRow) => {
+    remindPayment.mutate(row.id, {
+      onSuccess: () => toast.success(`Relance envoyée à ${studentLabel(row)}`),
+      onError: (err) => toast.error(err instanceof Error ? err.message : "Relance impossible"),
+    });
+  };
 
   const computedFinal = useMemo(() => {
     const initial = Number(initialAmount) || 0;
@@ -305,7 +318,7 @@ export function FinancePages({ mode }: { mode: string }) {
       <>
         <PageHeader
           title="Abonnements"
-          subtitle="Statut des abonnements étudiants depuis Supabase."
+          subtitle="Statut des abonnements étudiants."
         />
         <QueryState
           isLoading={subscriptionsQuery.isLoading}
@@ -427,6 +440,17 @@ export function FinancePages({ mode }: { mode: string }) {
                 {row.payment_method ? ` · ${paymentMethodLabel(row.payment_method)}` : ""}
               </p>
               <div className="flex flex-wrap gap-2">
+                {canRemindPayment(row.status) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    disabled={remindPayment.isPending}
+                    onClick={() => sendReminder(row)}
+                  >
+                    Relancer
+                  </Button>
+                )}
                 {row.status === "pending" && (
                   <Button
                     size="sm"
@@ -484,6 +508,16 @@ export function FinancePages({ mode }: { mode: string }) {
                     <Status tone={paymentTone(row.status)}>{paymentStatusLabel(row.status)}</Status>
                   </td>
                   <td className="space-x-1 whitespace-nowrap">
+                    {canRemindPayment(row.status) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={remindPayment.isPending}
+                        onClick={() => sendReminder(row)}
+                      >
+                        Relancer
+                      </Button>
+                    )}
                     {row.status === "pending" && (
                       <Button
                         size="sm"
@@ -718,9 +752,20 @@ export function StudentPaymentsPage() {
         <Surface className="mb-6 border-destructive/30 bg-alert-soft p-6">
           <h2 className="font-semibold">Accès académique restreint</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Votre abonnement est inactif. Vous pouvez consulter les paiements, déposer un
-            justificatif, gérer le profil et l’assistance. Les cours restent bloqués jusqu’à
-            validation administrative.
+            Votre abonnement n’est plus à jour pour le mois en cours. Vous pouvez consulter les
+            paiements, déposer un justificatif, gérer le profil et l’assistance. Les cours restent
+            bloqués après la 2ᵉ séance du mois suivant votre première connexion, jusqu’à
+            régularisation du paiement.
+          </p>
+        </Surface>
+      )}
+      {!accessBlocked && (
+        <Surface className="mb-6 border-border bg-success-soft/40 p-6">
+          <h2 className="font-semibold">Accès académique actif</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Le premier mois après votre première connexion correspond au règlement déjà effectué
+            hors plateforme. Pour les mois suivants, un paiement valide est requis afin de conserver
+            l’accès.
           </p>
         </Surface>
       )}

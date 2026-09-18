@@ -22,6 +22,7 @@ export const STUDENT_PAGES = [
   "messages",
   "recordings",
   "profile",
+  "settings",
 ] as const;
 
 export const TEACHER_PAGES = [
@@ -38,6 +39,7 @@ export const TEACHER_PAGES = [
   "messages",
   "recordings",
   "profile",
+  "settings",
 ] as const;
 
 export const DIRECTOR_PAGES = [

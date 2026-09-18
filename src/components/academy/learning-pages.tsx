@@ -818,8 +818,8 @@ export function StudentLearningPage() {
         <Surface className="space-y-3 p-6">
           <h2 className="font-semibold">Accès restreint</h2>
           <p className="text-sm text-muted-foreground">
-            Un abonnement actif est nécessaire pour ouvrir les cours. Consultez vos paiements pour
-            renouveler.
+            Votre mois d’essai est terminé ou votre paiement n’est plus à jour. Consultez Paiements
+            pour régulariser et retrouver l’accès aux cours.
           </p>
           <Button onClick={() => navigate("payments")}>Mes paiements</Button>
         </Surface>

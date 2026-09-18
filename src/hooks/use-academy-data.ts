@@ -694,6 +694,19 @@ export function useMarkPaymentOverdue() {
   });
 }
 
+export function useRemindPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (paymentId: string) => PaymentService.remindStudent(paymentId),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.payments.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+      ]);
+    },
+  });
+}
+
 export function usePaymentProofs(studentId?: string) {
   return useQuery({
     queryKey: studentId

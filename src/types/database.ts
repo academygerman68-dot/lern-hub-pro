@@ -2086,6 +2086,7 @@ export type Database = {
         Row: {
           archived_at: string | null;
           created_at: string;
+          first_login_at: string | null;
           id: string;
           level_code: string | null;
           notes: string | null;
@@ -2097,6 +2098,7 @@ export type Database = {
         Insert: {
           archived_at?: string | null;
           created_at?: string;
+          first_login_at?: string | null;
           id?: string;
           level_code?: string | null;
           notes?: string | null;
@@ -2108,6 +2110,7 @@ export type Database = {
         Update: {
           archived_at?: string | null;
           created_at?: string;
+          first_login_at?: string | null;
           id?: string;
           level_code?: string | null;
           notes?: string | null;
@@ -2385,6 +2388,15 @@ export type Database = {
         };
       };
       has_academic_access: { Args: { p_student_id: string }; Returns: boolean };
+      record_student_first_login: { Args: Record<string, never>; Returns: string | null };
+      delete_own_account: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      post_first_month_live_sessions_count: {
+        Args: { p_student_id: string };
+        Returns: number;
+      };
       has_active_academic_access: {
         Args: { p_user_id?: string };
         Returns: boolean;

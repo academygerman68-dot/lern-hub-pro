@@ -46,6 +46,7 @@ import {
   RecordingService,
 } from "@/services/academy-services";
 import { SettingsService } from "@/services/supabase/settings-service";
+import { DangerZoneAccountDeletion } from "./danger-zone-account-deletion";
 import { PeoplePicker } from "./people-picker";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -1418,7 +1419,7 @@ export function DirectorReports() {
     <>
       <PageHeader
         title="Rapports"
-        subtitle="Indicateurs calculés à partir des données Supabase — filtres appliqués côté client."
+        subtitle="Indicateurs calculés à partir des données de l’académie — filtres appliqués côté client."
       />
       <div className="mb-5 flex flex-wrap gap-2">
         <select
@@ -1792,6 +1793,7 @@ export function DirectorSettings() {
             <TabsTrigger value="paiements">Paiements</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="apparence">Apparence</TabsTrigger>
+            <TabsTrigger value="securite">Sécurité</TabsTrigger>
           </TabsList>
 
           <TabsContent value="profil">
@@ -2018,6 +2020,17 @@ export function DirectorSettings() {
               </p>
             </Surface>
           </TabsContent>
+
+          <TabsContent value="securite" className="space-y-5">
+            <Surface className="space-y-3 p-6">
+              <h2 className="font-semibold">Sécurité du compte</h2>
+              <p className="text-sm text-muted-foreground">
+                Gérez les actions sensibles liées à votre compte administrateur. La suppression est
+                définitive et protégée par une confirmation forte.
+              </p>
+            </Surface>
+            <DangerZoneAccountDeletion />
+          </TabsContent>
         </Tabs>
 
         <div className="mt-4 flex justify-end">
@@ -2026,6 +2039,58 @@ export function DirectorSettings() {
           </Button>
         </div>
       </QueryState>
+    </>
+  );
+}
+
+/** Shared settings for student / teacher (account + security). */
+export function AccountSettings() {
+  const { user, profile } = useAcademy();
+
+  return (
+    <>
+      <PageHeader
+        title="Paramètres"
+        subtitle="Compte, sécurité et suppression définitive."
+      />
+      <Tabs defaultValue="compte" className="space-y-5">
+        <TabsList className="flex h-auto flex-wrap gap-1">
+          <TabsTrigger value="compte">Compte</TabsTrigger>
+          <TabsTrigger value="securite">Sécurité</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="compte">
+          <Surface className="space-y-4 p-6">
+            <h2 className="font-semibold">Votre compte</h2>
+            <label className="block text-sm">
+              Nom
+              <Input className="mt-1" value={user?.name ?? ""} readOnly />
+            </label>
+            <label className="block text-sm">
+              E-mail
+              <Input className="mt-1" value={user?.email ?? ""} readOnly />
+            </label>
+            <label className="block text-sm">
+              Téléphone
+              <Input className="mt-1" value={profile?.phone ?? "—"} readOnly />
+            </label>
+            <p className="text-sm text-muted-foreground">
+              Contactez le support pour modifier l’e-mail ou le numéro de téléphone de votre compte.
+            </p>
+          </Surface>
+        </TabsContent>
+
+        <TabsContent value="securite" className="space-y-5">
+          <Surface className="space-y-3 p-6">
+            <h2 className="font-semibold">Sécurité du compte</h2>
+            <p className="text-sm text-muted-foreground">
+              Les actions ci-dessous sont définitives. Une confirmation forte est exigée avant toute
+              suppression.
+            </p>
+          </Surface>
+          <DangerZoneAccountDeletion />
+        </TabsContent>
+      </Tabs>
     </>
   );
 }
