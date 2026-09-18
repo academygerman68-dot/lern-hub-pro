@@ -1976,6 +1976,9 @@ export type Database = {
       };
       student_payments: {
         Row: {
+          admin_receipt_bucket: string | null;
+          admin_receipt_mime: string | null;
+          admin_receipt_path: string | null;
           amount: number;
           amount_paid: number;
           created_at: string;
@@ -1996,6 +1999,9 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          admin_receipt_bucket?: string | null;
+          admin_receipt_mime?: string | null;
+          admin_receipt_path?: string | null;
           amount: number;
           amount_paid?: number;
           created_at?: string;
@@ -2016,6 +2022,9 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          admin_receipt_bucket?: string | null;
+          admin_receipt_mime?: string | null;
+          admin_receipt_path?: string | null;
           amount?: number;
           amount_paid?: number;
           created_at?: string;

@@ -60,17 +60,30 @@ export function LiveClassesPage({ meeting }: { meeting: boolean }) {
   return <LiveSessionLobby />;
 }
 
-/** Embedded schedule — uses LiveCalendar (not CalendarPage) to avoid circular imports. */
+/** Planning on demand — calendar opens only after clicking the button. */
 function LiveSchedulePanel() {
+  const [open, setOpen] = useState(false);
+
   return (
     <Surface className="mb-6 overflow-hidden p-5">
-      <h2 className="font-semibold">Planning des séances</h2>
-      <p className="mt-1 mb-4 text-sm text-muted-foreground">
-        Vue semaine et mois — groupe, professeur, horaire, provider, statut.
-      </p>
-      <LiveCalendarErrorBoundary title="Planning indisponible">
-        <LiveCalendar embedded />
-      </LiveCalendarErrorBoundary>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-semibold">Planning des séances</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Vue semaine et mois — groupe, professeur, horaire, provider, statut.
+          </p>
+        </div>
+        <Button variant={open ? "outline" : "default"} onClick={() => setOpen((v) => !v)}>
+          {open ? "Fermer le planning" : "Planning"}
+        </Button>
+      </div>
+      {open ? (
+        <div className="mt-4 border-t pt-4">
+          <LiveCalendarErrorBoundary title="Planning indisponible">
+            <LiveCalendar embedded />
+          </LiveCalendarErrorBoundary>
+        </div>
+      ) : null}
     </Surface>
   );
 }

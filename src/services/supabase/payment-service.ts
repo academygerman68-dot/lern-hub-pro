@@ -118,6 +118,9 @@ export const SupabasePaymentService = {
     notes?: string | null;
     status?: PaymentStatus;
     createdBy?: string | null;
+    adminReceiptBucket?: string | null;
+    adminReceiptPath?: string | null;
+    adminReceiptMime?: string | null;
   }) {
     const initialAmount = input.initialAmount ?? input.amount ?? 0;
     const discountType = input.discountType ?? null;
@@ -143,11 +146,96 @@ export const SupabasePaymentService = {
         notes: input.notes ?? null,
         status,
         created_by: input.createdBy ?? null,
+        admin_receipt_bucket: input.adminReceiptBucket ?? null,
+        admin_receipt_path: input.adminReceiptPath ?? null,
+        admin_receipt_mime: input.adminReceiptMime ?? null,
       })
       .select(PAYMENT_SELECT)
       .single();
     if (error) throw error;
     return data as PaymentListItem;
+  },
+
+  async uploadAdminReceipt(paymentId: string, file: File) {
+    const allowed = new Set(["application/pdf", "image/jpeg", "image/png"]);
+    if (!allowed.has(file.type)) {
+      throw new Error("Type de fichier non autorisé (PDF, JPEG ou PNG).");
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      throw new Error("Fichier trop volumineux (max 10 Mo).");
+    }
+    const supabase = requireClient();
+    const existing = await this.get(paymentId);
+    const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
+    const path = `admin/payment-receipts/payments/${paymentId}/${crypto.randomUUID()}.${ext}`;
+    const { error: uploadError } = await supabase.storage.from("documents").upload(path, file, {
+      upsert: false,
+      contentType: file.type,
+    });
+    if (uploadError) throw uploadError;
+    const { data, error } = await supabase
+      .from("student_payments")
+      .update({
+        admin_receipt_bucket: "documents",
+        admin_receipt_path: path,
+        admin_receipt_mime: file.type,
+      })
+      .eq("id", paymentId)
+      .select(PAYMENT_SELECT)
+      .single();
+    if (error) {
+      await supabase.storage.from("documents").remove([path]);
+      throw error;
+    }
+    if (existing && "admin_receipt_path" in existing && existing.admin_receipt_path) {
+      const bucket =
+        (existing as { admin_receipt_bucket?: string | null }).admin_receipt_bucket ?? "documents";
+      await supabase.storage
+        .from(bucket)
+        .remove([existing.admin_receipt_path as string])
+        .catch(() => undefined);
+    }
+    return data as PaymentListItem;
+  },
+
+  async deleteAdminReceipt(paymentId: string) {
+    const existing = await this.get(paymentId);
+    const path = (existing as { admin_receipt_path?: string | null } | null)?.admin_receipt_path;
+    const bucket =
+      (existing as { admin_receipt_bucket?: string | null } | null)?.admin_receipt_bucket ??
+      "documents";
+    const { data, error } = await requireClient()
+      .from("student_payments")
+      .update({
+        admin_receipt_bucket: null,
+        admin_receipt_path: null,
+        admin_receipt_mime: null,
+      })
+      .eq("id", paymentId)
+      .select(PAYMENT_SELECT)
+      .single();
+    if (error) throw error;
+    if (path) {
+      await requireClient()
+        .storage.from(bucket)
+        .remove([path])
+        .catch(() => undefined);
+    }
+    return data as PaymentListItem;
+  },
+
+  async getAdminReceiptSignedUrl(
+    payment: { admin_receipt_bucket?: string | null; admin_receipt_path?: string | null },
+    expiresIn = 300,
+  ) {
+    if (!payment.admin_receipt_bucket || !payment.admin_receipt_path) {
+      throw new Error("Aucun reçu administratif.");
+    }
+    const { data, error } = await requireClient()
+      .storage.from(payment.admin_receipt_bucket)
+      .createSignedUrl(payment.admin_receipt_path, expiresIn);
+    if (error) throw error;
+    return data.signedUrl;
   },
 
   async markPaid(paymentId: string) {

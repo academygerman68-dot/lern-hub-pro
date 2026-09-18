@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -306,6 +306,7 @@ function Students() {
   const [enrollmentOpen, setEnrollmentOpen] = useState(false);
   const [studentId, setStudentId] = useState("");
   const [classId, setClassId] = useState("");
+  const [enrollLevelFilter, setEnrollLevelFilter] = useState("");
   const [confirmStatus, setConfirmStatus] = useState<AccountStatus | null>(null);
   const [resettingPassword, setResettingPassword] = useState(false);
 
@@ -317,10 +318,14 @@ function Students() {
   const enroll = useCreateEnrollment();
   const setProfileStatus = useSetProfileStatus();
 
+  const groupsForLevel = useMemo(
+    () => (classesQuery.data ?? []).filter((item) => !levelFilter || item.level === levelFilter),
+    [classesQuery.data, levelFilter],
+  );
+
   const filtered = (studentsQuery.data ?? []).filter((student) => {
     if (levelFilter && student.level !== levelFilter) return false;
-    if (groupFilter && student.classId !== groupFilter && student.className !== groupFilter)
-      return false;
+    if (groupFilter && student.classId !== groupFilter) return false;
     if (teacherFilter && (student.teacherName ?? "") !== teacherFilter) return false;
     if (statusFilter && student.accountStatus !== statusFilter) return false;
     return true;
@@ -447,6 +452,24 @@ function Students() {
             >
               <PeoplePicker purpose="enrollment" selectedId={studentId} onSelect={setStudentId} />
               <label className="block text-sm">
+                Niveau
+                <select
+                  className="mt-1 w-full rounded-md border bg-background p-2"
+                  value={enrollLevelFilter}
+                  onChange={(e) => {
+                    setEnrollLevelFilter(e.target.value);
+                    setClassId("");
+                  }}
+                >
+                  <option value="">Tous les niveaux</option>
+                  {(["A1", "A2", "B1", "B2"] as Level[]).map((level) => (
+                    <option key={level} value={level}>
+                      {level}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm">
                 Groupe
                 <select
                   className="mt-1 w-full rounded-md border bg-background p-2"
@@ -454,11 +477,13 @@ function Students() {
                   onChange={(e) => setClassId(e.target.value)}
                 >
                   <option value="">Choisir un groupe</option>
-                  {classesQuery.data?.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
+                  {(classesQuery.data ?? [])
+                    .filter((item) => !enrollLevelFilter || item.level === enrollLevelFilter)
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.reference || item.name} · {item.level}
+                      </option>
+                    ))}
                 </select>
               </label>
             </QueryState>
@@ -512,7 +537,10 @@ function Students() {
         <select
           className="h-10 rounded-md border border-input bg-background px-3 text-sm"
           value={levelFilter}
-          onChange={(e) => setLevelFilter(e.target.value)}
+          onChange={(e) => {
+            setLevelFilter(e.target.value);
+            setGroupFilter("");
+          }}
         >
           <option value="">Tous les niveaux</option>
           {(["A1", "A2", "B1", "B2"] as Level[]).map((level) => (
@@ -527,9 +555,10 @@ function Students() {
           onChange={(e) => setGroupFilter(e.target.value)}
         >
           <option value="">Tous les groupes</option>
-          {classesQuery.data?.map((item) => (
+          {groupsForLevel.map((item) => (
             <option key={item.id} value={item.id}>
-              {item.name}
+              {item.reference || item.name}
+              {item.level ? ` · ${item.level}` : ""}
             </option>
           ))}
         </select>

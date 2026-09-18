@@ -126,6 +126,54 @@ export const SupabaseAssignmentService = {
     return data as AssignmentRow;
   },
 
+  async update(
+    id: string,
+    patch: {
+      title?: string;
+      description?: string | null;
+      instructions?: string | null;
+      dueAt?: string | null;
+      publishedAt?: string | null;
+      levelId?: string;
+      classId?: string | null;
+      contentKind?: MediaKind;
+      contentUrl?: string | null;
+      mimeType?: string | null;
+      attachmentBucket?: string | null;
+      attachmentPath?: string | null;
+      clearAttachment?: boolean;
+    },
+  ) {
+    const update: Database["public"]["Tables"]["assignments"]["Update"] = {};
+    if (patch.title !== undefined) update.title = patch.title;
+    if (patch.description !== undefined) update.description = patch.description;
+    if (patch.instructions !== undefined) update.instructions = patch.instructions;
+    if (patch.dueAt !== undefined) update.due_at = patch.dueAt;
+    if (patch.publishedAt !== undefined) update.published_at = patch.publishedAt;
+    if (patch.levelId !== undefined) update.level_id = patch.levelId;
+    if (patch.classId !== undefined) update.class_id = patch.classId;
+    if (patch.contentKind !== undefined) update.content_kind = patch.contentKind;
+    if (patch.contentUrl !== undefined) update.content_url = patch.contentUrl;
+    if (patch.mimeType !== undefined) update.mime_type = patch.mimeType;
+    if (patch.clearAttachment) {
+      update.attachment_bucket = null;
+      update.attachment_path = null;
+      update.mime_type = null;
+      update.content_url = null;
+    } else {
+      if (patch.attachmentBucket !== undefined) update.attachment_bucket = patch.attachmentBucket;
+      if (patch.attachmentPath !== undefined) update.attachment_path = patch.attachmentPath;
+    }
+    const { data, error } = await requireClient()
+      .from("assignments")
+      .update(update)
+      .eq("id", id)
+      .select(ASSIGNMENT_SELECT)
+      .single();
+    if (error) throw error;
+    return data as AssignmentRow;
+  },
+
   async archive(id: string) {
     const { data, error } = await requireClient()
       .from("assignments")

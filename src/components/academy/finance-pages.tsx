@@ -6,6 +6,7 @@ import {
   useAcademicAccess,
   useCreatePayment,
   useDeleteAdminReceipt,
+  useDeletePaymentAdminReceipt,
   useMarkPaymentOverdue,
   usePaymentProofs,
   usePayments,
@@ -16,8 +17,9 @@ import {
   useSubmitPaymentProof,
   useSubscriptions,
   useUploadAdminReceipt,
+  useUploadPaymentAdminReceipt,
 } from "@/hooks/use-academy-data";
-import { PaymentProofService } from "@/services/academy-services";
+import { PaymentProofService, PaymentService } from "@/services/academy-services";
 import type { PaymentProofListItem } from "@/services/supabase/payment-proof-service";
 import { computeFinalAmount } from "@/services/supabase/payment-service";
 import type { Database } from "@/types/database";
@@ -463,6 +465,8 @@ export function FinancePages({ mode }: { mode: string }) {
   const createPayment = useCreatePayment();
   const markOverdue = useMarkPaymentOverdue();
   const remindPayment = useRemindPayment();
+  const uploadPaymentReceipt = useUploadPaymentAdminReceipt();
+  const deletePaymentReceipt = useDeletePaymentAdminReceipt();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [createOpen, setCreateOpen] = useState(false);
@@ -476,12 +480,110 @@ export function FinancePages({ mode }: { mode: string }) {
   const [note, setNote] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("pending");
   const [dueDate, setDueDate] = useState("");
+  const [receiptAttachment, setReceiptAttachment] = useState<AttachmentDraft>({
+    kind: "pdf",
+    url: "",
+    file: null,
+  });
+  const [replaceReceiptId, setReplaceReceiptId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<DocPreview | null>(null);
+  const replaceFileRef = useRef<HTMLInputElement>(null);
 
   const sendReminder = (row: PaymentRow) => {
     remindPayment.mutate(row.id, {
       onSuccess: () => toast.success(`Relance envoyée à ${studentLabel(row)}`),
       onError: (err) => toast.error(err instanceof Error ? err.message : "Relance impossible"),
     });
+  };
+
+  const openPaymentReceipt = async (row: PaymentRow) => {
+    setPreview({
+      title: `Reçu · ${studentLabel(row)}`,
+      url: null,
+      mimeType: row.admin_receipt_mime ?? null,
+      loading: true,
+      error: null,
+    });
+    try {
+      const url = await PaymentService.getAdminReceiptSignedUrl(row);
+      setPreview({
+        title: `Reçu · ${studentLabel(row)}`,
+        url,
+        mimeType: row.admin_receipt_mime ?? null,
+        loading: false,
+        error: null,
+      });
+    } catch (err) {
+      setPreview({
+        title: `Reçu · ${studentLabel(row)}`,
+        url: null,
+        mimeType: row.admin_receipt_mime ?? null,
+        loading: false,
+        error: err instanceof Error ? err.message : "Aperçu impossible",
+      });
+    }
+  };
+
+  const downloadPaymentReceipt = async (row: PaymentRow) => {
+    try {
+      const url = await PaymentService.getAdminReceiptSignedUrl(row);
+      await forceDownloadUrl(url, `recu-paiement-${row.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Téléchargement impossible");
+    }
+  };
+
+  const receiptActions = (row: PaymentRow) => {
+    if (!row.admin_receipt_path) {
+      return (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={uploadPaymentReceipt.isPending}
+          onClick={() => {
+            setReplaceReceiptId(row.id);
+            replaceFileRef.current?.click();
+          }}
+        >
+          Ajouter reçu
+        </Button>
+      );
+    }
+    return (
+      <>
+        <Button size="sm" variant="secondary" onClick={() => void openPaymentReceipt(row)}>
+          Voir
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => void downloadPaymentReceipt(row)}>
+          Télécharger
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={uploadPaymentReceipt.isPending}
+          onClick={() => {
+            setReplaceReceiptId(row.id);
+            replaceFileRef.current?.click();
+          }}
+        >
+          Remplacer
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={deletePaymentReceipt.isPending}
+          onClick={() => {
+            if (!window.confirm("Supprimer le reçu administratif ?")) return;
+            deletePaymentReceipt.mutate(row.id, {
+              onSuccess: () => toast.success("Reçu supprimé"),
+              onError: (err) => toast.error(err.message),
+            });
+          }}
+        >
+          Supprimer reçu
+        </Button>
+      </>
+    );
   };
 
   const computedFinal = useMemo(() => {
@@ -531,6 +633,7 @@ export function FinancePages({ mode }: { mode: string }) {
     setNote("");
     setPaymentStatus("pending");
     setDueDate("");
+    setReceiptAttachment({ kind: "pdf", url: "", file: null });
   };
 
   if (mode === "subscriptions") {
@@ -657,6 +760,7 @@ export function FinancePages({ mode }: { mode: string }) {
                 {row.payment_method ? ` · ${paymentMethodLabel(row.payment_method)}` : ""}
               </p>
               <div className="flex flex-wrap gap-2">
+                {receiptActions(row)}
                 {canRemindPayment(row.status) && (
                   <Button
                     size="sm"
@@ -725,6 +829,7 @@ export function FinancePages({ mode }: { mode: string }) {
                     <Status tone={paymentTone(row.status)}>{paymentStatusLabel(row.status)}</Status>
                   </td>
                   <td className="space-x-1 whitespace-nowrap">
+                    {receiptActions(row)}
                     {canRemindPayment(row.status) && (
                       <Button
                         size="sm"
@@ -896,14 +1001,35 @@ export function FinancePages({ mode }: { mode: string }) {
                 className="mt-1"
               />
             </label>
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <h3 className="text-sm font-semibold">Reçu / justificatif administratif</h3>
+              <p className="text-xs text-muted-foreground">
+                PDF ou image (JPEG/PNG) · glisser-déposer accepté · facultatif
+              </p>
+              <ContentAttachmentUploader
+                kinds={["pdf", "image"]}
+                value={receiptAttachment}
+                onChange={setReceiptAttachment}
+                disabled={createPayment.isPending || uploadPaymentReceipt.isPending}
+                uploading={createPayment.isPending || uploadPaymentReceipt.isPending}
+                requiredFileWhenNew={false}
+                showKindSelect={false}
+              />
+            </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setCreateOpen(false)}>
                 Annuler
               </Button>
               <Button
-                disabled={!studentId || !initialAmount || createPayment.isPending}
+                disabled={
+                  !studentId ||
+                  !initialAmount ||
+                  createPayment.isPending ||
+                  uploadPaymentReceipt.isPending
+                }
                 onClick={() => {
                   const discountType = discountMode === "none" ? null : discountMode;
+                  const receiptFile = receiptAttachment.file;
                   createPayment.mutate(
                     {
                       studentId,
@@ -920,10 +1046,31 @@ export function FinancePages({ mode }: { mode: string }) {
                       status: paymentStatus,
                     },
                     {
-                      onSuccess: () => {
-                        toast.success("Paiement enregistré");
-                        setCreateOpen(false);
-                        resetCreateForm();
+                      onSuccess: (created) => {
+                        const finish = () => {
+                          toast.success("Paiement enregistré");
+                          setCreateOpen(false);
+                          resetCreateForm();
+                        };
+                        if (receiptFile && created?.id) {
+                          uploadPaymentReceipt.mutate(
+                            { paymentId: created.id, file: receiptFile },
+                            {
+                              onSuccess: () => finish(),
+                              onError: (err) => {
+                                toast.error(
+                                  err instanceof Error
+                                    ? `Paiement créé, mais reçu non téléversé : ${err.message}`
+                                    : "Paiement créé, mais reçu non téléversé",
+                                );
+                                setCreateOpen(false);
+                                resetCreateForm();
+                              },
+                            },
+                          );
+                          return;
+                        }
+                        finish();
                       },
                       onError: (err) => toast.error(err.message),
                     },
@@ -936,6 +1083,34 @@ export function FinancePages({ mode }: { mode: string }) {
           </Surface>
         </div>
       )}
+      <input
+        ref={replaceFileRef}
+        type="file"
+        className="hidden"
+        accept="application/pdf,image/jpeg,image/png"
+        onChange={(e) => {
+          const file = e.target.files?.[0] ?? null;
+          e.target.value = "";
+          if (!file || !replaceReceiptId) return;
+          uploadPaymentReceipt.mutate(
+            { paymentId: replaceReceiptId, file },
+            {
+              onSuccess: () => toast.success("Reçu mis à jour"),
+              onError: (err) => toast.error(err.message),
+              onSettled: () => setReplaceReceiptId(null),
+            },
+          );
+        }}
+      />
+      <DocumentViewer
+        open={Boolean(preview)}
+        onClose={() => setPreview(null)}
+        title={preview?.title ?? ""}
+        url={preview?.url ?? null}
+        mimeType={preview?.mimeType}
+        loading={preview?.loading}
+        error={preview?.error}
+      />
     </>
   );
 }
@@ -1296,7 +1471,42 @@ export function StudentPaymentsPage() {
                   {row.reference ? ` · ${row.reference}` : ""}
                 </p>
               </div>
-              <Status tone={paymentTone(row.status)}>{row.status}</Status>
+              <div className="flex flex-wrap items-center gap-2">
+                {row.admin_receipt_path && row.status === "paid" ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() =>
+                        void openProofDoc(`Reçu administratif`, row.admin_receipt_mime, () =>
+                          PaymentService.getAdminReceiptSignedUrl(row),
+                        )
+                      }
+                    >
+                      Voir
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        void (async () => {
+                          try {
+                            const url = await PaymentService.getAdminReceiptSignedUrl(row);
+                            await forceDownloadUrl(url, `recu-${row.id}`);
+                          } catch (err) {
+                            toast.error(
+                              err instanceof Error ? err.message : "Téléchargement impossible",
+                            );
+                          }
+                        })();
+                      }}
+                    >
+                      Télécharger
+                    </Button>
+                  </>
+                ) : null}
+                <Status tone={paymentTone(row.status)}>{paymentStatusLabel(row.status)}</Status>
+              </div>
             </div>
           ))}
         </Surface>

@@ -430,6 +430,51 @@ export function useCreateAssignment() {
   });
 }
 
+export function useUpdateAssignment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; patch: Parameters<typeof AssignmentService.update>[1] }) =>
+      AssignmentService.update(input.id, input.patch),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.assignments.all });
+    },
+  });
+}
+
+export function useUpdateLibraryItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      patch?: Parameters<typeof LibraryService.update>[1];
+      file?: File | null;
+      clearFile?: boolean;
+    }) => {
+      if (input.file) {
+        await LibraryService.replaceFile(input.id, input.file);
+      }
+      return LibraryService.update(input.id, {
+        ...(input.patch ?? {}),
+        ...(input.clearFile && !input.file ? { clearFile: true } : {}),
+      });
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.library.all });
+    },
+  });
+}
+
+export function useSubmitAssignment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: AssignmentService.submit,
+    onSuccess: async (_data, vars) => {
+      await qc.invalidateQueries({ queryKey: queryKeys.assignments.all });
+      await qc.invalidateQueries({ queryKey: ["submissions", vars.assignmentId] });
+    },
+  });
+}
+
 export function useConversations() {
   return useQuery({
     queryKey: queryKeys.conversations.all,
@@ -805,6 +850,28 @@ export function useDeleteAdminReceipt() {
         qc.invalidateQueries({ queryKey: queryKeys.paymentProofs.all }),
         qc.invalidateQueries({ queryKey: queryKeys.paymentProofs.pending }),
       ]);
+    },
+  });
+}
+
+/** Admin receipt attached to a student_payments row (not payment_proofs). */
+export function useUploadPaymentAdminReceipt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { paymentId: string; file: File }) =>
+      PaymentService.uploadAdminReceipt(input.paymentId, input.file),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.payments.all });
+    },
+  });
+}
+
+export function useDeletePaymentAdminReceipt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (paymentId: string) => PaymentService.deleteAdminReceipt(paymentId),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.payments.all });
     },
   });
 }

@@ -155,4 +155,84 @@ export const SupabaseLibraryService = {
     if (error) throw error;
     return data;
   },
+
+  async update(
+    id: string,
+    patch: {
+      title?: string;
+      description?: string | null;
+      domain?: "academic" | "professional";
+      audience?: "everyone" | "level" | "class";
+      levelCode?: string | null;
+      classId?: string | null;
+      externalUrl?: string | null;
+      contentKind?: string;
+      storageBucket?: string | null;
+      storagePath?: string | null;
+      mimeType?: string | null;
+      clearFile?: boolean;
+    },
+  ) {
+    const update: Database["public"]["Tables"]["library_items"]["Update"] = {};
+    if (patch.title !== undefined) update.title = patch.title;
+    if (patch.description !== undefined) update.description = patch.description;
+    if (patch.domain !== undefined) update.domain = patch.domain;
+    if (patch.audience !== undefined) update.audience = patch.audience;
+    if (patch.levelCode !== undefined) update.level_code = patch.levelCode;
+    if (patch.classId !== undefined) update.class_id = patch.classId;
+    if (patch.externalUrl !== undefined) update.external_url = patch.externalUrl;
+    if (patch.contentKind !== undefined) {
+      update.content_kind = patch.contentKind as Database["public"]["Enums"]["media_content_kind"];
+    }
+    if (patch.clearFile) {
+      (update as { storage_bucket?: string | null }).storage_bucket = null;
+      (update as { storage_path?: string | null }).storage_path = null;
+      update.mime_type = null;
+    } else {
+      if (patch.storageBucket !== undefined && patch.storageBucket !== null) {
+        update.storage_bucket = patch.storageBucket;
+      }
+      if (patch.storagePath !== undefined && patch.storagePath !== null) {
+        update.storage_path = patch.storagePath;
+      }
+      if (patch.mimeType !== undefined) update.mime_type = patch.mimeType;
+    }
+    const { data, error } = await requireClient()
+      .from("library_items")
+      .update(update)
+      .eq("id", id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async replaceFile(id: string, file: File) {
+    const uploaded = await this.uploadFileOnly(file);
+    return this.update(id, {
+      storageBucket: uploaded.storageBucket,
+      storagePath: uploaded.storagePath,
+      mimeType: uploaded.mimeType,
+      externalUrl: null,
+      contentKind: file.type.startsWith("image/") ? "image" : "document",
+    });
+  },
+
+  async uploadFileOnly(file: File) {
+    const supabase = requireClient();
+    const ext = file.name.split(".").pop() ?? "bin";
+    const storagePath = `library/${crypto.randomUUID()}.${ext}`;
+    const uploadOptions = file.type
+      ? { upsert: false as const, contentType: file.type }
+      : { upsert: false as const };
+    const { error } = await supabase.storage
+      .from("course-materials")
+      .upload(storagePath, file, uploadOptions);
+    if (error) throw error;
+    return {
+      storageBucket: "course-materials" as const,
+      storagePath,
+      mimeType: file.type || null,
+    };
+  },
 };

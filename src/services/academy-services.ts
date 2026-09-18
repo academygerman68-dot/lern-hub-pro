@@ -542,6 +542,14 @@ export const LibraryService = {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseLibraryService.uploadAndCreate(input);
   },
+  async update(id: string, patch: Parameters<typeof SupabaseLibraryService.update>[1]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseLibraryService.update(id, patch);
+  },
+  async replaceFile(id: string, file: File) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseLibraryService.replaceFile(id, file);
+  },
   async getSignedUrl(item: Parameters<typeof SupabaseLibraryService.getSignedUrl>[0]) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseLibraryService.getSignedUrl(item);
@@ -581,6 +589,10 @@ export const AssignmentService = {
   async create(input: Parameters<typeof SupabaseAssignmentService.create>[0]) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseAssignmentService.create(input);
+  },
+  async update(id: string, patch: Parameters<typeof SupabaseAssignmentService.update>[1]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseAssignmentService.update(id, patch);
   },
   async uploadAttachment(file: File) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
@@ -745,6 +757,21 @@ export const PaymentService = {
   async create(input: Parameters<typeof SupabasePaymentService.create>[0]) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabasePaymentService.create(input);
+  },
+  async uploadAdminReceipt(paymentId: string, file: File) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabasePaymentService.uploadAdminReceipt(paymentId, file);
+  },
+  async deleteAdminReceipt(paymentId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabasePaymentService.deleteAdminReceipt(paymentId);
+  },
+  async getAdminReceiptSignedUrl(
+    payment: Parameters<typeof SupabasePaymentService.getAdminReceiptSignedUrl>[0],
+    expiresIn?: number,
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabasePaymentService.getAdminReceiptSignedUrl(payment, expiresIn);
   },
   async markPaid(paymentId: string) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");

@@ -37,6 +37,7 @@ export type StudentRow = {
       | {
           id: string;
           name: string;
+          reference?: string | null;
           schedule_label: string | null;
           level: { code: string } | { code: string }[] | null;
           teacher?:
@@ -53,6 +54,7 @@ export type StudentRow = {
       | Array<{
           id: string;
           name: string;
+          reference?: string | null;
           schedule_label: string | null;
           level: { code: string } | { code: string }[] | null;
           teacher?:
@@ -172,7 +174,7 @@ export function mapStudent(row: StudentRow): Student {
     name: profileName(profile),
     email: profile?.email ?? "",
     level: toLevel(row.level_code ?? levelFromClass),
-    className: klass?.name ?? "—",
+    className: klass?.reference || klass?.name || "—",
     progress: 0,
     average: 0,
     subscription: toUiSubscription(subscription?.status),

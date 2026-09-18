@@ -27,6 +27,7 @@ const STUDENT_SELECT = `
     class:classes (
       id,
       name,
+      reference,
       schedule_label,
       level:levels ( code ),
       teacher:teachers!classes_teacher_id_fkey (

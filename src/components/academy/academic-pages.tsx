@@ -15,7 +15,9 @@ import {
   useDeleteCourse,
   useLevels,
   useLibrary,
+  useUpdateAssignment,
   useUpdateCourse,
+  useUpdateLibraryItem,
   useUploadLibraryItem,
 } from "@/hooks/use-academy-data";
 import {
@@ -45,6 +47,7 @@ import { DocumentViewer } from "./document-viewer";
 import { useAcademy } from "./academy-context";
 import { PageHeader, Status, Surface } from "./primitives";
 import { QueryState } from "./query-state";
+import { AssignmentGrading } from "./workflow-pages";
 
 type PreviewState = {
   title: string;
@@ -454,11 +457,15 @@ export function MaterialsLibraryPage() {
   const { role, user, profile } = useAcademy();
   const libraryQuery = useLibrary();
   const upload = useUploadLibraryItem();
+  const updateItem = useUpdateLibraryItem();
   const archiveItem = useArchiveLibraryItem();
   const levelsQuery = useLevels();
   const classesQuery = useClasses();
   const { preview, setPreview, openLinkOrFile } = usePreview();
   const [domainTab, setDomainTab] = useState<"academic" | "professional">("academic");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [clearFile, setClearFile] = useState(false);
+  const [existingFile, setExistingFile] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [domain, setDomain] = useState<"academic" | "professional">("academic");
@@ -474,6 +481,7 @@ export function MaterialsLibraryPage() {
     file: null,
   });
   const [formError, setFormError] = useState<string | null>(null);
+  const saving = upload.isPending || updateItem.isPending;
 
   const restricted = profile?.status === "restricted";
   const teacherScope = useMemo(
@@ -491,8 +499,38 @@ export function MaterialsLibraryPage() {
   }, [libraryQuery.data, domainTab, role, teacherScope]);
   const classesForLevel = scopedClasses.filter((item) => !levelCode || item.level === levelCode);
 
+  const resetForm = () => {
+    setEditingId(null);
+    setClearFile(false);
+    setExistingFile(false);
+    setTitle("");
+    setDescription("");
+    setAttachment({ kind: "document", url: "", file: null });
+    setFormError(null);
+    if (!isTeacher) setAudience("everyone");
+  };
+
+  const openEdit = (item: NonNullable<typeof libraryQuery.data>[number]) => {
+    setEditingId(item.id);
+    setClearFile(false);
+    setTitle(item.title);
+    setDescription(item.description ?? "");
+    setDomain(item.domain);
+    setAudience(item.audience);
+    setLevelCode(item.level_code ?? "");
+    setClassId(item.class_id ?? "");
+    setAttachment({
+      kind: (item.content_kind as MediaKind) || "document",
+      url: item.external_url ?? "",
+      file: null,
+    });
+    setExistingFile(Boolean(item.storage_path || item.external_url));
+    setFormError(null);
+    setDomainTab(item.domain);
+  };
+
   useEffect(() => {
-    if (!isTeacher) return;
+    if (!isTeacher || editingId) return;
     setAudience("class");
     if (classId) return;
     const first = classesQuery.data?.[0];
@@ -500,7 +538,7 @@ export function MaterialsLibraryPage() {
       setLevelCode(first.level);
       setClassId(first.id);
     }
-  }, [isTeacher, classId, classesQuery.data]);
+  }, [isTeacher, classId, classesQuery.data, editingId]);
 
   return (
     <>
@@ -534,7 +572,16 @@ export function MaterialsLibraryPage() {
 
       {role !== "student" && (
         <Surface className="mb-5 space-y-3 p-5">
-          <h2 className="text-sm font-semibold">Ajouter une ressource</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">
+              {editingId ? "Modifier la ressource" : "Ajouter une ressource"}
+            </h2>
+            {editingId ? (
+              <Button size="sm" variant="outline" onClick={resetForm}>
+                Annuler la modification
+              </Button>
+            ) : null}
+          </div>
           <Input placeholder="Titre" value={title} onChange={(e) => setTitle(e.target.value)} />
           <Textarea
             placeholder="Description (facultative)"
@@ -614,15 +661,25 @@ export function MaterialsLibraryPage() {
           <ContentAttachmentUploader
             kinds={["poster", "document", "link", "image"]}
             value={attachment}
-            onChange={setAttachment}
-            disabled={upload.isPending}
-            uploading={upload.isPending}
+            onChange={(next) => {
+              setClearFile(false);
+              setAttachment(next);
+            }}
+            disabled={saving}
+            uploading={saving}
             error={formError}
+            requiredFileWhenNew={!editingId}
+            hasExistingFile={existingFile && !clearFile}
+            onClearExisting={() => {
+              setClearFile(true);
+              setExistingFile(false);
+              setAttachment({ ...attachment, file: null, url: "" });
+            }}
           />
           <Button
             disabled={
               !title.trim() ||
-              upload.isPending ||
+              saving ||
               (audience === "level" && !levelCode) ||
               (audience === "class" && (!levelCode || !classId))
             }
@@ -637,16 +694,46 @@ export function MaterialsLibraryPage() {
                 setFormError("Saisissez une URL valide (http ou https).");
                 return;
               }
-              if (kind !== "link") {
+              if (kind !== "link" && !editingId) {
                 if (!attachment.file) {
                   setFormError("Ajoutez un fichier.");
                   return;
                 }
+              }
+              if (attachment.file) {
                 const fileError = validateFileForKind(attachment.file, kind);
                 if (fileError) {
                   setFormError(fileError);
                   return;
                 }
+              }
+              if (editingId) {
+                updateItem.mutate(
+                  {
+                    id: editingId,
+                    ...(attachment.file && kind !== "link" ? { file: attachment.file } : {}),
+                    clearFile: clearFile && kind !== "link",
+                    patch: {
+                      title: title.trim(),
+                      description: description.trim() || null,
+                      domain,
+                      audience: isTeacher ? "class" : audience,
+                      levelCode: audience === "everyone" ? null : levelCode || null,
+                      classId: audience === "class" || isTeacher ? classId || null : null,
+                      contentKind: kind,
+                      externalUrl: kind === "link" ? attachment.url.trim() : null,
+                      ...(clearFile && kind !== "link" ? { clearFile: true } : {}),
+                    },
+                  },
+                  {
+                    onSuccess: () => {
+                      toast.success("Ressource mise à jour");
+                      resetForm();
+                    },
+                    onError: (err) => toast.error(err.message),
+                  },
+                );
+                return;
               }
               upload.mutate(
                 {
@@ -665,9 +752,7 @@ export function MaterialsLibraryPage() {
                 {
                   onSuccess: () => {
                     toast.success("Ressource publiée");
-                    setTitle("");
-                    setDescription("");
-                    setAttachment({ kind: "document", url: "", file: null });
+                    resetForm();
                     setDomainTab(domain);
                   },
                   onError: (err) => toast.error(err.message),
@@ -675,7 +760,7 @@ export function MaterialsLibraryPage() {
               );
             }}
           >
-            Publier
+            {editingId ? "Enregistrer" : "Publier"}
           </Button>
         </Surface>
       )}
@@ -741,20 +826,25 @@ export function MaterialsLibraryPage() {
                     </Button>
                   )}
                   {role !== "student" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={archiveItem.isPending}
-                      onClick={() => {
-                        if (!window.confirm(`Supprimer « ${item.title} » ?`)) return;
-                        archiveItem.mutate(item.id, {
-                          onSuccess: () => toast.success("Ressource supprimée"),
-                          onError: (err) => toast.error(err.message),
-                        });
-                      }}
-                    >
-                      Supprimer
-                    </Button>
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => openEdit(item)}>
+                        Modifier
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={archiveItem.isPending}
+                        onClick={() => {
+                          if (!window.confirm(`Supprimer la ressource « ${item.title} » ?`)) return;
+                          archiveItem.mutate(item.id, {
+                            onSuccess: () => toast.success("Ressource archivée"),
+                            onError: (err) => toast.error(err.message),
+                          });
+                        }}
+                      >
+                        Supprimer ressource
+                      </Button>
+                    </>
                   )}
                 </div>
               </Surface>
@@ -850,12 +940,21 @@ export function StudentLearningPage() {
   );
 }
 
+function toLocalInput(iso: string | null | undefined) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function DirectorAssignmentsPage() {
   const { user, role } = useAcademy();
   const classesQuery = useClasses();
   const levelsQuery = useLevels();
   const listQuery = useAssignmentRows();
   const create = useCreateAssignment();
+  const update = useUpdateAssignment();
   const archive = useArchiveAssignment();
   const { preview, setPreview, openLinkOrFile } = usePreview();
   const isTeacher = role === "teacher";
@@ -864,6 +963,9 @@ export function DirectorAssignmentsPage() {
     [classesQuery.data],
   );
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [gradingId, setGradingId] = useState<string | null>(null);
+  const [clearAttachment, setClearAttachment] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [levelId, setLevelId] = useState("");
@@ -875,6 +977,7 @@ export function DirectorAssignmentsPage() {
     url: "",
     file: null,
   });
+  const [existingFile, setExistingFile] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -887,6 +990,44 @@ export function DirectorAssignmentsPage() {
     );
   }, [listQuery.data, role, teacherScope]);
 
+  const resetForm = () => {
+    setEditingId(null);
+    setClearAttachment(false);
+    setTitle("");
+    setDescription("");
+    setLevelId("");
+    setClassId("");
+    setDueAt("");
+    setPublishedAt("");
+    setAttachment({ kind: "pdf", url: "", file: null });
+    setExistingFile(false);
+    setFormError(null);
+  };
+
+  const openCreate = () => {
+    resetForm();
+    setOpen(true);
+  };
+
+  const openEdit = (row: NonNullable<typeof listQuery.data>[number]) => {
+    setEditingId(row.id);
+    setClearAttachment(false);
+    setTitle(row.title);
+    setDescription(row.instructions || row.description || "");
+    setLevelId(row.level_id);
+    setClassId(row.class_id ?? "");
+    setDueAt(toLocalInput(row.due_at));
+    setPublishedAt(toLocalInput(row.published_at));
+    setAttachment({
+      kind: (row.content_kind as MediaKind) || "pdf",
+      url: row.content_url ?? "",
+      file: null,
+    });
+    setExistingFile(Boolean(row.content_url || row.attachment_path));
+    setFormError(null);
+    setOpen(true);
+  };
+
   useEffect(() => {
     if (!isTeacher || classId || !levelId) return;
     const firstClass = classesForLevel[0];
@@ -894,10 +1035,10 @@ export function DirectorAssignmentsPage() {
   }, [isTeacher, classId, levelId, classesForLevel]);
 
   useEffect(() => {
-    if (!isTeacher || classId) return;
+    if (!isTeacher || classId || editingId) return;
     const firstClass = classesQuery.data?.[0];
     if (firstClass) setClassId(firstClass.id);
-  }, [isTeacher, classId, classesQuery.data]);
+  }, [isTeacher, classId, classesQuery.data, editingId]);
 
   return (
     <>
@@ -908,7 +1049,7 @@ export function DirectorAssignmentsPage() {
             ? "Publiez et partagez des devoirs avec vos groupes uniquement."
             : "Ciblez un niveau entier ou un groupe de ce niveau."
         }
-        action={<Button onClick={() => setOpen(true)}>+ Créer un devoir</Button>}
+        action={<Button onClick={openCreate}>+ Créer un devoir</Button>}
       />
       <QueryState
         isLoading={listQuery.isLoading}
@@ -944,18 +1085,50 @@ export function DirectorAssignmentsPage() {
                 <div className="flex flex-wrap gap-2">
                   <Status>{statusLabel(row.status)}</Status>
                   {(row.content_url || row.attachment_path) && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        void openLinkOrFile(row.title, row.content_kind, row.mime_type, () =>
-                          AssignmentService.getAttachmentUrl(row),
-                        )
-                      }
-                    >
-                      Ouvrir
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          void openLinkOrFile(row.title, row.content_kind, row.mime_type, () =>
+                            AssignmentService.getAttachmentUrl(row),
+                          )
+                        }
+                      >
+                        Voir
+                      </Button>
+                      {row.content_kind !== "link" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            void (async () => {
+                              try {
+                                const url = await AssignmentService.getAttachmentUrl(row);
+                                await downloadFromUrl(url, row.title);
+                              } catch (err) {
+                                toast.error(
+                                  err instanceof Error ? err.message : "Téléchargement impossible",
+                                );
+                              }
+                            })()
+                          }
+                        >
+                          Télécharger
+                        </Button>
+                      )}
+                    </>
                   )}
+                  <Button size="sm" variant="outline" onClick={() => openEdit(row)}>
+                    Modifier
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setGradingId(gradingId === row.id ? null : row.id)}
+                  >
+                    {gradingId === row.id ? "Masquer les remises" : "Voir les remises"}
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
@@ -971,6 +1144,15 @@ export function DirectorAssignmentsPage() {
                   </Button>
                 </div>
               </div>
+              {gradingId === row.id &&
+                (row.class_id ? (
+                  <AssignmentGrading assignmentId={row.id} classId={row.class_id} />
+                ) : (
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    Les remises nécessitent un groupe. Assignez ce devoir à un groupe pour suivre et
+                    corriger les remises.
+                  </p>
+                ))}
             </Surface>
           ))}
         </div>
@@ -979,7 +1161,9 @@ export function DirectorAssignmentsPage() {
       {open && (
         <div className="mobile-modal">
           <Surface className="mobile-modal-panel max-h-[90dvh] space-y-4 overflow-y-auto">
-            <h2 className="text-lg font-semibold">Créer un devoir</h2>
+            <h2 className="text-lg font-semibold">
+              {editingId ? "Modifier le devoir" : "Créer un devoir"}
+            </h2>
             <Input placeholder="Titre" value={title} onChange={(e) => setTitle(e.target.value)} />
             <Textarea
               placeholder="Consigne / description"
@@ -1044,19 +1228,45 @@ export function DirectorAssignmentsPage() {
             <ContentAttachmentUploader
               kinds={["pdf", "document", "image", "link", "audio"]}
               value={attachment}
-              onChange={setAttachment}
+              onChange={(next) => {
+                setClearAttachment(false);
+                setAttachment(next);
+              }}
               disabled={saving}
               uploading={saving}
               error={formError}
               requiredFileWhenNew={false}
+              hasExistingFile={existingFile && !clearAttachment}
+              onClearExisting={() => {
+                setClearAttachment(true);
+                setExistingFile(false);
+                setAttachment({ ...attachment, file: null, url: "" });
+              }}
             />
+            {editingId && existingFile && !clearAttachment && attachment.kind !== "link" ? (
+              <p className="text-xs text-muted-foreground">
+                Déposez un fichier pour le remplacer, ou utilisez « Supprimer » pour retirer la
+                pièce jointe (Supprimer fichier).
+              </p>
+            ) : null}
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setOpen(false);
+                  resetForm();
+                }}
+              >
                 Annuler
               </Button>
               <Button
                 disabled={
-                  !title.trim() || !levelId || saving || create.isPending || (isTeacher && !classId)
+                  !title.trim() ||
+                  !levelId ||
+                  saving ||
+                  create.isPending ||
+                  update.isPending ||
+                  (isTeacher && !classId)
                 }
                 onClick={() => {
                   void (async () => {
@@ -1079,52 +1289,80 @@ export function DirectorAssignmentsPage() {
                     }
                     setSaving(true);
                     try {
-                      let attachmentBucket: string | null = null;
-                      let attachmentPath: string | null = null;
-                      let mimeType: string | null = null;
+                      let attachmentBucket: string | null | undefined;
+                      let attachmentPath: string | null | undefined;
+                      let mimeType: string | null | undefined;
                       if (attachment.file && kind !== "link") {
                         const uploaded = await AssignmentService.uploadAttachment(attachment.file);
                         attachmentBucket = uploaded.attachmentBucket;
                         attachmentPath = uploaded.attachmentPath;
                         mimeType = uploaded.mimeType;
                       }
-                      await create.mutateAsync({
-                        levelId,
-                        classId: classId || null,
-                        title: title.trim(),
-                        ...(description.trim()
-                          ? { description: description.trim(), instructions: description.trim() }
-                          : {}),
-                        dueAt: dueAt ? new Date(dueAt).toISOString() : null,
-                        publishedAt: publishedAt
-                          ? new Date(publishedAt).toISOString()
-                          : new Date().toISOString(),
-                        contentKind: kind,
-                        contentUrl: kind === "link" ? attachment.url.trim() || null : null,
-                        mimeType,
-                        attachmentBucket,
-                        attachmentPath,
-                        createdBy: user?.id ?? null,
-                        status: "published",
-                      });
-                      toast.success("Devoir publié");
+                      if (editingId) {
+                        const patch: Parameters<typeof AssignmentService.update>[1] = {
+                          title: title.trim(),
+                          description: description.trim() || null,
+                          instructions: description.trim() || null,
+                          levelId,
+                          classId: classId || null,
+                          dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+                          contentKind: kind,
+                          contentUrl: kind === "link" ? attachment.url.trim() || null : null,
+                        };
+                        if (publishedAt) {
+                          patch.publishedAt = new Date(publishedAt).toISOString();
+                        }
+                        if (clearAttachment) {
+                          patch.clearAttachment = true;
+                        } else if (attachment.file && kind !== "link") {
+                          patch.attachmentBucket = attachmentBucket ?? null;
+                          patch.attachmentPath = attachmentPath ?? null;
+                          patch.mimeType = mimeType ?? null;
+                        }
+                        await update.mutateAsync({
+                          id: editingId,
+                          patch,
+                        });
+                        toast.success("Devoir mis à jour");
+                      } else {
+                        await create.mutateAsync({
+                          levelId,
+                          classId: classId || null,
+                          title: title.trim(),
+                          ...(description.trim()
+                            ? { description: description.trim(), instructions: description.trim() }
+                            : {}),
+                          dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+                          publishedAt: publishedAt
+                            ? new Date(publishedAt).toISOString()
+                            : new Date().toISOString(),
+                          contentKind: kind,
+                          contentUrl: kind === "link" ? attachment.url.trim() || null : null,
+                          mimeType: mimeType ?? null,
+                          attachmentBucket: attachmentBucket ?? null,
+                          attachmentPath: attachmentPath ?? null,
+                          createdBy: user?.id ?? null,
+                          status: "published",
+                        });
+                        toast.success("Devoir publié");
+                      }
                       setOpen(false);
-                      setTitle("");
-                      setDescription("");
-                      setLevelId("");
-                      setClassId("");
-                      setDueAt("");
-                      setPublishedAt("");
-                      setAttachment({ kind: "pdf", url: "", file: null });
+                      resetForm();
                     } catch (err) {
-                      setFormError(err instanceof Error ? err.message : "Création impossible");
+                      setFormError(
+                        err instanceof Error
+                          ? err.message
+                          : editingId
+                            ? "Mise à jour impossible"
+                            : "Création impossible",
+                      );
                     } finally {
                       setSaving(false);
                     }
                   })();
                 }}
               >
-                Publier
+                {editingId ? "Enregistrer" : "Publier"}
               </Button>
             </div>
           </Surface>
