@@ -81,7 +81,9 @@ function paymentRemaining(row: PaymentRow) {
 }
 
 function canRemindPayment(status: string) {
-  return status === "pending" || status === "partial" || status === "overdue" || status === "suspended";
+  return (
+    status === "pending" || status === "partial" || status === "overdue" || status === "suspended"
+  );
 }
 
 function ProofReviewQueue() {
@@ -316,10 +318,7 @@ export function FinancePages({ mode }: { mode: string }) {
   if (mode === "subscriptions") {
     return (
       <>
-        <PageHeader
-          title="Abonnements"
-          subtitle="Statut des abonnements étudiants."
-        />
+        <PageHeader title="Abonnements" subtitle="Statut des abonnements étudiants." />
         <QueryState
           isLoading={subscriptionsQuery.isLoading}
           isError={subscriptionsQuery.isError}

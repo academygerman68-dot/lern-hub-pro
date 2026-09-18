@@ -710,7 +710,11 @@ export function DirectorExamsPage() {
     <>
       <PageHeader
         title="Examens blancs"
-        subtitle="Ciblez un niveau entier ou un groupe de ce niveau."
+        subtitle={
+          isTeacher
+            ? "Publiez et partagez des examens blancs avec vos groupes uniquement."
+            : "Ciblez un niveau entier ou un groupe de ce niveau."
+        }
         action={<Button onClick={() => setOpen(true)}>+ Créer un examen blanc</Button>}
       />
       <QueryState
@@ -832,12 +836,13 @@ export function DirectorExamsPage() {
               </select>
             </label>
             <label className="block text-sm">
-              Groupe (facultatif)
+              {isTeacher ? "Groupe" : "Groupe (facultatif)"}
               <select
                 className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={classId}
                 onChange={(e) => setClassId(e.target.value)}
                 disabled={!levelId}
+                required={isTeacher}
               >
                 <option value="">{isTeacher ? "Choisir le groupe" : "Tout le niveau"}</option>
                 {classesForLevel.map((item) => (
@@ -880,10 +885,20 @@ export function DirectorExamsPage() {
                 Annuler
               </Button>
               <Button
-                disabled={!title.trim() || !levelId || saving || createExam.isPending}
+                disabled={
+                  !title.trim() ||
+                  !levelId ||
+                  saving ||
+                  createExam.isPending ||
+                  (isTeacher && !classId)
+                }
                 onClick={() => {
                   void (async () => {
                     setFormError(null);
+                    if (isTeacher && !classId) {
+                      setFormError("Choisissez un de vos groupes pour partager cet examen.");
+                      return;
+                    }
                     const kind = attachment.kind as MediaKind;
                     if (kind === "link" && attachment.url && !isValidHttpUrl(attachment.url)) {
                       setFormError("Saisissez une URL valide.");

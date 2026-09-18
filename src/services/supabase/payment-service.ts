@@ -199,10 +199,7 @@ export const SupabasePaymentService = {
       ? payment.notes.replace(/Relance envoyée le[^\n]*/i, noteLine)
       : [payment.notes, noteLine].filter(Boolean).join("\n");
 
-    await requireClient()
-      .from("student_payments")
-      .update({ notes: nextNotes })
-      .eq("id", paymentId);
+    await requireClient().from("student_payments").update({ notes: nextNotes }).eq("id", paymentId);
 
     return data;
   },

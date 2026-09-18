@@ -43,8 +43,7 @@ import {
   DirectorCoursesPage,
   MaterialsLibraryPage,
 } from "./academic-pages";
-import { TeacherAssignmentsPage, TeacherLessonManagerPage } from "./learning-pages";
-import { DirectorExamsPage, StaffExamsPage } from "./exam-pages";
+import { DirectorExamsPage } from "./exam-pages";
 import { LiveClassesPage } from "./live-pages";
 import { FinancePages } from "./finance-pages";
 import { useClassSelection } from "./class-selection";
@@ -61,11 +60,11 @@ export function TeacherPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   const page = pageProp ?? contextPage;
   if (page === "classes") return <TeacherClass />;
   if (page === "students") return <TeacherStudents />;
-  if (page === "lessons") return <TeacherLessonManagerPage />;
-  if (page === "assignments") return <TeacherAssignmentsPage />;
+  if (page === "courses" || page === "lessons") return <DirectorCoursesPage />;
+  if (page === "assignments") return <DirectorAssignmentsPage />;
   if (page === "calendar") return <CalendarPage />;
   if (page === "materials") return <MaterialsLibraryPage />;
-  if (page === "exams") return <StaffExamsPage />;
+  if (page === "exams") return <DirectorExamsPage />;
   if (page === "live" || page === "meeting")
     return <LiveClassesPage meeting={page === "meeting"} />;
   if (page === "recordings") return <RecordingsPage />;

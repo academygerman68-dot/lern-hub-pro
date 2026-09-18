@@ -55,7 +55,8 @@ async function fetchJaasAuthorization(
   sessionId: string,
   expectedAppId: string | null,
 ): Promise<{ jwt: string; roomName: string }> {
-  if (!isSupabaseConfigured) throw new Error("Les réunions en ligne sont indisponibles pour le moment.");
+  if (!isSupabaseConfigured)
+    throw new Error("Les réunions en ligne sont indisponibles pour le moment.");
   const { data, error } = await getSupabase().functions.invoke<{
     jwt?: string;
     roomName?: string;
@@ -65,7 +66,9 @@ async function fetchJaasAuthorization(
     throw new Error("Impossible d’ouvrir la réunion. Réessayez ou contactez l’administration.");
   }
   if (expectedAppId && !data.roomName.startsWith(`${expectedAppId}/`)) {
-    throw new Error("La configuration des réunions en ligne est incohérente. Contactez l’administration.");
+    throw new Error(
+      "La configuration des réunions en ligne est incohérente. Contactez l’administration.",
+    );
   }
   return { jwt: data.jwt, roomName: data.roomName };
 }

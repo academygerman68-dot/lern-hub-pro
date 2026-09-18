@@ -1,8 +1,7 @@
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 
 const deleteAccountErrors: Record<string, string> = {
-  LAST_ADMIN:
-    "Impossible de supprimer ce compte : c’est le dernier administrateur de l’académie.",
+  LAST_ADMIN: "Impossible de supprimer ce compte : c’est le dernier administrateur de l’académie.",
   CONFIRMATION_REQUIRED: "Saisissez SUPPRIMER pour confirmer la suppression.",
   UNAUTHORIZED: "Session expirée. Reconnectez-vous puis réessayez.",
   PROFILE_NOT_FOUND: "Compte introuvable.",

@@ -1115,26 +1115,24 @@ export function PremiumStudent360() {
                     >
                       {paymentStatusLabel(payment.status)}
                     </Status>
-                    {isDirector &&
-                      payment.status !== "paid" &&
-                      payment.status !== "cancelled" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={remindPayment.isPending}
-                          onClick={() =>
-                            remindPayment.mutate(payment.id, {
-                              onSuccess: () => toast.success("Relance de paiement envoyée"),
-                              onError: (err) =>
-                                toast.error(
-                                  err instanceof Error ? err.message : "Relance impossible",
-                                ),
-                            })
-                          }
-                        >
-                          Relancer
-                        </Button>
-                      )}
+                    {isDirector && payment.status !== "paid" && payment.status !== "cancelled" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={remindPayment.isPending}
+                        onClick={() =>
+                          remindPayment.mutate(payment.id, {
+                            onSuccess: () => toast.success("Relance de paiement envoyée"),
+                            onError: (err) =>
+                              toast.error(
+                                err instanceof Error ? err.message : "Relance impossible",
+                              ),
+                          })
+                        }
+                      >
+                        Relancer
+                      </Button>
+                    )}
                   </div>
                 </Surface>
               ))}

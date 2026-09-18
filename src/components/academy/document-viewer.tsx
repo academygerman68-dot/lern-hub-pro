@@ -157,10 +157,7 @@ export function DocumentViewer({
                       Ouvrir dans un nouvel onglet
                     </a>
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => void forceDownload(url, title)}
-                  >
+                  <Button variant="outline" onClick={() => void forceDownload(url, title)}>
                     Télécharger
                   </Button>
                 </div>

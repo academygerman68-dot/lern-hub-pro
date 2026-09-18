@@ -30,6 +30,7 @@ export const TEACHER_PAGES = [
   "classes",
   "students",
   "calendar",
+  "courses",
   "lessons",
   "materials",
   "assignments",

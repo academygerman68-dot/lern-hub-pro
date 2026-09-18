@@ -190,7 +190,9 @@ export function DirectorCoursesPage() {
         subtitle={
           selectedLevel
             ? `Niveau ${selectedLevel.code} — ${selectedLevel.name}`
-            : "Choisissez un niveau pour consulter et créer des cours."
+            : isDirectorRole(role)
+              ? "Choisissez un niveau pour consulter et créer des cours."
+              : "Consultez et créez des cours pour les niveaux de vos groupes."
         }
         action={
           selectedLevel ? (
@@ -451,7 +453,10 @@ export function MaterialsLibraryPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [domain, setDomain] = useState<"academic" | "professional">("academic");
-  const [audience, setAudience] = useState<"everyone" | "level" | "class">("everyone");
+  const isTeacher = role === "teacher";
+  const [audience, setAudience] = useState<"everyone" | "level" | "class">(
+    isTeacher ? "class" : "everyone",
+  );
   const [levelCode, setLevelCode] = useState("");
   const [classId, setClassId] = useState("");
   const [attachment, setAttachment] = useState<AttachmentDraft>({
@@ -477,11 +482,26 @@ export function MaterialsLibraryPage() {
   }, [libraryQuery.data, domainTab, role, teacherScope]);
   const classesForLevel = scopedClasses.filter((item) => !levelCode || item.level === levelCode);
 
+  useEffect(() => {
+    if (!isTeacher) return;
+    setAudience("class");
+    if (classId) return;
+    const first = classesQuery.data?.[0];
+    if (first) {
+      setLevelCode(first.level);
+      setClassId(first.id);
+    }
+  }, [isTeacher, classId, classesQuery.data]);
+
   return (
     <>
       <PageHeader
         title="Ressources"
-        subtitle="Ressources académiques et professionnelles, ciblées par audience."
+        subtitle={
+          isTeacher
+            ? "Ajoutez des ressources et partagez-les uniquement avec vos groupes."
+            : "Ressources académiques et professionnelles, ciblées par audience."
+        }
       />
       <div className="mb-4 flex flex-wrap gap-2">
         {(["academic", "professional"] as const).map((d) => (
@@ -533,9 +553,10 @@ export function MaterialsLibraryPage() {
                   setAudience(e.target.value as typeof audience);
                   setClassId("");
                 }}
+                disabled={isTeacher}
               >
-                <option value="everyone">Tout le monde</option>
-                <option value="level">Un niveau spécifique</option>
+                {!isTeacher ? <option value="everyone">Tout le monde</option> : null}
+                {!isTeacher ? <option value="level">Un niveau spécifique</option> : null}
                 <option value="class">Un groupe spécifique</option>
               </select>
             </label>
@@ -598,6 +619,10 @@ export function MaterialsLibraryPage() {
             }
             onClick={() => {
               setFormError(null);
+              if (isTeacher && (!classId || audience !== "class")) {
+                setFormError("Choisissez un de vos groupes pour partager cette ressource.");
+                return;
+              }
               const kind = attachment.kind as MediaKind;
               if (kind === "link" && !isValidHttpUrl(attachment.url)) {
                 setFormError("Saisissez une URL valide (http ou https).");
@@ -620,11 +645,11 @@ export function MaterialsLibraryPage() {
                   title: title.trim(),
                   ...(description.trim() ? { description: description.trim() } : {}),
                   domain,
-                  audience,
+                  audience: isTeacher ? "class" : audience,
                   category: libraryCategoryForKind(kind),
                   contentKind: kind,
                   levelCode: audience === "everyone" ? null : levelCode || null,
-                  classId: audience === "class" ? classId || null : null,
+                  classId: audience === "class" || isTeacher ? classId || null : null,
                   externalUrl: kind === "link" ? attachment.url.trim() : null,
                   createdBy: user?.id ?? null,
                 },
@@ -869,7 +894,11 @@ export function DirectorAssignmentsPage() {
     <>
       <PageHeader
         title="Devoirs"
-        subtitle="Ciblez un niveau entier ou un groupe de ce niveau."
+        subtitle={
+          isTeacher
+            ? "Publiez et partagez des devoirs avec vos groupes uniquement."
+            : "Ciblez un niveau entier ou un groupe de ce niveau."
+        }
         action={<Button onClick={() => setOpen(true)}>+ Créer un devoir</Button>}
       />
       <QueryState
@@ -969,12 +998,13 @@ export function DirectorAssignmentsPage() {
               </select>
             </label>
             <label className="block text-sm">
-              Groupe (facultatif)
+              {isTeacher ? "Groupe" : "Groupe (facultatif)"}
               <select
                 className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={classId}
                 onChange={(e) => setClassId(e.target.value)}
                 disabled={!levelId}
+                required={isTeacher}
               >
                 <option value="">{isTeacher ? "Choisir le groupe" : "Tout le niveau"}</option>
                 {classesForLevel.map((item) => (
@@ -1022,6 +1052,10 @@ export function DirectorAssignmentsPage() {
                 onClick={() => {
                   void (async () => {
                     setFormError(null);
+                    if (isTeacher && !classId) {
+                      setFormError("Choisissez un de vos groupes pour partager ce devoir.");
+                      return;
+                    }
                     const kind = attachment.kind as MediaKind;
                     if (kind === "link" && attachment.url && !isValidHttpUrl(attachment.url)) {
                       setFormError("Saisissez une URL valide.");

@@ -2049,10 +2049,7 @@ export function AccountSettings() {
 
   return (
     <>
-      <PageHeader
-        title="Paramètres"
-        subtitle="Compte, sécurité et suppression définitive."
-      />
+      <PageHeader title="Paramètres" subtitle="Compte, sécurité et suppression définitive." />
       <Tabs defaultValue="compte" className="space-y-5">
         <TabsList className="flex h-auto flex-wrap gap-1">
           <TabsTrigger value="compte">Compte</TabsTrigger>
