@@ -36,6 +36,8 @@ import {
   LevelBadge,
   GroupBadge,
 } from "./primitives";
+import { AdminProfileEditModal } from "./profile/profile-editor";
+import { AssignStudentGroupModal } from "./students/assign-group-modal";
 import { PremiumStudent360 } from "./premium-screens";
 import { PremiumDirectorDashboard, PremiumTeacherDashboard } from "./dashboards";
 import {
@@ -312,6 +314,8 @@ function Students() {
   const [teacherFilter, setTeacherFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [detail, setDetail] = useState<Student | null>(null);
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [assignGroupOpen, setAssignGroupOpen] = useState(false);
   const [enrollmentOpen, setEnrollmentOpen] = useState(false);
   const [studentId, setStudentId] = useState("");
   const [classId, setClassId] = useState("");
@@ -744,7 +748,18 @@ function Students() {
                 variant="outline"
                 onClick={() => navigate("student360", { studentId: detail.id })}
               >
-                Fiche 360°
+                Voir le profil
+              </Button>
+              <Button
+                onClick={() => {
+                  if (detail.profileId) setEditProfileOpen(true);
+                }}
+                disabled={!detail.profileId}
+              >
+                Modifier le profil
+              </Button>
+              <Button variant="secondary" onClick={() => setAssignGroupOpen(true)}>
+                {detail.classId ? "Changer de groupe" : "Assigner à un groupe"}
               </Button>
               {detail.email ? (
                 <Button
@@ -806,6 +821,31 @@ function Students() {
           </Surface>
         </div>
       )}
+
+      {detail?.profileId ? (
+        <AdminProfileEditModal
+          open={editProfileOpen}
+          onClose={() => {
+            setEditProfileOpen(false);
+            void studentsQuery.refetch();
+          }}
+          profileId={detail.profileId}
+          email={detail.email}
+        />
+      ) : null}
+
+      {detail ? (
+        <AssignStudentGroupModal
+          open={assignGroupOpen}
+          student={detail}
+          onClose={() => setAssignGroupOpen(false)}
+          onAssigned={() => {
+            void studentsQuery.refetch();
+            void allStudents.refetch();
+            setDetail(null);
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -1427,6 +1467,7 @@ function Teachers() {
 
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editTeacherProfileOpen, setEditTeacherProfileOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -1606,9 +1647,18 @@ function Teachers() {
                 <h2 className="text-lg font-semibold">{selected.name}</h2>
                 <p className="text-sm text-muted-foreground">{selected.email}</p>
               </div>
-              <Status tone={accountStatusTone(selected.accountStatus)}>
-                {accountStatusLabel(selected.accountStatus)}
-              </Status>
+              <div className="flex flex-wrap items-center gap-2">
+                <Status tone={accountStatusTone(selected.accountStatus)}>
+                  {accountStatusLabel(selected.accountStatus)}
+                </Status>
+                <Button
+                  size="sm"
+                  disabled={!selected.profileId}
+                  onClick={() => setEditTeacherProfileOpen(true)}
+                >
+                  Modifier le profil
+                </Button>
+              </div>
             </div>
             <div className="grid gap-3 text-sm sm:grid-cols-2">
               <p>
@@ -1795,6 +1845,18 @@ function Teachers() {
           </Surface>
         </div>
       )}
+
+      {selected?.profileId ? (
+        <AdminProfileEditModal
+          open={editTeacherProfileOpen}
+          onClose={() => {
+            setEditTeacherProfileOpen(false);
+            void teachersQuery.refetch();
+          }}
+          profileId={selected.profileId}
+          email={selected.email}
+        />
+      ) : null}
     </>
   );
 }

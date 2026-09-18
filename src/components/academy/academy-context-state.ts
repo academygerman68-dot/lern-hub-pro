@@ -37,6 +37,8 @@ export type AcademyState = {
   setLastScore: (score: ExamScore | null) => void;
   session: PersistedSession | null;
   replaceSession: (next: PersistedSession | null) => void;
+  /** Reload profile + session user from Supabase after self-edit. */
+  refreshProfile: () => Promise<void>;
 };
 
 export const AcademyContext = createContext<AcademyState | null>(null);

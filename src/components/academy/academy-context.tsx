@@ -194,6 +194,33 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
     [lastScore],
   );
 
+  const refreshProfile = useCallback(async () => {
+    if (!isSupabaseConfigured) return;
+    try {
+      const auth = await SupabaseAuthService.getSession();
+      if (!auth) return;
+      const nextLocale = toUiLocale(auth.profile.language);
+      setProfile(auth.profile);
+      setSession((prev) =>
+        startSession(auth.sessionUser, {
+          locale: nextLocale,
+          ...(prev?.user.id === auth.sessionUser.id && prev?.user.role === auth.sessionUser.role
+            ? {
+                page: prev.page,
+                invoices: prev.invoices,
+                subscription: prev.subscription,
+                examPublished: prev.examPublished,
+                selectedStudentId: prev.selectedStudentId,
+              }
+            : {}),
+        }),
+      );
+      setLocaleState(nextLocale);
+    } catch {
+      /* keep current session */
+    }
+  }, []);
+
   const go = useCallback(
     (role: Role, page: AcademyPage, extra?: NavigateOptions) => {
       void routerNavigate({
@@ -302,8 +329,21 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
       setLastScore,
       session,
       replaceSession: persist,
+      refreshProfile,
     }),
-    [ready, session, profile, lastScore, locale, setRole, signIn, signOut, navigate, persist],
+    [
+      ready,
+      session,
+      profile,
+      lastScore,
+      locale,
+      setRole,
+      signIn,
+      signOut,
+      navigate,
+      persist,
+      refreshProfile,
+    ],
   );
 
   return (

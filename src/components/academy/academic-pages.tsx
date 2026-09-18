@@ -238,15 +238,17 @@ export function DirectorCoursesPage() {
                 <button
                   key={level.id}
                   type="button"
-                  className="rounded-2xl border border-border bg-card p-5 text-left shadow-soft transition hover:-translate-y-0.5"
+                  className="rounded-xl border border-border bg-card p-5 text-left shadow-soft transition duration-200 hover:-translate-y-0.5 hover:shadow-card motion-reduce:transform-none"
                   onClick={() => setSelectedLevelId(level.id)}
                 >
                   <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                     Niveau
                   </p>
-                  <h2 className="mt-2 text-2xl font-semibold">{level.code}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">{level.name}</p>
-                  <p className="mt-3 text-sm">{count} cours</p>
+                  <div className="mt-3">
+                    <LevelBadge code={level.code} />
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">{level.name}</p>
+                  <p className="mt-3 text-sm font-medium">{count} cours</p>
                 </button>
               );
             })}

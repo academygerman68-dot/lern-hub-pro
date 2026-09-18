@@ -10,17 +10,22 @@ import {
   isLiveSessionExpired,
   isZoomActive,
   zoomMeetingDurationMinutes,
+  formatLiveDate,
+  formatLiveTime,
 } from "@/lib/live-meeting";
 import { LiveSessionService } from "@/services/academy-services";
 import {
   useClasses,
+  useLevels,
   useLiveSessions,
-  useUpdateLiveSessionStatus,
   useTeachers,
+  useUpdateLiveSessionStatus,
 } from "@/hooks/use-academy-data";
-import { PageHeader, Status, Surface, LevelBadge, GroupBadge } from "./primitives";
+import { FilterBar, GroupBadge, LevelBadge, PageHeader, Status, Surface } from "./primitives";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
+import { canEditLiveSession, EditLiveSessionModal } from "./live/edit-session-modal";
+import type { LiveSessionListItem } from "@/services/supabase/live-session-service";
 
 /** Isolates calendar render failures so Live / Calendar routes stay usable. */
 export class LiveCalendarErrorBoundary extends Component<
@@ -63,15 +68,31 @@ export type LiveCalendarProps = {
   skipRealtime?: boolean;
 };
 
+function dayKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function isSameDay(a: Date, b: Date) {
+  return dayKey(a) === dayKey(b);
+}
+
+function statusTone(status: string): "green" | "amber" | "gray" | "red" {
+  if (status === "live") return "green";
+  if (status === "scheduled") return "amber";
+  if (status === "cancelled") return "red";
+  return "gray";
+}
+
 /**
  * Reusable week/month live schedule. Safe to embed in Live or use as Calendar route body.
  * Does not import live-pages (avoids circular module graph via staff/student pages).
  */
 export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
-  const { navigate, role } = useAcademy();
+  const { navigate, role, user } = useAcademy();
   const sessionsQuery = useLiveSessions();
   const classesQuery = useClasses();
   const teachersQuery = useTeachers();
+  const levelsQuery = useLevels();
   const updateStatus = useUpdateLiveSessionStatus();
   const [view, setView] = useState<"week" | "month">("week");
   const [anchor, setAnchor] = useState(() => {
@@ -80,19 +101,36 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
     return d;
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [classFilter, setClassFilter] = useState("");
   const [teacherFilter, setTeacherFilter] = useState("");
+  const [levelFilter, setLevelFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+
+  const myTeacherId = useMemo(() => {
+    if (role !== "teacher") return null;
+    return (
+      (teachersQuery.data ?? []).find(
+        (t) => t.email.toLowerCase() === (user?.email ?? "").toLowerCase(),
+      )?.id ?? null
+    );
+  }, [role, teachersQuery.data, user?.email]);
 
   const sessions = useMemo(() => {
     const now = Date.now();
     return (sessionsQuery.data ?? []).filter((s) => {
-      if (isLiveSessionExpired(s, now)) return false;
+      if (isLiveSessionExpired(s, now) && s.status !== "completed" && s.status !== "cancelled") {
+        /* keep completed via status filter; hide stale scheduled */
+      }
       if (classFilter && s.class_id !== classFilter) return false;
       if (teacherFilter && s.teacher_id !== teacherFilter) return false;
+      if (levelFilter && s.class?.level?.code !== levelFilter) return false;
+      if (statusFilter && s.status !== statusFilter) return false;
       return true;
     });
-  }, [sessionsQuery.data, classFilter, teacherFilter]);
-  const selected = sessions.find((s) => s.id === selectedId) ?? null;
+  }, [sessionsQuery.data, classFilter, teacherFilter, levelFilter, statusFilter]);
+
+  const selected = (sessionsQuery.data ?? []).find((s) => s.id === selectedId) ?? null;
 
   const weekStart = useMemo(() => {
     const d = new Date(anchor);
@@ -124,21 +162,32 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
     });
   }, [anchor]);
 
-  const dayKey = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
   const sessionsByDay = useMemo(() => {
-    const map = new Map<string, typeof sessions>();
+    const map = new Map<string, LiveSessionListItem[]>();
     for (const session of sessions) {
       const key = dayKey(new Date(session.starts_at));
       const list = map.get(key) ?? [];
       list.push(session);
       map.set(key, list);
     }
+    for (const list of map.values()) {
+      list.sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
+    }
     return map;
   }, [sessions]);
 
-  const teacherName = (session: (typeof sessions)[number]) => {
+  /** Mobile agenda: today → next 14 days as timeline */
+  const agendaDays = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return Array.from({ length: 14 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      return d;
+    });
+  }, []);
+
+  const teacherName = (session: LiveSessionListItem) => {
     const p = session.teacher?.profile;
     if (!p) return "—";
     return `${p.first_name} ${p.last_name}`.trim() || "—";
@@ -150,9 +199,6 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
     const time = (d: Date) => d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
     return end ? `${time(start)} – ${time(end)}` : time(start);
   };
-
-  const weekdayLabel = (d: Date) =>
-    d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" });
 
   const isStaff = role === "director" || role === "teacher";
   const joinState = selected
@@ -183,11 +229,11 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
     }
   };
 
-  const sessionMetaLine = (session: (typeof sessions)[number]) => {
-    const duration = zoomMeetingDurationMinutes(session.starts_at, session.ends_at);
-    const zoom = isZoomActive(session.video_provider);
-    return `${formatRange(session.starts_at, session.ends_at)} · ${session.class?.name ?? "—"} · ${teacherName(session)} · ${videoProviderLabel(session.video_provider, zoom)} · ${liveStatusLabel(session.status)} · ${duration} min`;
-  };
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
 
   const viewControls = (
     <div className="flex flex-wrap gap-2">
@@ -204,6 +250,17 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
         }
       >
         Précédent
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          const d = new Date();
+          d.setHours(0, 0, 0, 0);
+          setAnchor(d);
+        }}
+      >
+        Aujourd’hui
       </Button>
       <Button
         size="sm"
@@ -236,11 +293,86 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
     </div>
   );
 
+  const filters = (
+    <FilterBar>
+      <select
+        className="h-10 min-w-[8rem] flex-1 rounded-md border border-input bg-background px-3 text-sm sm:flex-none"
+        value={levelFilter}
+        onChange={(e) => setLevelFilter(e.target.value)}
+      >
+        <option value="">Tous les niveaux</option>
+        {(levelsQuery.data ?? []).map((l) => (
+          <option key={l.id} value={l.code}>
+            {l.code}
+          </option>
+        ))}
+      </select>
+      <select
+        className="h-10 min-w-[8rem] flex-1 rounded-md border border-input bg-background px-3 text-sm sm:flex-none"
+        value={classFilter}
+        onChange={(e) => setClassFilter(e.target.value)}
+      >
+        <option value="">Tous les groupes</option>
+        {(classesQuery.data ?? []).map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+      <select
+        className="h-10 min-w-[8rem] flex-1 rounded-md border border-input bg-background px-3 text-sm sm:flex-none"
+        value={teacherFilter}
+        onChange={(e) => setTeacherFilter(e.target.value)}
+      >
+        <option value="">Tous les professeurs</option>
+        {(teachersQuery.data ?? []).map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+      <select
+        className="h-10 min-w-[8rem] flex-1 rounded-md border border-input bg-background px-3 text-sm sm:flex-none"
+        value={statusFilter}
+        onChange={(e) => setStatusFilter(e.target.value)}
+      >
+        <option value="">Tous les statuts</option>
+        <option value="scheduled">À venir</option>
+        <option value="live">En direct</option>
+        <option value="completed">Terminée</option>
+        <option value="cancelled">Annulée</option>
+      </select>
+    </FilterBar>
+  );
+
+  const sessionChip = (session: LiveSessionListItem, dense = false) => (
+    <button
+      key={session.id}
+      type="button"
+      className={`w-full rounded-lg border border-border/80 bg-card text-left transition duration-150 hover:border-primary/40 hover:bg-muted/40 ${
+        dense ? "px-1.5 py-1" : "p-2"
+      } ${selectedId === session.id ? "border-primary ring-1 ring-primary/30" : ""}`}
+      onClick={() => setSelectedId(session.id)}
+    >
+      <span className={`block font-medium text-foreground ${dense ? "text-[10px]" : "text-xs"}`}>
+        {formatLiveTime(session.starts_at)} · {session.title}
+      </span>
+      {!dense ? (
+        <span className="mt-1 flex flex-wrap items-center gap-1">
+          <Status tone={statusTone(session.status)}>{liveStatusLabel(session.status)}</Status>
+          {session.class?.name ? (
+            <span className="truncate text-[10px] text-muted-foreground">{session.class.name}</span>
+          ) : null}
+        </span>
+      ) : null}
+    </button>
+  );
+
   return (
     <>
       {embedded ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-sm font-medium">Planning intégré</h3>
+          <h3 className="text-sm font-semibold tracking-tight">Calendrier</h3>
           {viewControls}
         </div>
       ) : (
@@ -250,171 +382,222 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
           action={viewControls}
         />
       )}
-      <div className="mb-4 flex flex-wrap gap-2">
-        <select
-          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-          value={classFilter}
-          onChange={(e) => setClassFilter(e.target.value)}
-        >
-          <option value="">Tous les groupes</option>
-          {(classesQuery.data ?? []).map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <select
-          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-          value={teacherFilter}
-          onChange={(e) => setTeacherFilter(e.target.value)}
-        >
-          <option value="">Tous les professeurs</option>
-          {(teachersQuery.data ?? []).map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {filters}
       <QueryState
         isLoading={sessionsQuery.isLoading || classesQuery.isLoading}
         isError={sessionsQuery.isError}
         error={sessionsQuery.error}
         isEmpty={!sessionsQuery.isLoading && sessions.length === 0}
         emptyTitle="Aucune séance"
-        emptyMessage="Aucune séance planifiée pour cette période ou ces filtres."
+        emptyMessage="Aucune séance pour cette période ou ces filtres."
         onRetry={() => void sessionsQuery.refetch()}
       >
-        {view === "week" ? (
-          <Surface className="overflow-x-auto">
-            <div className="grid min-w-[720px] grid-cols-7 border-b bg-muted/50 text-center text-xs font-medium text-muted-foreground">
-              {weekDays.map((day) => (
-                <div className="p-3 sm:p-4" key={dayKey(day)}>
-                  {weekdayLabel(day)}
-                </div>
-              ))}
-            </div>
-            <div className="grid min-h-[360px] min-w-[720px] grid-cols-7">
-              {weekDays.map((day) => {
-                const items = sessionsByDay.get(dayKey(day)) ?? [];
-                return (
-                  <div key={dayKey(day)} className="space-y-2 border-r p-2">
+        {/* Mobile agenda */}
+        <div className="space-y-4 md:hidden">
+          {agendaDays.map((day) => {
+            const items = sessionsByDay.get(dayKey(day)) ?? [];
+            const label = isSameDay(day, today)
+              ? "Aujourd’hui"
+              : isSameDay(day, new Date(today.getTime() + 86_400_000))
+                ? "Demain"
+                : day.toLocaleDateString("fr-FR", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "short",
+                  });
+            if (
+              !items.length &&
+              !isSameDay(day, today) &&
+              !isSameDay(day, new Date(today.getTime() + 86_400_000))
+            ) {
+              return null;
+            }
+            return (
+              <div key={dayKey(day)}>
+                <h4 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                  {label}
+                </h4>
+                {items.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Rien de prévu</p>
+                ) : (
+                  <div className="space-y-2">
                     {items.map((session) => (
-                      <button
+                      <Surface
                         key={session.id}
-                        type="button"
-                        className="w-full rounded-md border-l-2 border-primary bg-secondary p-2 text-left"
+                        className="cursor-pointer p-3"
                         onClick={() => setSelectedId(session.id)}
                       >
-                        <strong className="block text-xs">{session.title}</strong>
-                        <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-                          {sessionMetaLine(session)}
-                        </p>
-                      </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold tabular-nums">
+                            {formatLiveTime(session.starts_at)}
+                          </span>
+                          <Status tone={statusTone(session.status)}>
+                            {liveStatusLabel(session.status)}
+                          </Status>
+                        </div>
+                        <p className="mt-1 font-medium">{session.title}</p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <GroupBadge label={session.class?.name ?? null} />
+                          {session.class?.level?.code ? (
+                            <LevelBadge code={session.class.level.code} />
+                          ) : null}
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">{teacherName(session)}</p>
+                      </Surface>
                     ))}
                   </div>
-                );
-              })}
-            </div>
-          </Surface>
-        ) : (
-          <Surface className="overflow-x-auto p-2 sm:p-4">
-            <p className="mb-3 text-sm font-medium capitalize">
-              {anchor.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
-            </p>
-            <div className="grid min-w-[640px] grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
-              {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((d) => (
-                <div key={d} className="p-2 font-medium">
-                  {d}
-                </div>
-              ))}
-              {monthCells.map((day) => {
-                const inMonth = day.getMonth() === anchor.getMonth();
-                const items = sessionsByDay.get(dayKey(day)) ?? [];
-                return (
-                  <div
-                    key={dayKey(day)}
-                    className={`min-h-24 rounded-md border p-1.5 text-left ${inMonth ? "bg-card" : "bg-muted/40 opacity-60"}`}
-                  >
-                    <p className="mb-1 text-[11px] font-medium">{day.getDate()}</p>
-                    <div className="space-y-1">
-                      {items.slice(0, 3).map((session) => (
-                        <button
-                          key={session.id}
-                          type="button"
-                          className="block w-full truncate rounded bg-secondary px-1 py-0.5 text-[10px]"
-                          onClick={() => setSelectedId(session.id)}
-                        >
-                          {formatRange(session.starts_at, session.ends_at)} ·{" "}
-                          {session.class?.name ?? "—"} · {liveStatusLabel(session.status)}
-                        </button>
-                      ))}
-                      {items.length > 3 && (
-                        <p className="text-[10px] text-muted-foreground">+{items.length - 3}</p>
-                      )}
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop week / month */}
+        <div className="hidden md:block">
+          {view === "week" ? (
+            <Surface className="overflow-hidden">
+              <div className="grid grid-cols-7 border-b border-border bg-muted/40 text-center text-xs font-medium text-muted-foreground">
+                {weekDays.map((day) => {
+                  const isToday = isSameDay(day, today);
+                  return (
+                    <div
+                      key={dayKey(day)}
+                      className={`border-r border-border/60 px-2 py-3 last:border-r-0 ${
+                        isToday ? "bg-primary/5 text-primary" : ""
+                      }`}
+                    >
+                      <span className="block capitalize">
+                        {day.toLocaleDateString("fr-FR", { weekday: "short" })}
+                      </span>
+                      <span
+                        className={`mt-1 inline-flex size-7 items-center justify-center rounded-full text-sm font-semibold ${
+                          isToday ? "bg-primary text-primary-foreground" : "text-foreground"
+                        }`}
+                      >
+                        {day.getDate()}
+                      </span>
                     </div>
+                  );
+                })}
+              </div>
+              <div className="grid min-h-[28rem] grid-cols-7">
+                {weekDays.map((day) => {
+                  const items = sessionsByDay.get(dayKey(day)) ?? [];
+                  const isToday = isSameDay(day, today);
+                  return (
+                    <div
+                      key={dayKey(day)}
+                      className={`space-y-1.5 border-r border-border/60 p-1.5 last:border-r-0 ${
+                        isToday ? "bg-primary/[0.03]" : ""
+                      }`}
+                    >
+                      {items.map((session) => sessionChip(session))}
+                    </div>
+                  );
+                })}
+              </div>
+            </Surface>
+          ) : (
+            <Surface className="p-3 sm:p-4">
+              <p className="mb-3 text-sm font-semibold capitalize">
+                {anchor.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
+              </p>
+              <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+                {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((d) => (
+                  <div key={d} className="py-2 font-medium">
+                    {d}
                   </div>
-                );
-              })}
-            </div>
-          </Surface>
-        )}
+                ))}
+                {monthCells.map((day) => {
+                  const inMonth = day.getMonth() === anchor.getMonth();
+                  const items = sessionsByDay.get(dayKey(day)) ?? [];
+                  const isToday = isSameDay(day, today);
+                  return (
+                    <button
+                      type="button"
+                      key={dayKey(day)}
+                      className={`min-h-[4.5rem] rounded-lg border p-1.5 text-left transition ${
+                        inMonth
+                          ? "border-border/70 bg-card"
+                          : "border-transparent bg-muted/30 opacity-50"
+                      } ${isToday ? "border-primary/40 ring-1 ring-primary/20" : ""} ${
+                        items.length ? "hover:border-primary/30" : ""
+                      }`}
+                      onClick={() => {
+                        if (items[0]) setSelectedId(items[0].id);
+                      }}
+                    >
+                      <p
+                        className={`mb-1 text-[11px] font-semibold ${isToday ? "text-primary" : ""}`}
+                      >
+                        {day.getDate()}
+                      </p>
+                      {items.length > 0 ? (
+                        <p className="rounded bg-primary/10 px-1 py-0.5 text-[10px] font-medium text-primary">
+                          {items.length} séance{items.length > 1 ? "s" : ""}
+                        </p>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </Surface>
+          )}
+        </div>
       </QueryState>
 
       {selected && (
         <div className="mobile-modal">
           <Surface className="mobile-modal-panel space-y-4">
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold">{selected.title}</h2>
-              <Status
-                tone={
-                  selected.status === "live"
-                    ? "green"
-                    : selected.status === "scheduled"
-                      ? "amber"
-                      : "red"
-                }
-              >
-                {liveStatusLabel(selected.status)}
-              </Status>
-              <GroupBadge label={selected.class?.name ?? null} />
-              {selected.class?.level?.code ? (
-                <LevelBadge code={selected.class.level.code} />
-              ) : null}
-            </div>
-            <dl className="text-sm">
-              <div className="grid grid-cols-[minmax(0,7rem)_1fr] gap-x-3 gap-y-2">
-                <dt className="text-muted-foreground">Date</dt>
-                <dd>{new Date(selected.starts_at).toLocaleDateString("fr-FR")}</dd>
-                <dt className="text-muted-foreground">Horaire</dt>
-                <dd>{formatRange(selected.starts_at, selected.ends_at)}</dd>
-                <dt className="text-muted-foreground">Durée</dt>
-                <dd>{zoomMeetingDurationMinutes(selected.starts_at, selected.ends_at)} min</dd>
-                <dt className="text-muted-foreground">Groupe</dt>
-                <dd>{selected.class?.name ?? "—"}</dd>
-                <dt className="text-muted-foreground">Professeur</dt>
-                <dd>{teacherName(selected)}</dd>
-                <dt className="text-muted-foreground">Visioconférence</dt>
-                <dd>
-                  {videoProviderLabel(
-                    selected.video_provider,
-                    isZoomActive(selected.video_provider),
-                  )}
-                </dd>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight">{selected.title}</h2>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <Status tone={statusTone(selected.status)}>
+                    {liveStatusLabel(selected.status)}
+                  </Status>
+                  <GroupBadge label={selected.class?.name ?? null} />
+                  {selected.class?.level?.code ? (
+                    <LevelBadge code={selected.class.level.code} />
+                  ) : null}
+                </div>
               </div>
+              <Button size="sm" variant="ghost" onClick={() => setSelectedId(null)}>
+                Fermer
+              </Button>
+            </div>
+            <dl className="grid gap-2 text-sm sm:grid-cols-[7rem_1fr]">
+              <dt className="text-muted-foreground">Date</dt>
+              <dd>{formatLiveDate(selected.starts_at)}</dd>
+              <dt className="text-muted-foreground">Horaire</dt>
+              <dd>{formatRange(selected.starts_at, selected.ends_at)}</dd>
+              <dt className="text-muted-foreground">Durée</dt>
+              <dd>{zoomMeetingDurationMinutes(selected.starts_at, selected.ends_at)} min</dd>
+              <dt className="text-muted-foreground">Professeur</dt>
+              <dd>{teacherName(selected)}</dd>
+              <dt className="text-muted-foreground">Plateforme</dt>
+              <dd>
+                {videoProviderLabel(selected.video_provider, isZoomActive(selected.video_provider))}
+              </dd>
             </dl>
-            {joinState && !joinState.allowed && !isStaff && joinState.reason === "too_early" && (
-              <p className="text-sm text-amber-700">
-                Accès possible uniquement à partir de l’heure de début du créneau.
-              </p>
-            )}
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
+              {canEditLiveSession(role, selected, myTeacherId) &&
+              selected.status !== "cancelled" ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setEditOpen(true);
+                  }}
+                >
+                  Modifier la séance
+                </Button>
+              ) : null}
               {(selected.status === "scheduled" || selected.status === "live") && (
                 <Button
+                  disabled={!joinState?.allowed && !isStaff}
                   onClick={() => void joinFromCalendar()}
-                  disabled={Boolean(joinState && !joinState.allowed && !isStaff)}
                 >
-                  {isStaff ? (selected.status === "live" ? "Rejoindre" : "Démarrer") : "Rejoindre"}
+                  {isStaff && selected.status !== "live" ? "Démarrer" : "Rejoindre"}
                 </Button>
               )}
               <Button variant="outline" onClick={() => setSelectedId(null)}>
@@ -424,6 +607,15 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
           </Surface>
         </div>
       )}
+
+      <EditLiveSessionModal
+        open={editOpen}
+        session={selected}
+        onClose={() => {
+          setEditOpen(false);
+          void sessionsQuery.refetch();
+        }}
+      />
     </>
   );
 }

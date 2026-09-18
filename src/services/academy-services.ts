@@ -184,12 +184,45 @@ export const ProfileService = {
     if (!isSupabaseConfigured) return [];
     return SupabaseProfileService.listPendingProfiles();
   },
+  async getById(profileId: string) {
+    if (!isSupabaseConfigured) return null;
+    return SupabaseProfileService.getById(profileId);
+  },
   async setProfileStatus(profileId: string, status: AccountStatus) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseProfileService.setProfileStatus(profileId, status);
   },
   async setStatus(profileId: string, status: AccountStatus) {
     return this.setProfileStatus(profileId, status);
+  },
+  async updateMyProfile(input: { firstName: string; lastName: string; phone?: string | null }) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseProfileService.updateMyProfile(input);
+  },
+  async adminUpdateProfile(
+    profileId: string,
+    input: {
+      firstName: string;
+      lastName: string;
+      phone?: string | null;
+      avatarUrl?: string | null;
+      clearAvatar?: boolean;
+    },
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseProfileService.adminUpdateProfile(profileId, input);
+  },
+  async uploadAvatar(profileId: string, file: File) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseProfileService.uploadAvatar(profileId, file);
+  },
+  async removeAvatar(profileId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseProfileService.removeAvatar(profileId);
+  },
+  async getAvatarSignedUrl(avatarUrl: string | null | undefined) {
+    if (!isSupabaseConfigured || !avatarUrl) return null;
+    return SupabaseProfileService.getAvatarSignedUrl(avatarUrl);
   },
 };
 
@@ -882,6 +915,13 @@ export const LiveSessionService = {
   ) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseLiveSessionService.updateStatus(id, status);
+  },
+  async updateSchedule(
+    id: string,
+    input: Parameters<typeof SupabaseLiveSessionService.updateSchedule>[1],
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseLiveSessionService.updateSchedule(id, input);
   },
   async createEmergencyZoom(id: string) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");

@@ -34,6 +34,7 @@ export const queryKeys = {
   },
   profiles: {
     pending: ["profiles", "pending"] as const,
+    detail: (id: string) => ["profiles", id] as const,
   },
   liveSessionParticipants: {
     bySession: (id: string) => ["live-session-participants", id] as const,

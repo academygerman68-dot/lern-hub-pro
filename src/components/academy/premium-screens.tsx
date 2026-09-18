@@ -51,6 +51,8 @@ import { StudentExamsPage } from "./exam-pages";
 import { QueryState } from "./query-state";
 import { Eyebrow, PremiumHeader, Ring, SkillBars, Status } from "./premium-kit";
 import { Surface } from "./primitives";
+import { ProfileEditor, AdminProfileEditModal } from "./profile/profile-editor";
+import { AssignStudentGroupModal } from "./students/assign-group-modal";
 import { toast } from "sonner";
 
 const momentum = [
@@ -712,6 +714,8 @@ export function PremiumStudent360() {
   const [confirmStatus, setConfirmStatus] = useState<"active" | "restricted" | "suspended" | null>(
     null,
   );
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [assignGroupOpen, setAssignGroupOpen] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const studentQuery = useStudent(selectedStudentId);
   const enrollmentsQuery = useEnrollmentsByStudent(selectedStudentId);
@@ -899,6 +903,10 @@ export function PremiumStudent360() {
 
       {isDirector && student.profileId ? (
         <div className="mt-4 flex flex-wrap gap-2">
+          <Button onClick={() => setEditProfileOpen(true)}>Modifier le profil</Button>
+          <Button variant="secondary" onClick={() => setAssignGroupOpen(true)}>
+            {student.classId ? "Changer de groupe" : "Assigner à un groupe"}
+          </Button>
           <Button
             variant="outline"
             disabled={student.accountStatus === "active" || setProfileStatus.isPending}
@@ -921,6 +929,30 @@ export function PremiumStudent360() {
             Suspendre
           </Button>
         </div>
+      ) : null}
+
+      {isDirector && student.profileId ? (
+        <AdminProfileEditModal
+          open={editProfileOpen}
+          onClose={() => {
+            setEditProfileOpen(false);
+            void studentQuery.refetch();
+          }}
+          profileId={student.profileId}
+          email={student.email}
+        />
+      ) : null}
+
+      {isDirector && student ? (
+        <AssignStudentGroupModal
+          open={assignGroupOpen}
+          student={student}
+          onClose={() => setAssignGroupOpen(false)}
+          onAssigned={() => {
+            void studentQuery.refetch();
+            void enrollmentsQuery.refetch();
+          }}
+        />
       ) : null}
 
       <nav className="mt-9 flex gap-1 overflow-x-auto border-b border-border">
@@ -1190,51 +1222,28 @@ export function PremiumPayments() {
 }
 
 export function PremiumProfile() {
-  const { user } = useAcademy();
+  const { user, profile } = useAcademy();
   const studentsQuery = useStudents();
   const myStudent = (studentsQuery.data ?? []).find(
     (s) => s.email.toLowerCase() === (user?.email ?? "").toLowerCase(),
   );
-  const displayName = user?.name?.trim() || user?.email || "Profil";
-  const initialsText = displayName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
+  const profileId = profile?.id ?? user?.id;
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in space-y-6">
       <PremiumHeader
-        title={displayName}
-        subtitle={`${myStudent?.level ?? "—"} · ${myStudent?.className || "Sans classe"}`}
+        title="Mon profil"
+        subtitle={
+          myStudent
+            ? `${myStudent.level ?? "—"} · ${myStudent.className || "Sans groupe"}`
+            : "Informations personnelles"
+        }
       />
-      <section className="grid gap-8 xl:grid-cols-[.62fr_1.38fr]">
-        <div className="rounded-2xl bg-brand p-8 text-primary-foreground">
-          <span className="grid size-24 place-items-center rounded-full bg-primary-foreground/10 font-display text-3xl">
-            {initialsText || "?"}
-          </span>
-          <h2 className="mt-7 font-display text-3xl">{displayName}</h2>
-          <p className="mt-2 text-sm text-primary-foreground/60">
-            {myStudent?.level ?? "—"} · {myStudent?.className || "Sans classe"}
-          </p>
-          <div className="mt-8 space-y-5 border-t border-primary-foreground/10 pt-6 text-sm">
-            <p>
-              <span className="block text-primary-foreground/45">E-mail</span>
-              {user?.email || "—"}
-            </p>
-            <p>
-              <span className="block text-primary-foreground/45">Abonnement</span>
-              {myStudent?.subscription ?? "—"}
-            </p>
-          </div>
-        </div>
-        <div className="rounded-2xl border border-border p-8 text-sm text-muted-foreground">
-          Les informations affichées proviennent de votre profil académie et de votre fiche
-          étudiant. L’accès aux cours dépend de la régularisation de votre abonnement pour les mois
-          suivants la première connexion.
-        </div>
-      </section>
+      {profileId ? (
+        <ProfileEditor profileId={profileId} mode="self" email={user?.email ?? null} />
+      ) : (
+        <p className="text-sm text-muted-foreground">Profil non disponible.</p>
+      )}
     </div>
   );
 }

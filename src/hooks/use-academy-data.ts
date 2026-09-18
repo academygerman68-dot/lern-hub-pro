@@ -159,6 +159,9 @@ export function useCreateEnrollment() {
         qc.invalidateQueries({ queryKey: queryKeys.classes.all }),
         qc.invalidateQueries({ queryKey: queryKeys.students.all }),
         qc.invalidateQueries({ queryKey: queryKeys.enrollments.byStudent(vars.studentId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.enrollments.byClass(vars.classId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.classes.roster(vars.classId) }),
+        qc.invalidateQueries({ queryKey: ["students"] }),
       ]);
     },
   });
@@ -230,6 +233,87 @@ export function usePendingProfiles() {
   return useQuery({
     queryKey: queryKeys.profiles.pending,
     queryFn: () => ProfileService.listPendingProfiles(),
+  });
+}
+
+export function useProfile(profileId: string | null | undefined) {
+  return useQuery({
+    queryKey: profileId ? queryKeys.profiles.detail(profileId) : (["profiles", "none"] as const),
+    queryFn: () => ProfileService.getById(profileId!),
+    enabled: Boolean(profileId),
+  });
+}
+
+export function useUpdateMyProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { firstName: string; lastName: string; phone?: string | null }) =>
+      ProfileService.updateMyProfile(input),
+    onSuccess: async (row) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.profiles.detail(row.id) }),
+        qc.invalidateQueries({ queryKey: queryKeys.students.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.teachers.all }),
+      ]);
+    },
+  });
+}
+
+export function useAdminUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      profileId: string;
+      firstName: string;
+      lastName: string;
+      phone?: string | null;
+      avatarUrl?: string | null;
+      clearAvatar?: boolean;
+    }) =>
+      ProfileService.adminUpdateProfile(input.profileId, {
+        firstName: input.firstName,
+        lastName: input.lastName,
+        phone: input.phone ?? null,
+        ...(input.avatarUrl !== undefined ? { avatarUrl: input.avatarUrl } : {}),
+        ...(input.clearAvatar !== undefined ? { clearAvatar: input.clearAvatar } : {}),
+      }),
+    onSuccess: async (row) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.profiles.detail(row.id) }),
+        qc.invalidateQueries({ queryKey: queryKeys.students.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.teachers.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.profiles.pending }),
+      ]);
+    },
+  });
+}
+
+export function useUploadProfileAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { profileId: string; file: File }) =>
+      ProfileService.uploadAvatar(input.profileId, input.file),
+    onSuccess: async (row) => {
+      await qc.invalidateQueries({ queryKey: queryKeys.profiles.detail(row.id) });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.students.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.teachers.all }),
+      ]);
+    },
+  });
+}
+
+export function useRemoveProfileAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (profileId: string) => ProfileService.removeAvatar(profileId),
+    onSuccess: async (row) => {
+      await qc.invalidateQueries({ queryKey: queryKeys.profiles.detail(row.id) });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.students.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.teachers.all }),
+      ]);
+    },
   });
 }
 
@@ -1026,6 +1110,33 @@ export function useUpdateLiveSessionStatus() {
       await Promise.all([
         qc.invalidateQueries({ queryKey: queryKeys.liveSessions.all }),
         qc.invalidateQueries({ queryKey: queryKeys.liveSessions.detail(session.id) }),
+      ]);
+    },
+  });
+}
+
+export function useUpdateLiveSessionSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      id: string;
+      title?: string;
+      startsAt: string;
+      endsAt: string | null;
+      actorProfileId?: string | null;
+    }) =>
+      LiveSessionService.updateSchedule(input.id, {
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        startsAt: input.startsAt,
+        endsAt: input.endsAt,
+        ...(input.actorProfileId !== undefined ? { actorProfileId: input.actorProfileId } : {}),
+      }),
+    onSuccess: async (session) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.liveSessions.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.liveSessions.detail(session.id) }),
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.unread }),
       ]);
     },
   });

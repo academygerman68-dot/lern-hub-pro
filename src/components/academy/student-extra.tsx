@@ -40,6 +40,7 @@ import { DocumentViewer } from "./document-viewer";
 import { LiveCalendar, LiveCalendarErrorBoundary } from "./live-calendar";
 import { PeoplePicker } from "./people-picker";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
+import { ProfileEditor } from "./profile/profile-editor";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useAddConversationMember,
@@ -297,7 +298,8 @@ export function Assignments({ detail }: { detail: boolean }) {
                   </p>
                   {(selected.content_url || selected.attachment_path) && (
                     <div className="space-y-2 border-t border-border/70 pt-4">
-                      <h3 className="text-sm font-medium">2. Documents</h3>
+                      <h3 className="text-sm font-semibold">2. Documents</h3>
+                      <p className="text-xs text-muted-foreground">Pièces jointes à consulter</p>
                       <div className="flex flex-wrap gap-2">
                         <Button
                           variant="outline"
@@ -374,6 +376,7 @@ export function Assignments({ detail }: { detail: boolean }) {
 
                 <Surface className="space-y-4 p-6">
                   <h2 className="text-base font-semibold tracking-tight">3. Ma réponse</h2>
+                  <p className="text-xs text-muted-foreground">Texte et/ou fichier à remettre</p>
                   {!myStudent?.id ? (
                     <p className="text-sm text-destructive">Profil étudiant introuvable.</p>
                   ) : (
@@ -462,7 +465,8 @@ export function Assignments({ detail }: { detail: boolean }) {
               </div>
 
               <Surface className="h-fit space-y-4 p-6">
-                <h2 className="text-base font-semibold tracking-tight">4. Soumission / statut</h2>
+                <h2 className="text-base font-semibold tracking-tight">4. Soumission</h2>
+                <p className="text-xs text-muted-foreground">Statut, note et commentaires</p>
                 {submission ? (
                   <div className="space-y-1 text-sm">
                     <Status>
@@ -1159,7 +1163,7 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
 }
 
 export function TeacherProfile() {
-  const { user } = useAcademy();
+  const { user, profile } = useAcademy();
   const teachersQuery = useTeachers();
   const classesQuery = useClasses();
   const sessionsQuery = useLiveSessions();
@@ -1192,36 +1196,29 @@ export function TeacherProfile() {
   );
   const studentCount = myClasses.reduce((total, item) => total + item.size, 0);
   const levels = me?.levels.length ? me.levels.join(" / ") : "—";
+  const profileId = profile?.id ?? me?.profileId ?? user?.id;
 
   return (
     <>
-      <PageHeader
-        title={me?.name ?? user?.name ?? "Profil enseignant"}
-        subtitle={`Profil pédagogique · ${levels}`}
-      />
+      <PageHeader title="Mon profil" subtitle={`Profil pédagogique · ${levels}`} />
+      {profileId ? (
+        <div className="mb-6">
+          <ProfileEditor profileId={profileId} mode="self" email={user?.email ?? null} />
+        </div>
+      ) : null}
       <QueryState
         isLoading={teachersQuery.isLoading || classesQuery.isLoading}
         isError={teachersQuery.isError || classesQuery.isError}
         error={(teachersQuery.error ?? classesQuery.error) as Error | null}
         isEmpty={!me}
-        emptyTitle="Profil introuvable"
+        emptyTitle="Fiche enseignant introuvable"
         emptyMessage="Votre fiche enseignant n’a pas encore été créée par l’administration."
         onRetry={() => {
           void teachersQuery.refetch();
           void classesQuery.refetch();
         }}
       >
-        <div className="grid gap-5 lg:grid-cols-[20rem_1fr]">
-          <Surface className="p-6">
-            <h2 className="font-semibold">{me?.name}</h2>
-            <p className="mt-2 text-sm text-muted-foreground">{me?.email || "—"}</p>
-            {me?.phone ? <p className="mt-2 text-sm text-muted-foreground">{me.phone}</p> : null}
-            <p className="mt-4 text-sm">
-              {myClasses.length
-                ? `Groupes assignés : ${myClasses.map((item) => item.name).join(", ")}`
-                : "Aucun groupe assigné"}
-            </p>
-          </Surface>
+        <div className="grid gap-5 lg:grid-cols-[1fr]">
           <div className="grid gap-4 sm:grid-cols-3">
             <Metric label="Étudiants" value={String(studentCount)} />
             <Metric label="Séances cette semaine" value={String(sessionsThisWeek.length)} />
@@ -1231,6 +1228,14 @@ export function TeacherProfile() {
               icon={<CheckCircle2 />}
             />
           </div>
+          <Surface className="p-5">
+            <h2 className="text-sm font-semibold">Groupes assignés</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {myClasses.length
+                ? myClasses.map((item) => item.name).join(", ")
+                : "Aucun groupe assigné"}
+            </p>
+          </Surface>
         </div>
       </QueryState>
     </>
@@ -1846,25 +1851,17 @@ export function DirectorSettings() {
           </TabsList>
 
           <TabsContent value="profil">
-            <Surface className="space-y-4 p-6">
-              <h2 className="font-semibold">Votre profil</h2>
-              <label className="block text-sm">
-                Nom
-                <Input className="mt-1" value={user?.name ?? ""} readOnly />
-              </label>
-              <label className="block text-sm">
-                E-mail
-                <Input className="mt-1" value={user?.email ?? ""} readOnly />
-              </label>
-              <label className="block text-sm">
-                Téléphone
-                <Input className="mt-1" value={profile?.phone ?? "—"} readOnly />
-              </label>
-              <p className="text-sm text-muted-foreground">
-                Contactez le support pour modifier l’e-mail ou le numéro de téléphone de votre
-                compte.
-              </p>
-            </Surface>
+            {(profile?.id ?? user?.id) ? (
+              <ProfileEditor
+                profileId={(profile?.id ?? user?.id)!}
+                mode="self"
+                email={user?.email ?? null}
+              />
+            ) : (
+              <Surface className="p-6 text-sm text-muted-foreground">
+                Profil non disponible.
+              </Surface>
+            )}
           </TabsContent>
 
           <TabsContent value="academie">
@@ -2095,6 +2092,7 @@ export function DirectorSettings() {
 /** Shared settings for student / teacher (account + security). */
 export function AccountSettings() {
   const { user, profile } = useAcademy();
+  const profileId = profile?.id ?? user?.id;
 
   return (
     <>
@@ -2106,24 +2104,11 @@ export function AccountSettings() {
         </TabsList>
 
         <TabsContent value="compte">
-          <Surface className="space-y-4 p-6">
-            <h2 className="font-semibold">Votre compte</h2>
-            <label className="block text-sm">
-              Nom
-              <Input className="mt-1" value={user?.name ?? ""} readOnly />
-            </label>
-            <label className="block text-sm">
-              E-mail
-              <Input className="mt-1" value={user?.email ?? ""} readOnly />
-            </label>
-            <label className="block text-sm">
-              Téléphone
-              <Input className="mt-1" value={profile?.phone ?? "—"} readOnly />
-            </label>
-            <p className="text-sm text-muted-foreground">
-              Contactez le support pour modifier l’e-mail ou le numéro de téléphone de votre compte.
-            </p>
-          </Surface>
+          {profileId ? (
+            <ProfileEditor profileId={profileId} mode="self" email={user?.email ?? null} />
+          ) : (
+            <Surface className="p-6 text-sm text-muted-foreground">Profil non disponible.</Surface>
+          )}
         </TabsContent>
 
         <TabsContent value="securite" className="space-y-5">

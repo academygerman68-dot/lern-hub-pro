@@ -174,6 +174,155 @@ export const SupabaseLiveSessionService = {
     return data as LiveSessionListItem;
   },
 
+  /**
+   * Update title / schedule only — keeps meeting room & Zoom as-is.
+   * Checks obvious overlaps for the same group or same teacher.
+   */
+  async updateSchedule(
+    id: string,
+    input: {
+      title?: string;
+      startsAt: string;
+      endsAt: string | null;
+      /** Actor profile id — excluded from notifications. */
+      actorProfileId?: string | null;
+    },
+  ): Promise<LiveSessionListItem> {
+    const supabase = requireClient();
+    const current = await this.get(id);
+    if (!current) throw new Error("Séance introuvable.");
+    if (current.status === "cancelled") {
+      throw new Error("Impossible de modifier une séance annulée.");
+    }
+
+    const title = (input.title ?? current.title).trim();
+    if (!title) throw new Error("Le titre de la réunion est obligatoire.");
+    validateLiveSessionSchedule(input.startsAt, input.endsAt);
+
+    const newStart = new Date(input.startsAt).getTime();
+    const newEnd = input.endsAt ? new Date(input.endsAt).getTime() : newStart + 2 * 60 * 60_000;
+
+    const orParts = [
+      current.class_id ? `class_id.eq.${current.class_id}` : null,
+      current.teacher_id ? `teacher_id.eq.${current.teacher_id}` : null,
+    ].filter(Boolean) as string[];
+
+    if (orParts.length > 0) {
+      const { data: candidates, error: conflictError } = await supabase
+        .from("live_sessions")
+        .select("id, title, starts_at, ends_at, class_id, teacher_id, status")
+        .neq("id", id)
+        .neq("status", "cancelled")
+        .or(orParts.join(","));
+      if (conflictError) throw conflictError;
+
+      for (const row of candidates ?? []) {
+        const otherStart = new Date(row.starts_at).getTime();
+        const otherEnd = row.ends_at
+          ? new Date(row.ends_at).getTime()
+          : otherStart + 2 * 60 * 60_000;
+        const overlaps = newStart < otherEnd && otherStart < newEnd;
+        if (!overlaps) continue;
+        if (current.class_id && row.class_id === current.class_id) {
+          throw new Error(
+            "Ce créneau chevauche une autre séance du même groupe. Choisissez un autre horaire.",
+          );
+        }
+        if (current.teacher_id && row.teacher_id === current.teacher_id) {
+          throw new Error(
+            "Ce créneau chevauche une autre séance du même professeur. Choisissez un autre horaire.",
+          );
+        }
+      }
+    }
+
+    const { data, error } = await supabase
+      .from("live_sessions")
+      .update({
+        title,
+        starts_at: input.startsAt,
+        ends_at: input.endsAt,
+      })
+      .eq("id", id)
+      .select(SELECT)
+      .single();
+    if (error) {
+      if (error.message.includes("permission") || error.code === "42501") {
+        throw new Error("Vous n’êtes pas autorisé à modifier cette séance.");
+      }
+      throw new Error("Impossible d’enregistrer le nouvel horaire.");
+    }
+
+    const updated = data as LiveSessionListItem;
+    await this.notifyScheduleChange({
+      session: updated,
+      previousStartsAt: current.starts_at,
+      previousEndsAt: current.ends_at,
+      actorProfileId: input.actorProfileId ?? null,
+    }).catch(() => undefined);
+
+    return updated;
+  },
+
+  async notifyScheduleChange(input: {
+    session: LiveSessionListItem;
+    previousStartsAt: string;
+    previousEndsAt: string | null;
+    actorProfileId?: string | null;
+  }) {
+    const session = input.session;
+    const className = session.class?.name ?? "votre groupe";
+    const weekday = new Date(session.starts_at).toLocaleDateString("fr-FR", {
+      weekday: "long",
+    });
+    const fmt = (iso: string) =>
+      new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    const range = session.ends_at
+      ? `${fmt(session.starts_at)}–${fmt(session.ends_at)}`
+      : fmt(session.starts_at);
+    const message = `L’horaire du cours ${className} a été modifié : ${weekday} ${range}.`;
+    const title = "Horaire de cours modifié";
+
+    const supabase = requireClient();
+    const recipientIds = new Set<string>();
+
+    if (session.class_id) {
+      const { data: enrollments } = await supabase
+        .from("enrollments")
+        .select("student:students!enrollments_student_id_fkey ( profile_id )")
+        .eq("class_id", session.class_id)
+        .eq("status", "active");
+      for (const row of enrollments ?? []) {
+        const student = row.student as { profile_id?: string } | null;
+        if (student?.profile_id) recipientIds.add(student.profile_id);
+      }
+    }
+
+    if (session.teacher_id) {
+      const { data: teacher } = await supabase
+        .from("teachers")
+        .select("profile_id")
+        .eq("id", session.teacher_id)
+        .maybeSingle();
+      if (teacher?.profile_id) recipientIds.add(teacher.profile_id);
+    }
+
+    if (input.actorProfileId) recipientIds.delete(input.actorProfileId);
+
+    await Promise.all(
+      [...recipientIds].map((recipientId) =>
+        supabase.rpc("create_in_app_notification", {
+          p_recipient_id: recipientId,
+          p_title: title,
+          p_message: message,
+          p_category: "live",
+          p_link_page: "live",
+          p_link_id: session.id,
+        }),
+      ),
+    );
+  },
+
   async createEmergencyZoom(id: string) {
     const { data, error } = await requireClient().functions.invoke<{
       ok?: boolean;

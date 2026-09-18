@@ -733,8 +733,8 @@ export function FinancePages({ mode }: { mode: string }) {
         isError={paymentsQuery.isError}
         error={paymentsQuery.error}
         isEmpty={filtered.length === 0}
-        emptyTitle="No payments yet"
-        emptyMessage="Record a payment for a student to start the subscription workflow."
+        emptyTitle="Aucun paiement"
+        emptyMessage="Enregistrez un paiement pour démarrer le suivi d’abonnement."
         onRetry={() => void paymentsQuery.refetch()}
       >
         <div className="space-y-3 md:hidden">

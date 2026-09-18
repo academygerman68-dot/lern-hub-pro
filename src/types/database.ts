@@ -2310,6 +2310,86 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      update_my_profile: {
+        Args: {
+          p_first_name: string;
+          p_last_name: string;
+          p_phone?: string | null;
+        };
+        Returns: {
+          archived_at: string | null;
+          avatar_url: string | null;
+          created_at: string;
+          email: string | null;
+          first_name: string;
+          id: string;
+          language: Database["public"]["Enums"]["app_locale"];
+          last_name: string;
+          phone: string | null;
+          role: Database["public"]["Enums"]["app_role"];
+          status: Database["public"]["Enums"]["profile_status"];
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "profiles";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      admin_update_profile: {
+        Args: {
+          p_profile_id: string;
+          p_first_name: string;
+          p_last_name: string;
+          p_phone?: string | null;
+          p_avatar_url?: string | null;
+          p_clear_avatar?: boolean;
+        };
+        Returns: {
+          archived_at: string | null;
+          avatar_url: string | null;
+          created_at: string;
+          email: string | null;
+          first_name: string;
+          id: string;
+          language: Database["public"]["Enums"]["app_locale"];
+          last_name: string;
+          phone: string | null;
+          role: Database["public"]["Enums"]["app_role"];
+          status: Database["public"]["Enums"]["profile_status"];
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "profiles";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      update_my_avatar_url: {
+        Args: { p_avatar_url: string | null };
+        Returns: {
+          archived_at: string | null;
+          avatar_url: string | null;
+          created_at: string;
+          email: string | null;
+          first_name: string;
+          id: string;
+          language: Database["public"]["Enums"]["app_locale"];
+          last_name: string;
+          phone: string | null;
+          role: Database["public"]["Enums"]["app_role"];
+          status: Database["public"]["Enums"]["profile_status"];
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "profiles";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       can_access_live_session: {
         Args: { p_session_id: string };
         Returns: boolean;
