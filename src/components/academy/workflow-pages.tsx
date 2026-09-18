@@ -17,7 +17,7 @@ import type { Database } from "@/types/database";
 import { useAcademy } from "./academy-context";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { DocumentViewer } from "./document-viewer";
-import { PageHeader, Surface, Status, TableScroll } from "./primitives";
+import { PageHeader, Surface, Status, TableScroll, StatCard, AvatarName } from "./primitives";
 import { QueryState } from "./query-state";
 
 type Assignment = Database["public"]["Tables"]["assignments"]["Row"];
@@ -534,21 +534,21 @@ export function AssignmentGrading({
     >
       <div className="mt-4 space-y-4">
         <div>
-          <h3 className="font-semibold">Remises du devoir</h3>
+          <h3 className="text-base font-semibold tracking-tight">Remises du devoir</h3>
           <p className="text-sm text-muted-foreground">
             Limite : {formatFrDate(dueAt)} · Note maximale : {maxScore}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Status tone="gray">{counters.total} inscrit(s)</Status>
-          <Status tone="green">{counters.submitted} remis</Status>
-          <Status tone="red">{counters.missing} non remis</Status>
-          <Status tone="amber">{counters.late} en retard</Status>
-          <Status tone="blue">{counters.graded} corrigé(s)</Status>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <StatCard label="Total" value={counters.total} />
+          <StatCard label="Remis" value={counters.submitted} tone="success" />
+          <StatCard label="Non remis" value={counters.missing} tone="danger" />
+          <StatCard label="En retard" value={counters.late} tone="warning" />
+          <StatCard label="Corrigés" value={counters.graded} tone="info" />
         </div>
         <TableScroll>
           <table className="w-full min-w-[46rem] text-sm">
-            <thead className="text-left text-muted-foreground">
+            <thead className="sticky top-0 z-10 bg-card text-left text-muted-foreground">
               <tr className="border-b border-border">
                 <th className="p-3 font-medium">Étudiant</th>
                 <th className="p-3 font-medium">Remise</th>
@@ -564,8 +564,7 @@ export function AssignmentGrading({
                 <Fragment key={student.id}>
                   <tr className="border-b border-border align-middle">
                     <td className="p-3">
-                      <p className="font-medium text-foreground">{student.name}</p>
-                      <p className="text-xs text-muted-foreground">{student.email}</p>
+                      <AvatarName name={student.name} subtitle={student.email || null} size="sm" />
                     </td>
                     <td className="p-3">
                       <div className="flex flex-wrap gap-1">

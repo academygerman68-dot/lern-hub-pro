@@ -24,7 +24,7 @@ import { useAcademy } from "./academy-context";
 import { paymentStatusLabel } from "./finance-pages";
 import { QueryState } from "./query-state";
 import { Eyebrow, Status } from "./premium-kit";
-import { Surface } from "./primitives";
+import { GroupBadge, LevelBadge, Surface } from "./primitives";
 
 function dayKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -75,9 +75,12 @@ export function PremiumStudentDashboard() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm text-muted-foreground">{l("Bienvenue", "مرحبًا")}</p>
-          <h1 className="font-display text-3xl font-medium tracking-tight sm:text-4xl">
+          <h1 className="font-display text-3xl font-normal tracking-tight sm:text-4xl">
             Bonjour, {firstName}.
           </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {l("Votre prochaine étape d’apprentissage.", "خطوتك التالية في التعلم.")}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => navigate("courses")}>
@@ -119,21 +122,21 @@ export function PremiumStudentDashboard() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-soft">
           <Eyebrow>{l("Votre parcours", "مسارك")}</Eyebrow>
           <div className="mt-5 space-y-4 text-sm">
             <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
               <span className="text-muted-foreground">{l("Niveau", "المستوى")}</span>
-              <span className="font-medium">{level}</span>
+              <LevelBadge code={level === "—" ? null : String(level)} />
             </div>
             <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
-              <span className="text-muted-foreground">{l("Classe", "القسم")}</span>
-              <span className="font-medium">{className ?? l("Non assignée", "غير معيّن")}</span>
+              <span className="text-muted-foreground">{l("Groupe", "المجموعة")}</span>
+              <GroupBadge label={className ?? null} />
             </div>
             {recentAttempt ? (
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">{l("Dernier examen", "آخر امتحان")}</span>
-                <span className="font-medium">
+                <span className="font-semibold tabular-nums">
                   {Number(recentAttempt.percentage ?? 0).toFixed(0)} %
                 </span>
               </div>

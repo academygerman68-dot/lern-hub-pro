@@ -266,6 +266,7 @@
   align-items: center;
   gap: 0.7rem;
   border-radius: 0.65rem;
+  min-height: 2.75rem;
   padding: 0.58rem 0.75rem;
   font-size: 0.8125rem;
   font-weight: 500;
@@ -339,26 +340,32 @@
   border-collapse: collapse;
   font-size: 0.8125rem;
   & th {
-    padding: 0.75rem 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.7rem 1rem;
     text-align: left;
     color: var(--muted-foreground);
-    background: transparent;
+    background: color-mix(in oklab, var(--card) 92%, var(--muted));
     border-bottom: 1px solid var(--border);
     font-weight: 500;
-    font-size: 0.72rem;
-    letter-spacing: 0.04em;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
   }
   & td {
-    padding: 0.95rem 1rem;
-    border-bottom: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 75%, transparent);
     vertical-align: middle;
   }
   & tbody tr {
-    transition: background-color 140ms ease;
+    transition: background-color 150ms ease;
   }
   & tbody tr:hover {
-    background: color-mix(in oklab, var(--soft-blue) 55%, white);
+    background: color-mix(in oklab, var(--soft-blue) 45%, white);
+  }
+  & tbody tr:last-child td {
+    border-bottom: 0;
   }
 }
 

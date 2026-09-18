@@ -26,7 +26,16 @@ import { WEEKDAY_OPTIONS } from "@/services/supabase/class-schedule-service";
 import type { AccountStatus, AcademyPage, Level, Student } from "@/types/academy";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
-import { PageHeader, Metric, ProgressLine, Status, Surface } from "./primitives";
+import {
+  PageHeader,
+  Metric,
+  ProgressLine,
+  Status,
+  Surface,
+  AvatarName,
+  LevelBadge,
+  GroupBadge,
+} from "./primitives";
 import { PremiumStudent360 } from "./premium-screens";
 import { PremiumDirectorDashboard, PremiumTeacherDashboard } from "./dashboards";
 import {
@@ -535,7 +544,7 @@ function Students() {
           />
         </div>
         <select
-          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          className="h-10 min-h-11 rounded-md border border-input bg-background px-3 text-sm sm:min-h-10"
           value={levelFilter}
           onChange={(e) => {
             setLevelFilter(e.target.value);
@@ -550,7 +559,7 @@ function Students() {
           ))}
         </select>
         <select
-          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          className="h-10 min-h-11 rounded-md border border-input bg-background px-3 text-sm sm:min-h-10"
           value={groupFilter}
           onChange={(e) => setGroupFilter(e.target.value)}
         >
@@ -563,7 +572,7 @@ function Students() {
           ))}
         </select>
         <select
-          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          className="h-10 min-h-11 rounded-md border border-input bg-background px-3 text-sm sm:min-h-10"
           value={teacherFilter}
           onChange={(e) => setTeacherFilter(e.target.value)}
         >
@@ -575,7 +584,7 @@ function Students() {
           ))}
         </select>
         <select
-          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          className="h-10 min-h-11 rounded-md border border-input bg-background px-3 text-sm sm:min-h-10"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
@@ -600,19 +609,17 @@ function Students() {
           {filtered.map((student) => (
             <Surface key={student.id} className="space-y-3 p-4" onClick={() => setDetail(student)}>
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-semibold">
-                    {student.lastName} {student.firstName}
-                  </p>
-                  <p className="truncate text-sm text-muted-foreground">{student.email}</p>
-                </div>
+                <AvatarName
+                  name={`${student.firstName} ${student.lastName}`.trim() || student.name}
+                  subtitle={student.email}
+                />
                 <Status tone={accountStatusTone(student.accountStatus)}>
                   {accountStatusLabel(student.accountStatus)}
                 </Status>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
-                <span>Niveau · {student.level}</span>
-                <span className="truncate">Groupe · {student.className || "—"}</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <LevelBadge code={student.level} />
+                <GroupBadge label={student.className || null} />
               </div>
             </Surface>
           ))}
@@ -621,44 +628,43 @@ function Students() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Nom</th>
-                <th>Prénom</th>
+                <th>Étudiant</th>
                 <th>E-mail</th>
-                <th>Téléphone</th>
                 <th>Niveau</th>
                 <th>Groupe</th>
                 <th>Professeur</th>
-                <th>Statut compte</th>
+                <th>Statut</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((student) => (
                 <tr key={student.id} className="cursor-pointer" onClick={() => setDetail(student)}>
                   <td>
-                    <strong>{student.lastName || "—"}</strong>
+                    <AvatarName
+                      name={`${student.lastName} ${student.firstName}`.trim() || student.name}
+                      subtitle={student.email || null}
+                      size="sm"
+                    />
                   </td>
-                  <td>{student.firstName || "—"}</td>
                   <td onClick={(event) => event.stopPropagation()}>
                     {student.email ? (
-                      <a className="text-primary underline" href={`mailto:${student.email}`}>
+                      <a
+                        className="text-sm text-muted-foreground transition-colors hover:text-primary"
+                        href={`mailto:${student.email}`}
+                      >
                         {student.email}
                       </a>
                     ) : (
                       "—"
                     )}
                   </td>
-                  <td onClick={(event) => event.stopPropagation()}>
-                    {student.phone ? (
-                      <a className="text-primary underline" href={`tel:${student.phone}`}>
-                        {student.phone}
-                      </a>
-                    ) : (
-                      "—"
-                    )}
+                  <td>
+                    <LevelBadge code={student.level} />
                   </td>
-                  <td>{student.level}</td>
-                  <td>{student.className}</td>
-                  <td>{student.teacherName || "—"}</td>
+                  <td>
+                    <GroupBadge label={student.className || null} />
+                  </td>
+                  <td className="text-muted-foreground">{student.teacherName || "—"}</td>
                   <td>
                     <Status tone={accountStatusTone(student.accountStatus)}>
                       {accountStatusLabel(student.accountStatus)}
@@ -711,12 +717,16 @@ function Students() {
               <p>
                 <span className="text-muted-foreground">Niveau</span>
                 <br />
-                {detail.level}
+                <span className="mt-1 inline-block">
+                  <LevelBadge code={detail.level} />
+                </span>
               </p>
               <p>
                 <span className="text-muted-foreground">Groupe</span>
                 <br />
-                {detail.className}
+                <span className="mt-1 inline-block">
+                  <GroupBadge label={detail.className || null} />
+                </span>
               </p>
               <p>
                 <span className="text-muted-foreground">Professeur</span>
@@ -967,9 +977,10 @@ function Classes() {
               onClick={() => setSelectedId(item.id)}
             >
               <div className="flex justify-between gap-2">
-                <span className="grid size-10 place-items-center rounded-md bg-secondary font-semibold text-primary">
-                  {item.level}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <LevelBadge code={item.level} />
+                  <GroupBadge label={item.reference || item.name} />
+                </div>
                 <div className="flex flex-wrap justify-end gap-2">
                   {item.capacity > 0 && item.size >= item.capacity && (
                     <Status tone="red">Complet</Status>
@@ -979,17 +990,15 @@ function Classes() {
                   </Status>
                 </div>
               </div>
-              <h2 className="mt-4 text-lg font-semibold">{item.name}</h2>
+              <h2 className="mt-4 text-lg font-semibold tracking-tight">{item.name}</h2>
               <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-                <p>
-                  Référence : <strong className="text-foreground">{item.reference ?? "—"}</strong>
-                </p>
-                <p>
-                  Niveau : <strong className="text-foreground">{item.level}</strong>
-                </p>
-                <p>
-                  Professeur : <strong className="text-foreground">{item.teacher}</strong>
-                </p>
+                <div className="pt-1">
+                  <AvatarName
+                    name={item.teacher && item.teacher !== "—" ? item.teacher : "Non assigné"}
+                    size="sm"
+                    subtitle="Professeur"
+                  />
+                </div>
                 <p>
                   Du {item.startDate ?? "—"} au {item.endDate ?? "—"}
                 </p>
@@ -1475,32 +1484,33 @@ function Teachers() {
               onClick={() => setSelectedId(teacher.id)}
             >
               <div className="flex items-start justify-between gap-3">
-                <span className="grid size-12 place-items-center rounded-full bg-secondary font-semibold text-primary">
-                  {[teacher.firstName, teacher.lastName]
-                    .filter(Boolean)
-                    .map((part) => part[0])
-                    .join("") || "?"}
-                </span>
+                <AvatarName
+                  name={teacher.name}
+                  subtitle={teacher.email || teacher.subject || null}
+                />
                 <Status tone={accountStatusTone(teacher.accountStatus)}>
                   {accountStatusLabel(teacher.accountStatus)}
                 </Status>
               </div>
-              <h2 className="mt-4 font-semibold">{teacher.name}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {teacher.email || teacher.subject}
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap items-center gap-2">
                 {teacher.levels.length ? (
-                  teacher.levels.map((level) => <Status key={level}>{level}</Status>)
+                  teacher.levels.map((level) => <LevelBadge key={level} code={level} />)
                 ) : (
                   <span className="text-sm text-muted-foreground">Aucun niveau</span>
                 )}
               </div>
-              <p className="mt-3 text-sm text-muted-foreground">
-                {teacher.classes.length
-                  ? `${teacher.classes.length} groupe${teacher.classes.length > 1 ? "s" : ""}`
-                  : "Aucun groupe assigné"}
-              </p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {teacher.classes.length ? (
+                  teacher.classes.slice(0, 3).map((c) => <GroupBadge key={c} label={c} />)
+                ) : (
+                  <span className="text-sm text-muted-foreground">Aucun groupe assigné</span>
+                )}
+                {teacher.classes.length > 3 ? (
+                  <span className="text-xs text-muted-foreground">
+                    +{teacher.classes.length - 3}
+                  </span>
+                ) : null}
+              </div>
             </Surface>
           ))}
         </div>
@@ -1641,10 +1651,13 @@ function Teachers() {
                     return (
                       <Surface key={group.id} className="space-y-2 p-3">
                         <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <strong>{group.name}</strong>
+                          <div className="min-w-0 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <GroupBadge label={group.name} />
+                              <LevelBadge code={group.level} />
+                            </div>
                             <p className="text-sm text-muted-foreground">
-                              {group.level} · {groupStudents.length} étudiant
+                              {groupStudents.length} étudiant
                               {groupStudents.length > 1 ? "s" : ""}
                             </p>
                           </div>
@@ -1666,10 +1679,13 @@ function Teachers() {
                           </Button>
                         </div>
                         {groupStudents.length ? (
-                          <ul className="space-y-1 text-sm text-muted-foreground">
+                          <ul className="space-y-2">
                             {groupStudents.map((student) => (
                               <li key={student.id}>
-                                {student.lastName} {student.firstName}
+                                <AvatarName
+                                  size="sm"
+                                  name={`${student.lastName} ${student.firstName}`.trim()}
+                                />
                               </li>
                             ))}
                           </ul>

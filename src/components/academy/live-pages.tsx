@@ -37,7 +37,7 @@ import { useAcademy } from "./academy-context";
 import { JitsiMeetingEmbed } from "./jitsi-meeting";
 import { QueryState } from "./query-state";
 import { LiveCalendar, LiveCalendarErrorBoundary } from "./live-calendar";
-import { PageHeader, Status, Surface } from "./primitives";
+import { PageHeader, Status, Surface, LevelBadge, GroupBadge } from "./primitives";
 
 export function LiveClassesPage({ meeting }: { meeting: boolean }) {
   const accessQuery = useAcademicAccess();
@@ -144,43 +144,48 @@ function SessionCard({
   return (
     <Surface className="p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <span className="grid size-12 place-items-center rounded-lg bg-secondary text-primary">
+        <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary">
           <Video className="size-5" />
         </span>
-        <div className="min-w-0 flex-1 space-y-1">
-          <h2 className="text-lg font-semibold">{item.title}</h2>
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold tracking-tight">{item.title}</h2>
+            <Status
+              tone={
+                item.status === "live" ? "green" : item.status === "scheduled" ? "amber" : "gray"
+              }
+            >
+              {liveStatusLabel(item.status)}
+            </Status>
+          </div>
           <p className="text-sm text-muted-foreground">
             Professeur : <strong className="text-foreground">{teacherLabel(item)}</strong>
           </p>
-          <p className="text-sm text-muted-foreground">
-            Groupe : <strong className="text-foreground">{item.class?.name ?? "—"}</strong>
-            {item.class?.level?.code ? ` · Niveau ${item.class.level.code}` : ""}
-          </p>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <GroupBadge label={item.class?.name ?? null} />
+            {item.class?.level?.code ? <LevelBadge code={item.class.level.code} /> : null}
+          </div>
           <p className="text-sm text-muted-foreground">
             {formatLiveDate(item.starts_at)} · {formatLiveTime(item.starts_at)}
             {item.ends_at ? ` – ${formatLiveTime(item.ends_at)}` : ""}
             {" · "}
             {durationMin} min
           </p>
-          <p className="text-sm text-muted-foreground">
-            Visioconférence :{" "}
-            <strong className="text-foreground">
-              {videoProviderLabel(item.video_provider, zoom)}
-            </strong>
+          <p className="text-xs text-muted-foreground">
+            {videoProviderLabel(item.video_provider, zoom)}
           </p>
           {!joinState.allowed && unavailableLabel ? (
             <p className="text-xs text-muted-foreground">{unavailableLabel}</p>
           ) : null}
         </div>
         <div className="flex flex-col items-stretch gap-2 sm:items-end">
-          <Status
-            tone={item.status === "live" ? "green" : item.status === "scheduled" ? "amber" : "red"}
-          >
-            {liveStatusLabel(item.status)}
-          </Status>
           {canAct && (
             <>
-              <Button onClick={onStart} disabled={!joinState.allowed && !isStaff}>
+              <Button
+                className="min-h-11"
+                onClick={onStart}
+                disabled={!joinState.allowed && !isStaff}
+              >
                 <Video className="size-4" />
                 {joinLabel}
               </Button>

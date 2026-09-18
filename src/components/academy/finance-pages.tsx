@@ -27,7 +27,7 @@ import { useAcademy } from "./academy-context";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { DocumentViewer } from "./document-viewer";
 import { QueryState } from "./query-state";
-import { Metric, PageHeader, Status, Surface } from "./primitives";
+import { Metric, PageHeader, Status, Surface, FormSection, FileDropzoneVisual } from "./primitives";
 
 type DocPreview = {
   title: string;
@@ -885,138 +885,164 @@ export function FinancePages({ mode }: { mode: string }) {
         <div className="mobile-modal">
           <Surface className="mobile-modal-panel space-y-4">
             <h2 className="text-lg font-semibold">Enregistrer un paiement</h2>
-            <label className="block text-sm">
-              Étudiant
-              <select
-                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
-              >
-                <option value="">Choisir un étudiant</option>
-                {(studentsQuery.data ?? []).map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} · {s.email}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-sm">
-              Montant initial (MAD)
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={initialAmount}
-                onChange={(e) => setInitialAmount(e.target.value)}
-                className="mt-1"
-              />
-            </label>
-            <div className="grid gap-3 sm:grid-cols-2">
+
+            <FormSection title="Étudiant" description="Sélectionnez le compte étudiant concerné.">
               <label className="block text-sm">
-                Type de remise
+                Étudiant
                 <select
                   className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={discountMode}
-                  onChange={(e) => setDiscountMode(e.target.value as "none" | "percent" | "fixed")}
+                  value={studentId}
+                  onChange={(e) => setStudentId(e.target.value)}
                 >
-                  <option value="none">Aucune</option>
-                  <option value="percent">Pourcentage (%)</option>
-                  <option value="fixed">Montant fixe (MAD)</option>
+                  <option value="">Choisir un étudiant</option>
+                  {(studentsQuery.data ?? []).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} · {s.email}
+                    </option>
+                  ))}
                 </select>
               </label>
+            </FormSection>
+
+            <FormSection title="Montant" description="Montant initial avant remise.">
               <label className="block text-sm">
-                Valeur remise
+                Montant initial (MAD)
                 <Input
                   type="number"
                   min="0"
                   step="0.01"
-                  disabled={discountMode === "none"}
-                  value={discountValue}
-                  onChange={(e) => setDiscountValue(e.target.value)}
+                  value={initialAmount}
+                  onChange={(e) => setInitialAmount(e.target.value)}
                   className="mt-1"
                 />
               </label>
-            </div>
-            <div className="rounded-md bg-muted/50 px-3 py-2 text-sm">
-              Montant final :{" "}
-              <span className="font-semibold">{computedFinal.toLocaleString("fr-FR")} MAD</span>
-            </div>
-            <label className="block text-sm">
-              Montant payé (MAD)
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={amountPaid}
-                onChange={(e) => setAmountPaid(e.target.value)}
-                className="mt-1"
-              />
-            </label>
-            <label className="block text-sm">
-              Méthode de paiement
-              <select
-                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
+            </FormSection>
+
+            <FormSection title="Remise" description="Optionnelle — pourcentage ou montant fixe.">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm">
+                  Type de remise
+                  <select
+                    className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={discountMode}
+                    onChange={(e) =>
+                      setDiscountMode(e.target.value as "none" | "percent" | "fixed")
+                    }
+                  >
+                    <option value="none">Aucune</option>
+                    <option value="percent">Pourcentage (%)</option>
+                    <option value="fixed">Montant fixe (MAD)</option>
+                  </select>
+                </label>
+                <label className="block text-sm">
+                  Valeur remise
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    disabled={discountMode === "none"}
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(e.target.value)}
+                    className="mt-1"
+                  />
+                </label>
+              </div>
+              <div className="rounded-lg bg-muted/50 px-3 py-2 text-sm">
+                Montant final :{" "}
+                <span className="font-semibold">{computedFinal.toLocaleString("fr-FR")} MAD</span>
+              </div>
+              <label className="block text-sm">
+                Montant payé (MAD)
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={amountPaid}
+                  onChange={(e) => setAmountPaid(e.target.value)}
+                  className="mt-1"
+                />
+              </label>
+            </FormSection>
+
+            <FormSection title="Méthode" description="Mode de règlement et références.">
+              <label className="block text-sm">
+                Méthode de paiement
+                <select
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                >
+                  <option value="cash">Espèces</option>
+                  <option value="bank_transfer">Virement bancaire</option>
+                  <option value="card">Carte</option>
+                  <option value="mobile_money">Espèces mobile</option>
+                </select>
+              </label>
+              <label className="block text-sm">
+                Référence
+                <Input
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  className="mt-1"
+                />
+              </label>
+              <label className="block text-sm">
+                Note
+                <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1" />
+              </label>
+            </FormSection>
+
+            <FormSection title="Statut & échéance">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm">
+                  Statut
+                  <select
+                    className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={paymentStatus}
+                    onChange={(e) => setPaymentStatus(e.target.value as PaymentStatus)}
+                  >
+                    <option value="pending">En attente</option>
+                    <option value="partial">Partiel</option>
+                    <option value="paid">Confirmé</option>
+                    <option value="overdue">En retard</option>
+                    <option value="cancelled">Annulé</option>
+                    <option value="suspended">Suspendu</option>
+                  </select>
+                </label>
+                <label className="block text-sm">
+                  Échéance
+                  <Input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="mt-1"
+                  />
+                </label>
+              </div>
+            </FormSection>
+
+            <FormSection
+              title="Reçu administratif"
+              description="PDF ou image (JPEG/PNG). Zone de dépôt bien visible — facultatif."
+            >
+              <FileDropzoneVisual
+                title="Déposez le reçu administratif"
+                hint="PDF ou image (JPEG/PNG) — facultatif"
+                className="!py-4"
               >
-                <option value="cash">Espèces</option>
-                <option value="bank_transfer">Virement bancaire</option>
-                <option value="card">Carte</option>
-                <option value="mobile_money">Espèces mobile</option>
-              </select>
-            </label>
-            <label className="block text-sm">
-              Référence
-              <Input
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                className="mt-1"
-              />
-            </label>
-            <label className="block text-sm">
-              Note
-              <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1" />
-            </label>
-            <label className="block text-sm">
-              Statut
-              <select
-                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={paymentStatus}
-                onChange={(e) => setPaymentStatus(e.target.value as PaymentStatus)}
-              >
-                <option value="pending">En attente</option>
-                <option value="partial">Partiel</option>
-                <option value="paid">Confirmé</option>
-                <option value="overdue">En retard</option>
-                <option value="cancelled">Annulé</option>
-                <option value="suspended">Suspendu</option>
-              </select>
-            </label>
-            <label className="block text-sm">
-              Échéance
-              <Input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="mt-1"
-              />
-            </label>
-            <div className="space-y-2 rounded-md border border-border p-3">
-              <h3 className="text-sm font-semibold">Reçu / justificatif administratif</h3>
-              <p className="text-xs text-muted-foreground">
-                PDF ou image (JPEG/PNG) · glisser-déposer accepté · facultatif
-              </p>
-              <ContentAttachmentUploader
-                kinds={["pdf", "image"]}
-                value={receiptAttachment}
-                onChange={setReceiptAttachment}
-                disabled={createPayment.isPending || uploadPaymentReceipt.isPending}
-                uploading={createPayment.isPending || uploadPaymentReceipt.isPending}
-                requiredFileWhenNew={false}
-                showKindSelect={false}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
+                <ContentAttachmentUploader
+                  kinds={["pdf", "image"]}
+                  value={receiptAttachment}
+                  onChange={setReceiptAttachment}
+                  disabled={createPayment.isPending || uploadPaymentReceipt.isPending}
+                  uploading={createPayment.isPending || uploadPaymentReceipt.isPending}
+                  requiredFileWhenNew={false}
+                  showKindSelect={false}
+                />
+              </FileDropzoneVisual>
+            </FormSection>
+
+            <div className="sticky bottom-0 -mx-1 flex justify-end gap-2 border-t bg-card/95 px-1 pt-4 pb-1 backdrop-blur-sm">
               <Button variant="outline" onClick={() => setCreateOpen(false)}>
                 Annuler
               </Button>

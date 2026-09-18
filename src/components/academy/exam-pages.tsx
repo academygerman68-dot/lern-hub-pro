@@ -43,7 +43,7 @@ import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attac
 import { ExamBuilder } from "./exam-builder";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
-import { PageHeader, Status, Surface } from "./primitives";
+import { PageHeader, Status, Surface, ProgressLine } from "./primitives";
 
 const EXAM_ID_KEY = "ga_active_exam_id";
 const ATTEMPT_ID_KEY = "ga_active_attempt_id";
@@ -363,12 +363,10 @@ function StudentExamRunner() {
               {remaining}
             </span>
           </div>
-          <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-secondary">
-            <div
-              className="h-full bg-primary transition-all"
-              style={{ width: `${((index + 1) / Math.max(questions.length, 1)) * 100}%` }}
-            />
-          </div>
+          <ProgressLine
+            className="mt-4"
+            value={((index + 1) / Math.max(questions.length, 1)) * 100}
+          />
         </header>
 
         <div className="grid gap-6 lg:grid-cols-[1fr_14rem]">
@@ -404,9 +402,9 @@ function StudentExamRunner() {
                     <button
                       key={option.id}
                       type="button"
-                      className={`flex w-full rounded-md border px-4 py-3 text-left text-sm transition ${
+                      className={`flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left text-sm transition duration-150 ${
                         selected
-                          ? "border-primary bg-primary/5 text-foreground"
+                          ? "border-primary bg-primary/5 font-medium text-foreground shadow-soft"
                           : "border-border hover:border-primary/40"
                       }`}
                       onClick={() => {
@@ -414,7 +412,17 @@ function StudentExamRunner() {
                         persist(current.id, option.value);
                       }}
                     >
-                      {option.label}
+                      <span
+                        className={`grid size-4 shrink-0 place-items-center rounded-full border ${
+                          selected ? "border-primary bg-primary" : "border-muted-foreground/40"
+                        }`}
+                        aria-hidden
+                      >
+                        {selected ? (
+                          <span className="size-1.5 rounded-full bg-primary-foreground" />
+                        ) : null}
+                      </span>
+                      <span>{option.label}</span>
                     </button>
                   );
                 })}
@@ -424,7 +432,7 @@ function StudentExamRunner() {
                 current?.type === "speaking") && (
                 <div>
                   <Textarea
-                    className="min-h-40"
+                    className="min-h-52 text-base leading-relaxed"
                     value={answerValue(localAnswers[current.id])}
                     placeholder="Saisissez votre réponse…"
                     onChange={(e) => {

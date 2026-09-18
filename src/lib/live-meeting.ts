@@ -33,8 +33,8 @@ export function videoProviderLabel(provider: string | null | undefined, emergenc
 }
 
 export function liveStatusLabel(status: string) {
-  if (status === "live") return "En direct";
-  if (status === "scheduled") return "Planifiée";
+  if (status === "live") return "Live";
+  if (status === "scheduled") return "À venir";
   if (status === "completed") return "Terminée";
   if (status === "cancelled") return "Annulée";
   return status;

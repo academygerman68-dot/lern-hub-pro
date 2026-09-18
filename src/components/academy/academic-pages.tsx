@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
+import { MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -45,7 +53,7 @@ import type { Database } from "@/types/database";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { DocumentViewer } from "./document-viewer";
 import { useAcademy } from "./academy-context";
-import { PageHeader, Status, Surface } from "./primitives";
+import { PageHeader, Status, Surface, LevelBadge, GroupBadge, FormSection } from "./primitives";
 import { QueryState } from "./query-state";
 import { AssignmentGrading } from "./workflow-pages";
 
@@ -258,16 +266,18 @@ export function DirectorCoursesPage() {
             {courses.map((course) => (
               <Surface className="p-5" key={course.id}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                      {course.level?.code ?? selectedLevel?.code} ·{" "}
-                      {COURSE_KIND_LABELS[course.content_kind]}
-                    </p>
-                    <h2 className="mt-1 text-lg font-semibold">{course.title}</h2>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <LevelBadge code={course.level?.code ?? selectedLevel?.code} />
+                      <span className="text-xs text-muted-foreground">
+                        {COURSE_KIND_LABELS[course.content_kind]}
+                      </span>
+                    </div>
+                    <h2 className="mt-2 text-lg font-semibold tracking-tight">{course.title}</h2>
                     {course.description ? (
                       <p className="mt-1 text-sm text-muted-foreground">{course.description}</p>
                     ) : null}
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {formatFrDate(course.created_at)}
                     </p>
                   </div>
@@ -277,7 +287,6 @@ export function DirectorCoursesPage() {
                     </Status>
                     <Button
                       size="sm"
-                      variant="outline"
                       onClick={() =>
                         void openLinkOrFile(
                           course.title,
@@ -289,23 +298,32 @@ export function DirectorCoursesPage() {
                     >
                       Ouvrir
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => openEdit(course)}>
-                      Modifier
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={deleteCourse.isPending}
-                      onClick={() => {
-                        if (!window.confirm(`Supprimer le cours « ${course.title} » ?`)) return;
-                        deleteCourse.mutate(course.id, {
-                          onSuccess: () => toast.success("Cours supprimé"),
-                          onError: (err) => toast.error(err.message),
-                        });
-                      }}
-                    >
-                      Supprimer
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="outline" aria-label="Actions du cours">
+                          <MoreHorizontal className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEdit(course)}>
+                          Modifier
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          disabled={deleteCourse.isPending}
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => {
+                            if (!window.confirm(`Supprimer le cours « ${course.title} » ?`)) return;
+                            deleteCourse.mutate(course.id, {
+                              onSuccess: () => toast.success("Cours supprimé"),
+                              onError: (err) => toast.error(err.message),
+                            });
+                          }}
+                        >
+                          Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               </Surface>
@@ -781,12 +799,24 @@ export function MaterialsLibraryPage() {
                 className="flex flex-wrap items-center justify-between gap-3 p-4"
                 key={item.id}
               >
-                <div>
-                  <h2 className="font-semibold">{item.title}</h2>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {item.level_code ? <LevelBadge code={item.level_code} /> : null}
+                    {item.audience === "class" || item.class_id ? (
+                      <GroupBadge
+                        label={
+                          (classesQuery.data ?? []).find((c) => c.id === item.class_id)?.name ??
+                          "Groupe"
+                        }
+                      />
+                    ) : null}
+                    <span className="text-xs text-muted-foreground">
+                      {DOMAIN_LABELS[item.domain]} · {MEDIA_KIND_LABELS[item.content_kind]}
+                    </span>
+                  </div>
+                  <h2 className="mt-1.5 font-semibold tracking-tight">{item.title}</h2>
                   <p className="text-sm text-muted-foreground">
-                    {DOMAIN_LABELS[item.domain]} · {MEDIA_KIND_LABELS[item.content_kind]} ·{" "}
                     {AUDIENCE_LABELS[item.audience]}
-                    {item.level_code ? ` · ${item.level_code}` : ""}
                     {` · ${formatFrDate(item.created_at)}`}
                   </p>
                   {item.description ? (
@@ -826,25 +856,31 @@ export function MaterialsLibraryPage() {
                     </Button>
                   )}
                   {role !== "student" && (
-                    <>
-                      <Button variant="outline" size="sm" onClick={() => openEdit(item)}>
-                        Modifier
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={archiveItem.isPending}
-                        onClick={() => {
-                          if (!window.confirm(`Supprimer la ressource « ${item.title} » ?`)) return;
-                          archiveItem.mutate(item.id, {
-                            onSuccess: () => toast.success("Ressource archivée"),
-                            onError: (err) => toast.error(err.message),
-                          });
-                        }}
-                      >
-                        Supprimer ressource
-                      </Button>
-                    </>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="outline" aria-label="Actions ressource">
+                          <MoreHorizontal className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEdit(item)}>Modifier</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          disabled={archiveItem.isPending}
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => {
+                            if (!window.confirm(`Supprimer la ressource « ${item.title} » ?`))
+                              return;
+                            archiveItem.mutate(item.id, {
+                              onSuccess: () => toast.success("Ressource archivée"),
+                              onError: (err) => toast.error(err.message),
+                            });
+                          }}
+                        >
+                          Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
               </Surface>
@@ -1068,12 +1104,14 @@ export function DirectorAssignmentsPage() {
           {assignments.map((row) => (
             <Surface className="p-5" key={row.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="font-semibold">{row.title}</h2>
+                <div className="min-w-0">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <LevelBadge code={row.level?.code} />
+                    <GroupBadge label={row.class?.name ?? "Niveau entier"} />
+                  </div>
+                  <h2 className="font-semibold tracking-tight">{row.title}</h2>
                   <p className="text-sm text-muted-foreground">
-                    {row.level?.code ?? "—"}
-                    {row.class?.name ? ` · ${row.class.name}` : " · Niveau entier"}
-                    {` · Limite ${formatFrDate(row.due_at)}`}
+                    {`Limite ${formatFrDate(row.due_at)}`}
                     {` · ${MEDIA_KIND_LABELS[row.content_kind]}`}
                   </p>
                   {row.instructions || row.description ? (
@@ -1124,7 +1162,7 @@ export function DirectorAssignmentsPage() {
                   </Button>
                   <Button
                     size="sm"
-                    variant="outline"
+                    className="min-h-10 font-semibold shadow-soft"
                     onClick={() => setGradingId(gradingId === row.id ? null : row.id)}
                   >
                     {gradingId === row.id ? "Masquer les remises" : "Voir les remises"}
@@ -1164,12 +1202,17 @@ export function DirectorAssignmentsPage() {
             <h2 className="text-lg font-semibold">
               {editingId ? "Modifier le devoir" : "Créer un devoir"}
             </h2>
-            <Input placeholder="Titre" value={title} onChange={(e) => setTitle(e.target.value)} />
-            <Textarea
-              placeholder="Consigne / description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
+            <FormSection
+              title="Consigne"
+              description="Titre et instructions visibles par les étudiants."
+            >
+              <Input placeholder="Titre" value={title} onChange={(e) => setTitle(e.target.value)} />
+              <Textarea
+                placeholder="Consigne / description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </FormSection>
             <label className="block text-sm">
               Niveau
               <select

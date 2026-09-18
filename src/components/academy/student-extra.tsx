@@ -285,87 +285,184 @@ export function Assignments({ detail }: { detail: boolean }) {
           onRetry={() => void listQuery.refetch()}
         >
           {selected ? (
-            <div className="grid gap-5 lg:grid-cols-[1fr_22rem]">
-              <Surface className="space-y-4 p-6">
-                <h2 className="font-semibold">Consignes</h2>
-                <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
-                  {selected.instructions ||
-                    selected.description ||
-                    "Suivez les consignes données par votre professeur."}
-                </p>
-                {(selected.content_url || selected.attachment_path) && (
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setPreview({
-                          title: selected.title,
-                          url: null,
-                          mimeType: selected.mime_type,
-                          loading: true,
-                          error: null,
-                        });
-                        void AssignmentService.getAttachmentUrl(selected)
-                          .then((url) => {
-                            if (selected.content_kind === "link") {
-                              window.open(url, "_blank", "noopener,noreferrer");
-                              setPreview(null);
-                              return;
-                            }
-                            setPreview({
-                              title: selected.title,
-                              url,
-                              mimeType: selected.mime_type,
-                              loading: false,
-                              error: null,
-                            });
-                          })
-                          .catch((err: Error) =>
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+              <div className="space-y-5">
+                <Surface className="space-y-4 p-6">
+                  <h2 className="text-base font-semibold tracking-tight">1. Consigne</h2>
+                  <p className="text-xs text-muted-foreground">Instructions du professeur</p>
+                  <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
+                    {selected.instructions ||
+                      selected.description ||
+                      "Suivez les consignes données par votre professeur."}
+                  </p>
+                  {(selected.content_url || selected.attachment_path) && (
+                    <div className="space-y-2 border-t border-border/70 pt-4">
+                      <h3 className="text-sm font-medium">2. Documents</h3>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
                             setPreview({
                               title: selected.title,
                               url: null,
                               mimeType: selected.mime_type,
-                              loading: false,
-                              error: err.message,
-                            }),
-                          );
-                      }}
-                    >
-                      Voir
-                    </Button>
-                    {selected.content_kind !== "link" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          void (async () => {
-                            try {
-                              const url = await AssignmentService.getAttachmentUrl(selected);
-                              const response = await fetch(url);
-                              const blob = await response.blob();
-                              const objectUrl = URL.createObjectURL(blob);
-                              const a = document.createElement("a");
-                              a.href = objectUrl;
-                              a.download = selected.title;
-                              a.click();
-                              URL.revokeObjectURL(objectUrl);
-                            } catch (err) {
-                              toast.error(
-                                err instanceof Error ? err.message : "Téléchargement impossible",
+                              loading: true,
+                              error: null,
+                            });
+                            void AssignmentService.getAttachmentUrl(selected)
+                              .then((url) => {
+                                if (selected.content_kind === "link") {
+                                  window.open(url, "_blank", "noopener,noreferrer");
+                                  setPreview(null);
+                                  return;
+                                }
+                                setPreview({
+                                  title: selected.title,
+                                  url,
+                                  mimeType: selected.mime_type,
+                                  loading: false,
+                                  error: null,
+                                });
+                              })
+                              .catch((err: Error) =>
+                                setPreview({
+                                  title: selected.title,
+                                  url: null,
+                                  mimeType: selected.mime_type,
+                                  loading: false,
+                                  error: err.message,
+                                }),
                               );
+                          }}
+                        >
+                          Voir
+                        </Button>
+                        {selected.content_kind !== "link" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              void (async () => {
+                                try {
+                                  const url = await AssignmentService.getAttachmentUrl(selected);
+                                  const response = await fetch(url);
+                                  const blob = await response.blob();
+                                  const objectUrl = URL.createObjectURL(blob);
+                                  const a = document.createElement("a");
+                                  a.href = objectUrl;
+                                  a.download = selected.title;
+                                  a.click();
+                                  URL.revokeObjectURL(objectUrl);
+                                } catch (err) {
+                                  toast.error(
+                                    err instanceof Error
+                                      ? err.message
+                                      : "Téléchargement impossible",
+                                  );
+                                }
+                              })()
                             }
-                          })()
-                        }
-                      >
-                        Télécharger
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </Surface>
-              <Surface className="space-y-4 p-6">
-                <h2 className="font-semibold">Votre remise</h2>
+                          >
+                            Télécharger
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </Surface>
+
+                <Surface className="space-y-4 p-6">
+                  <h2 className="text-base font-semibold tracking-tight">3. Ma réponse</h2>
+                  {!myStudent?.id ? (
+                    <p className="text-sm text-destructive">Profil étudiant introuvable.</p>
+                  ) : (
+                    <>
+                      <label className="block text-sm">
+                        Réponse écrite
+                        <Textarea
+                          className="mt-2 min-h-40 text-base"
+                          value={text}
+                          disabled={locked || submit.isPending}
+                          onChange={(e) => setText(e.target.value)}
+                          placeholder="Rédigez votre réponse ici…"
+                        />
+                      </label>
+                      {!locked && (
+                        <div className="rounded-xl border-2 border-dashed border-primary/25 bg-primary/[0.03] p-3">
+                          <ContentAttachmentUploader
+                            kinds={["document", "pdf", "image"]}
+                            value={attachment}
+                            onChange={setAttachment}
+                            disabled={submit.isPending}
+                            uploading={submit.isPending}
+                            error={formError}
+                            requiredFileWhenNew={false}
+                          />
+                        </div>
+                      )}
+                      {submission?.file_path ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            void (async () => {
+                              try {
+                                const url =
+                                  await AssignmentService.getSubmissionFileUrl(submission);
+                                window.open(url, "_blank", "noopener,noreferrer");
+                              } catch (err) {
+                                toast.error(
+                                  err instanceof Error ? err.message : "Fichier indisponible",
+                                );
+                              }
+                            })()
+                          }
+                        >
+                          Voir mon fichier
+                        </Button>
+                      ) : null}
+                      {!locked && (
+                        <Button
+                          className="w-full"
+                          disabled={submit.isPending || (!text.trim() && !attachment.file)}
+                          onClick={() => {
+                            if (!myStudent?.id) return;
+                            setFormError(null);
+                            if (!text.trim() && !attachment.file) {
+                              setFormError("Ajoutez une réponse écrite ou un fichier.");
+                              return;
+                            }
+                            submit.mutate(
+                              {
+                                assignmentId: selected.id,
+                                studentId: myStudent.id,
+                                contentText: text.trim(),
+                                ...(attachment.file ? { file: attachment.file } : {}),
+                              },
+                              {
+                                onSuccess: () => {
+                                  toast.success("Devoir remis");
+                                  void submissionsQuery.refetch();
+                                },
+                                onError: (err) => {
+                                  setFormError(err.message);
+                                  toast.error(err.message);
+                                },
+                              },
+                            );
+                          }}
+                        >
+                          Remettre le devoir
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </Surface>
+              </div>
+
+              <Surface className="h-fit space-y-4 p-6">
+                <h2 className="text-base font-semibold tracking-tight">4. Soumission / statut</h2>
                 {submission ? (
                   <div className="space-y-1 text-sm">
                     <Status>
@@ -392,87 +489,6 @@ export function Assignments({ detail }: { detail: boolean }) {
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">Aucune remise pour l’instant.</p>
-                )}
-                {!myStudent?.id ? (
-                  <p className="text-sm text-destructive">Profil étudiant introuvable.</p>
-                ) : (
-                  <>
-                    <label className="block text-sm">
-                      Réponse écrite
-                      <Textarea
-                        className="mt-2 min-h-36"
-                        value={text}
-                        disabled={locked || submit.isPending}
-                        onChange={(e) => setText(e.target.value)}
-                        placeholder="Texte facultatif si vous joignez un fichier"
-                      />
-                    </label>
-                    {!locked && (
-                      <ContentAttachmentUploader
-                        kinds={["document", "pdf", "image"]}
-                        value={attachment}
-                        onChange={setAttachment}
-                        disabled={submit.isPending}
-                        uploading={submit.isPending}
-                        error={formError}
-                        requiredFileWhenNew={false}
-                      />
-                    )}
-                    {submission?.file_path ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          void (async () => {
-                            try {
-                              const url = await AssignmentService.getSubmissionFileUrl(submission);
-                              window.open(url, "_blank", "noopener,noreferrer");
-                            } catch (err) {
-                              toast.error(
-                                err instanceof Error ? err.message : "Fichier indisponible",
-                              );
-                            }
-                          })()
-                        }
-                      >
-                        Voir mon fichier
-                      </Button>
-                    ) : null}
-                    {!locked && (
-                      <Button
-                        className="w-full"
-                        disabled={submit.isPending || (!text.trim() && !attachment.file)}
-                        onClick={() => {
-                          if (!myStudent?.id) return;
-                          setFormError(null);
-                          if (!text.trim() && !attachment.file) {
-                            setFormError("Ajoutez une réponse écrite ou un fichier.");
-                            return;
-                          }
-                          submit.mutate(
-                            {
-                              assignmentId: selected.id,
-                              studentId: myStudent.id,
-                              contentText: text.trim(),
-                              ...(attachment.file ? { file: attachment.file } : {}),
-                            },
-                            {
-                              onSuccess: () => {
-                                toast.success("Devoir remis");
-                                void submissionsQuery.refetch();
-                              },
-                              onError: (err) => {
-                                setFormError(err.message);
-                                toast.error(err.message);
-                              },
-                            },
-                          );
-                        }}
-                      >
-                        Remettre le devoir
-                      </Button>
-                    )}
-                  </>
                 )}
               </Surface>
             </div>
@@ -647,6 +663,7 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
   const addMember = useAddConversationMember();
   const removeMember = useRemoveConversationMember();
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -671,7 +688,7 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
     if (!q) return conversations;
     return conversations.filter((c) => c.name.toLowerCase().includes(q));
   }, [conversations, search]);
-  const active = conversations.find((c) => c.id === activeId) ?? conversations[0] ?? null;
+  const active = conversations.find((c) => c.id === activeId) ?? null;
   const activeConversationId = active?.id ?? null;
   const messagesQuery = useConversationMessages(activeConversationId);
   const classesForLevel = useMemo(
@@ -680,7 +697,10 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
   );
 
   useEffect(() => {
-    if (!activeId && conversations[0]?.id) setActiveId(conversations[0].id);
+    if (activeId || !conversations[0]?.id) return;
+    if (typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches) {
+      setActiveId(conversations[0].id);
+    }
   }, [activeId, conversations]);
 
   const memberLabel = (c: (typeof conversations)[number]) => {
@@ -737,8 +757,8 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
           ) : undefined
         }
       />
-      <Surface className="grid min-h-[560px] overflow-hidden md:grid-cols-[17rem_1fr]">
-        <aside className="border-r p-3">
+      <Surface className="grid min-h-[min(70vh,560px)] overflow-hidden md:grid-cols-[17rem_1fr]">
+        <aside className={`border-r p-3 ${mobileThreadOpen ? "hidden md:block" : "block"}`}>
           <Input
             className="mb-3"
             placeholder="Rechercher une conversation…"
@@ -762,45 +782,68 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
           >
             {filteredConversations.map((item) => (
               <button
-                className={`mb-1 w-full rounded-md p-3 text-left text-sm ${
-                  item.id === activeConversationId ? "bg-secondary text-primary" : "hover:bg-muted"
+                className={`mb-1 flex min-h-11 w-full items-start gap-3 rounded-lg p-3 text-left text-sm transition-colors duration-150 ${
+                  item.id === activeConversationId
+                    ? "bg-[color:var(--brand-navy)]/8 text-primary"
+                    : "hover:bg-muted"
                 }`}
                 key={item.id}
                 type="button"
-                onClick={() => setActiveId(item.id)}
+                onClick={() => {
+                  setActiveId(item.id);
+                  setMobileThreadOpen(true);
+                }}
               >
-                {item.name}
-                <small className="mt-1 block text-muted-foreground">
-                  {item.class?.name ? `${item.class.name} · ` : ""}
-                  {memberLabel(item)}
-                </small>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--brand-navy)]/10 text-xs font-semibold text-[color:var(--brand-navy)]">
+                  {item.name.slice(0, 2).toUpperCase()}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{item.name}</span>
+                  <small className="mt-0.5 block truncate text-muted-foreground">
+                    {item.class?.name ? `${item.class.name} · ` : ""}
+                    {memberLabel(item)}
+                  </small>
+                </span>
               </button>
             ))}
           </QueryState>
         </aside>
-        <div className="flex min-h-[420px] flex-col">
+        <div
+          className={`flex min-h-[420px] flex-col ${mobileThreadOpen ? "flex" : "hidden md:flex"}`}
+        >
           {active ? (
             <>
               <div className="border-b p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <strong>{active.name}</strong>
-                    {active.class?.name && (
-                      <small className="ml-2 text-muted-foreground">{active.class.name}</small>
-                    )}
-                    {(active.members?.length ?? 0) > 0 && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {(active.members ?? [])
-                          .slice(0, 6)
-                          .map((m) =>
-                            m.profile
-                              ? `${m.profile.first_name} ${m.profile.last_name}`.trim()
-                              : "—",
-                          )
-                          .join(", ")}
-                        {(active.members?.length ?? 0) > 6 ? "…" : ""}
-                      </p>
-                    )}
+                  <div className="flex items-start gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="md:hidden"
+                      onClick={() => setMobileThreadOpen(false)}
+                    >
+                      ← Retour
+                    </Button>
+                    <div>
+                      <strong>{active.name}</strong>
+                      {active.class?.name && (
+                        <small className="ml-2 text-muted-foreground">{active.class.name}</small>
+                      )}
+                      {(active.members?.length ?? 0) > 0 && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {(active.members ?? [])
+                            .slice(0, 6)
+                            .map((m) =>
+                              m.profile
+                                ? `${m.profile.first_name} ${m.profile.last_name}`.trim()
+                                : "—",
+                            )
+                            .join(", ")}
+                          {(active.members?.length ?? 0) > 6 ? "…" : ""}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   {role === "director" && (
                     <Button size="sm" variant="outline" onClick={() => setMembersOpen(true)}>

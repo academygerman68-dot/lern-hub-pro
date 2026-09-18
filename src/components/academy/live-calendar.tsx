@@ -18,7 +18,7 @@ import {
   useUpdateLiveSessionStatus,
   useTeachers,
 } from "@/hooks/use-academy-data";
-import { PageHeader, Status, Surface } from "./primitives";
+import { PageHeader, Status, Surface, LevelBadge, GroupBadge } from "./primitives";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
 
@@ -377,6 +377,10 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
               >
                 {liveStatusLabel(selected.status)}
               </Status>
+              <GroupBadge label={selected.class?.name ?? null} />
+              {selected.class?.level?.code ? (
+                <LevelBadge code={selected.class.level.code} />
+              ) : null}
             </div>
             <dl className="text-sm">
               <div className="grid grid-cols-[minmax(0,7rem)_1fr] gap-x-3 gap-y-2">

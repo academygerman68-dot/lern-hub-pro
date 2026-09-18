@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Status } from "./primitives";
+import { Status, PageHeader, ProgressLine } from "./primitives";
 
 export function Eyebrow({ children }: { children: ReactNode }) {
   return <p className="eyebrow">{children}</p>;
@@ -77,18 +77,14 @@ export function SkillBars({
             <span>{skill.name}</span>
             <strong className="font-medium">{skill.value}</strong>
           </div>
-          <div className={`${compact ? "h-1" : "h-1.5"} overflow-hidden rounded-full bg-muted`}>
-            <div
-              className="h-full rounded-full bg-primary transition-all duration-700"
-              style={{ width: `${skill.value}%` }}
-            />
-          </div>
+          <ProgressLine value={skill.value} className={compact ? "h-1" : "h-1.5"} />
         </div>
       ))}
     </div>
   );
 }
 
+/** @deprecated Prefer PageHeader from primitives — kept for existing imports. */
 export function PremiumHeader({
   title,
   subtitle,
@@ -98,17 +94,7 @@ export function PremiumHeader({
   subtitle: string;
   action?: ReactNode;
 }) {
-  return (
-    <header className="mb-10 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-5">
-      <div className="min-w-0">
-        <h1 className="font-display text-3xl font-normal leading-tight text-foreground sm:text-4xl">
-          {title}
-        </h1>
-        <p className="mt-3 text-sm text-muted-foreground sm:text-base">{subtitle}</p>
-      </div>
-      {action && <div className="shrink-0">{action}</div>}
-    </header>
-  );
+  return <PageHeader title={title} subtitle={subtitle} action={action} />;
 }
 
 export { Status };

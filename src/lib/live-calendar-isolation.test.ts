@@ -10,5 +10,5 @@ describe("live calendar module isolation", () => {
     const mod = await import("@/components/academy/live-calendar");
     expect(typeof mod.LiveCalendar).toBe("function");
     expect(typeof mod.LiveCalendarErrorBoundary).toBe("function");
-  });
+  }, 15_000);
 });

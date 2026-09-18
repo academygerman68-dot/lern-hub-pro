@@ -260,18 +260,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
       <div className="academy-content lg:pl-[16.5rem]">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/90 px-3 backdrop-blur-xl sm:h-16 sm:gap-3 sm:px-8 pt-[env(safe-area-inset-top,0px)]">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border/80 bg-background/85 px-3 backdrop-blur-xl sm:h-16 sm:gap-3 sm:px-8 pt-[env(safe-area-inset-top,0px)]">
           <Button
             size="icon"
             variant="ghost"
-            className="shrink-0 lg:hidden"
+            className="min-h-11 min-w-11 shrink-0 lg:hidden"
             onClick={() => setMobile(true)}
             aria-label={locale === "ar" ? "فتح القائمة" : "Ouvrir la navigation"}
           >
             <Menu className="size-5" />
           </Button>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium tracking-tight">{roleLabel}</p>
+            <p className="truncate text-sm font-semibold tracking-tight">{roleLabel}</p>
             <p className="hidden truncate text-xs text-muted-foreground sm:block">{user.name}</p>
           </div>
           <div className="flex items-center gap-1">
@@ -280,6 +280,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Button
                 size="icon"
                 variant="ghost"
+                className="relative min-h-11 min-w-11"
                 aria-label={t("shell.notifications")}
                 onClick={() => {
                   const next = !notice;
@@ -289,7 +290,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 <Bell className="size-4" />
                 {unread > 0 && (
-                  <span className="absolute top-2 right-2 size-1.5 rounded-full bg-alert" />
+                  <span className="absolute top-1.5 right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-alert px-1 text-[10px] font-semibold text-alert-foreground">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
                 )}
               </Button>
               {notice && (
@@ -297,21 +300,25 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <button
                     type="button"
                     className="fixed inset-0 z-40 sm:hidden"
-                    aria-label="Close"
+                    aria-label={locale === "ar" ? "إغلاق" : "Fermer"}
                     onClick={() => setNotice(false)}
                   />
                   <div className="absolute top-12 right-0 z-50 w-[min(22rem,calc(100vw-1.25rem))] max-h-[min(70dvh,28rem)] overflow-y-auto rounded-xl border border-border bg-popover p-2 shadow-card animate-scale-in">
-                    <div className="px-3 py-2 text-sm font-medium">{t("shell.notifications")}</div>
+                    <div className="px-3 py-2 text-sm font-semibold tracking-tight">
+                      {t("shell.notifications")}
+                    </div>
                     {notificationRows.length === 0 && (
-                      <p className="px-3 py-4 text-sm text-muted-foreground">
-                        No notifications yet.
+                      <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+                        {locale === "ar"
+                          ? "لا إشعارات بعد."
+                          : "Aucune notification pour le moment."}
                       </p>
                     )}
                     {notificationRows.slice(0, 8).map((item) => (
                       <button
                         key={item.id}
                         type="button"
-                        className="flex w-full gap-3 rounded-lg px-3 py-3 text-left hover:bg-muted active:bg-muted"
+                        className="flex w-full gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-150 hover:bg-muted active:bg-muted"
                         onClick={() => {
                           if (item.status === "unread") markRead.mutate(item.id);
                           if (item.link_page) navigate(item.link_page as AcademyPage);
@@ -324,12 +331,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                           }`}
                         />
                         <div className="min-w-0">
-                          <p className="text-sm">{item.title}</p>
+                          <p className="text-sm font-medium">{item.title}</p>
                           <p className="text-xs text-muted-foreground line-clamp-2">
                             {item.message}
                           </p>
                           <p className="mt-1 text-[10px] text-muted-foreground">
-                            {new Date(item.created_at).toLocaleString()}
+                            {new Date(item.created_at).toLocaleString(
+                              locale === "ar" ? "ar" : "fr-FR",
+                            )}
                           </p>
                         </div>
                       </button>
@@ -341,7 +350,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
         <main className="px-3 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))] sm:px-8 sm:py-8">
-          {children}
+          <div className="mx-auto w-full max-w-[72rem]">{children}</div>
         </main>
       </div>
     </div>
