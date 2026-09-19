@@ -22,10 +22,13 @@ const PROOF_SELECT = `
   payment:student_payments (
     id,
     amount,
+    amount_paid,
     currency,
     due_date,
     status,
-    reference
+    reference,
+    billing_plan,
+    billing_period
   )
 `;
 
@@ -42,10 +45,13 @@ export type PaymentProofListItem = PaymentProof & {
   payment?: {
     id: string;
     amount: number;
+    amount_paid?: number;
     currency: string;
     due_date: string | null;
     status: string;
     reference: string | null;
+    billing_plan?: string | null;
+    billing_period?: string | null;
   } | null;
 };
 

@@ -4,7 +4,7 @@ export const PAYMENT_PROOF_ACCEPT = ".pdf,.jpg,.jpeg,.png,application/pdf,image/
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const USER_FACING_RE =
-  /justificatif|échéance|montant|fichier|opération|téléversement|enregistrement|profil étudiant/i;
+  /justificatif|échéance|mois à payer|montant|fichier|opération|téléversement|enregistrement|profil étudiant|formule|devise|RIB/i;
 
 export function paymentProofMimeFromFile(file: Pick<File, "name" | "type">): string | null {
   const type = (file.type || "").toLowerCase().trim();
@@ -43,7 +43,7 @@ export function validatePaymentProofSubmitInput(input: {
     return "Profil étudiant introuvable. Contactez l’administration.";
   }
   if (!input.paymentId?.trim() || !UUID_RE.test(input.paymentId.trim())) {
-    return "Sélectionnez une échéance à régler.";
+    return "Sélectionnez un mois à payer.";
   }
   const fileError = validatePaymentProofFile(input.file);
   if (fileError) return fileError;
@@ -63,10 +63,10 @@ export function studentProofDeadlineHint(input: {
 }): string | null {
   if (!input.paymentsLoaded) return null;
   if (input.eligibleCount === 0) {
-    return "Aucune échéance à régler n’est disponible. Contactez l’administration.";
+    return "Aucun mois à payer n’est disponible. Contactez l’administration.";
   }
   if (!input.paymentId.trim()) {
-    return "Sélectionnez une échéance à régler.";
+    return "Sélectionnez un mois à payer.";
   }
   return null;
 }
@@ -143,11 +143,11 @@ export function toPaymentProofUserError(
 
   if (code === "23505" || blob.includes("duplicate") || blob.includes("payment_proofs_one_open")) {
     return new Error(
-      "Un justificatif est déjà en cours de validation ou déjà approuvé pour cette échéance.",
+      "Un justificatif est déjà en cours de validation ou déjà approuvé pour ce mois.",
     );
   }
   if (code === "23503" || blob.includes("foreign key")) {
-    return new Error("L’échéance sélectionnée est introuvable. Actualisez la page et réessayez.");
+    return new Error("Le mois sélectionné est introuvable. Actualisez la page et réessayez.");
   }
   if (
     code === "42501" ||
@@ -156,7 +156,7 @@ export function toPaymentProofUserError(
     blob.includes("unauthorized")
   ) {
     return new Error(
-      "L’enregistrement du justificatif a été refusé. Vérifiez l’échéance, ou contactez l’administration.",
+      "L’enregistrement du justificatif a été refusé. Vérifiez le mois à payer, ou contactez l’administration.",
     );
   }
 

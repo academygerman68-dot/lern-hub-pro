@@ -616,7 +616,7 @@ export function PremiumDirectorDashboard() {
                           : "—"}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {Number(payment.amount).toLocaleString("fr-FR")} MAD
+                        {Number(payment.amount).toLocaleString("fr-FR")} {payment.currency || "MAD"}
                       </p>
                     </div>
                     <Status tone="red">{paymentStatusLabel(payment.status)}</Status>

@@ -121,6 +121,8 @@ export const SupabasePaymentService = {
     adminReceiptBucket?: string | null;
     adminReceiptPath?: string | null;
     adminReceiptMime?: string | null;
+    billingPlan?: string | null;
+    billingPeriod?: string | null;
   }) {
     const initialAmount = input.initialAmount ?? input.amount ?? 0;
     const discountType = input.discountType ?? null;
@@ -149,11 +151,29 @@ export const SupabasePaymentService = {
         admin_receipt_bucket: input.adminReceiptBucket ?? null,
         admin_receipt_path: input.adminReceiptPath ?? null,
         admin_receipt_mime: input.adminReceiptMime ?? null,
+        billing_plan: input.billingPlan ?? null,
+        billing_period: input.billingPeriod ?? null,
       })
       .select(PAYMENT_SELECT)
       .single();
     if (error) throw error;
     return data as PaymentListItem;
+  },
+
+  async ensureBillingPayment(input: {
+    billingPlan: string;
+    currency: string;
+    period: string;
+    amount: number;
+  }) {
+    const { data, error } = await requireClient().rpc("ensure_student_billing_payment", {
+      p_billing_plan: input.billingPlan,
+      p_currency: input.currency,
+      p_period: input.period,
+      p_amount: input.amount,
+    });
+    if (error) throw error;
+    return String(data);
   },
 
   async uploadAdminReceipt(paymentId: string, file: File) {

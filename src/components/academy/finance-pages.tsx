@@ -25,11 +25,19 @@ import { computeFinalAmount } from "@/services/supabase/payment-service";
 import {
   PAYMENT_PROOF_ACCEPT,
   resolveOwnStudent,
-  studentProofDeadlineHint,
   toPaymentProofUserError,
   validatePaymentProofFile,
   validatePaymentProofSubmitInput,
 } from "@/lib/payment-proof";
+import {
+  type BillingCurrency,
+  type BillingPlan,
+  billingPeriodLabel,
+  billingPlanLabel,
+  formatMoneyAmount,
+  listBillingPeriods,
+  planAmount,
+} from "@/lib/subscription-plans";
 import type { Database } from "@/types/database";
 import { useAcademy } from "./academy-context";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
@@ -95,7 +103,23 @@ function proofStatusLabel(status: string) {
 function formatDiscount(row: PaymentRow) {
   if (!row.discount_type || Number(row.discount_value) <= 0) return "—";
   if (row.discount_type === "percent") return `${Number(row.discount_value)} %`;
-  return `${Number(row.discount_value).toLocaleString("fr-FR")} MAD`;
+  return formatMoneyAmount(Number(row.discount_value), row.currency || "MAD");
+}
+
+function paymentBillingSummary(row: {
+  billing_plan?: string | null;
+  billing_period?: string | null;
+  currency?: string | null;
+  amount?: number | null;
+  amount_paid?: number | null;
+  due_date?: string | null;
+}) {
+  const plan = billingPlanLabel(row.billing_plan);
+  const period = billingPeriodLabel(row.billing_period, row.billing_plan);
+  const currency = row.currency || "MAD";
+  const expected = formatMoneyAmount(Number(row.amount ?? 0), currency);
+  const paid = formatMoneyAmount(Number(row.amount_paid ?? 0), currency);
+  return { plan, period, currency, expected, paid };
 }
 
 function paymentInitial(row: PaymentRow) {
@@ -336,13 +360,22 @@ function ProofReviewQueue() {
                       {proof.student_note ? ` · ${proof.student_note}` : ""}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Déclaré : {Number(proof.declared_amount).toLocaleString()}{" "}
-                      {proof.payment?.currency ?? "MAD"}
+                      Déclaré :{" "}
+                      {formatMoneyAmount(
+                        Number(proof.declared_amount),
+                        proof.payment?.currency ?? "MAD",
+                      )}
                       {proof.payment
-                        ? ` · attendu : ${Number(proof.payment.amount).toLocaleString()} ${proof.payment.currency}`
+                        ? ` · attendu : ${formatMoneyAmount(Number(proof.payment.amount), proof.payment.currency)}`
+                        : ""}
+                      {proof.payment?.billing_plan
+                        ? ` · ${billingPlanLabel(proof.payment.billing_plan)}`
+                        : ""}
+                      {proof.payment?.billing_period
+                        ? ` · ${billingPeriodLabel(proof.payment.billing_period, proof.payment.billing_plan)}`
                         : ""}
                       {` · opération du ${proof.operation_date}`}
-                      {proof.operation_reference ? ` · réf. ${proof.operation_reference}` : ""}
+                      {proof.operation_reference ? ` · RIB ${proof.operation_reference}` : ""}
                     </p>
                     <Status tone="amber">{proofStatusLabel(proof.status)}</Status>
                   </div>
@@ -432,7 +465,10 @@ function ProofReviewQueue() {
                       {proof.reviewed_at
                         ? new Date(proof.reviewed_at).toLocaleString("fr-FR")
                         : new Date(proof.created_at).toLocaleString("fr-FR")}
-                      {` · ${Number(proof.declared_amount).toLocaleString()} ${proof.payment?.currency ?? "MAD"}`}
+                      {` · ${formatMoneyAmount(Number(proof.declared_amount), proof.payment?.currency ?? "MAD")}`}
+                      {proof.payment?.billing_plan
+                        ? ` · ${billingPlanLabel(proof.payment.billing_plan)}`
+                        : ""}
                     </p>
                     <Status tone={proof.status === "approved" ? "green" : "red"}>
                       {proofStatusLabel(proof.status)}
@@ -479,7 +515,12 @@ export function FinancePages({ mode }: { mode: string }) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [studentId, setStudentId] = useState("");
-  const [initialAmount, setInitialAmount] = useState("1200");
+  const [billingPlan, setBillingPlan] = useState<BillingPlan>("monthly");
+  const [currency, setCurrency] = useState<BillingCurrency>("MAD");
+  const [billingPeriod, setBillingPeriod] = useState(
+    () => listBillingPeriods("monthly", 1)[0] ?? "",
+  );
+  const [initialAmount, setInitialAmount] = useState(String(planAmount("monthly", "MAD")));
   const [discountMode, setDiscountMode] = useState<"none" | "percent" | "fixed">("none");
   const [discountValue, setDiscountValue] = useState("");
   const [amountPaid, setAmountPaid] = useState("");
@@ -496,6 +537,14 @@ export function FinancePages({ mode }: { mode: string }) {
   const [replaceReceiptId, setReplaceReceiptId] = useState<string | null>(null);
   const [preview, setPreview] = useState<DocPreview | null>(null);
   const replaceFileRef = useRef<HTMLInputElement>(null);
+
+  const applyPlanDefaults = (plan: BillingPlan, nextCurrency: BillingCurrency) => {
+    setBillingPlan(plan);
+    setCurrency(nextCurrency);
+    setInitialAmount(String(planAmount(plan, nextCurrency)));
+    const periods = listBillingPeriods(plan, 6);
+    setBillingPeriod((prev) => (periods.includes(prev) ? prev : (periods[0] ?? "")));
+  };
 
   const sendReminder = (row: PaymentRow) => {
     remindPayment.mutate(row.id, {
@@ -616,15 +665,24 @@ export function FinancePages({ mode }: { mode: string }) {
 
   const stats = useMemo(() => {
     const rows = paymentsQuery.data ?? [];
-    const expected = rows.reduce((acc, r) => acc + Number(r.amount), 0);
-    const collected = rows.reduce((acc, r) => acc + Number(r.amount_paid ?? 0), 0);
-    const paidTotal = rows
-      .filter((r) => r.status === "paid")
-      .reduce((acc, r) => acc + Number(r.amount_paid ?? r.amount), 0);
+    const byCurrency = new Map<string, { expected: number; collected: number; paid: number }>();
+    for (const r of rows) {
+      const code = (r.currency || "MAD").toUpperCase();
+      const bucket = byCurrency.get(code) ?? { expected: 0, collected: 0, paid: 0 };
+      bucket.expected += Number(r.amount);
+      bucket.collected += Number(r.amount_paid ?? 0);
+      if (r.status === "paid") bucket.paid += Number(r.amount_paid ?? r.amount);
+      byCurrency.set(code, bucket);
+    }
+    const formatBuckets = (key: "expected" | "collected" | "paid") => {
+      const parts = [...byCurrency.entries()].map(([code, bucket]) =>
+        formatMoneyAmount(bucket[key], code),
+      );
+      return parts.length ? parts.join(" · ") : "—";
+    };
     return {
-      expected,
-      collected,
-      paidTotal,
+      paidLabel: formatBuckets("paid"),
+      expectedVsCollected: `${formatBuckets("expected")} / ${formatBuckets("collected")}`,
       overdue: rows.filter((r) => r.status === "overdue").length,
       partial: rows.filter((r) => r.status === "partial").length,
     };
@@ -632,7 +690,10 @@ export function FinancePages({ mode }: { mode: string }) {
 
   const resetCreateForm = () => {
     setStudentId("");
-    setInitialAmount("1200");
+    setBillingPlan("monthly");
+    setCurrency("MAD");
+    setBillingPeriod(listBillingPeriods("monthly", 1)[0] ?? "");
+    setInitialAmount(String(planAmount("monthly", "MAD")));
     setDiscountMode("none");
     setDiscountValue("");
     setAmountPaid("");
@@ -705,13 +766,10 @@ export function FinancePages({ mode }: { mode: string }) {
       />
       <ProofReviewQueue />
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Total encaissé" value={`${stats.paidTotal.toLocaleString("fr-FR")} MAD`} />
+        <Metric label="Total encaissé" value={stats.paidLabel} />
         <Metric label="En retard" value={String(stats.overdue)} />
         <Metric label="Partiels" value={String(stats.partial)} />
-        <Metric
-          label="Attendu vs encaissé"
-          value={`${stats.expected.toLocaleString("fr-FR")} / ${stats.collected.toLocaleString("fr-FR")} MAD`}
-        />
+        <Metric label="Attendu vs encaissé" value={stats.expectedVsCollected} />
       </div>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row">
@@ -746,126 +804,129 @@ export function FinancePages({ mode }: { mode: string }) {
         onRetry={() => void paymentsQuery.refetch()}
       >
         <div className="space-y-3 md:hidden">
-          {filtered.map((row) => (
-            <Surface key={row.id} className="space-y-3 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-semibold">{studentLabel(row)}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Final {Number(row.amount).toLocaleString("fr-FR")} {row.currency}
-                  </p>
+          {filtered.map((row) => {
+            const billing = paymentBillingSummary(row);
+            return (
+              <Surface key={row.id} className="space-y-3 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{studentLabel(row)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {billing.plan} · {billing.period}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Attendu {billing.expected} · Versé {billing.paid}
+                    </p>
+                  </div>
+                  <Status tone={paymentTone(row.status)}>{paymentStatusLabel(row.status)}</Status>
                 </div>
-                <Status tone={paymentTone(row.status)}>{paymentStatusLabel(row.status)}</Status>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                <span>Initial : {paymentInitial(row).toLocaleString("fr-FR")}</span>
-                <span>Remise : {formatDiscount(row)}</span>
-                <span>Payé : {Number(row.amount_paid ?? 0).toLocaleString("fr-FR")}</span>
-                <span>Reste : {paymentRemaining(row).toLocaleString("fr-FR")}</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Échéance {row.due_date ?? "—"}
-                {row.payment_method ? ` · ${paymentMethodLabel(row.payment_method)}` : ""}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {receiptActions(row)}
-                {canRemindPayment(row.status) && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                    disabled={remindPayment.isPending}
-                    onClick={() => sendReminder(row)}
-                  >
-                    Relancer
-                  </Button>
-                )}
-                {row.status === "pending" && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                    disabled={markOverdue.isPending}
-                    onClick={() => {
-                      markOverdue.mutate(row.id, {
-                        onSuccess: () => toast.success("Marqué en retard · accès restreint"),
-                        onError: (err) => toast.error(err.message),
-                      });
-                    }}
-                  >
-                    Marquer en retard
-                  </Button>
-                )}
-              </div>
-            </Surface>
-          ))}
+                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                  <span>Initial : {formatMoneyAmount(paymentInitial(row), row.currency)}</span>
+                  <span>Remise : {formatDiscount(row)}</span>
+                  <span>Payé : {billing.paid}</span>
+                  <span>Reste : {formatMoneyAmount(paymentRemaining(row), row.currency)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Mois / période {row.due_date ?? billing.period}
+                  {row.payment_method ? ` · ${paymentMethodLabel(row.payment_method)}` : ""}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {receiptActions(row)}
+                  {canRemindPayment(row.status) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      disabled={remindPayment.isPending}
+                      onClick={() => sendReminder(row)}
+                    >
+                      Relancer
+                    </Button>
+                  )}
+                  {row.status === "pending" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      disabled={markOverdue.isPending}
+                      onClick={() => {
+                        markOverdue.mutate(row.id, {
+                          onSuccess: () => toast.success("Marqué en retard · accès restreint"),
+                          onError: (err) => toast.error(err.message),
+                        });
+                      }}
+                    >
+                      Marquer en retard
+                    </Button>
+                  )}
+                </div>
+              </Surface>
+            );
+          })}
         </div>
         <Surface className="table-scroll hidden md:block">
           <table className="data-table">
             <thead>
               <tr>
                 <th>Étudiant</th>
-                <th>Montant initial</th>
-                <th>Remise</th>
-                <th>Final</th>
-                <th>Payé</th>
+                <th>Formule</th>
+                <th>Période</th>
+                <th>Devise</th>
+                <th>Attendu</th>
+                <th>Versé</th>
                 <th>Reste</th>
-                <th>Méthode</th>
                 <th>Statut</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row) => (
-                <tr key={row.id}>
-                  <td className="font-medium">{studentLabel(row)}</td>
-                  <td>
-                    {paymentInitial(row).toLocaleString("fr-FR")} {row.currency}
-                  </td>
-                  <td>{formatDiscount(row)}</td>
-                  <td>
-                    {Number(row.amount).toLocaleString("fr-FR")} {row.currency}
-                  </td>
-                  <td>
-                    {Number(row.amount_paid ?? 0).toLocaleString("fr-FR")} {row.currency}
-                  </td>
-                  <td>
-                    {paymentRemaining(row).toLocaleString("fr-FR")} {row.currency}
-                  </td>
-                  <td>{paymentMethodLabel(row.payment_method)}</td>
-                  <td>
-                    <Status tone={paymentTone(row.status)}>{paymentStatusLabel(row.status)}</Status>
-                  </td>
-                  <td className="space-x-1 whitespace-nowrap">
-                    {receiptActions(row)}
-                    {canRemindPayment(row.status) && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={remindPayment.isPending}
-                        onClick={() => sendReminder(row)}
-                      >
-                        Relancer
-                      </Button>
-                    )}
-                    {row.status === "pending" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={markOverdue.isPending}
-                        onClick={() => {
-                          markOverdue.mutate(row.id, {
-                            onSuccess: () => toast.success("Marqué en retard · accès restreint"),
-                            onError: (err) => toast.error(err.message),
-                          });
-                        }}
-                      >
-                        Marquer en retard
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {filtered.map((row) => {
+                const billing = paymentBillingSummary(row);
+                return (
+                  <tr key={row.id}>
+                    <td className="font-medium">{studentLabel(row)}</td>
+                    <td>{billing.plan}</td>
+                    <td>{billing.period}</td>
+                    <td>{billing.currency}</td>
+                    <td>{billing.expected}</td>
+                    <td>{billing.paid}</td>
+                    <td>{formatMoneyAmount(paymentRemaining(row), row.currency)}</td>
+                    <td>
+                      <Status tone={paymentTone(row.status)}>
+                        {paymentStatusLabel(row.status)}
+                      </Status>
+                    </td>
+                    <td className="space-x-1 whitespace-nowrap">
+                      {receiptActions(row)}
+                      {canRemindPayment(row.status) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={remindPayment.isPending}
+                          onClick={() => sendReminder(row)}
+                        >
+                          Relancer
+                        </Button>
+                      )}
+                      {row.status === "pending" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={markOverdue.isPending}
+                          onClick={() => {
+                            markOverdue.mutate(row.id, {
+                              onSuccess: () => toast.success("Marqué en retard · accès restreint"),
+                              onError: (err) => toast.error(err.message),
+                            });
+                          }}
+                        >
+                          Marquer en retard
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </Surface>
@@ -912,9 +973,56 @@ export function FinancePages({ mode }: { mode: string }) {
               </label>
             </FormSection>
 
+            <FormSection title="Formule" description="Mensuel ou trimestriel, en MAD ou EUR.">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm">
+                  Formule
+                  <select
+                    className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={billingPlan}
+                    onChange={(e) => applyPlanDefaults(e.target.value as BillingPlan, currency)}
+                  >
+                    <option value="monthly">
+                      Mensuel ({formatMoneyAmount(planAmount("monthly", currency), currency)})
+                    </option>
+                    <option value="quarterly">
+                      Trimestriel ({formatMoneyAmount(planAmount("quarterly", currency), currency)})
+                    </option>
+                  </select>
+                </label>
+                <label className="block text-sm">
+                  Devise
+                  <select
+                    className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={currency}
+                    onChange={(e) =>
+                      applyPlanDefaults(billingPlan, e.target.value as BillingCurrency)
+                    }
+                  >
+                    <option value="MAD">MAD</option>
+                    <option value="EUR">EUR</option>
+                  </select>
+                </label>
+              </div>
+              <label className="mt-3 block text-sm">
+                Mois / période
+                <select
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={billingPeriod}
+                  onChange={(e) => setBillingPeriod(e.target.value)}
+                >
+                  {listBillingPeriods(billingPlan, 8).map((period) => (
+                    <option key={period} value={period}>
+                      {billingPeriodLabel(period, billingPlan)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </FormSection>
+
             <FormSection title="Montant" description="Montant initial avant remise.">
               <label className="block text-sm">
-                Montant initial (MAD)
+                Montant initial ({currency})
                 <Input
                   type="number"
                   min="0"
@@ -939,7 +1047,7 @@ export function FinancePages({ mode }: { mode: string }) {
                   >
                     <option value="none">Aucune</option>
                     <option value="percent">Pourcentage (%)</option>
-                    <option value="fixed">Montant fixe (MAD)</option>
+                    <option value="fixed">Montant fixe ({currency})</option>
                   </select>
                 </label>
                 <label className="block text-sm">
@@ -957,10 +1065,10 @@ export function FinancePages({ mode }: { mode: string }) {
               </div>
               <div className="rounded-lg bg-muted/50 px-3 py-2 text-sm">
                 Montant final :{" "}
-                <span className="font-semibold">{computedFinal.toLocaleString("fr-FR")} MAD</span>
+                <span className="font-semibold">{formatMoneyAmount(computedFinal, currency)}</span>
               </div>
               <label className="block text-sm">
-                Montant payé (MAD)
+                Montant payé ({currency})
                 <Input
                   type="number"
                   min="0"
@@ -1018,7 +1126,7 @@ export function FinancePages({ mode }: { mode: string }) {
                   </select>
                 </label>
                 <label className="block text-sm">
-                  Échéance
+                  Mois à payer (échéance)
                   <Input
                     type="date"
                     value={dueDate}
@@ -1072,12 +1180,14 @@ export function FinancePages({ mode }: { mode: string }) {
                       discountValue: discountMode === "none" ? 0 : Number(discountValue) || 0,
                       amount: computedFinal,
                       amountPaid: Number(amountPaid) || 0,
-                      currency: "MAD",
+                      currency,
                       dueDate: dueDate || null,
                       paymentMethod,
                       reference: reference || null,
                       notes: note || null,
                       status: paymentStatus,
+                      billingPlan,
+                      billingPeriod: billingPeriod || null,
                     },
                     {
                       onSuccess: (created) => {
@@ -1161,12 +1271,12 @@ export function StudentPaymentsPage() {
   const studentId = myStudent?.id || paymentsQuery.data?.[0]?.student_id || "";
   const proofsQuery = usePaymentProofs(studentId || undefined);
   const submitProof = useSubmitPaymentProof();
-  const eligiblePayments = (paymentsQuery.data ?? []).filter((payment) =>
-    ["pending", "partial", "overdue"].includes(payment.status),
+  const [billingPlan, setBillingPlan] = useState<BillingPlan>("monthly");
+  const [currency, setCurrency] = useState<BillingCurrency>("MAD");
+  const [billingPeriod, setBillingPeriod] = useState(
+    () => listBillingPeriods("monthly", 1)[0] ?? "",
   );
-  const [paymentId, setPaymentId] = useState("");
-  const selectedPayment = eligiblePayments.find((payment) => payment.id === paymentId);
-  const [declaredAmount, setDeclaredAmount] = useState("");
+  const [declaredAmount, setDeclaredAmount] = useState(String(planAmount("monthly", "MAD")));
   const [operationDate, setOperationDate] = useState("");
   const [operationReference, setOperationReference] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
@@ -1177,83 +1287,105 @@ export function StudentPaymentsPage() {
     file: null,
   });
   const [formError, setFormError] = useState<string | null>(null);
+  const [ensuringPayment, setEnsuringPayment] = useState(false);
   const [preview, setPreview] = useState<DocPreview | null>(null);
   const accessBlocked = accessQuery.data === false;
   const hasNotApproved = (proofsQuery.data ?? []).some((p) => p.status === "not_approved");
-  const paymentsLoaded = !studentsQuery.isLoading && !paymentsQuery.isLoading;
-  const installmentHint = studentProofDeadlineHint({
-    paymentsLoaded,
-    eligibleCount: eligiblePayments.length,
-    paymentId,
-  });
+  const expectedAmount = planAmount(billingPlan, currency);
+  const periodOptions = useMemo(() => listBillingPeriods(billingPlan, 8), [billingPlan]);
+
+  const applyStudentPlan = (plan: BillingPlan, nextCurrency: BillingCurrency) => {
+    setBillingPlan(plan);
+    setCurrency(nextCurrency);
+    setDeclaredAmount(String(planAmount(plan, nextCurrency)));
+    const periods = listBillingPeriods(plan, 8);
+    setBillingPeriod((prev) => (periods.includes(prev) ? prev : (periods[0] ?? "")));
+  };
+
   const identityHint =
-    paymentsLoaded && !studentId
+    !studentsQuery.isLoading && !paymentsQuery.isLoading && !studentId
       ? "Profil étudiant introuvable. Contactez l’administration."
       : null;
-  const submitBlockReason =
-    eligiblePayments.length === 0 && paymentsLoaded
-      ? installmentHint
-      : validatePaymentProofSubmitInput({
-          studentId,
-          paymentId: selectedPayment?.id ?? paymentId,
-          file: attachment.file,
-          declaredAmount,
-          operationDate,
-        });
 
   const resetProofForm = () => {
     setAttachment({ kind: "pdf", url: "", file: null });
     setNote("");
-    setPaymentId("");
-    setDeclaredAmount("");
+    setDeclaredAmount(String(planAmount(billingPlan, currency)));
     setOperationDate("");
     setOperationReference("");
     setPaymentMethod("bank_transfer");
     setFormError(null);
   };
 
-  const handleSubmitProof = () => {
-    if (eligiblePayments.length === 0) {
-      setFormError("Aucune échéance à régler n’est disponible. Contactez l’administration.");
+  const handleSubmitProof = async () => {
+    if (!studentId) {
+      setFormError("Profil étudiant introuvable. Contactez l’administration.");
       return;
     }
-    const reason = validatePaymentProofSubmitInput({
-      studentId,
-      paymentId: selectedPayment?.id ?? paymentId,
-      declaredAmount,
-      operationDate,
-      file: attachment.file,
-    });
-    if (reason) {
-      setFormError(reason);
+    if (!billingPeriod) {
+      setFormError("Sélectionnez un mois à payer.");
       return;
     }
-    if (!attachment.file || !selectedPayment || !studentId) return;
+    if (!attachment.file) {
+      setFormError("Joignez un justificatif PDF, JPEG ou PNG.");
+      return;
+    }
     setFormError(null);
-    submitProof.mutate(
-      {
+    setEnsuringPayment(true);
+    try {
+      const paymentId = await PaymentService.ensureBillingPayment({
+        billingPlan,
+        currency,
+        period: billingPeriod,
+        amount: expectedAmount,
+      });
+      const reason = validatePaymentProofSubmitInput({
         studentId,
-        file: attachment.file,
-        paymentId: selectedPayment.id,
-        declaredAmount: Number(declaredAmount),
+        paymentId,
+        declaredAmount,
         operationDate,
-        operationReference: operationReference || null,
-        studentNote: note || null,
-        paymentMethod,
-      },
-      {
-        onSuccess: () => {
-          toast.success("Justificatif envoyé");
-          resetProofForm();
-          void proofsQuery.refetch();
-        },
-        onError: (err) => {
-          const mapped = toPaymentProofUserError(err, "generic");
-          setFormError(mapped.message);
-          toast.error(mapped.message);
-        },
-      },
-    );
+        file: attachment.file,
+      });
+      if (reason) {
+        setFormError(reason);
+        return;
+      }
+      await new Promise<void>((resolve, reject) => {
+        submitProof.mutate(
+          {
+            studentId,
+            file: attachment.file!,
+            paymentId,
+            declaredAmount: Number(declaredAmount),
+            operationDate,
+            operationReference: operationReference || null,
+            studentNote: note || null,
+            paymentMethod,
+          },
+          {
+            onSuccess: () => {
+              toast.success("Justificatif envoyé");
+              resetProofForm();
+              void proofsQuery.refetch();
+              void paymentsQuery.refetch();
+              resolve();
+            },
+            onError: (err) => {
+              const mapped = toPaymentProofUserError(err, "generic");
+              setFormError(mapped.message);
+              toast.error(mapped.message);
+              reject(err);
+            },
+          },
+        );
+      });
+    } catch (err) {
+      const mapped = toPaymentProofUserError(err, "generic");
+      setFormError(mapped.message);
+      toast.error(mapped.message);
+    } finally {
+      setEnsuringPayment(false);
+    }
   };
 
   const openProofDoc = async (
@@ -1281,6 +1413,19 @@ export function StudentPaymentsPage() {
       });
     }
   };
+
+  const formBusy = submitProof.isPending || ensuringPayment;
+  const blockReason =
+    identityHint ||
+    (!billingPeriod
+      ? "Sélectionnez un mois à payer."
+      : !attachment.file
+        ? "Joignez un justificatif PDF, JPEG ou PNG."
+        : !operationDate
+          ? "La date de l’opération est obligatoire."
+          : !Number.isFinite(Number(declaredAmount)) || Number(declaredAmount) <= 0
+            ? "Le montant déclaré doit être supérieur à zéro."
+            : null);
 
   return (
     <>
@@ -1329,49 +1474,81 @@ export function StudentPaymentsPage() {
       <Surface className="mb-6 p-5">
         <h2 className="font-semibold">Déclarer un paiement</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Déclarez le versement, joignez le justificatif (PDF/JPEG/PNG · max 10 Mo). Validation sous
-          48 heures.
+          Choisissez votre formule, la devise et le mois à payer, puis joignez le justificatif
+          (PDF/JPEG/PNG · max 10 Mo). Validation sous 48 heures.
         </p>
         <div className="mt-4 space-y-3">
           <form
             className="space-y-3"
             onSubmit={(event) => {
               event.preventDefault();
-              handleSubmitProof();
+              void handleSubmitProof();
             }}
           >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm">
+                Formule
+                <select
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={billingPlan}
+                  disabled={formBusy}
+                  onChange={(e) => applyStudentPlan(e.target.value as BillingPlan, currency)}
+                >
+                  <option value="monthly">
+                    Mensuel — {formatMoneyAmount(planAmount("monthly", currency), currency)}
+                  </option>
+                  <option value="quarterly">
+                    Trimestriel — {formatMoneyAmount(planAmount("quarterly", currency), currency)}
+                  </option>
+                </select>
+              </label>
+              <label className="block text-sm">
+                Devise
+                <select
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={currency}
+                  disabled={formBusy}
+                  onChange={(e) => applyStudentPlan(billingPlan, e.target.value as BillingCurrency)}
+                >
+                  <option value="MAD">MAD</option>
+                  <option value="EUR">EUR</option>
+                </select>
+              </label>
+            </div>
             <label className="block text-sm">
-              Échéance concernée
+              Mois à payer
               <select
                 className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={paymentId}
+                value={billingPeriod}
                 required
-                disabled={submitProof.isPending || eligiblePayments.length === 0}
+                disabled={formBusy}
                 onChange={(event) => {
-                  const nextId = event.target.value;
-                  const payment = eligiblePayments.find((item) => item.id === nextId);
-                  setPaymentId(nextId);
-                  setDeclaredAmount(payment ? String(payment.amount) : "");
+                  setBillingPeriod(event.target.value);
                   setFormError(null);
                 }}
               >
-                <option value="">Sélectionner un paiement à régler</option>
-                {eligiblePayments.map((payment) => (
-                  <option key={payment.id} value={payment.id}>
-                    {Number(payment.amount).toLocaleString()} {payment.currency} · échéance{" "}
-                    {payment.due_date ?? "non définie"}
+                <option value="">Sélectionner un mois / une période</option>
+                {periodOptions.map((period) => (
+                  <option key={period} value={period}>
+                    {billingPeriodLabel(period, billingPlan)}
                   </option>
                 ))}
               </select>
             </label>
+            <p className="text-sm text-muted-foreground">
+              Montant attendu :{" "}
+              <span className="font-medium text-foreground">
+                {formatMoneyAmount(expectedAmount, currency)}
+              </span>{" "}
+              ({billingPlanLabel(billingPlan)})
+            </p>
             {identityHint ? <p className="text-sm text-destructive">{identityHint}</p> : null}
-            {installmentHint ? <p className="text-sm text-destructive">{installmentHint}</p> : null}
             <label className="block text-sm">
               Moyen de paiement
               <select
                 className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={paymentMethod}
-                disabled={submitProof.isPending}
+                disabled={formBusy}
                 onChange={(e) => setPaymentMethod(e.target.value)}
               >
                 <option value="bank_transfer">Virement</option>
@@ -1383,7 +1560,7 @@ export function StudentPaymentsPage() {
             </label>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm">
-                Montant versé
+                Montant versé ({currency})
                 <Input
                   type="number"
                   min="0.01"
@@ -1391,7 +1568,7 @@ export function StudentPaymentsPage() {
                   value={declaredAmount}
                   onChange={(event) => setDeclaredAmount(event.target.value)}
                   className="mt-1"
-                  disabled={submitProof.isPending}
+                  disabled={formBusy}
                 />
               </label>
               <label className="block text-sm">
@@ -1401,17 +1578,18 @@ export function StudentPaymentsPage() {
                   value={operationDate}
                   onChange={(event) => setOperationDate(event.target.value)}
                   className="mt-1"
-                  disabled={submitProof.isPending}
+                  disabled={formBusy}
                 />
               </label>
             </div>
             <label className="block text-sm">
-              Référence de l’opération (optionnel)
+              RIB du compte ayant effectué le virement
               <Input
                 value={operationReference}
                 onChange={(event) => setOperationReference(event.target.value)}
                 className="mt-1"
-                disabled={submitProof.isPending}
+                disabled={formBusy}
+                placeholder="Ex. 007 …"
               />
             </label>
             <ContentAttachmentUploader
@@ -1424,8 +1602,8 @@ export function StudentPaymentsPage() {
                 setAttachment(next);
                 setFormError(null);
               }}
-              disabled={submitProof.isPending}
-              uploading={submitProof.isPending}
+              disabled={formBusy}
+              uploading={formBusy}
             />
             <label className="block text-sm">
               Note (optionnel)
@@ -1433,21 +1611,15 @@ export function StudentPaymentsPage() {
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 className="mt-1"
-                disabled={submitProof.isPending}
+                disabled={formBusy}
               />
             </label>
-            {formError && !installmentHint ? (
-              <p className="text-sm text-destructive">{formError}</p>
+            {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+            {blockReason && !formError && !formBusy ? (
+              <p className="text-sm text-muted-foreground">{blockReason}</p>
             ) : null}
-            {submitBlockReason &&
-            !formError &&
-            !installmentHint &&
-            !identityHint &&
-            !submitProof.isPending ? (
-              <p className="text-sm text-muted-foreground">{submitBlockReason}</p>
-            ) : null}
-            <Button type="submit" disabled={Boolean(submitBlockReason) || submitProof.isPending}>
-              {submitProof.isPending ? "Envoi en cours…" : "Envoyer le justificatif"}
+            <Button type="submit" disabled={Boolean(blockReason) || formBusy}>
+              {formBusy ? "Envoi en cours…" : "Envoyer le justificatif"}
             </Button>
           </form>
         </div>
@@ -1461,8 +1633,15 @@ export function StudentPaymentsPage() {
                   </p>
                   <p className="text-xs text-muted-foreground">{p.student_note || "Sans note"}</p>
                   <p className="text-xs text-muted-foreground">
-                    {Number(p.declared_amount).toLocaleString()} {p.payment?.currency ?? "MAD"} ·{" "}
-                    {p.operation_date}
+                    {formatMoneyAmount(Number(p.declared_amount), p.payment?.currency ?? "MAD")}
+                    {p.payment?.billing_plan
+                      ? ` · ${billingPlanLabel(p.payment.billing_plan)}`
+                      : ""}
+                    {p.payment?.billing_period
+                      ? ` · ${billingPeriodLabel(p.payment.billing_period, p.payment.billing_plan)}`
+                      : ""}{" "}
+                    · {p.operation_date}
+                    {p.operation_reference ? ` · RIB ${p.operation_reference}` : ""}
                     {p.validation_deadline
                       ? ` · limite validation ${p.validation_deadline.slice(0, 16).replace("T", " ")}`
                       : ""}
@@ -1480,29 +1659,11 @@ export function StudentPaymentsPage() {
                   >
                     Voir
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      void (async () => {
-                        try {
-                          const url = await PaymentProofService.getSignedUrl(p);
-                          await forceDownloadUrl(url, `justificatif-${p.id}`);
-                        } catch (err) {
-                          toast.error(
-                            err instanceof Error ? err.message : "Téléchargement impossible",
-                          );
-                        }
-                      })();
-                    }}
-                  >
-                    Télécharger
-                  </Button>
                   {p.admin_receipt_path ? (
                     <>
                       <Button
                         size="sm"
-                        variant="secondary"
+                        variant="outline"
                         onClick={() =>
                           void openProofDoc(
                             `Reçu · ${p.operation_date}`,
@@ -1571,58 +1732,62 @@ export function StudentPaymentsPage() {
         onRetry={() => void paymentsQuery.refetch()}
       >
         <Surface className="divide-y">
-          {paymentsQuery.data?.map((row) => (
-            <div
-              key={row.id}
-              className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
-            >
-              <div>
-                <p className="font-medium">
-                  {Number(row.amount).toLocaleString()} {row.currency}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Échéance {row.due_date ?? "—"}
-                  {row.reference ? ` · ${row.reference}` : ""}
-                </p>
+          {paymentsQuery.data?.map((row) => {
+            const billing = paymentBillingSummary(row);
+            return (
+              <div
+                key={row.id}
+                className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
+              >
+                <div>
+                  <p className="font-medium">
+                    {billing.expected} · {billing.plan}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {billing.period}
+                    {row.due_date ? ` · à régler avant ${row.due_date}` : ""}
+                    {` · versé ${billing.paid}`}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {row.admin_receipt_path && row.status === "paid" ? (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() =>
+                          void openProofDoc(`Reçu administratif`, row.admin_receipt_mime, () =>
+                            PaymentService.getAdminReceiptSignedUrl(row),
+                          )
+                        }
+                      >
+                        Voir
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          void (async () => {
+                            try {
+                              const url = await PaymentService.getAdminReceiptSignedUrl(row);
+                              await forceDownloadUrl(url, `recu-${row.id}`);
+                            } catch (err) {
+                              toast.error(
+                                err instanceof Error ? err.message : "Téléchargement impossible",
+                              );
+                            }
+                          })();
+                        }}
+                      >
+                        Télécharger
+                      </Button>
+                    </>
+                  ) : null}
+                  <Status tone={paymentTone(row.status)}>{paymentStatusLabel(row.status)}</Status>
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {row.admin_receipt_path && row.status === "paid" ? (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() =>
-                        void openProofDoc(`Reçu administratif`, row.admin_receipt_mime, () =>
-                          PaymentService.getAdminReceiptSignedUrl(row),
-                        )
-                      }
-                    >
-                      Voir
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        void (async () => {
-                          try {
-                            const url = await PaymentService.getAdminReceiptSignedUrl(row);
-                            await forceDownloadUrl(url, `recu-${row.id}`);
-                          } catch (err) {
-                            toast.error(
-                              err instanceof Error ? err.message : "Téléchargement impossible",
-                            );
-                          }
-                        })();
-                      }}
-                    >
-                      Télécharger
-                    </Button>
-                  </>
-                ) : null}
-                <Status tone={paymentTone(row.status)}>{paymentStatusLabel(row.status)}</Status>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </Surface>
       </QueryState>
     </>

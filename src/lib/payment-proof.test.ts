@@ -60,7 +60,7 @@ describe("payment proof submit validation", () => {
         declaredAmount: 500,
         operationDate: "2026-09-18",
       }),
-    ).toBe("Sélectionnez une échéance à régler.");
+    ).toBe("Sélectionnez un mois à payer.");
   });
 
   it("accepts a complete valid payload", () => {
@@ -86,13 +86,13 @@ describe("student proof deadline copy", () => {
   it("asks to select an installment when none is chosen", () => {
     expect(
       studentProofDeadlineHint({ paymentsLoaded: true, eligibleCount: 2, paymentId: "" }),
-    ).toBe("Sélectionnez une échéance à régler.");
+    ).toBe("Sélectionnez un mois à payer.");
   });
 
   it("explains when no installment is available", () => {
     expect(
       studentProofDeadlineHint({ paymentsLoaded: true, eligibleCount: 0, paymentId: "" }),
-    ).toBe("Aucune échéance à régler n’est disponible. Contactez l’administration.");
+    ).toBe("Aucun mois à payer n’est disponible. Contactez l’administration.");
   });
 });
 

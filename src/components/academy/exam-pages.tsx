@@ -140,6 +140,21 @@ function StudentExamCatalog() {
         <div className="grid gap-4 md:grid-cols-2">
           {examsQuery.data?.map((exam) => {
             const latest = latestByExam.get(exam.id);
+            const attemptStatus = latest?.status;
+            const examProgress =
+              attemptStatus === "in_progress"
+                ? "in_progress"
+                : attemptStatus === "submitted" ||
+                    attemptStatus === "graded" ||
+                    attemptStatus === "expired"
+                  ? "done"
+                  : "todo";
+            const progressBadge =
+              examProgress === "in_progress"
+                ? { tone: "amber" as const, label: "En cours" }
+                : examProgress === "done"
+                  ? { tone: "green" as const, label: "Fait" }
+                  : { tone: "gray" as const, label: "À faire" };
             return (
               <Surface className="p-6" key={exam.id}>
                 <div className="flex items-start justify-between gap-3">
@@ -162,18 +177,15 @@ function StudentExamCatalog() {
                       </p>
                     ) : null}
                   </div>
-                  <Status tone="green">
-                    {exam.status === "published" ? "Publié" : exam.status}
-                  </Status>
+                  <Status tone={progressBadge.tone}>{progressBadge.label}</Status>
                 </div>
-                {latest && latest.status !== "in_progress" && (
+                {latest && examProgress === "done" && (
                   <p className="mt-4 text-sm text-muted-foreground">
-                    Dernier résultat : {Number(latest.percentage ?? 0).toFixed(0)} % ·{" "}
-                    {latest.status === "submitted"
-                      ? "Remis"
-                      : latest.status === "graded"
-                        ? "Corrigé"
-                        : latest.status}
+                    {attemptStatus === "graded"
+                      ? `Résultat : ${Number(latest.percentage ?? 0).toFixed(0)} % · Corrigé`
+                      : attemptStatus === "submitted"
+                        ? "Marqué comme fait — en attente de correction"
+                        : "Marqué comme fait"}
                   </p>
                 )}
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -195,31 +207,61 @@ function StudentExamCatalog() {
                       Ouvrir le document
                     </Button>
                   )}
-                  <Button
-                    disabled={startExam.isPending}
-                    onClick={() => {
-                      startExam.mutate(exam.id, {
-                        onSuccess: (attempt) => {
-                          persistExamSession(exam.id, attempt.id);
-                          navigate("mock-exam");
-                        },
-                        onError: (err) => toast.error(err.message),
-                      });
-                    }}
-                  >
-                    {latest?.status === "in_progress" ? "Continuer" : "Commencer"}
-                  </Button>
-                  {latest && latest.status !== "in_progress" && (
+                  {examProgress === "todo" ? (
                     <Button
-                      variant="outline"
+                      disabled={startExam.isPending}
                       onClick={() => {
-                        persistExamSession(exam.id, latest.id);
-                        navigate("exam-result");
+                        startExam.mutate(exam.id, {
+                          onSuccess: (attempt) => {
+                            persistExamSession(exam.id, attempt.id);
+                            navigate("mock-exam");
+                          },
+                          onError: (err) => toast.error(err.message),
+                        });
                       }}
                     >
-                      Voir le résultat
+                      Commencer
                     </Button>
-                  )}
+                  ) : null}
+                  {examProgress === "in_progress" ? (
+                    <Button
+                      disabled={startExam.isPending}
+                      onClick={() => {
+                        if (latest) {
+                          persistExamSession(exam.id, latest.id);
+                          navigate("mock-exam");
+                          return;
+                        }
+                        startExam.mutate(exam.id, {
+                          onSuccess: (attempt) => {
+                            persistExamSession(exam.id, attempt.id);
+                            navigate("mock-exam");
+                          },
+                          onError: (err) => toast.error(err.message),
+                        });
+                      }}
+                    >
+                      Reprendre
+                    </Button>
+                  ) : null}
+                  {examProgress === "done" ? (
+                    <>
+                      <Button variant="secondary" disabled>
+                        Fait
+                      </Button>
+                      {latest ? (
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            persistExamSession(exam.id, latest.id);
+                            navigate("exam-result");
+                          }}
+                        >
+                          Voir le résultat
+                        </Button>
+                      ) : null}
+                    </>
+                  ) : null}
                 </div>
               </Surface>
             );

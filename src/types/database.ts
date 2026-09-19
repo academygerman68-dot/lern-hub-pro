@@ -1981,6 +1981,8 @@ export type Database = {
           admin_receipt_path: string | null;
           amount: number;
           amount_paid: number;
+          billing_period: string | null;
+          billing_plan: string | null;
           created_at: string;
           created_by: string | null;
           currency: string;
@@ -2004,6 +2006,8 @@ export type Database = {
           admin_receipt_path?: string | null;
           amount: number;
           amount_paid?: number;
+          billing_period?: string | null;
+          billing_plan?: string | null;
           created_at?: string;
           created_by?: string | null;
           currency?: string;
@@ -2027,6 +2031,8 @@ export type Database = {
           admin_receipt_path?: string | null;
           amount?: number;
           amount_paid?: number;
+          billing_period?: string | null;
+          billing_plan?: string | null;
           created_at?: string;
           created_by?: string | null;
           currency?: string;
@@ -2499,6 +2505,19 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      billing_period_due_date: {
+        Args: { p_period: string; p_plan: string };
+        Returns: string;
+      };
+      ensure_student_billing_payment: {
+        Args: {
+          p_amount: number;
+          p_billing_plan: string;
+          p_currency: string;
+          p_period: string;
+        };
+        Returns: string;
       };
       has_academic_access: { Args: { p_student_id: string }; Returns: boolean };
       record_student_first_login: { Args: Record<string, never>; Returns: string | null };
