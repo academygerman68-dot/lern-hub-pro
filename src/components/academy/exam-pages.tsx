@@ -41,7 +41,10 @@ import {
   scopedClassOrLevelItemVisible,
 } from "@/lib/academy-logic";
 import {
+  canRetakeExam,
+  countCompletedExamAttempts,
   countWritingStats,
+  examAttemptsLeft,
   isManualQuestionType,
   studentExamProgressLabel,
 } from "@/lib/exam-writing";
@@ -189,6 +192,26 @@ function StudentExamCatalog() {
             const isInProgress = progressLabel === "En cours";
             const isDone =
               progressLabel === "Terminé" || progressLabel === "En attente de correction";
+            const maxAttempts = Math.max(1, Number(exam.max_attempts ?? 3));
+            const completedAttempts = countCompletedExamAttempts(
+              attemptsQuery.data ?? [],
+              exam.id,
+            );
+            const attemptsLeft = examAttemptsLeft(completedAttempts, maxAttempts);
+            const allowRetake = canRetakeExam({
+              latestStatus: latest?.status,
+              completedAttempts,
+              maxAttempts,
+            });
+            const launchExam = () => {
+              startExam.mutate(exam.id, {
+                onSuccess: (attempt) => {
+                  persistExamSession(exam.id, attempt.id);
+                  navigate("mock-exam");
+                },
+                onError: (err) => toast.error(err.message),
+              });
+            };
             return (
               <Surface className="p-6" key={exam.id}>
                 <div className="flex items-start justify-between gap-3">
@@ -206,6 +229,10 @@ function StudentExamCatalog() {
                       Durée : {exam.duration_minutes} min
                       {exam.starts_at ? ` · Début ${formatFrDate(exam.starts_at)}` : ""}
                       {exam.ends_at ? ` · Fin ${formatFrDate(exam.ends_at)}` : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Tentatives : {completedAttempts}/{maxAttempts}
+                      {attemptsLeft > 0 ? ` · ${attemptsLeft} restante${attemptsLeft > 1 ? "s" : ""}` : ""}
                     </p>
                   </div>
                   <Status tone={progressTone(progressLabel)}>{progressLabel}</Status>
@@ -235,18 +262,7 @@ function StudentExamCatalog() {
                     </Button>
                   )}
                   {isTodo ? (
-                    <Button
-                      disabled={startExam.isPending}
-                      onClick={() => {
-                        startExam.mutate(exam.id, {
-                          onSuccess: (attempt) => {
-                            persistExamSession(exam.id, attempt.id);
-                            navigate("mock-exam");
-                          },
-                          onError: (err) => toast.error(err.message),
-                        });
-                      }}
-                    >
+                    <Button disabled={startExam.isPending} onClick={launchExam}>
                       Commencer
                     </Button>
                   ) : null}
@@ -259,13 +275,7 @@ function StudentExamCatalog() {
                           navigate("mock-exam");
                           return;
                         }
-                        startExam.mutate(exam.id, {
-                          onSuccess: (attempt) => {
-                            persistExamSession(exam.id, attempt.id);
-                            navigate("mock-exam");
-                          },
-                          onError: (err) => toast.error(err.message),
-                        });
+                        launchExam();
                       }}
                     >
                       Reprendre
@@ -273,9 +283,6 @@ function StudentExamCatalog() {
                   ) : null}
                   {isDone ? (
                     <>
-                      <Button variant="secondary" disabled>
-                        {progressLabel}
-                      </Button>
                       {latest ? (
                         <Button
                           variant="outline"
@@ -287,6 +294,15 @@ function StudentExamCatalog() {
                           Voir le résultat
                         </Button>
                       ) : null}
+                      {allowRetake ? (
+                        <Button disabled={startExam.isPending} onClick={launchExam}>
+                          Repasser le test
+                        </Button>
+                      ) : (
+                        <Button variant="secondary" disabled>
+                          Tentatives épuisées
+                        </Button>
+                      )}
                     </>
                   ) : null}
                 </div>

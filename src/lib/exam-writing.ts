@@ -40,6 +40,31 @@ export function studentExamProgressLabel(
   return "À faire";
 }
 
+/** Counts completed attempts the same way as start_exam_attempt (submitted + graded). */
+export function countCompletedExamAttempts(
+  attempts: Array<{ exam_id: string; status: string }>,
+  examId: string,
+): number {
+  return attempts.filter(
+    (attempt) =>
+      attempt.exam_id === examId &&
+      (attempt.status === "submitted" || attempt.status === "graded"),
+  ).length;
+}
+
+export function canRetakeExam(input: {
+  latestStatus: string | null | undefined;
+  completedAttempts: number;
+  maxAttempts: number;
+}): boolean {
+  if (!input.latestStatus || input.latestStatus === "in_progress") return false;
+  return input.completedAttempts < input.maxAttempts;
+}
+
+export function examAttemptsLeft(completedAttempts: number, maxAttempts: number): number {
+  return Math.max(0, maxAttempts - completedAttempts);
+}
+
 export function attemptGradingStatus(status: string, hasUngradedManual: boolean) {
   if (status === "graded" && !hasUngradedManual) return "corrigé";
   if (status === "submitted" || hasUngradedManual) return "non corrigé";

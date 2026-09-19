@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   attemptGradingStatus,
+  canRetakeExam,
   combineExamScore,
+  countCompletedExamAttempts,
   countWritingStats,
+  examAttemptsLeft,
   filterGroupsByLevel,
   groupAverage,
   isManualQuestionType,
@@ -45,6 +48,26 @@ describe("exam final score with QCM + writing", () => {
     expect(studentExamProgressLabel("submitted", true)).toBe("En attente de correction");
     expect(studentExamProgressLabel("graded", false)).toBe("Terminé");
     expect(studentExamProgressLabel("graded", true)).toBe("En attente de correction");
+  });
+
+  it("counts completed attempts and allows retake under max_attempts", () => {
+    const attempts = [
+      { exam_id: "e1", status: "graded" },
+      { exam_id: "e1", status: "submitted" },
+      { exam_id: "e1", status: "in_progress" },
+      { exam_id: "e2", status: "graded" },
+    ];
+    expect(countCompletedExamAttempts(attempts, "e1")).toBe(2);
+    expect(examAttemptsLeft(2, 3)).toBe(1);
+    expect(
+      canRetakeExam({ latestStatus: "graded", completedAttempts: 2, maxAttempts: 3 }),
+    ).toBe(true);
+    expect(
+      canRetakeExam({ latestStatus: "graded", completedAttempts: 3, maxAttempts: 3 }),
+    ).toBe(false);
+    expect(
+      canRetakeExam({ latestStatus: "in_progress", completedAttempts: 1, maxAttempts: 3 }),
+    ).toBe(false);
   });
 });
 

@@ -428,7 +428,19 @@ export const SupabaseExamService = {
 
   async startAttempt(examId: string): Promise<ExamAttempt> {
     const { data, error } = await requireClient().rpc("start_exam_attempt", { p_exam_id: examId });
-    if (error) throw error;
+    if (error) {
+      const message = error.message ?? "";
+      if (message.includes("MAX_ATTEMPTS_REACHED")) {
+        throw new Error("Vous avez atteint le nombre maximum de tentatives pour cet examen.");
+      }
+      if (message.includes("EXAM_NOT_ALLOWED")) {
+        throw new Error("Cet examen n’est pas disponible pour votre compte.");
+      }
+      if (message.includes("EXAM_NOT_PUBLISHED")) {
+        throw new Error("Cet examen n’est plus publié.");
+      }
+      throw error;
+    }
     return data as ExamAttempt;
   },
 
