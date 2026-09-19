@@ -39,9 +39,7 @@ export function QueryState({
         <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
           Un problème est survenu lors du chargement. Vous pouvez réessayer dans un instant.
         </p>
-        {error?.message && (
-          <p className="mt-3 text-xs text-muted-foreground/80">Référence : requête en échec</p>
-        )}
+        {error?.message ? <p className="mt-3 text-sm text-foreground/80">{error.message}</p> : null}
         {onRetry && (
           <Button className="mt-5" variant="outline" onClick={onRetry}>
             Réessayer

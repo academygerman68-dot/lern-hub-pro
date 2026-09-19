@@ -601,6 +601,7 @@ export const AssignmentService = {
         id: row.id,
         title: row.title,
         due: row.due_at ? new Date(row.due_at).toLocaleString("fr-FR") : "—",
+        dueAt: row.due_at,
         status:
           row.status === "published" ? "Publié" : row.status === "draft" ? "Brouillon" : row.status,
         ...(row.class_id ? { classId: row.class_id } : {}),

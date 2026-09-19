@@ -66,6 +66,7 @@ import {
   useUploadRecording,
 } from "@/hooks/use-academy-data";
 import type { ClassDetail } from "@/lib/academy-mappers";
+import { resolveOwnStudent } from "@/lib/payment-proof";
 import type { Student } from "@/types/academy";
 import { Metric, PageHeader, ProgressLine, Status, Surface } from "./primitives";
 import { useAcademy } from "./academy-context";
@@ -205,14 +206,15 @@ export function CalendarPage() {
 }
 
 export function Assignments({ detail }: { detail: boolean }) {
-  const { navigate, user } = useAcademy();
+  const { navigate, user, profile } = useAcademy();
   const search = useSearch({ from: "/app/$role/$page" });
   const studentsQuery = useStudents();
-  const listQuery = useAssignmentRows();
+  const myStudent = resolveOwnStudent(studentsQuery.data ?? [], {
+    profileId: profile?.id ?? user?.id ?? null,
+    email: user?.email ?? null,
+  });
+  const listQuery = useAssignmentRows(myStudent?.classId);
   const submit = useSubmitAssignment();
-  const myStudent = (studentsQuery.data ?? []).find(
-    (s) => s.email.toLowerCase() === (user?.email ?? "").toLowerCase(),
-  );
   const published = useMemo(
     () => (listQuery.data ?? []).filter((row) => row.status === "published"),
     [listQuery.data],
@@ -252,12 +254,24 @@ export function Assignments({ detail }: { detail: boolean }) {
 
   if (detail) {
     const submission = submissionsQuery.data;
+    const pastDue = selected?.due_at != null && new Date(selected.due_at).getTime() < Date.now();
     const locked =
       !selected ||
       selected.status !== "published" ||
-      (selected.due_at !== null && new Date(selected.due_at).getTime() < Date.now()) ||
+      pastDue ||
       submission?.status === "submitted" ||
       submission?.status === "graded";
+    const lockReason = !myStudent?.id
+      ? "Profil étudiant introuvable."
+      : submission?.status === "graded"
+        ? "Ce devoir est corrigé — lecture seule."
+        : submission?.status === "submitted"
+          ? "Devoir déjà remis. Vous pouvez consulter votre réponse."
+          : pastDue
+            ? "Échéance dépassée — la remise est fermée."
+            : selected?.status !== "published"
+              ? "Ce devoir n’est pas encore ouvert."
+              : null;
 
     return (
       <>
@@ -377,6 +391,11 @@ export function Assignments({ detail }: { detail: boolean }) {
                 <Surface className="space-y-4 p-6">
                   <h2 className="text-base font-semibold tracking-tight">3. Ma réponse</h2>
                   <p className="text-xs text-muted-foreground">Texte et/ou fichier à remettre</p>
+                  {lockReason ? (
+                    <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                      {lockReason}
+                    </p>
+                  ) : null}
                   {!myStudent?.id ? (
                     <p className="text-sm text-destructive">Profil étudiant introuvable.</p>
                   ) : (
@@ -857,6 +876,21 @@ export function Messages({ counterpart: _counterpart }: { counterpart?: string }
                 </div>
               </div>
               <div className="flex-1 space-y-3 overflow-y-auto p-5">
+                {messagesQuery.isError ? (
+                  <div className="rounded-lg border border-destructive/30 bg-alert-soft p-3 text-sm text-foreground">
+                    Impossible de charger les messages.{" "}
+                    <button
+                      type="button"
+                      className="font-medium underline"
+                      onClick={() => void messagesQuery.refetch()}
+                    >
+                      Réessayer
+                    </button>
+                  </div>
+                ) : null}
+                {messagesQuery.isLoading ? (
+                  <p className="text-sm text-muted-foreground">Chargement des messages…</p>
+                ) : null}
                 {(messagesQuery.data ?? []).map((message) => {
                   const mine = message.sender_id === user?.id;
                   const senderName = message.sender

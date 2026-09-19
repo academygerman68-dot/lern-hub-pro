@@ -132,6 +132,8 @@ export interface AssignmentListItem {
   id: string;
   title: string;
   due: string;
+  /** ISO due date when available (for sorting / urgency). */
+  dueAt?: string | null;
   status: string;
   classId?: string;
   description?: string | null;

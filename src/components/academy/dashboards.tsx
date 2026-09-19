@@ -18,6 +18,9 @@ import {
   useTeachers,
 } from "@/hooks/use-academy-data";
 import { queryKeys } from "@/lib/query-keys";
+import { resolveOwnStudent } from "@/lib/payment-proof";
+import { resolveCalendarTeacherId } from "@/lib/live-calendar-scope";
+import { setLiveSessionId } from "@/lib/live-class-session";
 import { formatLiveDate, formatLiveTime, liveStatusLabel } from "@/lib/live-meeting";
 import { AssignmentService } from "@/services/academy-services";
 import { useAcademy } from "./academy-context";
@@ -34,9 +37,10 @@ export function PremiumStudentDashboard() {
   const { navigate, user, l, profile } = useAcademy();
   const firstName = user?.name?.split(" ")[0] ?? "there";
   const studentsQuery = useStudents();
-  const myStudent = (studentsQuery.data ?? []).find(
-    (row) => row.email.toLowerCase() === (user?.email ?? "").toLowerCase(),
-  );
+  const myStudent = resolveOwnStudent(studentsQuery.data ?? [], {
+    profileId: profile?.id ?? user?.id ?? null,
+    email: user?.email ?? null,
+  });
   const enrollmentsQuery = useEnrollmentsByStudent(myStudent?.id);
   const sessionsQuery = useLiveSessions(myStudent?.classId);
   const conversationsQuery = useConversations();
@@ -58,11 +62,21 @@ export function PremiumStudentDashboard() {
   const nextSession = (sessionsQuery.data ?? [])
     .filter((s) => new Date(s.starts_at).getTime() >= now && s.status !== "cancelled")
     .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())[0];
-  const upcomingAssignments = (assignmentsQuery.data ?? []).slice(0, 3);
+  const upcomingAssignments = (assignmentsQuery.data ?? [])
+    .filter((item) => item.status === "published" || item.status === "Publié")
+    .slice()
+    .sort((a, b) => {
+      const da = a.dueAt ? Date.parse(a.dueAt) : Number.POSITIVE_INFINITY;
+      const db = b.dueAt ? Date.parse(b.dueAt) : Number.POSITIVE_INFINITY;
+      return da - db;
+    })
+    .slice(0, 3);
   const levelExams = (examsQuery.data ?? [])
     .filter((exam) => !exam.level?.code || exam.level.code === level)
     .slice(0, 3);
   const recentAttempt = (attemptsQuery.data ?? [])[0];
+  const identityMissing =
+    !studentsQuery.isLoading && !studentsQuery.isError && !myStudent && Boolean(user?.email);
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -72,6 +86,11 @@ export function PremiumStudentDashboard() {
           restreint. Veuillez contacter l’administration.
         </div>
       )}
+      {identityMissing ? (
+        <div className="rounded-2xl border border-destructive/30 bg-alert-soft p-4 text-sm text-foreground">
+          Votre profil étudiant est introuvable. Contactez l’administration pour lier votre compte.
+        </div>
+      ) : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm text-muted-foreground">{l("Bienvenue", "مرحبًا")}</p>
@@ -103,7 +122,14 @@ export function PremiumStudentDashboard() {
               <Button
                 className="mt-5"
                 variant="secondary"
-                onClick={() => navigate(nextSession.status === "live" ? "meeting" : "live")}
+                onClick={() => {
+                  if (nextSession.status === "live") {
+                    setLiveSessionId(nextSession.id);
+                    navigate("meeting");
+                    return;
+                  }
+                  navigate("live");
+                }}
               >
                 {nextSession.status === "live"
                   ? l("Rejoindre", "انضم")
@@ -206,13 +232,14 @@ export function PremiumStudentDashboard() {
 
         <Surface className="p-5">
           <Eyebrow>{l("Messages", "الرسائل")}</Eyebrow>
-          <p className="mt-3 font-display text-3xl">{(conversationsQuery.data ?? []).length}</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {l("Conversations actives", "محادثات نشطة")}
+          <p className="mt-3 text-sm text-muted-foreground">
+            {(conversationsQuery.data ?? []).length > 0
+              ? l("Écrire à votre professeur ou votre groupe.", "راسل أستاذك أو مجموعتك.")
+              : l("Aucune conversation pour l’instant.", "لا توجد محادثات حاليًا.")}
           </p>
           <button
             type="button"
-            className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary"
+            className="mt-4 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary"
             onClick={() => navigate("messages")}
           >
             {l("Ouvrir la messagerie", "فتح المراسلة")} <MessageSquare className="size-4" />
@@ -239,20 +266,25 @@ export function PremiumStudentDashboard() {
 }
 
 export function PremiumTeacherDashboard() {
-  const { navigate, l, user } = useAcademy();
+  const { navigate, l, user, profile } = useAcademy();
   const classesQuery = useClasses();
   const teachersQuery = useTeachers();
   const sessionsQuery = useLiveSessions();
   const assignmentsQuery = useAssignments();
 
-  const me = (teachersQuery.data ?? []).find(
-    (teacher) => teacher.email.toLowerCase() === (user?.email ?? "").toLowerCase(),
+  const meId = useMemo(
+    () =>
+      resolveCalendarTeacherId("teacher", classesQuery.data ?? [], teachersQuery.data ?? [], {
+        profileId: profile?.id ?? user?.id ?? null,
+        email: user?.email ?? null,
+      }),
+    [classesQuery.data, teachersQuery.data, profile?.id, user?.id, user?.email],
   );
   const myClasses = useMemo(
-    () => (classesQuery.data ?? []).filter((item) => item.teacherId === me?.id),
-    [classesQuery.data, me?.id],
+    () => (classesQuery.data ?? []).filter((item) => item.teacherId === meId),
+    [classesQuery.data, meId],
   );
-  const primaryClass = myClasses[0] ?? classesQuery.data?.[0];
+  const primaryClass = myClasses[0];
   const rosterQuery = useClassRoster(primaryClass?.id);
   const classIds = useMemo(() => new Set(myClasses.map((item) => item.id)), [myClasses]);
 

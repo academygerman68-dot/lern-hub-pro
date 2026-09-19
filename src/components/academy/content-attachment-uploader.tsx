@@ -45,6 +45,8 @@ export function ContentAttachmentUploader({
   existingLabel = "Un fichier est déjà enregistré. Déposez-en un autre pour le remplacer.",
   onClearExisting,
   showKindSelect = true,
+  accept,
+  validateFile,
 }: {
   kinds: Kind[];
   value: AttachmentDraft;
@@ -59,6 +61,10 @@ export function ContentAttachmentUploader({
   existingLabel?: string;
   onClearExisting?: () => void;
   showKindSelect?: boolean;
+  /** Override the file input accept list (e.g. PDF+JPEG+PNG together). */
+  accept?: string;
+  /** Override kind-based validation. Return an error message or null. */
+  validateFile?: (file: File) => string | null;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -73,7 +79,9 @@ export function ContentAttachmentUploader({
         onChange({ ...value, file: null });
         return;
       }
-      const validation = validateFileForKind(file, value.kind as MediaKind | CourseKind);
+      const validation = validateFile
+        ? validateFile(file)
+        : validateFileForKind(file, value.kind as MediaKind | CourseKind);
       if (validation) {
         setLocalError(validation);
         onChange({ ...value, file: null });
@@ -81,7 +89,7 @@ export function ContentAttachmentUploader({
       }
       onChange({ ...value, file });
     },
-    [onChange, value],
+    [onChange, validateFile, value],
   );
 
   const onDrop = (event: React.DragEvent) => {
@@ -167,9 +175,12 @@ export function ContentAttachmentUploader({
               ref={inputRef}
               type="file"
               className="hidden"
-              accept={acceptForKind(value.kind)}
+              accept={accept ?? acceptForKind(value.kind)}
               disabled={disabled}
-              onChange={(e) => applyFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                applyFile(e.target.files?.[0] ?? null);
+                e.target.value = "";
+              }}
             />
           </div>
 

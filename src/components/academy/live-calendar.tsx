@@ -1,4 +1,4 @@
-import { Component, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
+import { Component, useEffect, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getLiveSessionJoinState } from "@/lib/jitsi-config";
@@ -11,8 +11,17 @@ import {
   isZoomActive,
   zoomMeetingDurationMinutes,
   formatLiveDate,
-  formatLiveTime,
 } from "@/lib/live-meeting";
+import {
+  calendarFilterVisibility,
+  filterClassesByLevelCode,
+  pickStudentCalendarClass,
+  resolveCalendarTeacherId,
+  sessionBelongsToEnrolledClasses,
+  studentCalendarContextLabel,
+  studentScopeClassId,
+} from "@/lib/live-calendar-scope";
+import { calendarDayKey, calendarStatusTone } from "@/lib/live-calendar-layout";
 import { LiveSessionService } from "@/services/academy-services";
 import {
   useClasses,
@@ -25,6 +34,10 @@ import { FilterBar, GroupBadge, LevelBadge, PageHeader, Status, Surface } from "
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
 import { canEditLiveSession, EditLiveSessionModal } from "./live/edit-session-modal";
+import { CalendarToolbar } from "./live/calendar/calendar-toolbar";
+import { CalendarWeekView } from "./live/calendar/calendar-week-view";
+import { CalendarMonthView } from "./live/calendar/calendar-month-view";
+import { CalendarAgendaView } from "./live/calendar/calendar-agenda-view";
 import type { LiveSessionListItem } from "@/services/supabase/live-session-service";
 
 /** Isolates calendar render failures so Live / Calendar routes stay usable. */
@@ -68,31 +81,22 @@ export type LiveCalendarProps = {
   skipRealtime?: boolean;
 };
 
-function dayKey(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function isSameDay(a: Date, b: Date) {
-  return dayKey(a) === dayKey(b);
-}
-
-function statusTone(status: string): "green" | "amber" | "gray" | "red" {
-  if (status === "live") return "green";
-  if (status === "scheduled") return "amber";
-  if (status === "cancelled") return "red";
-  return "gray";
-}
-
 /**
  * Reusable week/month live schedule. Safe to embed in Live or use as Calendar route body.
  * Does not import live-pages (avoids circular module graph via staff/student pages).
  */
 export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
-  const { navigate, role, user } = useAcademy();
-  const sessionsQuery = useLiveSessions();
+  const { navigate, role, user, profile } = useAcademy();
+  const filterVisibility = calendarFilterVisibility(role);
   const classesQuery = useClasses();
-  const teachersQuery = useTeachers();
-  const levelsQuery = useLevels();
+  const teachersQuery = useTeachers(filterVisibility.teacher);
+  const levelsQuery = useLevels(filterVisibility.level);
+  const enrolledClassIds = useMemo(
+    () => (classesQuery.data ?? []).map((klass) => klass.id),
+    [classesQuery.data],
+  );
+  const studentClassId = role === "student" ? studentScopeClassId(enrolledClassIds) : undefined;
+  const sessionsQuery = useLiveSessions(studentClassId);
   const updateStatus = useUpdateLiveSessionStatus();
   const [view, setView] = useState<"week" | "month">("week");
   const [anchor, setAnchor] = useState(() => {
@@ -106,15 +110,36 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
   const [teacherFilter, setTeacherFilter] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
-  const myTeacherId = useMemo(() => {
-    if (role !== "teacher") return null;
-    return (
-      (teachersQuery.data ?? []).find(
-        (t) => t.email.toLowerCase() === (user?.email ?? "").toLowerCase(),
-      )?.id ?? null
-    );
-  }, [role, teachersQuery.data, user?.email]);
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const myTeacherId = useMemo(
+    () =>
+      resolveCalendarTeacherId(role, classesQuery.data ?? [], teachersQuery.data ?? [], {
+        profileId: profile?.id ?? user?.id ?? null,
+        email: user?.email ?? null,
+      }),
+    [role, classesQuery.data, teachersQuery.data, profile?.id, user?.id, user?.email],
+  );
+
+  const groupsForLevel = useMemo(
+    () => filterClassesByLevelCode(classesQuery.data ?? [], levelFilter),
+    [classesQuery.data, levelFilter],
+  );
+
+  const studentContext = useMemo(() => {
+    if (role !== "student") return null;
+    const klass = pickStudentCalendarClass(classesQuery.data ?? []);
+    return klass ? studentCalendarContextLabel(klass) : null;
+  }, [role, classesQuery.data]);
+
+  const enrolledClassIdSet = useMemo(() => new Set(enrolledClassIds), [enrolledClassIds]);
+  const classesReady = !classesQuery.isLoading;
+  const showTeacherOnCards = role === "student" || role === "director";
 
   const sessions = useMemo(() => {
     const now = Date.now();
@@ -122,13 +147,38 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
       if (isLiveSessionExpired(s, now) && s.status !== "completed" && s.status !== "cancelled") {
         /* keep completed via status filter; hide stale scheduled */
       }
-      if (classFilter && s.class_id !== classFilter) return false;
-      if (teacherFilter && s.teacher_id !== teacherFilter) return false;
-      if (levelFilter && s.class?.level?.code !== levelFilter) return false;
+      if (
+        role === "student" &&
+        classesReady &&
+        !classesQuery.isError &&
+        !sessionBelongsToEnrolledClasses(s.class_id, enrolledClassIdSet)
+      ) {
+        return false;
+      }
+      if (filterVisibility.group && classFilter && s.class_id !== classFilter) return false;
+      if (filterVisibility.teacher && teacherFilter && s.teacher_id !== teacherFilter) {
+        return false;
+      }
+      if (filterVisibility.level && levelFilter && s.class?.level?.code !== levelFilter) {
+        return false;
+      }
       if (statusFilter && s.status !== statusFilter) return false;
       return true;
     });
-  }, [sessionsQuery.data, classFilter, teacherFilter, levelFilter, statusFilter]);
+  }, [
+    sessionsQuery.data,
+    role,
+    classesReady,
+    classesQuery.isError,
+    enrolledClassIdSet,
+    filterVisibility.group,
+    filterVisibility.teacher,
+    filterVisibility.level,
+    classFilter,
+    teacherFilter,
+    levelFilter,
+    statusFilter,
+  ]);
 
   const selected = (sessionsQuery.data ?? []).find((s) => s.id === selectedId) ?? null;
 
@@ -165,7 +215,7 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
   const sessionsByDay = useMemo(() => {
     const map = new Map<string, LiveSessionListItem[]>();
     for (const session of sessions) {
-      const key = dayKey(new Date(session.starts_at));
+      const key = calendarDayKey(new Date(session.starts_at));
       const list = map.get(key) ?? [];
       list.push(session);
       map.set(key, list);
@@ -176,7 +226,6 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
     return map;
   }, [sessions]);
 
-  /** Mobile agenda: today → next 14 days as timeline */
   const agendaDays = useMemo(() => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
@@ -235,154 +284,128 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
     return d;
   }, []);
 
-  const viewControls = (
-    <div className="flex flex-wrap gap-2">
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() =>
-          setAnchor((prev) => {
-            const d = new Date(prev);
-            if (view === "week") d.setDate(d.getDate() - 7);
-            else d.setMonth(d.getMonth() - 1);
-            return d;
-          })
-        }
-      >
-        Précédent
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => {
-          const d = new Date();
-          d.setHours(0, 0, 0, 0);
-          setAnchor(d);
-        }}
-      >
-        Aujourd’hui
-      </Button>
-      <Button
-        size="sm"
-        variant={view === "week" ? "default" : "outline"}
-        onClick={() => setView("week")}
-      >
-        Semaine
-      </Button>
-      <Button
-        size="sm"
-        variant={view === "month" ? "default" : "outline"}
-        onClick={() => setView("month")}
-      >
-        Mois
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() =>
-          setAnchor((prev) => {
-            const d = new Date(prev);
-            if (view === "week") d.setDate(d.getDate() + 7);
-            else d.setMonth(d.getMonth() + 1);
-            return d;
-          })
-        }
-      >
-        Suivant
-      </Button>
-    </div>
+  const now = useMemo(() => new Date(nowTick), [nowTick]);
+
+  const shiftAnchor = (direction: -1 | 1) => {
+    setAnchor((prev) => {
+      const d = new Date(prev);
+      if (view === "week") d.setDate(d.getDate() + direction * 7);
+      else d.setMonth(d.getMonth() + direction);
+      return d;
+    });
+  };
+
+  const toolbar = (
+    <CalendarToolbar
+      view={view}
+      anchor={anchor}
+      onViewChange={setView}
+      onPrev={() => shiftAnchor(-1)}
+      onNext={() => shiftAnchor(1)}
+      onToday={() => {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        setAnchor(d);
+      }}
+    />
   );
 
   const filters = (
-    <FilterBar>
-      <select
-        className="h-10 min-w-[8rem] flex-1 rounded-md border border-input bg-background px-3 text-sm sm:flex-none"
-        value={levelFilter}
-        onChange={(e) => setLevelFilter(e.target.value)}
-      >
-        <option value="">Tous les niveaux</option>
-        {(levelsQuery.data ?? []).map((l) => (
-          <option key={l.id} value={l.code}>
-            {l.code}
-          </option>
-        ))}
-      </select>
-      <select
-        className="h-10 min-w-[8rem] flex-1 rounded-md border border-input bg-background px-3 text-sm sm:flex-none"
-        value={classFilter}
-        onChange={(e) => setClassFilter(e.target.value)}
-      >
-        <option value="">Tous les groupes</option>
-        {(classesQuery.data ?? []).map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
-      <select
-        className="h-10 min-w-[8rem] flex-1 rounded-md border border-input bg-background px-3 text-sm sm:flex-none"
-        value={teacherFilter}
-        onChange={(e) => setTeacherFilter(e.target.value)}
-      >
-        <option value="">Tous les professeurs</option>
-        {(teachersQuery.data ?? []).map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.name}
-          </option>
-        ))}
-      </select>
-      <select
-        className="h-10 min-w-[8rem] flex-1 rounded-md border border-input bg-background px-3 text-sm sm:flex-none"
-        value={statusFilter}
-        onChange={(e) => setStatusFilter(e.target.value)}
-      >
-        <option value="">Tous les statuts</option>
-        <option value="scheduled">À venir</option>
-        <option value="live">En direct</option>
-        <option value="completed">Terminée</option>
-        <option value="cancelled">Annulée</option>
-      </select>
-    </FilterBar>
-  );
-
-  const sessionChip = (session: LiveSessionListItem, dense = false) => (
-    <button
-      key={session.id}
-      type="button"
-      className={`w-full rounded-lg border border-border/80 bg-card text-left transition duration-150 hover:border-primary/40 hover:bg-muted/40 ${
-        dense ? "px-1.5 py-1" : "p-2"
-      } ${selectedId === session.id ? "border-primary ring-1 ring-primary/30" : ""}`}
-      onClick={() => setSelectedId(session.id)}
-    >
-      <span className={`block font-medium text-foreground ${dense ? "text-[10px]" : "text-xs"}`}>
-        {formatLiveTime(session.starts_at)} · {session.title}
-      </span>
-      {!dense ? (
-        <span className="mt-1 flex flex-wrap items-center gap-1">
-          <Status tone={statusTone(session.status)}>{liveStatusLabel(session.status)}</Status>
-          {session.class?.name ? (
-            <span className="truncate text-[10px] text-muted-foreground">{session.class.name}</span>
-          ) : null}
-        </span>
+    <div className="space-y-3">
+      {studentContext ? (
+        <p className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+          <LevelBadge code={studentContext.level} />
+          <GroupBadge label={studentContext.group} />
+          <span aria-hidden>•</span>
+          <span>{studentContext.teacher}</span>
+        </p>
       ) : null}
-    </button>
+      <FilterBar className="mb-0 sm:mb-0">
+        {filterVisibility.level ? (
+          <select
+            aria-label="Niveau"
+            className="h-10 min-w-[8rem] flex-1 rounded-md border border-input bg-background px-3 text-sm sm:flex-none"
+            value={levelFilter}
+            onChange={(e) => {
+              const next = e.target.value;
+              setLevelFilter(next);
+              const stillValid = filterClassesByLevelCode(classesQuery.data ?? [], next).some(
+                (klass) => klass.id === classFilter,
+              );
+              if (!stillValid) setClassFilter("");
+            }}
+          >
+            <option value="">Tous les niveaux</option>
+            {(levelsQuery.data ?? []).map((l) => (
+              <option key={l.id} value={l.code}>
+                {l.code}
+              </option>
+            ))}
+          </select>
+        ) : null}
+        {filterVisibility.group ? (
+          <select
+            aria-label="Groupe"
+            className="h-10 min-w-[8rem] flex-1 rounded-md border border-input bg-background px-3 text-sm sm:flex-none"
+            value={classFilter}
+            onChange={(e) => setClassFilter(e.target.value)}
+          >
+            <option value="">Tous les groupes</option>
+            {groupsForLevel.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.reference || c.name}
+              </option>
+            ))}
+          </select>
+        ) : null}
+        {filterVisibility.teacher ? (
+          <select
+            aria-label="Professeur"
+            className="h-10 min-w-[8rem] flex-1 rounded-md border border-input bg-background px-3 text-sm sm:flex-none"
+            value={teacherFilter}
+            onChange={(e) => setTeacherFilter(e.target.value)}
+          >
+            <option value="">Tous les professeurs</option>
+            {(teachersQuery.data ?? []).map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        ) : null}
+        {filterVisibility.status ? (
+          <select
+            aria-label="Statut"
+            className="h-10 min-w-[8rem] flex-1 rounded-md border border-input bg-background px-3 text-sm sm:flex-none"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">Tous les statuts</option>
+            <option value="scheduled">À venir</option>
+            <option value="live">En direct</option>
+            <option value="completed">Terminée</option>
+            <option value="cancelled">Annulée</option>
+          </select>
+        ) : null}
+      </FilterBar>
+    </div>
   );
 
   return (
     <>
       {embedded ? (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-4 space-y-3">
           <h3 className="text-sm font-semibold tracking-tight">Calendrier</h3>
-          {viewControls}
+          {toolbar}
         </div>
       ) : (
         <PageHeader
           title="Calendrier"
           subtitle="Planning des cours en direct : heure, groupe, professeur, statut."
-          action={viewControls}
+          action={toolbar}
         />
       )}
-      {filters}
+      <div className="mb-4">{filters}</div>
       <QueryState
         isLoading={sessionsQuery.isLoading || classesQuery.isLoading}
         isError={sessionsQuery.isError}
@@ -392,156 +415,39 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
         emptyMessage="Aucune séance pour cette période ou ces filtres."
         onRetry={() => void sessionsQuery.refetch()}
       >
-        {/* Mobile agenda */}
-        <div className="space-y-4 md:hidden">
-          {agendaDays.map((day) => {
-            const items = sessionsByDay.get(dayKey(day)) ?? [];
-            const label = isSameDay(day, today)
-              ? "Aujourd’hui"
-              : isSameDay(day, new Date(today.getTime() + 86_400_000))
-                ? "Demain"
-                : day.toLocaleDateString("fr-FR", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "short",
-                  });
-            if (
-              !items.length &&
-              !isSameDay(day, today) &&
-              !isSameDay(day, new Date(today.getTime() + 86_400_000))
-            ) {
-              return null;
-            }
-            return (
-              <div key={dayKey(day)}>
-                <h4 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                  {label}
-                </h4>
-                {items.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Rien de prévu</p>
-                ) : (
-                  <div className="space-y-2">
-                    {items.map((session) => (
-                      <Surface
-                        key={session.id}
-                        className="cursor-pointer p-3"
-                        onClick={() => setSelectedId(session.id)}
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-semibold tabular-nums">
-                            {formatLiveTime(session.starts_at)}
-                          </span>
-                          <Status tone={statusTone(session.status)}>
-                            {liveStatusLabel(session.status)}
-                          </Status>
-                        </div>
-                        <p className="mt-1 font-medium">{session.title}</p>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          <GroupBadge label={session.class?.name ?? null} />
-                          {session.class?.level?.code ? (
-                            <LevelBadge code={session.class.level.code} />
-                          ) : null}
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">{teacherName(session)}</p>
-                      </Surface>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <div className="md:hidden">
+          <CalendarAgendaView
+            agendaDays={agendaDays}
+            sessionsByDay={sessionsByDay}
+            today={today}
+            selectedId={selectedId}
+            showTeacher={showTeacherOnCards}
+            teacherName={teacherName}
+            onSelect={setSelectedId}
+          />
         </div>
 
-        {/* Desktop week / month */}
         <div className="hidden md:block">
           {view === "week" ? (
-            <Surface className="overflow-hidden">
-              <div className="grid grid-cols-7 border-b border-border bg-muted/40 text-center text-xs font-medium text-muted-foreground">
-                {weekDays.map((day) => {
-                  const isToday = isSameDay(day, today);
-                  return (
-                    <div
-                      key={dayKey(day)}
-                      className={`border-r border-border/60 px-2 py-3 last:border-r-0 ${
-                        isToday ? "bg-primary/5 text-primary" : ""
-                      }`}
-                    >
-                      <span className="block capitalize">
-                        {day.toLocaleDateString("fr-FR", { weekday: "short" })}
-                      </span>
-                      <span
-                        className={`mt-1 inline-flex size-7 items-center justify-center rounded-full text-sm font-semibold ${
-                          isToday ? "bg-primary text-primary-foreground" : "text-foreground"
-                        }`}
-                      >
-                        {day.getDate()}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="grid min-h-[28rem] grid-cols-7">
-                {weekDays.map((day) => {
-                  const items = sessionsByDay.get(dayKey(day)) ?? [];
-                  const isToday = isSameDay(day, today);
-                  return (
-                    <div
-                      key={dayKey(day)}
-                      className={`space-y-1.5 border-r border-border/60 p-1.5 last:border-r-0 ${
-                        isToday ? "bg-primary/[0.03]" : ""
-                      }`}
-                    >
-                      {items.map((session) => sessionChip(session))}
-                    </div>
-                  );
-                })}
-              </div>
-            </Surface>
+            <CalendarWeekView
+              weekDays={weekDays}
+              sessionsByDay={sessionsByDay}
+              today={today}
+              now={now}
+              selectedId={selectedId}
+              showTeacher={role === "director"}
+              teacherName={teacherName}
+              onSelect={setSelectedId}
+            />
           ) : (
-            <Surface className="p-3 sm:p-4">
-              <p className="mb-3 text-sm font-semibold capitalize">
-                {anchor.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
-              </p>
-              <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
-                {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((d) => (
-                  <div key={d} className="py-2 font-medium">
-                    {d}
-                  </div>
-                ))}
-                {monthCells.map((day) => {
-                  const inMonth = day.getMonth() === anchor.getMonth();
-                  const items = sessionsByDay.get(dayKey(day)) ?? [];
-                  const isToday = isSameDay(day, today);
-                  return (
-                    <button
-                      type="button"
-                      key={dayKey(day)}
-                      className={`min-h-[4.5rem] rounded-lg border p-1.5 text-left transition ${
-                        inMonth
-                          ? "border-border/70 bg-card"
-                          : "border-transparent bg-muted/30 opacity-50"
-                      } ${isToday ? "border-primary/40 ring-1 ring-primary/20" : ""} ${
-                        items.length ? "hover:border-primary/30" : ""
-                      }`}
-                      onClick={() => {
-                        if (items[0]) setSelectedId(items[0].id);
-                      }}
-                    >
-                      <p
-                        className={`mb-1 text-[11px] font-semibold ${isToday ? "text-primary" : ""}`}
-                      >
-                        {day.getDate()}
-                      </p>
-                      {items.length > 0 ? (
-                        <p className="rounded bg-primary/10 px-1 py-0.5 text-[10px] font-medium text-primary">
-                          {items.length} séance{items.length > 1 ? "s" : ""}
-                        </p>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            </Surface>
+            <CalendarMonthView
+              monthCells={monthCells}
+              anchor={anchor}
+              sessionsByDay={sessionsByDay}
+              today={today}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+            />
           )}
         </div>
       </QueryState>
@@ -553,7 +459,7 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
               <div>
                 <h2 className="text-lg font-semibold tracking-tight">{selected.title}</h2>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  <Status tone={statusTone(selected.status)}>
+                  <Status tone={calendarStatusTone(selected.status)}>
                     {liveStatusLabel(selected.status)}
                   </Status>
                   <GroupBadge label={selected.class?.name ?? null} />
@@ -580,6 +486,16 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
                 {videoProviderLabel(selected.video_provider, isZoomActive(selected.video_provider))}
               </dd>
             </dl>
+            {role === "student" &&
+            (selected.status === "scheduled" || selected.status === "live") &&
+            joinState &&
+            !joinState.allowed ? (
+              <p className="text-sm text-muted-foreground">
+                {joinState.reason === "too_early"
+                  ? "La réunion sera accessible à partir de l’heure de début du créneau."
+                  : "Cette séance n’est plus rejoignable."}
+              </p>
+            ) : null}
             <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
               {canEditLiveSession(role, selected, myTeacherId) &&
               selected.status !== "cancelled" ? (

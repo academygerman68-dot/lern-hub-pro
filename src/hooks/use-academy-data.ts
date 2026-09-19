@@ -29,10 +29,11 @@ import type { Database } from "@/types/database";
 type PaymentStatus = Database["public"]["Enums"]["payment_status"];
 type LiveSessionStatus = Database["public"]["Enums"]["live_session_status"];
 
-export function useLevels() {
+export function useLevels(enabled = true) {
   return useQuery({
     queryKey: ["levels"] as const,
     queryFn: () => ClassService.listLevels(),
+    enabled,
   });
 }
 
@@ -51,10 +52,11 @@ export function useStudent(id: string | null | undefined) {
   });
 }
 
-export function useTeachers() {
+export function useTeachers(enabled = true) {
   return useQuery({
     queryKey: queryKeys.teachers.all,
     queryFn: () => TeacherService.list(),
+    enabled,
   });
 }
 
@@ -887,6 +889,8 @@ export function useSubmitPaymentProof() {
         qc.invalidateQueries({ queryKey: queryKeys.paymentProofs.all }),
         qc.invalidateQueries({ queryKey: queryKeys.paymentProofs.pending }),
         qc.invalidateQueries({ queryKey: queryKeys.paymentProofs.byStudent(vars.studentId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.payments.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.payments.byStudent(vars.studentId) }),
       ]);
     },
   });

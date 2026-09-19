@@ -20,6 +20,7 @@ import {
 } from "@/hooks/use-academy-data";
 import { getLiveSessionId, setLiveSessionId, clearLiveSessionId } from "@/lib/live-class-session";
 import { getLiveSessionJoinState } from "@/lib/jitsi-config";
+import { resolveCalendarTeacherId, studentScopeClassId } from "@/lib/live-calendar-scope";
 import {
   formatLiveDate,
   formatLiveTime,
@@ -64,12 +65,18 @@ export function LiveClassesPage({ meeting }: { meeting: boolean }) {
 
 /** Planning section — always visible, does not replace the lobby. */
 function LiveScheduleSection() {
+  const { role } = useAcademy();
+  const student = role === "student";
   return (
     <section className="space-y-4">
       <div>
         <h2 className="text-base font-semibold tracking-tight">Planning</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Vue semaine et mois — filtrez par groupe ou professeur.
+          {student
+            ? "Vue semaine et mois de vos cours en direct."
+            : role === "teacher"
+              ? "Vue semaine et mois — filtrez par niveau, groupe ou statut."
+              : "Vue semaine et mois — filtrez par niveau, groupe, professeur ou statut."}
         </p>
       </div>
       <LiveCalendarErrorBoundary title="Planning indisponible">
@@ -225,9 +232,13 @@ function SessionCard({
 
 function LiveSessionLobby() {
   const { navigate, role, user } = useAcademy();
-  const sessionsQuery = useLiveSessions();
   const classesQuery = useClasses();
-  const teachersQuery = useTeachers();
+  const teachersQuery = useTeachers(role !== "student");
+  const studentClassId =
+    role === "student"
+      ? studentScopeClassId((classesQuery.data ?? []).map((klass) => klass.id))
+      : undefined;
+  const sessionsQuery = useLiveSessions(studentClassId);
   const recordingProvider = useRecordingProvider();
   const recordingsQuery = useRecordings();
   const createSession = useCreateLiveSession();
@@ -249,14 +260,14 @@ function LiveSessionLobby() {
   const [monthClassId, setMonthClassId] = useState("");
   const [nowTick, setNowTick] = useState(() => Date.now());
 
-  const myTeacherId = useMemo(() => {
-    if (role !== "teacher") return null;
-    return (
-      (teachersQuery.data ?? []).find(
-        (t) => t.email.toLowerCase() === (user?.email ?? "").toLowerCase(),
-      )?.id ?? null
-    );
-  }, [role, teachersQuery.data, user?.email]);
+  const myTeacherId = useMemo(
+    () =>
+      resolveCalendarTeacherId(role, classesQuery.data ?? [], teachersQuery.data ?? [], {
+        profileId: user?.id ?? null,
+        email: user?.email ?? null,
+      }),
+    [role, classesQuery.data, teachersQuery.data, user?.id, user?.email],
+  );
 
   useEffect(() => {
     const id = window.setInterval(() => setNowTick(Date.now()), 30_000);
@@ -287,6 +298,15 @@ function LiveSessionLobby() {
       hasAny: rows.length > 0,
     };
   }, [sessionsQuery.data, nowTick]);
+
+  const heroJoinState = hero
+    ? getLiveSessionJoinState({
+        startsAt: hero.starts_at,
+        endsAt: hero.ends_at,
+        status: hero.status,
+        isStaff,
+      })
+    : null;
 
   const markLive = (session: LiveSessionListItem) => {
     if (isStaff && session.status === "scheduled") {
@@ -430,10 +450,27 @@ function LiveSessionLobby() {
                     Début dans {formatCountdown(new Date(hero.starts_at).getTime(), nowTick)}
                   </p>
                 ) : null}
+                {heroJoinState && !heroJoinState.allowed ? (
+                  <p className="mt-4 text-sm text-primary-foreground/80">
+                    {heroJoinState.reason === "too_early"
+                      ? "Accès disponible à partir de l’heure du créneau."
+                      : heroJoinState.reason === "ended" || heroJoinState.reason === "closed"
+                        ? "Cette séance est fermée."
+                        : "Rejoindre n’est pas encore disponible."}
+                  </p>
+                ) : null}
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Button
                     variant="secondary"
                     className="min-h-11"
+                    disabled={!heroJoinState?.allowed}
+                    title={
+                      !heroJoinState?.allowed
+                        ? heroJoinState?.reason === "too_early"
+                          ? "Accès disponible à partir de l’heure du créneau."
+                          : "Rejoindre indisponible"
+                        : undefined
+                    }
                     onClick={() => void startSession(hero)}
                   >
                     <Video className="size-4" />
@@ -477,41 +514,68 @@ function LiveSessionLobby() {
               <p className="text-sm text-muted-foreground">Aucune autre séance planifiée.</p>
             ) : (
               <div className="space-y-2">
-                {upcomingList.map((item) => (
-                  <Surface
-                    key={item.id}
-                    className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium">{item.title}</p>
-                        <Status tone="amber">{liveStatusLabel(item.status)}</Status>
-                      </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {formatLiveTime(item.starts_at)}
-                        {item.ends_at ? ` – ${formatLiveTime(item.ends_at)}` : ""} ·{" "}
-                        {formatLiveDate(item.starts_at)}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        <GroupBadge label={item.class?.name ?? null} />
-                        {item.class?.level?.code ? (
-                          <LevelBadge code={item.class.level.code} />
+                {upcomingList.map((item) => {
+                  const joinState = getLiveSessionJoinState({
+                    startsAt: item.starts_at,
+                    endsAt: item.ends_at,
+                    status: item.status,
+                    isStaff,
+                  });
+                  return (
+                    <Surface
+                      key={item.id}
+                      className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{item.title}</p>
+                          <Status tone="amber">{liveStatusLabel(item.status)}</Status>
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {formatLiveTime(item.starts_at)}
+                          {item.ends_at ? ` – ${formatLiveTime(item.ends_at)}` : ""} ·{" "}
+                          {formatLiveDate(item.starts_at)}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <GroupBadge label={item.class?.name ?? null} />
+                          {item.class?.level?.code ? (
+                            <LevelBadge code={item.class.level.code} />
+                          ) : null}
+                          <span className="text-xs text-muted-foreground">
+                            {teacherLabel(item)}
+                          </span>
+                        </div>
+                        {!joinState.allowed && joinState.reason === "too_early" ? (
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            Accès à partir de l’heure du créneau.
+                          </p>
                         ) : null}
-                        <span className="text-xs text-muted-foreground">{teacherLabel(item)}</span>
                       </div>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap gap-2">
-                      {canEditLiveSession(role, item, myTeacherId) ? (
-                        <Button size="sm" variant="outline" onClick={() => setEditSession(item)}>
-                          Modifier
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        {canEditLiveSession(role, item, myTeacherId) ? (
+                          <Button size="sm" variant="outline" onClick={() => setEditSession(item)}>
+                            Modifier
+                          </Button>
+                        ) : null}
+                        <Button
+                          size="sm"
+                          className="min-h-11"
+                          disabled={!joinState.allowed}
+                          title={
+                            !joinState.allowed
+                              ? joinState.reason === "too_early"
+                                ? "Accès disponible à partir de l’heure du créneau."
+                                : "Rejoindre indisponible"
+                              : undefined
+                          }
+                          onClick={() => void startSession(item)}
+                        >
+                          {isStaff ? "Démarrer" : "Rejoindre"}
                         </Button>
-                      ) : null}
-                      <Button size="sm" onClick={() => void startSession(item)}>
-                        {isStaff ? "Démarrer" : "Rejoindre"}
-                      </Button>
-                    </div>
-                  </Surface>
-                ))}
+                      </div>
+                    </Surface>
+                  );
+                })}
               </div>
             )}
           </section>

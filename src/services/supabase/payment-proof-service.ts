@@ -1,4 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  PAYMENT_PROOF_MAX_BYTES,
+  paymentProofMimeFromFile,
+  toPaymentProofUserError,
+  validatePaymentProofSubmitInput,
+} from "@/lib/payment-proof";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { PaymentProof, PaymentProofStatus } from "@/types/phase3";
 
@@ -48,7 +54,6 @@ function requireClient(): SupabaseClient {
   return getSupabase() as unknown as SupabaseClient;
 }
 
-const MAX_PROOF_BYTES = 10 * 1024 * 1024;
 const ALLOWED_MIME = new Set(["application/pdf", "image/jpeg", "image/png"]);
 
 export const SupabasePaymentProofService = {
@@ -90,19 +95,22 @@ export const SupabasePaymentProofService = {
     studentNote?: string | null;
     paymentMethod?: string | null;
   }) {
-    if (!ALLOWED_MIME.has(input.file.type)) {
+    const validationError = validatePaymentProofSubmitInput({
+      studentId: input.studentId,
+      paymentId: input.paymentId,
+      file: input.file,
+      declaredAmount: input.declaredAmount,
+      operationDate: input.operationDate,
+    });
+    if (validationError) throw new Error(validationError);
+
+    const mimeType = paymentProofMimeFromFile(input.file);
+    if (!mimeType || !ALLOWED_MIME.has(mimeType)) {
       throw new Error("Type de fichier non autorisé (PDF, JPEG ou PNG uniquement).");
     }
-    if (input.file.size > MAX_PROOF_BYTES) {
-      throw new Error("Fichier trop volumineux (max 10 Mo).");
-    }
-    if (!Number.isFinite(input.declaredAmount) || input.declaredAmount <= 0) {
-      throw new Error("Le montant déclaré doit être supérieur à zéro.");
-    }
-    if (!input.operationDate) throw new Error("La date de l’opération est obligatoire.");
 
     const supabase = requireClient();
-    const ext = input.file.name.split(".").pop()?.toLowerCase() || "bin";
+    const ext = mimeType === "application/pdf" ? "pdf" : mimeType === "image/png" ? "png" : "jpg";
     const path = `students/${input.studentId}/payment-proofs/${crypto.randomUUID()}.${ext}`;
     const submittedAt = new Date();
     const deadline = new Date(submittedAt.getTime() + 48 * 60 * 60 * 1000);
@@ -111,9 +119,9 @@ export const SupabasePaymentProofService = {
       .from("documents")
       .upload(path, input.file, {
         upsert: false,
-        contentType: input.file.type,
+        contentType: mimeType,
       });
-    if (uploadError) throw uploadError;
+    if (uploadError) throw toPaymentProofUserError(uploadError, "storage");
 
     const { data, error } = await supabase
       .from("payment_proofs")
@@ -122,7 +130,7 @@ export const SupabasePaymentProofService = {
         payment_id: input.paymentId,
         storage_bucket: "documents",
         storage_path: path,
-        mime_type: input.file.type,
+        mime_type: mimeType,
         file_size: input.file.size,
         declared_amount: input.declaredAmount,
         operation_date: input.operationDate,
@@ -136,8 +144,11 @@ export const SupabasePaymentProofService = {
       .select(PROOF_SELECT)
       .single();
     if (error) {
-      await supabase.storage.from("documents").remove([path]);
-      throw error;
+      await supabase.storage
+        .from("documents")
+        .remove([path])
+        .catch(() => undefined);
+      throw toPaymentProofUserError(error, "insert");
     }
     return data as PaymentProofListItem;
   },
@@ -152,7 +163,7 @@ export const SupabasePaymentProofService = {
     if (!ALLOWED_MIME.has(file.type)) {
       throw new Error("Type de fichier non autorisé (PDF, JPEG ou PNG uniquement).");
     }
-    if (file.size > MAX_PROOF_BYTES) {
+    if (file.size > PAYMENT_PROOF_MAX_BYTES) {
       throw new Error("Fichier trop volumineux (max 10 Mo).");
     }
     const supabase = requireClient();

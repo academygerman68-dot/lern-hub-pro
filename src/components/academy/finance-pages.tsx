@@ -22,6 +22,14 @@ import {
 import { PaymentProofService, PaymentService } from "@/services/academy-services";
 import type { PaymentProofListItem } from "@/services/supabase/payment-proof-service";
 import { computeFinalAmount } from "@/services/supabase/payment-service";
+import {
+  PAYMENT_PROOF_ACCEPT,
+  resolveOwnStudent,
+  studentProofDeadlineHint,
+  toPaymentProofUserError,
+  validatePaymentProofFile,
+  validatePaymentProofSubmitInput,
+} from "@/lib/payment-proof";
 import type { Database } from "@/types/database";
 import { useAcademy } from "./academy-context";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
@@ -1142,14 +1150,16 @@ export function FinancePages({ mode }: { mode: string }) {
 }
 
 export function StudentPaymentsPage() {
-  const { user } = useAcademy();
+  const { user, profile } = useAcademy();
   const studentsQuery = useStudents();
   const accessQuery = useAcademicAccess();
-  const myStudent = (studentsQuery.data ?? []).find(
-    (s) => s.email.toLowerCase() === (user?.email ?? "").toLowerCase(),
-  );
+  const myStudent = resolveOwnStudent(studentsQuery.data ?? [], {
+    profileId: profile?.id ?? user?.id ?? null,
+    email: user?.email ?? null,
+  });
   const paymentsQuery = usePayments(myStudent?.id);
-  const proofsQuery = usePaymentProofs(myStudent?.id);
+  const studentId = myStudent?.id || paymentsQuery.data?.[0]?.student_id || "";
+  const proofsQuery = usePaymentProofs(studentId || undefined);
   const submitProof = useSubmitPaymentProof();
   const eligiblePayments = (paymentsQuery.data ?? []).filter((payment) =>
     ["pending", "partial", "overdue"].includes(payment.status),
@@ -1166,9 +1176,85 @@ export function StudentPaymentsPage() {
     url: "",
     file: null,
   });
+  const [formError, setFormError] = useState<string | null>(null);
   const [preview, setPreview] = useState<DocPreview | null>(null);
   const accessBlocked = accessQuery.data === false;
   const hasNotApproved = (proofsQuery.data ?? []).some((p) => p.status === "not_approved");
+  const paymentsLoaded = !studentsQuery.isLoading && !paymentsQuery.isLoading;
+  const installmentHint = studentProofDeadlineHint({
+    paymentsLoaded,
+    eligibleCount: eligiblePayments.length,
+    paymentId,
+  });
+  const identityHint =
+    paymentsLoaded && !studentId
+      ? "Profil étudiant introuvable. Contactez l’administration."
+      : null;
+  const submitBlockReason =
+    eligiblePayments.length === 0 && paymentsLoaded
+      ? installmentHint
+      : validatePaymentProofSubmitInput({
+          studentId,
+          paymentId: selectedPayment?.id ?? paymentId,
+          file: attachment.file,
+          declaredAmount,
+          operationDate,
+        });
+
+  const resetProofForm = () => {
+    setAttachment({ kind: "pdf", url: "", file: null });
+    setNote("");
+    setPaymentId("");
+    setDeclaredAmount("");
+    setOperationDate("");
+    setOperationReference("");
+    setPaymentMethod("bank_transfer");
+    setFormError(null);
+  };
+
+  const handleSubmitProof = () => {
+    if (eligiblePayments.length === 0) {
+      setFormError("Aucune échéance à régler n’est disponible. Contactez l’administration.");
+      return;
+    }
+    const reason = validatePaymentProofSubmitInput({
+      studentId,
+      paymentId: selectedPayment?.id ?? paymentId,
+      declaredAmount,
+      operationDate,
+      file: attachment.file,
+    });
+    if (reason) {
+      setFormError(reason);
+      return;
+    }
+    if (!attachment.file || !selectedPayment || !studentId) return;
+    setFormError(null);
+    submitProof.mutate(
+      {
+        studentId,
+        file: attachment.file,
+        paymentId: selectedPayment.id,
+        declaredAmount: Number(declaredAmount),
+        operationDate,
+        operationReference: operationReference || null,
+        studentNote: note || null,
+        paymentMethod,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Justificatif envoyé");
+          resetProofForm();
+          void proofsQuery.refetch();
+        },
+        onError: (err) => {
+          const mapped = toPaymentProofUserError(err, "generic");
+          setFormError(mapped.message);
+          toast.error(mapped.message);
+        },
+      },
+    );
+  };
 
   const openProofDoc = async (
     title: string,
@@ -1247,121 +1333,123 @@ export function StudentPaymentsPage() {
           48 heures.
         </p>
         <div className="mt-4 space-y-3">
-          <label className="block text-sm">
-            Échéance concernée
-            <select
-              className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={paymentId}
-              onChange={(event) => {
-                const nextId = event.target.value;
-                const payment = eligiblePayments.find((item) => item.id === nextId);
-                setPaymentId(nextId);
-                setDeclaredAmount(payment ? String(payment.amount) : "");
-              }}
-            >
-              <option value="">Sélectionner un paiement à régler</option>
-              {eligiblePayments.map((payment) => (
-                <option key={payment.id} value={payment.id}>
-                  {Number(payment.amount).toLocaleString()} {payment.currency} · échéance{" "}
-                  {payment.due_date ?? "non définie"}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
-            Moyen de paiement
-            <select
-              className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-            >
-              <option value="bank_transfer">Virement</option>
-              <option value="cash">Espèces</option>
-              <option value="card">Carte</option>
-              <option value="mobile">Paiement mobile</option>
-              <option value="other">Autre</option>
-            </select>
-          </label>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm">
-              Montant versé
-              <Input
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={declaredAmount}
-                onChange={(event) => setDeclaredAmount(event.target.value)}
-                className="mt-1"
-              />
-            </label>
-            <label className="block text-sm">
-              Date de l’opération
-              <Input
-                type="date"
-                value={operationDate}
-                onChange={(event) => setOperationDate(event.target.value)}
-                className="mt-1"
-              />
-            </label>
-          </div>
-          <label className="block text-sm">
-            Référence de l’opération (optionnel)
-            <Input
-              value={operationReference}
-              onChange={(event) => setOperationReference(event.target.value)}
-              className="mt-1"
-            />
-          </label>
-          <ContentAttachmentUploader
-            kinds={["pdf", "image"]}
-            value={attachment}
-            onChange={setAttachment}
-            disabled={submitProof.isPending}
-            uploading={submitProof.isPending}
-          />
-          <label className="block text-sm">
-            Note (optionnel)
-            <Input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1" />
-          </label>
-          <Button
-            disabled={
-              !myStudent?.id ||
-              !selectedPayment ||
-              !attachment.file ||
-              !operationDate ||
-              Number(declaredAmount) <= 0 ||
-              submitProof.isPending
-            }
-            onClick={() => {
-              if (!myStudent?.id || !attachment.file || !selectedPayment) return;
-              submitProof.mutate(
-                {
-                  studentId: myStudent.id,
-                  file: attachment.file,
-                  paymentId: selectedPayment.id,
-                  declaredAmount: Number(declaredAmount),
-                  operationDate,
-                  operationReference: operationReference || null,
-                  studentNote: note || null,
-                  paymentMethod,
-                },
-                {
-                  onSuccess: () => {
-                    toast.success("Justificatif déposé — en attente de validation (48 h)");
-                    setAttachment({ kind: "pdf", url: "", file: null });
-                    setNote("");
-                    setPaymentId("");
-                    setDeclaredAmount("");
-                    setOperationDate("");
-                    setOperationReference("");
-                  },
-                  onError: (err) => toast.error(err.message),
-                },
-              );
+          <form
+            className="space-y-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleSubmitProof();
             }}
           >
-            Envoyer le justificatif
-          </Button>
+            <label className="block text-sm">
+              Échéance concernée
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={paymentId}
+                required
+                disabled={submitProof.isPending || eligiblePayments.length === 0}
+                onChange={(event) => {
+                  const nextId = event.target.value;
+                  const payment = eligiblePayments.find((item) => item.id === nextId);
+                  setPaymentId(nextId);
+                  setDeclaredAmount(payment ? String(payment.amount) : "");
+                  setFormError(null);
+                }}
+              >
+                <option value="">Sélectionner un paiement à régler</option>
+                {eligiblePayments.map((payment) => (
+                  <option key={payment.id} value={payment.id}>
+                    {Number(payment.amount).toLocaleString()} {payment.currency} · échéance{" "}
+                    {payment.due_date ?? "non définie"}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {identityHint ? <p className="text-sm text-destructive">{identityHint}</p> : null}
+            {installmentHint ? <p className="text-sm text-destructive">{installmentHint}</p> : null}
+            <label className="block text-sm">
+              Moyen de paiement
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={paymentMethod}
+                disabled={submitProof.isPending}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+              >
+                <option value="bank_transfer">Virement</option>
+                <option value="cash">Espèces</option>
+                <option value="card">Carte</option>
+                <option value="mobile">Paiement mobile</option>
+                <option value="other">Autre</option>
+              </select>
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm">
+                Montant versé
+                <Input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={declaredAmount}
+                  onChange={(event) => setDeclaredAmount(event.target.value)}
+                  className="mt-1"
+                  disabled={submitProof.isPending}
+                />
+              </label>
+              <label className="block text-sm">
+                Date de l’opération
+                <Input
+                  type="date"
+                  value={operationDate}
+                  onChange={(event) => setOperationDate(event.target.value)}
+                  className="mt-1"
+                  disabled={submitProof.isPending}
+                />
+              </label>
+            </div>
+            <label className="block text-sm">
+              Référence de l’opération (optionnel)
+              <Input
+                value={operationReference}
+                onChange={(event) => setOperationReference(event.target.value)}
+                className="mt-1"
+                disabled={submitProof.isPending}
+              />
+            </label>
+            <ContentAttachmentUploader
+              kinds={["pdf", "image"]}
+              showKindSelect={false}
+              accept={PAYMENT_PROOF_ACCEPT}
+              validateFile={validatePaymentProofFile}
+              value={attachment}
+              onChange={(next) => {
+                setAttachment(next);
+                setFormError(null);
+              }}
+              disabled={submitProof.isPending}
+              uploading={submitProof.isPending}
+            />
+            <label className="block text-sm">
+              Note (optionnel)
+              <Input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                className="mt-1"
+                disabled={submitProof.isPending}
+              />
+            </label>
+            {formError && !installmentHint ? (
+              <p className="text-sm text-destructive">{formError}</p>
+            ) : null}
+            {submitBlockReason &&
+            !formError &&
+            !installmentHint &&
+            !identityHint &&
+            !submitProof.isPending ? (
+              <p className="text-sm text-muted-foreground">{submitBlockReason}</p>
+            ) : null}
+            <Button type="submit" disabled={Boolean(submitBlockReason) || submitProof.isPending}>
+              {submitProof.isPending ? "Envoi en cours…" : "Envoyer le justificatif"}
+            </Button>
+          </form>
         </div>
         {(proofsQuery.data?.length ?? 0) > 0 && (
           <div className="mt-6 divide-y border-t">
