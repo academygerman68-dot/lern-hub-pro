@@ -656,19 +656,25 @@ export type Database = {
         Row: {
           correct_values: string[];
           created_at: string;
+          explanation: string | null;
           question_id: string;
+          teacher_payload: Json;
           updated_at: string;
         };
         Insert: {
           correct_values?: string[];
           created_at?: string;
+          explanation?: string | null;
           question_id: string;
+          teacher_payload?: Json;
           updated_at?: string;
         };
         Update: {
           correct_values?: string[];
           created_at?: string;
+          explanation?: string | null;
           question_id?: string;
+          teacher_payload?: Json;
           updated_at?: string;
         };
         Relationships: [
@@ -687,6 +693,7 @@ export type Database = {
           attempt_id: string;
           created_at: string;
           flagged: boolean;
+          grading_detail: Json | null;
           id: string;
           is_correct: boolean | null;
           points_awarded: number | null;
@@ -699,6 +706,7 @@ export type Database = {
           attempt_id: string;
           created_at?: string;
           flagged?: boolean;
+          grading_detail?: Json | null;
           id?: string;
           is_correct?: boolean | null;
           points_awarded?: number | null;
@@ -711,6 +719,7 @@ export type Database = {
           attempt_id?: string;
           created_at?: string;
           flagged?: boolean;
+          grading_detail?: Json | null;
           id?: string;
           is_correct?: boolean | null;
           points_awarded?: number | null;
@@ -933,6 +942,7 @@ export type Database = {
       exams: {
         Row: {
           class_id: string | null;
+          code: string | null;
           content_kind: Database["public"]["Enums"]["media_content_kind"];
           content_url: string | null;
           created_at: string;
@@ -957,6 +967,7 @@ export type Database = {
         };
         Insert: {
           class_id?: string | null;
+          code?: string | null;
           content_kind?: Database["public"]["Enums"]["media_content_kind"];
           content_url?: string | null;
           created_at?: string;
@@ -981,6 +992,7 @@ export type Database = {
         };
         Update: {
           class_id?: string | null;
+          code?: string | null;
           content_kind?: Database["public"]["Enums"]["media_content_kind"];
           content_url?: string | null;
           created_at?: string;
@@ -2729,12 +2741,17 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      get_exam_attempt_review: {
+        Args: { p_attempt_id: string };
+        Returns: Json;
+      };
       grade_exam_writing_answer: {
         Args: {
           p_attempt_id: string;
           p_question_id: string;
           p_points: number;
           p_comment?: string | null;
+          p_grading_detail?: Json | null;
         };
         Returns: {
           created_at: string;
@@ -2794,7 +2811,8 @@ export type Database = {
         | "ordering"
         | "listening"
         | "writing"
-        | "speaking";
+        | "speaking"
+        | "form_fill";
       exam_skill: "lesen" | "hoeren" | "schreiben" | "sprechen" | "grammatik" | "wortschatz";
       exam_status: "draft" | "published" | "archived";
       invoice_status: "draft" | "issued" | "paid" | "void" | "overdue";
@@ -2968,6 +2986,7 @@ export const Constants = {
         "listening",
         "writing",
         "speaking",
+        "form_fill",
       ],
       exam_skill: ["lesen", "hoeren", "schreiben", "sprechen", "grammatik", "wortschatz"],
       exam_status: ["draft", "published", "archived"],

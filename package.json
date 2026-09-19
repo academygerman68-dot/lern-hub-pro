@@ -11,7 +11,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed:a1-exams": "node scripts/import-a1-exam-bank.mjs",
+    "generate:a1-exam-seed": "node scripts/generate-a1-exam-seed.mjs"
   },
   "overrides": {
     "rolldown": "1.2.1"

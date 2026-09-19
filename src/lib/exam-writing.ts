@@ -27,6 +27,19 @@ export function isManualQuestionType(type: string) {
   return type === "writing" || type === "text" || type === "speaking" || type === "open_text";
 }
 
+export function studentExamProgressLabel(
+  status: string | null | undefined,
+  hasUngradedWriting: boolean,
+): "À faire" | "En cours" | "En attente de correction" | "Terminé" {
+  if (!status) return "À faire";
+  if (status === "in_progress") return "En cours";
+  if (status === "graded" && !hasUngradedWriting) return "Terminé";
+  if (status === "submitted" || status === "expired" || hasUngradedWriting) {
+    return "En attente de correction";
+  }
+  return "À faire";
+}
+
 export function attemptGradingStatus(status: string, hasUngradedManual: boolean) {
   if (status === "graded" && !hasUngradedManual) return "corrigé";
   if (status === "submitted" || hasUngradedManual) return "non corrigé";

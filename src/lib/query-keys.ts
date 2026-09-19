@@ -51,6 +51,7 @@ export const queryKeys = {
     attempt: (id: string) => ["exams", "attempt", id] as const,
     answers: (attemptId: string) => ["exams", "answers", attemptId] as const,
     result: (attemptId: string) => ["exams", "result", attemptId] as const,
+    review: (attemptId: string) => ["exams", "review", attemptId] as const,
     myAttempts: ["exams", "my-attempts"] as const,
     allAttempts: ["exams", "all-attempts"] as const,
     attemptsByExam: (examId: string) => ["exams", "attempts-by-exam", examId] as const,

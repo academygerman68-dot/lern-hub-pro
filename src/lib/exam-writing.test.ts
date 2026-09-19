@@ -6,6 +6,7 @@ import {
   filterGroupsByLevel,
   groupAverage,
   isManualQuestionType,
+  studentExamProgressLabel,
 } from "./exam-writing";
 
 describe("writing stats", () => {
@@ -27,12 +28,23 @@ describe("exam final score with QCM + writing", () => {
 
   it("flags manual question types", () => {
     expect(isManualQuestionType("writing")).toBe(true);
+    expect(isManualQuestionType("text")).toBe(true);
+    expect(isManualQuestionType("speaking")).toBe(true);
     expect(isManualQuestionType("single_choice")).toBe(false);
+    expect(isManualQuestionType("form_fill")).toBe(false);
   });
 
   it("maps grading status", () => {
     expect(attemptGradingStatus("graded", false)).toBe("corrigé");
     expect(attemptGradingStatus("submitted", true)).toBe("non corrigé");
+  });
+
+  it("maps student progress labels", () => {
+    expect(studentExamProgressLabel(null, false)).toBe("À faire");
+    expect(studentExamProgressLabel("in_progress", false)).toBe("En cours");
+    expect(studentExamProgressLabel("submitted", true)).toBe("En attente de correction");
+    expect(studentExamProgressLabel("graded", false)).toBe("Terminé");
+    expect(studentExamProgressLabel("graded", true)).toBe("En attente de correction");
   });
 });
 

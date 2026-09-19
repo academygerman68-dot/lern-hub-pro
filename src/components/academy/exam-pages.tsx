@@ -13,6 +13,7 @@ import {
   useExam,
   useExamAnswers,
   useExamAttempt,
+  useExamAttemptReview,
   useExamAttemptsForExam,
   useExamResult,
   useGradeWritingAnswer,
@@ -39,6 +40,11 @@ import {
   isDirectorRole,
   scopedClassOrLevelItemVisible,
 } from "@/lib/academy-logic";
+import {
+  countWritingStats,
+  isManualQuestionType,
+  studentExamProgressLabel,
+} from "@/lib/exam-writing";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { ExamBuilder } from "./exam-builder";
 import { useAcademy } from "./academy-context";
@@ -49,12 +55,19 @@ const EXAM_ID_KEY = "ga_active_exam_id";
 const ATTEMPT_ID_KEY = "ga_active_attempt_id";
 
 const SKILL_LABELS: Record<string, string> = {
-  lesen: "Lecture",
-  hoeren: "Écoute",
-  schreiben: "Écriture",
+  lesen: "Lesen",
+  hoeren: "Hören",
+  schreiben: "Schreiben",
   sprechen: "Expression orale",
   grammatik: "Grammaire",
   wortschatz: "Vocabulaire",
+};
+
+const RUBRIC_LABELS: Record<string, string> = {
+  task_completion: "Réalisation de la tâche",
+  comprehensibility: "Compréhensibilité",
+  vocabulary: "Vocabulaire",
+  grammar_and_spelling: "Grammaire et orthographe",
 };
 
 function persistExamSession(examId: string, attemptId: string) {
@@ -84,6 +97,35 @@ function answerValue(answer: Json | null | undefined): string {
   if (typeof answer === "string") return answer;
   if (typeof answer === "number" || typeof answer === "boolean") return String(answer);
   return JSON.stringify(answer);
+}
+
+function questionMeta(metadata: Json | null | undefined): Record<string, unknown> {
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+    return metadata as Record<string, unknown>;
+  }
+  return {};
+}
+
+function formFillAnswer(answer: Json | null | undefined): Record<string, string> {
+  if (!answer || typeof answer !== "object" || Array.isArray(answer)) return {};
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(answer)) {
+    out[key] = value == null ? "" : String(value);
+  }
+  return out;
+}
+
+function shortBankId(bankQuestionId: string | null | undefined, fallback: string) {
+  if (!bankQuestionId) return fallback;
+  const parts = bankQuestionId.split("-");
+  return parts[parts.length - 1] ?? bankQuestionId;
+}
+
+function progressTone(label: ReturnType<typeof studentExamProgressLabel>) {
+  if (label === "Terminé") return "green" as const;
+  if (label === "En cours") return "amber" as const;
+  if (label === "En attente de correction") return "amber" as const;
+  return "gray" as const;
 }
 
 export function StudentExamsPage({ mode }: { mode: string }) {
@@ -140,21 +182,13 @@ function StudentExamCatalog() {
         <div className="grid gap-4 md:grid-cols-2">
           {examsQuery.data?.map((exam) => {
             const latest = latestByExam.get(exam.id);
-            const attemptStatus = latest?.status;
-            const examProgress =
-              attemptStatus === "in_progress"
-                ? "in_progress"
-                : attemptStatus === "submitted" ||
-                    attemptStatus === "graded" ||
-                    attemptStatus === "expired"
-                  ? "done"
-                  : "todo";
-            const progressBadge =
-              examProgress === "in_progress"
-                ? { tone: "amber" as const, label: "En cours" }
-                : examProgress === "done"
-                  ? { tone: "green" as const, label: "Fait" }
-                  : { tone: "gray" as const, label: "À faire" };
+            const hasUngradedWriting =
+              latest?.status === "submitted" || latest?.status === "expired";
+            const progressLabel = studentExamProgressLabel(latest?.status, hasUngradedWriting);
+            const isTodo = progressLabel === "À faire";
+            const isInProgress = progressLabel === "En cours";
+            const isDone =
+              progressLabel === "Terminé" || progressLabel === "En attente de correction";
             return (
               <Surface className="p-6" key={exam.id}>
                 <div className="flex items-start justify-between gap-3">
@@ -162,30 +196,27 @@ function StudentExamCatalog() {
                     <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                       {exam.level?.code ?? "—"}
                       {exam.class?.name ? ` · ${exam.class.name}` : " · Niveau entier"} ·{" "}
-                      {exam.duration_minutes} min · {MEDIA_KIND_LABELS[exam.content_kind]}
+                      {exam.duration_minutes} min
                     </p>
                     <h2 className="mt-2 text-xl font-semibold">{exam.title}</h2>
+                    {exam.description ? (
+                      <p className="mt-2 text-sm text-muted-foreground">{exam.description}</p>
+                    ) : null}
                     <p className="mt-2 text-sm text-muted-foreground">
-                      {exam.starts_at
-                        ? `Début ${formatFrDate(exam.starts_at)}`
-                        : "Horaire non précisé"}
+                      Durée : {exam.duration_minutes} min
+                      {exam.starts_at ? ` · Début ${formatFrDate(exam.starts_at)}` : ""}
                       {exam.ends_at ? ` · Fin ${formatFrDate(exam.ends_at)}` : ""}
                     </p>
-                    {exam.instructions || exam.description ? (
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        {exam.instructions || exam.description}
-                      </p>
-                    ) : null}
                   </div>
-                  <Status tone={progressBadge.tone}>{progressBadge.label}</Status>
+                  <Status tone={progressTone(progressLabel)}>{progressLabel}</Status>
                 </div>
-                {latest && examProgress === "done" && (
+                {latest && isDone && (
                   <p className="mt-4 text-sm text-muted-foreground">
-                    {attemptStatus === "graded"
-                      ? `Résultat : ${Number(latest.percentage ?? 0).toFixed(0)} % · Corrigé`
-                      : attemptStatus === "submitted"
-                        ? "Marqué comme fait — en attente de correction"
-                        : "Marqué comme fait"}
+                    {progressLabel === "Terminé" && latest.percentage != null
+                      ? `Score : ${Number(latest.percentage).toFixed(0)} %`
+                      : progressLabel === "En attente de correction"
+                        ? "Score partiel disponible — écrit en attente de correction"
+                        : null}
                   </p>
                 )}
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -195,10 +226,6 @@ function StudentExamCatalog() {
                       onClick={() => {
                         void ExamService.getExamMaterialUrl(exam)
                           .then((url) => {
-                            if (exam.content_kind === "link") {
-                              window.open(url, "_blank", "noopener,noreferrer");
-                              return;
-                            }
                             window.open(url, "_blank", "noopener,noreferrer");
                           })
                           .catch((err: Error) => toast.error(err.message));
@@ -207,7 +234,7 @@ function StudentExamCatalog() {
                       Ouvrir le document
                     </Button>
                   )}
-                  {examProgress === "todo" ? (
+                  {isTodo ? (
                     <Button
                       disabled={startExam.isPending}
                       onClick={() => {
@@ -223,7 +250,7 @@ function StudentExamCatalog() {
                       Commencer
                     </Button>
                   ) : null}
-                  {examProgress === "in_progress" ? (
+                  {isInProgress ? (
                     <Button
                       disabled={startExam.isPending}
                       onClick={() => {
@@ -244,10 +271,10 @@ function StudentExamCatalog() {
                       Reprendre
                     </Button>
                   ) : null}
-                  {examProgress === "done" ? (
+                  {isDone ? (
                     <>
                       <Button variant="secondary" disabled>
-                        Fait
+                        {progressLabel}
                       </Button>
                       {latest ? (
                         <Button
@@ -314,6 +341,7 @@ function StudentExamRunner() {
   );
 
   const current = questions[index];
+  const currentMeta = current ? questionMeta(current.metadata) : {};
   const remaining = formatRemaining(attemptQuery.data?.expires_at);
   const expired =
     attemptQuery.data?.expires_at != null &&
@@ -340,20 +368,16 @@ function StudentExamRunner() {
     });
   };
 
-  const writingText =
-    current &&
-    (current.type === "writing" || current.type === "text" || current.type === "speaking")
-      ? answerValue(localAnswers[current.id])
-      : "";
-  const writingWordCount = writingText.trim()
-    ? writingText.trim().split(/\s+/).filter(Boolean).length
-    : 0;
+  const isWritingType = current ? isManualQuestionType(current.type) : false;
+  const isFormFill = current?.type === "form_fill";
+  const writingText = isWritingType && current ? answerValue(localAnswers[current.id]) : "";
+  const writingStats = countWritingStats(writingText);
+  const formFillDraft = isFormFill && current ? formFillAnswer(localAnswers[current.id]) : {};
+  const formFillSerialized = JSON.stringify(formFillDraft);
 
   useEffect(() => {
     if (!current || !session.attemptId) return;
-    if (current.type !== "writing" && current.type !== "text" && current.type !== "speaking") {
-      return;
-    }
+    if (!isManualQuestionType(current.type)) return;
     const value = localAnswers[current.id];
     if (value === undefined) return;
     const timer = window.setTimeout(() => {
@@ -362,6 +386,17 @@ function StudentExamRunner() {
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce local draft only
   }, [current?.id, current?.type, writingText, session.attemptId]);
+
+  useEffect(() => {
+    if (!current || !session.attemptId || current.type !== "form_fill") return;
+    const value = localAnswers[current.id];
+    if (value === undefined) return;
+    const timer = window.setTimeout(() => {
+      persist(current.id, value);
+    }, 800);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce form_fill draft
+  }, [current?.id, current?.type, formFillSerialized, session.attemptId]);
 
   if (!session.examId || !session.attemptId) {
     return (
@@ -373,6 +408,24 @@ function StudentExamRunner() {
       </Surface>
     );
   }
+
+  const instruction =
+    typeof currentMeta["instruction"] === "string" ? currentMeta["instruction"] : null;
+  const passage = typeof currentMeta["passage"] === "string" ? currentMeta["passage"] : null;
+  const audioUrl = typeof currentMeta["audio_url"] === "string" ? currentMeta["audio_url"] : null;
+  const requirements = Array.isArray(currentMeta["requirements"])
+    ? currentMeta["requirements"].filter((item): item is string => typeof item === "string")
+    : [];
+  const recommendedWords =
+    typeof currentMeta["recommended_words"] === "string" ? currentMeta["recommended_words"] : null;
+  const formFields = Array.isArray(currentMeta["fields"])
+    ? currentMeta["fields"].filter(
+        (field): field is { key: string; points: number } =>
+          Boolean(field) &&
+          typeof field === "object" &&
+          typeof (field as { key?: unknown }).key === "string",
+      )
+    : [];
 
   return (
     <QueryState
@@ -397,7 +450,8 @@ function StudentExamRunner() {
             <div className="min-w-0 flex-1 text-center sm:text-left">
               <p className="truncate text-sm font-medium">{examQuery.data?.title}</p>
               <p className="text-xs text-muted-foreground">
-                {examQuery.data?.level?.code} · Question {index + 1}/{questions.length}
+                {current ? (SKILL_LABELS[current.skill] ?? current.sectionTitle) : ""} · Question{" "}
+                {index + 1}/{questions.length}
               </p>
             </div>
             <span className="inline-flex items-center gap-2 rounded-md border border-alert/20 bg-alert-soft px-3 py-1.5 text-sm font-medium text-alert">
@@ -414,9 +468,17 @@ function StudentExamRunner() {
         <div className="grid gap-6 lg:grid-cols-[1fr_14rem]">
           <Surface className="p-6 sm:p-8">
             <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              {current ? (SKILL_LABELS[current.skill] ?? current.sectionTitle) : ""}
+              {current ? current.sectionTitle : ""}
             </p>
-            <h2 className="mt-3 text-xl font-semibold leading-snug sm:text-2xl">
+            {instruction ? (
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{instruction}</p>
+            ) : null}
+            {passage ? (
+              <div className="mt-4 whitespace-pre-wrap rounded-md border border-border bg-muted/30 p-4 text-sm leading-6">
+                {passage}
+              </div>
+            ) : null}
+            <h2 className="mt-4 text-xl font-semibold leading-snug sm:text-2xl">
               {current?.prompt}
             </h2>
 
@@ -426,11 +488,13 @@ function StudentExamRunner() {
                   <Headphones className="size-4" />
                   Audio
                 </div>
-                <p className="mt-2">
-                  {current.media_path
-                    ? "Fichier audio disponible."
-                    : "Aucun fichier audio — répondez à partir de la consigne."}
-                </p>
+                {audioUrl ? (
+                  <audio className="mt-3 w-full" controls src={audioUrl} preload="none">
+                    Votre navigateur ne prend pas en charge l’audio.
+                  </audio>
+                ) : (
+                  <p className="mt-2">Audio bientôt disponible</p>
+                )}
               </div>
             )}
 
@@ -469,10 +533,44 @@ function StudentExamRunner() {
                   );
                 })}
 
-              {(current?.type === "writing" ||
-                current?.type === "text" ||
-                current?.type === "speaking") && (
+              {current?.type === "form_fill" && (
+                <div className="space-y-3">
+                  {formFields.map((field) => (
+                    <label key={field.key} className="block text-sm">
+                      <span className="font-medium">{field.key}</span>
+                      <Input
+                        className="mt-1"
+                        value={formFillDraft[field.key] ?? ""}
+                        onChange={(e) => {
+                          const next = {
+                            ...formFillDraft,
+                            [field.key]: e.target.value,
+                          };
+                          setLocalAnswers((prev) => ({ ...prev, [current.id]: next }));
+                        }}
+                        onBlur={() => {
+                          persist(current.id, formFillAnswer(localAnswers[current.id]));
+                        }}
+                      />
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {isWritingType && current && (
                 <div>
+                  {requirements.length > 0 ? (
+                    <ul className="mb-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                      {requirements.map((req) => (
+                        <li key={req}>{req}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {recommendedWords ? (
+                    <p className="mb-3 text-xs text-muted-foreground">
+                      Nombre de mots conseillé : {recommendedWords}
+                    </p>
+                  ) : null}
                   <Textarea
                     className="min-h-52 text-base leading-relaxed"
                     value={answerValue(localAnswers[current.id])}
@@ -487,8 +585,9 @@ function StudentExamRunner() {
                     }}
                   />
                   <p className="mt-2 text-xs text-muted-foreground">
-                    {writingWordCount} mot{writingWordCount === 1 ? "" : "s"} · {writingText.length}{" "}
-                    caractère{writingText.length === 1 ? "" : "s"}
+                    {writingStats.words} mot{writingStats.words === 1 ? "" : "s"} ·{" "}
+                    {writingStats.characters} caractère
+                    {writingStats.characters === 1 ? "" : "s"}
                   </p>
                 </div>
               )}
@@ -549,10 +648,15 @@ function StudentExamRunner() {
             </p>
             <div className="grid grid-cols-5 gap-2 sm:grid-cols-4 lg:grid-cols-3">
               {questions.map((q, i) => {
+                const raw = localAnswers[q.id];
                 const answered =
-                  localAnswers[q.id] !== undefined &&
-                  localAnswers[q.id] !== null &&
-                  answerValue(localAnswers[q.id]) !== "";
+                  raw !== undefined &&
+                  raw !== null &&
+                  (typeof raw === "object" && !Array.isArray(raw)
+                    ? Object.values(raw as Record<string, unknown>).some(
+                        (v) => String(v ?? "").trim() !== "",
+                      )
+                    : answerValue(raw) !== "");
                 const isCurrent = i === index;
                 const isFlagged = flagged[q.id];
                 return (
@@ -587,9 +691,53 @@ function StudentExamResult() {
   const { navigate } = useAcademy();
   const session = readExamSession();
   const resultQuery = useExamResult(session.attemptId);
+  const [showReview, setShowReview] = useState(false);
+  const reviewQuery = useExamAttemptReview(showReview ? session.attemptId : null);
 
   const skills = resultQuery.data?.skills ?? {};
-  const percentage = resultQuery.data?.percentage ?? 0;
+  const awaiting = resultQuery.data?.awaitingManual ?? false;
+  const displayScore = awaiting
+    ? (resultQuery.data?.automaticScore ?? 0)
+    : (resultQuery.data?.score ?? 0);
+  const displayMax = awaiting
+    ? (resultQuery.data?.automaticMax ?? 40)
+    : (resultQuery.data?.maxScore ?? 50);
+  const displayPct = displayMax > 0 ? Math.round((displayScore / displayMax) * 10000) / 100 : 0;
+
+  const formatStudentAnswer = (item: {
+    type: string;
+    student_answer: Json;
+    options: Array<{ value: string; label: string }>;
+  }) => {
+    if (item.type === "form_fill") {
+      const form = formFillAnswer(item.student_answer);
+      return Object.keys(form).length
+        ? Object.entries(form)
+            .map(([k, v]) => `${k}: ${v || "—"}`)
+            .join(" · ")
+        : "—";
+    }
+    const raw = answerValue(item.student_answer);
+    const option = item.options.find((o) => o.value === raw);
+    return option?.label ?? (raw || "—");
+  };
+
+  const formatCorrectAnswer = (item: {
+    type: string;
+    correct_values: string[] | null;
+    correct_form: Record<string, string> | null;
+    options: Array<{ value: string; label: string }>;
+  }) => {
+    if (item.type === "form_fill" && item.correct_form) {
+      return Object.entries(item.correct_form)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(" · ");
+    }
+    if (!item.correct_values?.length) return "—";
+    return item.correct_values
+      .map((value) => item.options.find((o) => o.value === value)?.label ?? value)
+      .join(", ");
+  };
 
   return (
     <QueryState
@@ -612,19 +760,24 @@ function StudentExamResult() {
         </button>
         <section className="grid items-center gap-8 rounded-2xl bg-primary p-8 text-primary-foreground md:grid-cols-[auto_1fr] md:p-12">
           <div className="grid size-36 place-items-center rounded-full border-4 border-primary-foreground/20">
-            <span className="font-display text-4xl">{percentage.toFixed(0)}%</span>
+            <span className="font-display text-4xl">{displayPct.toFixed(0)}%</span>
           </div>
           <div>
             <p className="text-xs tracking-wide uppercase text-primary-foreground/70">
               Votre résultat
             </p>
             <h1 className="mt-2 font-display text-3xl md:text-4xl">
-              {resultQuery.data?.passed ? "Réussi" : "À améliorer"}
+              {awaiting
+                ? "En attente de correction"
+                : resultQuery.data?.passed
+                  ? "Réussi"
+                  : "À améliorer"}
             </h1>
             <p className="mt-3 max-w-lg text-sm leading-6 text-primary-foreground/75">
-              {resultQuery.data?.exam?.title} · {resultQuery.data?.correct}/
-              {resultQuery.data?.totalObjective} questions objectives correctes. L’écrit et l’oral
-              peuvent attendre une correction du professeur.
+              {resultQuery.data?.exam?.title}
+              {awaiting
+                ? ` · Score auto ${displayScore}/${displayMax}`
+                : ` · Score final ${displayScore}/${displayMax}`}
             </p>
           </div>
         </section>
@@ -635,19 +788,53 @@ function StudentExamResult() {
               Résultats par compétence
             </h2>
             <div className="mt-5 space-y-4">
-              {Object.keys(skills).length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Aucun détail par compétence pour le moment.
-                </p>
-              )}
-              {Object.entries(skills).map(([skill, value]) => {
-                const pct = value.max > 0 ? Math.round((value.score / value.max) * 100) : 0;
+              {(["lesen", "hoeren", "schreiben"] as const).map((skill) => {
+                const value = skills[skill];
+                if (!value && skill !== "schreiben") return null;
+                if (skill === "schreiben") {
+                  return (
+                    <div key={skill} className="space-y-2">
+                      <p className="text-sm font-medium">{SKILL_LABELS[skill]}</p>
+                      {(resultQuery.data?.schreibenItems ?? []).map((item, idx) => {
+                        const label = shortBankId(item.bankQuestionId, `S0${idx + 1}`);
+                        return (
+                          <div
+                            key={item.questionId}
+                            className="flex justify-between text-sm text-muted-foreground"
+                          >
+                            <span>
+                              {label}
+                              {item.type === "form_fill" ? " (formulaire)" : ""}
+                            </span>
+                            <span>
+                              {item.pending
+                                ? "En attente"
+                                : `${Number(item.pointsAwarded ?? 0)}/${item.points}`}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {value ? (
+                        <div className="h-2 rounded-full bg-secondary">
+                          <div
+                            className="h-full rounded-full bg-primary"
+                            style={{
+                              width: `${value.max > 0 ? Math.round((value.score / value.max) * 100) : 0}%`,
+                            }}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                }
+                const pct =
+                  value && value.max > 0 ? Math.round((value.score / value.max) * 100) : 0;
                 return (
                   <div key={skill}>
                     <div className="mb-1 flex justify-between text-sm">
-                      <span>{SKILL_LABELS[skill] ?? skill}</span>
+                      <span>{SKILL_LABELS[skill]}</span>
                       <span className="text-muted-foreground">
-                        {value.score}/{value.max} · {pct}%
+                        {value?.score ?? 0}/{value?.max ?? 15} · {pct}%
                       </span>
                     </div>
                     <div className="h-2 rounded-full bg-secondary">
@@ -664,16 +851,73 @@ function StudentExamResult() {
           <div className="space-y-5">
             <div>
               <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                Prochaine étape
+                Correction
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Revenez sur les compétences les plus faibles, puis entraînez-vous à l’écrit avec les
-                retours de votre professeur.
+                Consultez le détail question par question après l’envoi.
               </p>
             </div>
+            <Button
+              variant="outline"
+              onClick={() => setShowReview(true)}
+              disabled={!session.attemptId}
+            >
+              Voir la correction détaillée
+            </Button>
             <Button onClick={() => navigate("courses")}>Continuer les cours</Button>
           </div>
         </div>
+
+        {showReview ? (
+          <div className="mt-10 space-y-4">
+            <h2 className="text-lg font-semibold">Correction détaillée</h2>
+            <QueryState
+              isLoading={reviewQuery.isLoading}
+              isError={reviewQuery.isError}
+              error={reviewQuery.error}
+              isEmpty={!reviewQuery.data?.items?.length}
+              emptyTitle="Aucune correction"
+              emptyMessage="La correction n’est pas encore disponible."
+              onRetry={() => void reviewQuery.refetch()}
+            >
+              <div className="space-y-3">
+                {(reviewQuery.data?.items ?? [])
+                  .filter((item) => !isManualQuestionType(item.type))
+                  .map((item) => (
+                    <Surface className="space-y-2 p-4" key={item.question_id}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                          {SKILL_LABELS[item.skill] ?? item.section_title}
+                          {item.external_id ? ` · ${shortBankId(item.external_id, "")}` : ""}
+                        </p>
+                        <Status tone={item.is_correct ? "green" : "amber"}>
+                          {item.is_correct ? "Correct" : "Incorrect"}
+                        </Status>
+                      </div>
+                      {item.instruction ? (
+                        <p className="text-sm text-muted-foreground">{item.instruction}</p>
+                      ) : null}
+                      <p className="text-sm font-medium">{item.prompt}</p>
+                      <p className="text-sm">
+                        Votre réponse :{" "}
+                        <span className="text-muted-foreground">{formatStudentAnswer(item)}</span>
+                      </p>
+                      <p className="text-sm">
+                        Bonne réponse :{" "}
+                        <span className="text-muted-foreground">{formatCorrectAnswer(item)}</span>
+                      </p>
+                      {item.explanation ? (
+                        <p className="text-sm text-muted-foreground">{item.explanation}</p>
+                      ) : null}
+                      <p className="text-xs text-muted-foreground">
+                        {Number(item.points_awarded ?? 0)}/{item.points} pts
+                      </p>
+                    </Surface>
+                  ))}
+              </div>
+            </QueryState>
+          </div>
+        ) : null}
       </div>
     </QueryState>
   );
@@ -684,12 +928,23 @@ function ExamWritingGradingPanel({ examId }: { examId: string }) {
   const examQuery = useExam(examId);
   const gradeWriting = useGradeWritingAnswer();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, { points: string; comment: string }>>({});
+  const [drafts, setDrafts] = useState<
+    Record<
+      string,
+      {
+        task_completion: string;
+        comprehensibility: string;
+        vocabulary: string;
+        grammar_and_spelling: string;
+        comment: string;
+      }
+    >
+  >({});
 
   const writingQuestions = useMemo(() => {
     return (examQuery.data?.sections ?? []).flatMap((section) =>
       (section.questions ?? [])
-        .filter((q) => q.type === "writing" || q.type === "text" || q.type === "speaking")
+        .filter((q) => isManualQuestionType(q.type))
         .map((q) => ({ ...q, sectionTitle: section.title })),
     );
   }, [examQuery.data]);
@@ -712,8 +967,20 @@ function ExamWritingGradingPanel({ examId }: { examId: string }) {
       for (const answer of answersQuery.data) {
         const key = `${expandedId}:${answer.question_id}`;
         if (next[key]) continue;
+        const detail =
+          answer.grading_detail &&
+          typeof answer.grading_detail === "object" &&
+          !Array.isArray(answer.grading_detail)
+            ? (answer.grading_detail as Record<string, unknown>)
+            : {};
         next[key] = {
-          points: answer.points_awarded != null ? String(answer.points_awarded) : "",
+          task_completion:
+            detail["task_completion"] != null ? String(detail["task_completion"]) : "",
+          comprehensibility:
+            detail["comprehensibility"] != null ? String(detail["comprehensibility"]) : "",
+          vocabulary: detail["vocabulary"] != null ? String(detail["vocabulary"]) : "",
+          grammar_and_spelling:
+            detail["grammar_and_spelling"] != null ? String(detail["grammar_and_spelling"]) : "",
           comment: answer.teacher_comment ?? "",
         };
       }
@@ -799,78 +1066,140 @@ function ExamWritingGradingPanel({ examId }: { examId: string }) {
                         (row) => row.question_id === question.id,
                       );
                       const key = `${attempt.id}:${question.id}`;
+                      const meta = questionMeta(question.metadata);
+                      const requirements = Array.isArray(meta["requirements"])
+                        ? meta["requirements"].filter(
+                            (item): item is string => typeof item === "string",
+                          )
+                        : [];
+                      const rubricRaw = meta["rubric"];
+                      const rubric =
+                        rubricRaw && typeof rubricRaw === "object" && !Array.isArray(rubricRaw)
+                          ? (rubricRaw as Record<string, number>)
+                          : {
+                              task_completion: 4,
+                              comprehensibility: 2,
+                              vocabulary: 2,
+                              grammar_and_spelling: 2,
+                            };
                       const draft = drafts[key] ?? {
-                        points: "",
+                        task_completion: "",
+                        comprehensibility: "",
+                        vocabulary: "",
+                        grammar_and_spelling: "",
                         comment: "",
                       };
+                      const rubricSum =
+                        Number(draft.task_completion || 0) +
+                        Number(draft.comprehensibility || 0) +
+                        Number(draft.vocabulary || 0) +
+                        Number(draft.grammar_and_spelling || 0);
+                      const text = answer ? answerValue(answer.answer) : "";
+                      const stats = countWritingStats(text);
                       return (
-                        <div key={question.id} className="space-y-2 rounded-md bg-muted/40 p-3">
+                        <div key={question.id} className="space-y-3 rounded-md bg-muted/40 p-3">
                           <p className="text-xs font-medium text-muted-foreground">
                             {question.sectionTitle}
                           </p>
-                          <p className="text-sm font-medium">{question.prompt}</p>
-                          <p className="whitespace-pre-wrap rounded-md border border-border bg-background p-3 text-sm">
-                            {answer ? answerValue(answer.answer) || "—" : "Pas de réponse"}
+                          <p className="text-sm font-medium">
+                            {typeof meta["instruction"] === "string"
+                              ? meta["instruction"]
+                              : question.prompt}
                           </p>
-                          <div className="grid gap-2 sm:grid-cols-[8rem_1fr_auto]">
-                            <label className="block text-xs">
-                              Points (/{question.points})
-                              <Input
-                                className="mt-1"
-                                type="number"
-                                min={0}
-                                max={question.points}
-                                step="0.5"
-                                value={draft.points}
-                                onChange={(e) =>
-                                  setDrafts((prev) => ({
-                                    ...prev,
-                                    [key]: { ...draft, points: e.target.value },
-                                  }))
-                                }
-                              />
-                            </label>
-                            <label className="block text-xs">
-                              Commentaire
-                              <Input
-                                className="mt-1"
-                                value={draft.comment}
-                                onChange={(e) =>
-                                  setDrafts((prev) => ({
-                                    ...prev,
-                                    [key]: { ...draft, comment: e.target.value },
-                                  }))
-                                }
-                              />
-                            </label>
-                            <div className="flex items-end">
-                              <Button
-                                size="sm"
-                                disabled={gradeWriting.isPending || draft.points === ""}
-                                onClick={() => {
-                                  const points = Number(draft.points);
-                                  if (!Number.isFinite(points)) {
-                                    toast.error("Points invalides");
-                                    return;
+                          {requirements.length > 0 ? (
+                            <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                              {requirements.map((req) => (
+                                <li key={req}>{req}</li>
+                              ))}
+                            </ul>
+                          ) : null}
+                          <p className="whitespace-pre-wrap rounded-md border border-border bg-background p-3 text-sm">
+                            {text || "Pas de réponse"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {stats.words} mot{stats.words === 1 ? "" : "s"}
+                          </p>
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {(
+                              [
+                                "task_completion",
+                                "comprehensibility",
+                                "vocabulary",
+                                "grammar_and_spelling",
+                              ] as const
+                            ).map((rubricKey) => (
+                              <label key={rubricKey} className="block text-xs">
+                                {RUBRIC_LABELS[rubricKey]} (/{rubric[rubricKey] ?? 0})
+                                <Input
+                                  className="mt-1"
+                                  type="number"
+                                  min={0}
+                                  max={rubric[rubricKey] ?? question.points}
+                                  step="0.5"
+                                  value={draft[rubricKey]}
+                                  onChange={(e) =>
+                                    setDrafts((prev) => ({
+                                      ...prev,
+                                      [key]: { ...draft, [rubricKey]: e.target.value },
+                                    }))
                                   }
-                                  gradeWriting.mutate(
-                                    {
-                                      attemptId: attempt.id,
-                                      questionId: question.id,
-                                      points,
-                                      comment: draft.comment.trim() || null,
-                                    },
-                                    {
-                                      onSuccess: () => toast.success("Note enregistrée"),
-                                      onError: (err) => toast.error(err.message),
-                                    },
-                                  );
-                                }}
-                              >
-                                Enregistrer
-                              </Button>
-                            </div>
+                                />
+                              </label>
+                            ))}
                           </div>
+                          <p className="text-sm text-muted-foreground">
+                            Total : {rubricSum} / {question.points}
+                          </p>
+                          <label className="block text-xs">
+                            Commentaire
+                            <Input
+                              className="mt-1"
+                              value={draft.comment}
+                              onChange={(e) =>
+                                setDrafts((prev) => ({
+                                  ...prev,
+                                  [key]: { ...draft, comment: e.target.value },
+                                }))
+                              }
+                            />
+                          </label>
+                          <Button
+                            size="sm"
+                            disabled={
+                              gradeWriting.isPending ||
+                              draft.task_completion === "" ||
+                              draft.comprehensibility === "" ||
+                              draft.vocabulary === "" ||
+                              draft.grammar_and_spelling === ""
+                            }
+                            onClick={() => {
+                              if (!Number.isFinite(rubricSum) || rubricSum > question.points) {
+                                toast.error("Points invalides");
+                                return;
+                              }
+                              const gradingDetail = {
+                                task_completion: Number(draft.task_completion),
+                                comprehensibility: Number(draft.comprehensibility),
+                                vocabulary: Number(draft.vocabulary),
+                                grammar_and_spelling: Number(draft.grammar_and_spelling),
+                              };
+                              gradeWriting.mutate(
+                                {
+                                  attemptId: attempt.id,
+                                  questionId: question.id,
+                                  points: rubricSum,
+                                  comment: draft.comment.trim() || null,
+                                  gradingDetail,
+                                },
+                                {
+                                  onSuccess: () => toast.success("Note enregistrée"),
+                                  onError: (err) => toast.error(err.message),
+                                },
+                              );
+                            }}
+                          >
+                            Enregistrer
+                          </Button>
                         </div>
                       );
                     })}

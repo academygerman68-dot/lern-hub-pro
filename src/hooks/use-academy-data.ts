@@ -677,6 +677,14 @@ export function useExamResult(attemptId: string | null | undefined) {
   });
 }
 
+export function useExamAttemptReview(attemptId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.exams.review(attemptId ?? ""),
+    queryFn: () => ExamService.getAttemptReview(attemptId!),
+    enabled: Boolean(attemptId),
+  });
+}
+
 export function useMyExamAttempts() {
   return useQuery({
     queryKey: queryKeys.exams.myAttempts,
@@ -702,12 +710,19 @@ export function useExamAttemptsForExam(examId: string | null | undefined) {
 export function useGradeWritingAnswer() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ExamService.gradeWritingAnswer,
+    mutationFn: (input: {
+      attemptId: string;
+      questionId: string;
+      points: number;
+      comment?: string | null;
+      gradingDetail?: Json | null;
+    }) => ExamService.gradeWritingAnswer(input),
     onSuccess: async (attempt) => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: queryKeys.exams.attempt(attempt.id) }),
         qc.invalidateQueries({ queryKey: queryKeys.exams.answers(attempt.id) }),
         qc.invalidateQueries({ queryKey: queryKeys.exams.result(attempt.id) }),
+        qc.invalidateQueries({ queryKey: queryKeys.exams.review(attempt.id) }),
         qc.invalidateQueries({ queryKey: queryKeys.exams.attemptsByExam(attempt.exam_id) }),
         qc.invalidateQueries({ queryKey: queryKeys.exams.allAttempts }),
       ]);

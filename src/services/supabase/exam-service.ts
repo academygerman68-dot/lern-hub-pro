@@ -1,4 +1,6 @@
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
+import { sanitizeQuestionMetadataForStudent } from "@/lib/exam-form-fill";
+import { isManualQuestionType } from "@/lib/exam-writing";
 import type { Database, Json } from "@/types/database";
 
 type Exam = Database["public"]["Tables"]["exams"]["Row"];
@@ -23,7 +25,11 @@ export type ExamQuestionWithOptions = ExamQuestion & {
 
 /** Staff-only view: includes the protected answer key. */
 export type ExamStructureQuestion = ExamQuestionWithOptions & {
-  answer_key: { correct_values: string[] } | null;
+  answer_key: {
+    correct_values: string[];
+    explanation: string | null;
+    teacher_payload: Json;
+  } | null;
 };
 
 export type ExamStructureSection = ExamSection & {
@@ -47,6 +53,15 @@ export type ExamListItem = Exam & {
 
 export type SkillBreakdown = Record<string, { score: number; max: number }>;
 
+export type ExamSchreibenItem = {
+  questionId: string;
+  bankQuestionId: string | null;
+  type: string;
+  points: number;
+  pointsAwarded: number | null;
+  pending: boolean;
+};
+
 export type ExamResultView = {
   attempt: ExamAttempt;
   exam: ExamListItem | null;
@@ -55,6 +70,43 @@ export type ExamResultView = {
   skills: SkillBreakdown;
   correct: number;
   totalObjective: number;
+  score: number;
+  maxScore: number;
+  automaticScore: number;
+  automaticMax: number;
+  schreibenItems: ExamSchreibenItem[];
+  awaitingManual: boolean;
+};
+
+export type ExamAttemptReviewItem = {
+  question_id: string;
+  external_id: string | null;
+  skill: string;
+  section_title: string;
+  type: string;
+  prompt: string;
+  instruction: string | null;
+  passage: string | null;
+  points: number;
+  student_answer: Json;
+  is_correct: boolean | null;
+  points_awarded: number | null;
+  correct_values: string[] | null;
+  correct_form: Record<string, string> | null;
+  explanation: string | null;
+  options: Array<{ value: string; label: string }>;
+  teacher_comment: string | null;
+  grading_detail: Json | null;
+};
+
+export type ExamAttemptReview = {
+  attempt_id: string;
+  status: string;
+  score: number | null;
+  max_score: number | null;
+  percentage: number | null;
+  skill_breakdown: Json;
+  items: ExamAttemptReviewItem[];
 };
 
 function parseSkills(raw: Json): SkillBreakdown {
@@ -68,6 +120,13 @@ function parseSkills(raw: Json): SkillBreakdown {
     }
   }
   return out;
+}
+
+function asMetaRecord(metadata: Json): Record<string, unknown> {
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+    return metadata as Record<string, unknown>;
+  }
+  return {};
 }
 
 export const SupabaseExamService = {
@@ -123,6 +182,7 @@ export const SupabaseExamService = {
         questions: (section.questions ?? [])
           .map((q) => ({
             ...q,
+            metadata: (sanitizeQuestionMetadataForStudent(asMetaRecord(q.metadata)) ?? {}) as Json,
             options: (q.options ?? []).slice().sort((a, b) => a.sort_order - b.sort_order),
           }))
           .sort((a, b) => a.sort_order - b.sort_order),
@@ -240,7 +300,7 @@ export const SupabaseExamService = {
         questions:exam_questions (
           *,
           options:exam_question_options ( * ),
-          answer_key:exam_answer_keys ( correct_values )
+          answer_key:exam_answer_keys ( correct_values, explanation, teacher_payload )
         )
       `,
       )
@@ -396,6 +456,7 @@ export const SupabaseExamService = {
         ...row,
         is_correct: null,
         points_awarded: null,
+        grading_detail: null,
       }));
     }
     return rows;
@@ -430,15 +491,30 @@ export const SupabaseExamService = {
     questionId: string;
     points: number;
     comment?: string | null;
+    gradingDetail?: Json | null;
   }): Promise<ExamAttempt> {
     const { data, error } = await requireClient().rpc("grade_exam_writing_answer", {
       p_attempt_id: input.attemptId,
       p_question_id: input.questionId,
       p_points: input.points,
       p_comment: input.comment ?? null,
+      p_grading_detail: input.gradingDetail ?? null,
     });
     if (error) throw error;
     return data as ExamAttempt;
+  },
+
+  async getAttemptReview(attemptId: string): Promise<ExamAttemptReview> {
+    const { data, error } = await requireClient().rpc("get_exam_attempt_review", {
+      p_attempt_id: attemptId,
+    });
+    if (error) throw error;
+    const raw = data as ExamAttemptReview | null;
+    if (!raw) throw new Error("REVIEW_NOT_FOUND");
+    return {
+      ...raw,
+      items: Array.isArray(raw.items) ? raw.items : [],
+    };
   },
 
   async listAttemptsForExam(examId: string): Promise<
@@ -530,11 +606,63 @@ export const SupabaseExamService = {
 
     const exam = await this.getExam(attempt.exam_id);
     const answers = await this.listAnswers(attemptId);
+    const answerByQuestion = new Map(answers.map((a) => [a.question_id, a]));
     const skills = parseSkills(attempt.skill_breakdown);
-    const objective = answers.filter((a) => a.is_correct !== null);
-    const correct = objective.filter((a) => a.is_correct).length;
+
+    const schreibenItems: ExamSchreibenItem[] = [];
+    let automaticScore = 0;
+    let automaticMax = 0;
+    let objectiveCorrect = 0;
+    let objectiveTotal = 0;
+
+    for (const section of exam?.sections ?? []) {
+      for (const question of section.questions ?? []) {
+        const answer = answerByQuestion.get(question.id);
+        const meta = asMetaRecord(question.metadata);
+        const bankQuestionId =
+          typeof meta["bank_question_id"] === "string" ? meta["bank_question_id"] : null;
+
+        if (isManualQuestionType(question.type)) {
+          schreibenItems.push({
+            questionId: question.id,
+            bankQuestionId,
+            type: question.type,
+            points: Number(question.points),
+            pointsAwarded: answer?.points_awarded ?? null,
+            pending: answer?.points_awarded == null || answer.is_correct === null,
+          });
+          continue;
+        }
+
+        automaticMax += Number(question.points);
+        const awarded = Number(answer?.points_awarded ?? 0);
+        automaticScore += awarded;
+
+        if (question.type === "form_fill") {
+          schreibenItems.push({
+            questionId: question.id,
+            bankQuestionId,
+            type: question.type,
+            points: Number(question.points),
+            pointsAwarded: answer?.points_awarded ?? null,
+            pending: false,
+          });
+          continue;
+        }
+
+        objectiveTotal += 1;
+        if (answer?.is_correct) objectiveCorrect += 1;
+      }
+    }
+
+    const score = Number(attempt.score ?? automaticScore);
+    const maxScore = Number(attempt.max_score ?? automaticMax);
     const percentage = Number(attempt.percentage ?? 0);
     const pass = Number(exam?.pass_percentage ?? 60);
+    const awaitingManual =
+      attempt.status === "submitted" ||
+      attempt.status === "expired" ||
+      schreibenItems.some((item) => item.pending);
 
     return {
       attempt,
@@ -548,8 +676,14 @@ export const SupabaseExamService = {
       percentage,
       passed: percentage >= pass,
       skills,
-      correct,
-      totalObjective: objective.length,
+      correct: objectiveCorrect,
+      totalObjective: objectiveTotal,
+      score,
+      maxScore,
+      automaticScore,
+      automaticMax: automaticMax || 40,
+      schreibenItems,
+      awaitingManual,
     };
   },
 

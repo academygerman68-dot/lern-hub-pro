@@ -1,0 +1,2446 @@
+{
+  "schema_version": "1.0",
+  "bank": {
+    "name": "German Academy - A1 Mock Exams",
+    "level": "A1",
+    "language": "de",
+    "exams_count": 3
+  },
+  "exams": [
+    {
+      "id": "A1-01",
+      "level": "A1",
+      "title": "Examen blanc A1-01",
+      "subtitle": "Alltag & Familie",
+      "duration_minutes": 65,
+      "total_points": 50,
+      "automatic_points": 40,
+      "manual_points": 10,
+      "sections": [
+        {
+          "id": "A1-01-LESEN",
+          "type": "lesen",
+          "title": "Lesen",
+          "max_points": 15,
+          "questions": [
+            {
+              "id": "A1-01-L01",
+              "part": 1,
+              "order": 1,
+              "type": "true_false",
+              "instruction": "Lesen Sie die Nachricht. Ist die Aussage richtig oder falsch?",
+              "passage": "Hallo Karim, mein Zug hat heute Verspätung. Ich komme nicht um 18 Uhr, sondern gegen 19 Uhr. Bis später! Lisa",
+              "prompt": "Lisa kommt um 18 Uhr.",
+              "choices": [
+                "Richtig",
+                "Falsch"
+              ],
+              "correct_answer": "Falsch",
+              "points": 1,
+              "explanation": "Lisa schreibt, dass sie erst gegen 19 Uhr kommt."
+            },
+            {
+              "id": "A1-01-L02",
+              "part": 1,
+              "order": 2,
+              "type": "true_false",
+              "instruction": "Lesen Sie die Nachricht. Ist die Aussage richtig oder falsch?",
+              "passage": "Guten Morgen Sara, ich arbeite heute bis 16 Uhr. Danach können wir zusammen Kaffee trinken. Paul",
+              "prompt": "Paul kann vor 16 Uhr Kaffee trinken.",
+              "choices": [
+                "Richtig",
+                "Falsch"
+              ],
+              "correct_answer": "Falsch",
+              "points": 1,
+              "explanation": "Paul arbeitet bis 16 Uhr und kann erst danach Kaffee trinken."
+            },
+            {
+              "id": "A1-01-L03",
+              "part": 1,
+              "order": 3,
+              "type": "true_false",
+              "passage": "Liebe Anna, am Sonntag feiern wir den Geburtstag von meiner Mutter. Kommst du um 15 Uhr zu uns? Viele Grüße Maria",
+              "prompt": "Die Geburtstagsfeier ist am Sonntag.",
+              "choices": [
+                "Richtig",
+                "Falsch"
+              ],
+              "correct_answer": "Richtig",
+              "points": 1,
+              "explanation": "Im Text steht ausdrücklich: am Sonntag."
+            },
+            {
+              "id": "A1-01-L04",
+              "part": 1,
+              "order": 4,
+              "type": "true_false",
+              "passage": "Hallo Jonas, heute Abend können wir nicht ins Kino gehen. Ich bin krank. Vielleicht am Freitag? Nina",
+              "prompt": "Nina möchte heute Abend ins Kino gehen.",
+              "choices": [
+                "Richtig",
+                "Falsch"
+              ],
+              "correct_answer": "Falsch",
+              "points": 1,
+              "explanation": "Nina ist krank und kann heute Abend nicht ins Kino gehen."
+            },
+            {
+              "id": "A1-01-L05",
+              "part": 1,
+              "order": 5,
+              "type": "true_false",
+              "passage": "Herr Müller, Ihr Termin beim Zahnarzt ist morgen um 10:30 Uhr. Bitte kommen Sie zehn Minuten früher. Praxis Schneider",
+              "prompt": "Herr Müller soll um 10:20 Uhr in der Praxis sein.",
+              "choices": [
+                "Richtig",
+                "Falsch"
+              ],
+              "correct_answer": "Richtig",
+              "points": 1,
+              "explanation": "Der Termin ist um 10:30 Uhr. Zehn Minuten früher bedeutet 10:20 Uhr."
+            },
+            {
+              "id": "A1-01-L06",
+              "part": 2,
+              "order": 6,
+              "type": "single_choice",
+              "passage": "Bäckerei König. Montag-Freitag: 06:30-18:00. Samstag: 07:00-13:00. Sonntag: geschlossen.",
+              "prompt": "Wann kann man am Samstag Brot kaufen?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "06:30"
+                },
+                {
+                  "id": "B",
+                  "text": "10:00"
+                },
+                {
+                  "id": "C",
+                  "text": "15:00"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Am Samstag ist die Bäckerei von 07:00 bis 13:00 Uhr geöffnet."
+            },
+            {
+              "id": "A1-01-L07",
+              "part": 2,
+              "order": 7,
+              "type": "single_choice",
+              "passage": "Bitte nicht parken! Einfahrt Tag und Nacht freihalten.",
+              "prompt": "Was bedeutet das?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Man darf hier nur nachts parken."
+                },
+                {
+                  "id": "B",
+                  "text": "Man darf hier kurz parken."
+                },
+                {
+                  "id": "C",
+                  "text": "Man darf hier nicht parken."
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Bitte nicht parken bedeutet, dass Parken hier verboten ist."
+            },
+            {
+              "id": "A1-01-L08",
+              "part": 2,
+              "order": 8,
+              "type": "single_choice",
+              "passage": "Bibliothek. Heute ab 14 Uhr geschlossen.",
+              "prompt": "Wann ist die Bibliothek heute geschlossen?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "den ganzen Tag"
+                },
+                {
+                  "id": "B",
+                  "text": "ab 14 Uhr"
+                },
+                {
+                  "id": "C",
+                  "text": "bis 14 Uhr"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Ab 14 Uhr bedeutet: ab diesem Zeitpunkt ist die Bibliothek geschlossen."
+            },
+            {
+              "id": "A1-01-L09",
+              "part": 2,
+              "order": 9,
+              "type": "single_choice",
+              "passage": "Nur für Mitarbeiter",
+              "prompt": "Wer darf hier hinein?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "alle Besucher"
+                },
+                {
+                  "id": "B",
+                  "text": "nur Studenten"
+                },
+                {
+                  "id": "C",
+                  "text": "die Mitarbeiter"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Nur für Mitarbeiter bedeutet, dass nur das Personal hinein darf."
+            },
+            {
+              "id": "A1-01-L10",
+              "part": 2,
+              "order": 10,
+              "type": "single_choice",
+              "passage": "Frühstück täglich von 7:00 bis 10:00 Uhr. Restaurant - Erdgeschoss.",
+              "prompt": "Wo gibt es Frühstück?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "im ersten Stock"
+                },
+                {
+                  "id": "B",
+                  "text": "im Erdgeschoss"
+                },
+                {
+                  "id": "C",
+                  "text": "im Zimmer"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Im Text steht: Restaurant - Erdgeschoss."
+            },
+            {
+              "id": "A1-01-L11",
+              "part": 3,
+              "order": 11,
+              "type": "single_choice",
+              "passage": "Zimmer frei. Kleines möbliertes Zimmer in Köln. 390 € pro Monat. Internet inklusive.",
+              "prompt": "Was kostet das Zimmer?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "176 €"
+                },
+                {
+                  "id": "B",
+                  "text": "390 €"
+                },
+                {
+                  "id": "C",
+                  "text": "442 €"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Das Zimmer kostet 390 € pro Monat."
+            },
+            {
+              "id": "A1-01-L12",
+              "part": 3,
+              "order": 12,
+              "type": "single_choice",
+              "passage": "Deutsch lernen! A1-Kurs Dienstag und Donnerstag, 18:00-20:00 Uhr.",
+              "prompt": "Wie oft pro Woche ist der Kurs?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "einmal"
+                },
+                {
+                  "id": "B",
+                  "text": "zweimal"
+                },
+                {
+                  "id": "C",
+                  "text": "dreimal"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Der Kurs findet am Dienstag und Donnerstag statt, also zweimal pro Woche."
+            },
+            {
+              "id": "A1-01-L13",
+              "part": 3,
+              "order": 13,
+              "type": "single_choice",
+              "passage": "Fahrrad zu verkaufen. Blaues Citybike, zwei Jahre alt, sehr guter Zustand. Preis: 120 €.",
+              "prompt": "Was wird verkauft?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "ein Auto"
+                },
+                {
+                  "id": "B",
+                  "text": "ein Fahrrad"
+                },
+                {
+                  "id": "C",
+                  "text": "ein Motorrad"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Die Anzeige beginnt mit Fahrrad zu verkaufen."
+            },
+            {
+              "id": "A1-01-L14",
+              "part": 3,
+              "order": 14,
+              "type": "single_choice",
+              "passage": "Café Morgenrot. Frühstück, Kuchen und Kaffee. Montag Ruhetag.",
+              "prompt": "Wann ist das Café geschlossen?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Sonntag"
+                },
+                {
+                  "id": "B",
+                  "text": "Montag"
+                },
+                {
+                  "id": "C",
+                  "text": "Freitag"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Montag ist Ruhetag."
+            },
+            {
+              "id": "A1-01-L15",
+              "part": 3,
+              "order": 15,
+              "type": "single_choice",
+              "passage": "Babysitter gesucht. Wir suchen eine freundliche Person für unsere zwei Kinder. Freitagabend, 18-22 Uhr.",
+              "prompt": "Wann braucht die Familie den Babysitter?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Freitagmorgen"
+                },
+                {
+                  "id": "B",
+                  "text": "Samstagnachmittag"
+                },
+                {
+                  "id": "C",
+                  "text": "Freitagabend"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Die Anzeige nennt Freitagabend von 18 bis 22 Uhr."
+            }
+          ]
+        },
+        {
+          "id": "A1-01-HOEREN",
+          "type": "hoeren",
+          "title": "Hören",
+          "max_points": 15,
+          "questions": [
+            {
+              "id": "A1-01-H01",
+              "part": 1,
+              "order": 1,
+              "type": "single_choice",
+              "audio_script": "Frau: Entschuldigung, wie spät ist es? Mann: Viertel nach neun. Frau: Danke.",
+              "audio_url": null,
+              "prompt": "Wie spät ist es?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "08:45"
+                },
+                {
+                  "id": "B",
+                  "text": "09:15"
+                },
+                {
+                  "id": "C",
+                  "text": "09:30"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Viertel nach neun bedeutet 09:15 Uhr."
+            },
+            {
+              "id": "A1-01-H02",
+              "part": 1,
+              "order": 2,
+              "type": "single_choice",
+              "audio_script": "Mann: Was kostet der Kaffee? Frau: Zwei Euro fünfzig. Mann: Dann nehme ich einen.",
+              "audio_url": null,
+              "prompt": "Wie viel kostet der Kaffee?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "2,05 €"
+                },
+                {
+                  "id": "B",
+                  "text": "2,50 €"
+                },
+                {
+                  "id": "C",
+                  "text": "5,20 €"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Die Frau sagt: Zwei Euro fünfzig."
+            },
+            {
+              "id": "A1-01-H03",
+              "part": 1,
+              "order": 3,
+              "type": "single_choice",
+              "audio_script": "Frau: Welcher Bus fährt zum Bahnhof? Mann: Die Nummer zwölf. Frau: Danke schön.",
+              "audio_url": null,
+              "prompt": "Welchen Bus braucht die Frau?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "2"
+                },
+                {
+                  "id": "B",
+                  "text": "10"
+                },
+                {
+                  "id": "C",
+                  "text": "12"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Der Mann sagt: Die Nummer zwölf."
+            },
+            {
+              "id": "A1-01-H04",
+              "part": 1,
+              "order": 4,
+              "type": "single_choice",
+              "audio_script": "Mann: Gehen wir heute ins Kino? Frau: Heute kann ich nicht. Aber morgen habe ich Zeit.",
+              "audio_url": null,
+              "prompt": "Wann kann die Frau ins Kino gehen?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "heute"
+                },
+                {
+                  "id": "B",
+                  "text": "morgen"
+                },
+                {
+                  "id": "C",
+                  "text": "nächste Woche"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Die Frau sagt, dass sie morgen Zeit hat."
+            },
+            {
+              "id": "A1-01-H05",
+              "part": 1,
+              "order": 5,
+              "type": "single_choice",
+              "audio_script": "Frau: Möchten Sie Tee oder Kaffee? Mann: Einen Tee, bitte. Ohne Zucker.",
+              "audio_url": null,
+              "prompt": "Was möchte der Mann?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Kaffee mit Zucker"
+                },
+                {
+                  "id": "B",
+                  "text": "Tee mit Zucker"
+                },
+                {
+                  "id": "C",
+                  "text": "Tee ohne Zucker"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Der Mann bestellt Tee ohne Zucker."
+            },
+            {
+              "id": "A1-01-H06",
+              "part": 2,
+              "order": 6,
+              "type": "single_choice",
+              "audio_script": "Achtung auf Gleis drei. Der Zug nach Frankfurt fährt heute zehn Minuten später ab.",
+              "audio_url": null,
+              "prompt": "Was ist richtig?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Der Zug fährt früher."
+                },
+                {
+                  "id": "B",
+                  "text": "Der Zug hat zehn Minuten Verspätung."
+                },
+                {
+                  "id": "C",
+                  "text": "Der Zug fährt nicht."
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Zehn Minuten später bedeutet zehn Minuten Verspätung."
+            },
+            {
+              "id": "A1-01-H07",
+              "part": 2,
+              "order": 7,
+              "type": "single_choice",
+              "audio_script": "Guten Tag, hier ist die Praxis Dr. Weber. Ihr Termin morgen ist nicht um neun Uhr, sondern um elf Uhr.",
+              "audio_url": null,
+              "prompt": "Wann ist der neue Termin?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "9 Uhr"
+                },
+                {
+                  "id": "B",
+                  "text": "10 Uhr"
+                },
+                {
+                  "id": "C",
+                  "text": "11 Uhr"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Der neue Termin ist um elf Uhr."
+            },
+            {
+              "id": "A1-01-H08",
+              "part": 2,
+              "order": 8,
+              "type": "single_choice",
+              "audio_script": "Liebe Kundinnen und Kunden, unser Geschäft schließt heute bereits um 17 Uhr.",
+              "audio_url": null,
+              "prompt": "Wann schließt das Geschäft?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "17 Uhr"
+                },
+                {
+                  "id": "B",
+                  "text": "18 Uhr"
+                },
+                {
+                  "id": "C",
+                  "text": "19 Uhr"
+                }
+              ],
+              "correct_answer": "A",
+              "points": 1,
+              "explanation": "Das Geschäft schließt um 17 Uhr."
+            },
+            {
+              "id": "A1-01-H09",
+              "part": 2,
+              "order": 9,
+              "type": "single_choice",
+              "audio_script": "Hallo David, hier ist Emma. Ich bin schon im Restaurant. Ich sitze draußen vor dem Eingang.",
+              "audio_url": null,
+              "prompt": "Wo wartet Emma?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "in der Küche"
+                },
+                {
+                  "id": "B",
+                  "text": "draußen vor dem Eingang"
+                },
+                {
+                  "id": "C",
+                  "text": "im Auto"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Emma sagt: Ich sitze draußen vor dem Eingang."
+            },
+            {
+              "id": "A1-01-H10",
+              "part": 2,
+              "order": 10,
+              "type": "single_choice",
+              "audio_script": "Der Bus zum Flughafen fährt in fünf Minuten von Haltestelle sieben.",
+              "audio_url": null,
+              "prompt": "Wo fährt der Bus ab?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Haltestelle 5"
+                },
+                {
+                  "id": "B",
+                  "text": "Haltestelle 6"
+                },
+                {
+                  "id": "C",
+                  "text": "Haltestelle 7"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Der Bus fährt von Haltestelle sieben ab."
+            },
+            {
+              "id": "A1-01-H11",
+              "part": 3,
+              "order": 11,
+              "type": "single_choice",
+              "audio_script": "Frau: Was möchtest du zum Frühstück? Mann: Nur Brot und Käse. Kaffee möchte ich heute nicht.",
+              "audio_url": null,
+              "prompt": "Was möchte der Mann nicht?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Brot"
+                },
+                {
+                  "id": "B",
+                  "text": "Käse"
+                },
+                {
+                  "id": "C",
+                  "text": "Kaffee"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Der Mann sagt ausdrücklich, dass er keinen Kaffee möchte."
+            },
+            {
+              "id": "A1-01-H12",
+              "part": 3,
+              "order": 12,
+              "type": "single_choice",
+              "audio_script": "Mann: Wann beginnt dein Deutschkurs? Frau: Um halb sieben am Abend. Mann: Also um 18:30? Frau: Genau.",
+              "audio_url": null,
+              "prompt": "Wann beginnt der Kurs?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "17:30"
+                },
+                {
+                  "id": "B",
+                  "text": "18:30"
+                },
+                {
+                  "id": "C",
+                  "text": "19:30"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Halb sieben am Abend bedeutet 18:30 Uhr."
+            },
+            {
+              "id": "A1-01-H13",
+              "part": 3,
+              "order": 13,
+              "type": "single_choice",
+              "audio_script": "Frau: Wir brauchen noch Milch. Mann: Ich gehe gleich zum Supermarkt. Brauchen wir auch Eier? Frau: Nein, Eier haben wir noch.",
+              "audio_url": null,
+              "prompt": "Was soll der Mann kaufen?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Eier"
+                },
+                {
+                  "id": "B",
+                  "text": "Milch"
+                },
+                {
+                  "id": "C",
+                  "text": "Eier und Milch"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Sie brauchen Milch. Eier haben sie schon."
+            },
+            {
+              "id": "A1-01-H14",
+              "part": 3,
+              "order": 14,
+              "type": "single_choice",
+              "audio_script": "Mann: Guten Tag. Ich möchte einen Termin bei Frau Dr. Berger. Frau: Donnerstag um 14 Uhr ist noch frei. Mann: Ja, das passt.",
+              "audio_url": null,
+              "prompt": "Wann ist der Termin?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Dienstag, 14 Uhr"
+                },
+                {
+                  "id": "B",
+                  "text": "Donnerstag, 12 Uhr"
+                },
+                {
+                  "id": "C",
+                  "text": "Donnerstag, 14 Uhr"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Der freie Termin ist Donnerstag um 14 Uhr."
+            },
+            {
+              "id": "A1-01-H15",
+              "part": 3,
+              "order": 15,
+              "type": "single_choice",
+              "audio_script": "Frau: Kommst du mit zum Schwimmen? Mann: Heute leider nicht. Ich muss arbeiten. Am Samstag habe ich Zeit. Frau: Gut, dann Samstag.",
+              "audio_url": null,
+              "prompt": "Wann gehen sie schwimmen?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "heute"
+                },
+                {
+                  "id": "B",
+                  "text": "Freitag"
+                },
+                {
+                  "id": "C",
+                  "text": "Samstag"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Sie vereinbaren Samstag."
+            }
+          ]
+        },
+        {
+          "id": "A1-01-SCHREIBEN",
+          "type": "schreiben",
+          "title": "Schreiben",
+          "max_points": 20,
+          "questions": [
+            {
+              "id": "A1-01-S01",
+              "part": 1,
+              "order": 1,
+              "type": "form_fill",
+              "automatic_grading": true,
+              "points": 10,
+              "instruction": "Sie möchten einen Kurs im Sportzentrum besuchen. Füllen Sie das Formular aus.",
+              "source_data": {
+                "Vorname": "Adam",
+                "Nachname": "El Mansouri",
+                "Geburtsdatum": "12.03.2001",
+                "Adresse": "Rosenstraße 14, 50667 Köln",
+                "Telefonnummer": "0157 45892130"
+              },
+              "fields": [
+                {
+                  "key": "Vorname",
+                  "points": 2
+                },
+                {
+                  "key": "Nachname",
+                  "points": 2
+                },
+                {
+                  "key": "Geburtsdatum",
+                  "points": 2
+                },
+                {
+                  "key": "Adresse",
+                  "points": 2
+                },
+                {
+                  "key": "Telefonnummer",
+                  "points": 2
+                }
+              ]
+            },
+            {
+              "id": "A1-01-S02",
+              "part": 2,
+              "order": 2,
+              "type": "writing",
+              "automatic_grading": false,
+              "points": 10,
+              "instruction": "Sie möchten Ihre Freundin Anna am Samstag besuchen. Schreiben Sie eine kurze Nachricht.",
+              "requirements": [
+                "Sagen Sie, wann Sie kommen.",
+                "Sagen Sie, was Sie mitbringen.",
+                "Fragen Sie nach der Adresse."
+              ],
+              "recommended_words": "30-40",
+              "sample_answer": "Hallo Anna, ich komme am Samstag gegen 15 Uhr. Ich bringe einen Kuchen und Saft mit. Kannst du mir bitte noch deine Adresse schicken? Bis Samstag! Liebe Grüße, Samir",
+              "rubric": {
+                "task_completion": 4,
+                "comprehensibility": 2,
+                "vocabulary": 2,
+                "grammar_and_spelling": 2
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "A1-02",
+      "level": "A1",
+      "title": "Examen blanc A1-02",
+      "subtitle": "Reisen & Termine",
+      "duration_minutes": 65,
+      "total_points": 50,
+      "automatic_points": 40,
+      "manual_points": 10,
+      "sections": [
+        {
+          "id": "A1-02-LESEN",
+          "type": "lesen",
+          "title": "Lesen",
+          "max_points": 15,
+          "questions": [
+            {
+              "id": "A1-02-L01",
+              "part": 1,
+              "order": 1,
+              "type": "true_false",
+              "passage": "Hallo Samir, mein Bus kommt heute erst um 17:30 Uhr. Warte bitte nicht um 17 Uhr auf mich. Bis später! Julia",
+              "prompt": "Julia kommt um 17 Uhr.",
+              "choices": [
+                "Richtig",
+                "Falsch"
+              ],
+              "correct_answer": "Falsch",
+              "points": 1,
+              "explanation": "Julia kommt erst um 17:30 Uhr."
+            },
+            {
+              "id": "A1-02-L02",
+              "part": 1,
+              "order": 2,
+              "type": "true_false",
+              "passage": "Guten Tag Herr Becker, Ihr Termin ist am Dienstag, den 14. Mai, um 9 Uhr. Praxis Hoffmann",
+              "prompt": "Herr Becker hat am Dienstag einen Termin.",
+              "choices": [
+                "Richtig",
+                "Falsch"
+              ],
+              "correct_answer": "Richtig",
+              "points": 1,
+              "explanation": "Der Termin ist am Dienstag."
+            },
+            {
+              "id": "A1-02-L03",
+              "part": 1,
+              "order": 3,
+              "type": "true_false",
+              "passage": "Hallo Mia, unser Zug fährt morgen nicht um 8:10 Uhr, sondern um 8:40 Uhr. Leon",
+              "prompt": "Der Zug fährt um 8:40 Uhr.",
+              "choices": [
+                "Richtig",
+                "Falsch"
+              ],
+              "correct_answer": "Richtig",
+              "points": 1,
+              "explanation": "Im Text steht ausdrücklich 8:40 Uhr."
+            },
+            {
+              "id": "A1-02-L04",
+              "part": 1,
+              "order": 4,
+              "type": "true_false",
+              "passage": "Liebe Gäste, das Frühstück ist von 7 bis 10 Uhr im Restaurant im Erdgeschoss.",
+              "prompt": "Das Frühstück endet um 10 Uhr.",
+              "choices": [
+                "Richtig",
+                "Falsch"
+              ],
+              "correct_answer": "Richtig",
+              "points": 1,
+              "explanation": "Das Frühstück ist bis 10 Uhr."
+            },
+            {
+              "id": "A1-02-L05",
+              "part": 1,
+              "order": 5,
+              "type": "true_false",
+              "passage": "Hallo Tom, ich kann am Montag nicht zum Arzt gehen. Ich habe jetzt einen neuen Termin am Mittwoch. Lara",
+              "prompt": "Lara geht am Montag zum Arzt.",
+              "choices": [
+                "Richtig",
+                "Falsch"
+              ],
+              "correct_answer": "Falsch",
+              "points": 1,
+              "explanation": "Der neue Termin ist am Mittwoch."
+            },
+            {
+              "id": "A1-02-L06",
+              "part": 2,
+              "order": 6,
+              "type": "single_choice",
+              "passage": "Flughafen-Bus. Abfahrt alle 30 Minuten. 06:00-22:00 Uhr.",
+              "prompt": "Ein Bus fährt um 15:00 Uhr. Wann fährt der nächste?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "15:15"
+                },
+                {
+                  "id": "B",
+                  "text": "15:30"
+                },
+                {
+                  "id": "C",
+                  "text": "16:00"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Der Bus fährt alle 30 Minuten."
+            },
+            {
+              "id": "A1-02-L07",
+              "part": 2,
+              "order": 7,
+              "type": "single_choice",
+              "passage": "Hotel Rezeption. 24 Stunden geöffnet.",
+              "prompt": "Was ist richtig?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Die Rezeption ist nur morgens geöffnet."
+                },
+                {
+                  "id": "B",
+                  "text": "Die Rezeption schließt um 24 Uhr."
+                },
+                {
+                  "id": "C",
+                  "text": "Die Rezeption ist Tag und Nacht geöffnet."
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "24 Stunden geöffnet bedeutet Tag und Nacht geöffnet."
+            },
+            {
+              "id": "A1-02-L08",
+              "part": 2,
+              "order": 8,
+              "type": "single_choice",
+              "passage": "Gleis 4. Zug nach Hamburg. Abfahrt 12:45 Uhr.",
+              "prompt": "Wo fährt der Zug ab?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Gleis 2"
+                },
+                {
+                  "id": "B",
+                  "text": "Gleis 4"
+                },
+                {
+                  "id": "C",
+                  "text": "Gleis 12"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Der Zug fährt von Gleis 4."
+            },
+            {
+              "id": "A1-02-L09",
+              "part": 2,
+              "order": 9,
+              "type": "single_choice",
+              "passage": "Heute keine Tickets am Automaten. Bitte Tickets am Schalter kaufen.",
+              "prompt": "Wo kann man heute ein Ticket kaufen?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "am Automaten"
+                },
+                {
+                  "id": "B",
+                  "text": "am Schalter"
+                },
+                {
+                  "id": "C",
+                  "text": "im Zug"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Heute muss man die Tickets am Schalter kaufen."
+            },
+            {
+              "id": "A1-02-L10",
+              "part": 2,
+              "order": 10,
+              "type": "single_choice",
+              "passage": "Check-out bis 11:00 Uhr.",
+              "prompt": "Was müssen Hotelgäste tun?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "vor 8 Uhr frühstücken"
+                },
+                {
+                  "id": "B",
+                  "text": "um 11 Uhr einchecken"
+                },
+                {
+                  "id": "C",
+                  "text": "spätestens um 11 Uhr das Zimmer verlassen"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Check-out bis 11 Uhr bedeutet, dass das Zimmer spätestens um 11 Uhr verlassen werden muss."
+            },
+            {
+              "id": "A1-02-L11",
+              "part": 3,
+              "order": 11,
+              "type": "single_choice",
+              "passage": "Pension Sonnenschein. Einzelzimmer: 55 €. Doppelzimmer: 80 €. Frühstück inklusive.",
+              "prompt": "Was kostet ein Einzelzimmer?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "35 €"
+                },
+                {
+                  "id": "B",
+                  "text": "55 €"
+                },
+                {
+                  "id": "C",
+                  "text": "80 €"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Ein Einzelzimmer kostet 55 €."
+            },
+            {
+              "id": "A1-02-L12",
+              "part": 3,
+              "order": 12,
+              "type": "single_choice",
+              "passage": "Stadtrundfahrt Berlin. Jeden Samstag um 10 Uhr. Dauer: 2 Stunden.",
+              "prompt": "Wann endet die Stadtrundfahrt?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "11 Uhr"
+                },
+                {
+                  "id": "B",
+                  "text": "12 Uhr"
+                },
+                {
+                  "id": "C",
+                  "text": "14 Uhr"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Sie beginnt um 10 Uhr und dauert zwei Stunden."
+            },
+            {
+              "id": "A1-02-L13",
+              "part": 3,
+              "order": 13,
+              "type": "single_choice",
+              "passage": "Taxi Müller. Tag und Nacht erreichbar.",
+              "prompt": "Was bietet Taxi Müller?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "nur Fahrten am Tag"
+                },
+                {
+                  "id": "B",
+                  "text": "nur Fahrten am Wochenende"
+                },
+                {
+                  "id": "C",
+                  "text": "Fahrten zu jeder Tageszeit"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Tag und Nacht bedeutet zu jeder Tageszeit."
+            },
+            {
+              "id": "A1-02-L14",
+              "part": 3,
+              "order": 14,
+              "type": "single_choice",
+              "passage": "Reisebüro Weltweit. Montag-Freitag: 9-18 Uhr. Samstag: 9-13 Uhr. Sonntag: geschlossen.",
+              "prompt": "Wann ist das Reisebüro sonntags geöffnet?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "9-13 Uhr"
+                },
+                {
+                  "id": "B",
+                  "text": "9-18 Uhr"
+                },
+                {
+                  "id": "C",
+                  "text": "gar nicht"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Am Sonntag ist das Reisebüro geschlossen."
+            },
+            {
+              "id": "A1-02-L15",
+              "part": 3,
+              "order": 15,
+              "type": "single_choice",
+              "passage": "Hotel am See. WLAN kostenlos. Parkplatz: 8 € pro Tag.",
+              "prompt": "Was ist kostenlos?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "der Parkplatz"
+                },
+                {
+                  "id": "B",
+                  "text": "das WLAN"
+                },
+                {
+                  "id": "C",
+                  "text": "das Frühstück"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Im Text steht WLAN kostenlos."
+            }
+          ]
+        },
+        {
+          "id": "A1-02-HOEREN",
+          "type": "hoeren",
+          "title": "Hören",
+          "max_points": 15,
+          "questions": [
+            {
+              "id": "A1-02-H01",
+              "part": 1,
+              "order": 1,
+              "type": "single_choice",
+              "audio_script": "Frau: Wann fährt unser Zug? Mann: Um zehn Uhr fünfundzwanzig. Frau: Gut, dann haben wir noch zwanzig Minuten.",
+              "audio_url": null,
+              "prompt": "Wann fährt der Zug?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "10:05"
+                },
+                {
+                  "id": "B",
+                  "text": "10:25"
+                },
+                {
+                  "id": "C",
+                  "text": "10:45"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Der Mann sagt: zehn Uhr fünfundzwanzig."
+            },
+            {
+              "id": "A1-02-H02",
+              "part": 1,
+              "order": 2,
+              "type": "single_choice",
+              "audio_script": "Mann: Entschuldigung, wo ist Gleis sechs? Frau: Dort rechts, neben Gleis fünf.",
+              "audio_url": null,
+              "prompt": "Welches Gleis sucht der Mann?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "5"
+                },
+                {
+                  "id": "B",
+                  "text": "6"
+                },
+                {
+                  "id": "C",
+                  "text": "7"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Der Mann fragt nach Gleis sechs."
+            },
+            {
+              "id": "A1-02-H03",
+              "part": 1,
+              "order": 3,
+              "type": "single_choice",
+              "audio_script": "Frau: Wie lange bleiben Sie in München? Mann: Drei Tage. Von Freitag bis Sonntag.",
+              "audio_url": null,
+              "prompt": "Wie lange bleibt der Mann?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "zwei Tage"
+                },
+                {
+                  "id": "B",
+                  "text": "drei Tage"
+                },
+                {
+                  "id": "C",
+                  "text": "eine Woche"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Der Mann sagt ausdrücklich drei Tage."
+            },
+            {
+              "id": "A1-02-H04",
+              "part": 1,
+              "order": 4,
+              "type": "single_choice",
+              "audio_script": "Mann: Ein Einzelzimmer für zwei Nächte, bitte. Frau: Das kostet 60 Euro pro Nacht.",
+              "audio_url": null,
+              "prompt": "Was möchte der Mann?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "ein Doppelzimmer"
+                },
+                {
+                  "id": "B",
+                  "text": "ein Einzelzimmer"
+                },
+                {
+                  "id": "C",
+                  "text": "eine Wohnung"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Der Mann möchte ein Einzelzimmer."
+            },
+            {
+              "id": "A1-02-H05",
+              "part": 1,
+              "order": 5,
+              "type": "single_choice",
+              "audio_script": "Frau: Treffen wir uns um drei Uhr? Mann: Das ist zu früh. Geht auch halb vier? Frau: Ja, gut.",
+              "audio_url": null,
+              "prompt": "Wann treffen sie sich?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "15:00"
+                },
+                {
+                  "id": "B",
+                  "text": "15:30"
+                },
+                {
+                  "id": "C",
+                  "text": "16:30"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Halb vier bedeutet 15:30 Uhr."
+            },
+            {
+              "id": "A1-02-H06",
+              "part": 2,
+              "order": 6,
+              "type": "single_choice",
+              "audio_script": "Achtung. Der Zug nach Köln fährt heute von Gleis acht statt von Gleis fünf.",
+              "audio_url": null,
+              "prompt": "Wo fährt der Zug ab?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Gleis 5"
+                },
+                {
+                  "id": "B",
+                  "text": "Gleis 8"
+                },
+                {
+                  "id": "C",
+                  "text": "Gleis 13"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Heute fährt der Zug von Gleis acht."
+            },
+            {
+              "id": "A1-02-H07",
+              "part": 2,
+              "order": 7,
+              "type": "single_choice",
+              "audio_script": "Willkommen im Hotel Central. Das Frühstück gibt es morgen von sieben bis halb elf.",
+              "audio_url": null,
+              "prompt": "Bis wann gibt es Frühstück?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "10:00"
+                },
+                {
+                  "id": "B",
+                  "text": "10:30"
+                },
+                {
+                  "id": "C",
+                  "text": "11:00"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Halb elf bedeutet 10:30 Uhr."
+            },
+            {
+              "id": "A1-02-H08",
+              "part": 2,
+              "order": 8,
+              "type": "single_choice",
+              "audio_script": "Hallo Frau Keller. Ihr Termin beim Arzt ist morgen nicht um 14 Uhr. Bitte kommen Sie um 16 Uhr.",
+              "audio_url": null,
+              "prompt": "Wann ist der Termin?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "14 Uhr"
+                },
+                {
+                  "id": "B",
+                  "text": "15 Uhr"
+                },
+                {
+                  "id": "C",
+                  "text": "16 Uhr"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Der neue Termin ist um 16 Uhr."
+            },
+            {
+              "id": "A1-02-H09",
+              "part": 2,
+              "order": 9,
+              "type": "single_choice",
+              "audio_script": "Der Flug nach Paris startet heute 25 Minuten später.",
+              "audio_url": null,
+              "prompt": "Was ist passiert?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Der Flug startet früher."
+                },
+                {
+                  "id": "B",
+                  "text": "Der Flug hat Verspätung."
+                },
+                {
+                  "id": "C",
+                  "text": "Der Flug ist abgesagt."
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "25 Minuten später bedeutet Verspätung."
+            },
+            {
+              "id": "A1-02-H10",
+              "part": 2,
+              "order": 10,
+              "type": "single_choice",
+              "audio_script": "Liebe Fahrgäste, der nächste Bus zum Hauptbahnhof kommt in zehn Minuten.",
+              "audio_url": null,
+              "prompt": "Wann kommt der Bus?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "sofort"
+                },
+                {
+                  "id": "B",
+                  "text": "in fünf Minuten"
+                },
+                {
+                  "id": "C",
+                  "text": "in zehn Minuten"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Die Ansage sagt: in zehn Minuten."
+            },
+            {
+              "id": "A1-02-H11",
+              "part": 3,
+              "order": 11,
+              "type": "single_choice",
+              "audio_script": "Frau: Möchtest du lieber mit dem Zug oder mit dem Bus fahren? Mann: Mit dem Zug. Das geht schneller.",
+              "audio_url": null,
+              "prompt": "Wie möchte der Mann fahren?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "mit dem Bus"
+                },
+                {
+                  "id": "B",
+                  "text": "mit dem Zug"
+                },
+                {
+                  "id": "C",
+                  "text": "mit dem Auto"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Der Mann möchte mit dem Zug fahren."
+            },
+            {
+              "id": "A1-02-H12",
+              "part": 3,
+              "order": 12,
+              "type": "single_choice",
+              "audio_script": "Mann: Hast du das Hotel schon gebucht? Frau: Ja, für Freitag und Samstag. Am Sonntag fahren wir nach Hause.",
+              "audio_url": null,
+              "prompt": "Wann fahren sie nach Hause?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Freitag"
+                },
+                {
+                  "id": "B",
+                  "text": "Samstag"
+                },
+                {
+                  "id": "C",
+                  "text": "Sonntag"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Am Sonntag fahren sie nach Hause."
+            },
+            {
+              "id": "A1-02-H13",
+              "part": 3,
+              "order": 13,
+              "type": "single_choice",
+              "audio_script": "Frau: Entschuldigung, wann öffnet das Museum? Mann: Um zehn Uhr. Heute ist es bis 18 Uhr geöffnet.",
+              "audio_url": null,
+              "prompt": "Wann öffnet das Museum?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "8 Uhr"
+                },
+                {
+                  "id": "B",
+                  "text": "9 Uhr"
+                },
+                {
+                  "id": "C",
+                  "text": "10 Uhr"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Das Museum öffnet um zehn Uhr."
+            },
+            {
+              "id": "A1-02-H14",
+              "part": 3,
+              "order": 14,
+              "type": "single_choice",
+              "audio_script": "Mann: Ich habe morgen um neun Uhr einen Termin. Frau: Beim Zahnarzt? Mann: Nein, beim Augenarzt.",
+              "audio_url": null,
+              "prompt": "Wo hat der Mann einen Termin?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "beim Zahnarzt"
+                },
+                {
+                  "id": "B",
+                  "text": "beim Augenarzt"
+                },
+                {
+                  "id": "C",
+                  "text": "im Krankenhaus"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Der Mann sagt, dass der Termin beim Augenarzt ist."
+            },
+            {
+              "id": "A1-02-H15",
+              "part": 3,
+              "order": 15,
+              "type": "single_choice",
+              "audio_script": "Frau: Wie kommen wir zum Flughafen? Mann: Wir nehmen ein Taxi. Der Bus dauert zu lange.",
+              "audio_url": null,
+              "prompt": "Wie fahren sie zum Flughafen?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "mit dem Bus"
+                },
+                {
+                  "id": "B",
+                  "text": "mit dem Zug"
+                },
+                {
+                  "id": "C",
+                  "text": "mit dem Taxi"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Sie nehmen ein Taxi."
+            }
+          ]
+        },
+        {
+          "id": "A1-02-SCHREIBEN",
+          "type": "schreiben",
+          "title": "Schreiben",
+          "max_points": 20,
+          "questions": [
+            {
+              "id": "A1-02-S01",
+              "part": 1,
+              "order": 1,
+              "type": "form_fill",
+              "automatic_grading": true,
+              "points": 10,
+              "instruction": "Sie sind in einem Hotel in Hamburg. Füllen Sie das Formular aus.",
+              "source_data": {
+                "Vorname": "Sofia",
+                "Nachname": "Benali",
+                "Geburtsdatum": "05.09.2002",
+                "Wohnort": "Casablanca",
+                "Nächte": "3"
+              },
+              "fields": [
+                {
+                  "key": "Vorname",
+                  "points": 2
+                },
+                {
+                  "key": "Nachname",
+                  "points": 2
+                },
+                {
+                  "key": "Geburtsdatum",
+                  "points": 2
+                },
+                {
+                  "key": "Wohnort",
+                  "points": 2
+                },
+                {
+                  "key": "Nächte",
+                  "points": 2
+                }
+              ]
+            },
+            {
+              "id": "A1-02-S02",
+              "part": 2,
+              "order": 2,
+              "type": "writing",
+              "automatic_grading": false,
+              "points": 10,
+              "instruction": "Sie fahren zu Ihrem Freund Daniel. Ihr Zug hat Verspätung. Schreiben Sie Daniel.",
+              "requirements": [
+                "Sagen Sie, warum Sie zu spät kommen.",
+                "Sagen Sie Ihre neue Ankunftszeit.",
+                "Bitten Sie Daniel, auf Sie zu warten."
+              ],
+              "recommended_words": "30-40",
+              "sample_answer": "Hallo Daniel, mein Zug hat leider Verspätung. Ich komme nicht um 18 Uhr, sondern gegen 19 Uhr an. Kannst du bitte am Bahnhof auf mich warten? Bis später! Amir",
+              "rubric": {
+                "task_completion": 4,
+                "comprehensibility": 2,
+                "vocabulary": 2,
+                "grammar_and_spelling": 2
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "A1-03",
+      "level": "A1",
+      "title": "Examen blanc A1-03",
+      "subtitle": "Wohnen & Freizeit",
+      "duration_minutes": 65,
+      "total_points": 50,
+      "automatic_points": 40,
+      "manual_points": 10,
+      "sections": [
+        {
+          "id": "A1-03-LESEN",
+          "type": "lesen",
+          "title": "Lesen",
+          "max_points": 15,
+          "questions": [
+            {
+              "id": "A1-03-L01",
+              "part": 1,
+              "order": 1,
+              "type": "true_false",
+              "passage": "Hallo Emma, ich ziehe am Samstag in meine neue Wohnung. Kannst du mir am Nachmittag helfen? Lena",
+              "prompt": "Lena braucht am Samstag Hilfe.",
+              "choices": [
+                "Richtig",
+                "Falsch"
+              ],
+              "correct_answer": "Richtig",
+              "points": 1,
+              "explanation": "Lena fragt Emma, ob sie ihr am Samstag helfen kann."
+            },
+            {
+              "id": "A1-03-L02",
+              "part": 1,
+              "order": 2,
+              "type": "true_false",
+              "passage": "Lieber Ben, heute kann ich nicht Fußball spielen. Ich muss bis 19 Uhr arbeiten. Max",
+              "prompt": "Max spielt heute Fußball.",
+              "choices": [
+                "Richtig",
+                "Falsch"
+              ],
+              "correct_answer": "Falsch",
+              "points": 1,
+              "explanation": "Max kann heute nicht Fußball spielen, weil er arbeitet."
+            },
+            {
+              "id": "A1-03-L03",
+              "part": 1,
+              "order": 3,
+              "type": "true_false",
+              "passage": "Hallo Marie, der Film beginnt um 20 Uhr. Treffen wir uns um 19:30 Uhr vor dem Kino? Anna",
+              "prompt": "Der Film beginnt um 19:30 Uhr.",
+              "choices": [
+                "Richtig",
+                "Falsch"
+              ],
+              "correct_answer": "Falsch",
+              "points": 1,
+              "explanation": "Sie treffen sich um 19:30 Uhr, aber der Film beginnt um 20 Uhr."
+            },
+            {
+              "id": "A1-03-L04",
+              "part": 1,
+              "order": 4,
+              "type": "true_false",
+              "passage": "Guten Tag Frau Klein, der Techniker kommt morgen zwischen 9 und 11 Uhr wegen Ihrer Heizung.",
+              "prompt": "Der Techniker kommt wegen eines Problems mit der Heizung.",
+              "choices": [
+                "Richtig",
+                "Falsch"
+              ],
+              "correct_answer": "Richtig",
+              "points": 1,
+              "explanation": "Der Techniker kommt wegen der Heizung."
+            },
+            {
+              "id": "A1-03-L05",
+              "part": 1,
+              "order": 5,
+              "type": "true_false",
+              "passage": "Hi David, am Sonntag machen wir ein Picknick im Stadtpark. Bring bitte etwas zu trinken mit.",
+              "prompt": "David soll Getränke mitbringen.",
+              "choices": [
+                "Richtig",
+                "Falsch"
+              ],
+              "correct_answer": "Richtig",
+              "points": 1,
+              "explanation": "David soll etwas zu trinken mitbringen."
+            },
+            {
+              "id": "A1-03-L06",
+              "part": 2,
+              "order": 6,
+              "type": "single_choice",
+              "passage": "Schwimmbad. Montag geschlossen.",
+              "prompt": "Wann kann man nicht schwimmen?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Sonntag"
+                },
+                {
+                  "id": "B",
+                  "text": "Montag"
+                },
+                {
+                  "id": "C",
+                  "text": "Dienstag"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Das Schwimmbad ist am Montag geschlossen."
+            },
+            {
+              "id": "A1-03-L07",
+              "part": 2,
+              "order": 7,
+              "type": "single_choice",
+              "passage": "Bitte Fahrräder hier abstellen.",
+              "prompt": "Was soll man hier machen?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Autos parken"
+                },
+                {
+                  "id": "B",
+                  "text": "Fahrräder abstellen"
+                },
+                {
+                  "id": "C",
+                  "text": "Fahrräder verkaufen"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Hier sollen Fahrräder abgestellt werden."
+            },
+            {
+              "id": "A1-03-L08",
+              "part": 2,
+              "order": 8,
+              "type": "single_choice",
+              "passage": "Ruhe bitte ab 22 Uhr.",
+              "prompt": "Was bedeutet das?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Nach 22 Uhr Musik machen."
+                },
+                {
+                  "id": "B",
+                  "text": "Um 22 Uhr das Haus verlassen."
+                },
+                {
+                  "id": "C",
+                  "text": "Nach 22 Uhr leise sein."
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Ab 22 Uhr soll man leise sein."
+            },
+            {
+              "id": "A1-03-L09",
+              "part": 2,
+              "order": 9,
+              "type": "single_choice",
+              "passage": "Fitnessstudio. Neue Öffnungszeiten: Mo-Fr 07:00-22:00. Sa-So 09:00-18:00.",
+              "prompt": "Wann öffnet das Fitnessstudio sonntags?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "7 Uhr"
+                },
+                {
+                  "id": "B",
+                  "text": "8 Uhr"
+                },
+                {
+                  "id": "C",
+                  "text": "9 Uhr"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Am Wochenende öffnet das Fitnessstudio um 9 Uhr."
+            },
+            {
+              "id": "A1-03-L10",
+              "part": 2,
+              "order": 10,
+              "type": "single_choice",
+              "passage": "Kino 3 - Filmstart 18:45",
+              "prompt": "Wann beginnt der Film?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "18:15"
+                },
+                {
+                  "id": "B",
+                  "text": "18:45"
+                },
+                {
+                  "id": "C",
+                  "text": "19:45"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Der Film startet um 18:45 Uhr."
+            },
+            {
+              "id": "A1-03-L11",
+              "part": 3,
+              "order": 11,
+              "type": "single_choice",
+              "passage": "Wohnung zu vermieten. 2 Zimmer, Küche, Bad. 650 € monatlich. Nähe Stadtzentrum.",
+              "prompt": "Wie viele Zimmer hat die Wohnung?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "1"
+                },
+                {
+                  "id": "B",
+                  "text": "2"
+                },
+                {
+                  "id": "C",
+                  "text": "3"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Die Wohnung hat zwei Zimmer."
+            },
+            {
+              "id": "A1-03-L12",
+              "part": 3,
+              "order": 12,
+              "type": "single_choice",
+              "passage": "Tennisclub Nord. Training mittwochs um 18 Uhr. Anfänger willkommen.",
+              "prompt": "Wann ist das Training?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Montag"
+                },
+                {
+                  "id": "B",
+                  "text": "Mittwoch"
+                },
+                {
+                  "id": "C",
+                  "text": "Freitag"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Das Training ist mittwochs."
+            },
+            {
+              "id": "A1-03-L13",
+              "part": 3,
+              "order": 13,
+              "type": "single_choice",
+              "passage": "Konzert im Stadtpark. Samstag, 20 Uhr. Eintritt frei.",
+              "prompt": "Was kostet der Eintritt?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "5 €"
+                },
+                {
+                  "id": "B",
+                  "text": "20 €"
+                },
+                {
+                  "id": "C",
+                  "text": "nichts"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Eintritt frei bedeutet kostenlos."
+            },
+            {
+              "id": "A1-03-L14",
+              "part": 3,
+              "order": 14,
+              "type": "single_choice",
+              "passage": "Stadtbibliothek. Bücher, Zeitschriften und kostenloses WLAN.",
+              "prompt": "Was kann man kostenlos benutzen?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "das Café"
+                },
+                {
+                  "id": "B",
+                  "text": "das WLAN"
+                },
+                {
+                  "id": "C",
+                  "text": "den Parkplatz"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Das WLAN ist kostenlos."
+            },
+            {
+              "id": "A1-03-L15",
+              "part": 3,
+              "order": 15,
+              "type": "single_choice",
+              "passage": "Pizza Bella. Lieferung täglich von 17 bis 23 Uhr.",
+              "prompt": "Wann kann man Pizza bestellen?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "12 Uhr"
+                },
+                {
+                  "id": "B",
+                  "text": "20 Uhr"
+                },
+                {
+                  "id": "C",
+                  "text": "Mitternacht"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "20 Uhr liegt zwischen 17 und 23 Uhr."
+            }
+          ]
+        },
+        {
+          "id": "A1-03-HOEREN",
+          "type": "hoeren",
+          "title": "Hören",
+          "max_points": 15,
+          "questions": [
+            {
+              "id": "A1-03-H01",
+              "part": 1,
+              "order": 1,
+              "type": "single_choice",
+              "audio_script": "Frau: Wie groß ist deine Wohnung? Mann: Sie hat drei Zimmer.",
+              "audio_url": null,
+              "prompt": "Wie viele Zimmer hat die Wohnung?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "zwei"
+                },
+                {
+                  "id": "B",
+                  "text": "drei"
+                },
+                {
+                  "id": "C",
+                  "text": "vier"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Die Wohnung hat drei Zimmer."
+            },
+            {
+              "id": "A1-03-H02",
+              "part": 1,
+              "order": 2,
+              "type": "single_choice",
+              "audio_script": "Mann: Gehst du heute laufen? Frau: Nein, heute gehe ich schwimmen.",
+              "audio_url": null,
+              "prompt": "Was macht die Frau?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "laufen"
+                },
+                {
+                  "id": "B",
+                  "text": "schwimmen"
+                },
+                {
+                  "id": "C",
+                  "text": "Tennis spielen"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Die Frau sagt, dass sie schwimmen geht."
+            },
+            {
+              "id": "A1-03-H03",
+              "part": 1,
+              "order": 3,
+              "type": "single_choice",
+              "audio_script": "Frau: Wann beginnt das Konzert? Mann: Um acht Uhr abends.",
+              "audio_url": null,
+              "prompt": "Wann beginnt das Konzert?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "18 Uhr"
+                },
+                {
+                  "id": "B",
+                  "text": "20 Uhr"
+                },
+                {
+                  "id": "C",
+                  "text": "22 Uhr"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Acht Uhr abends bedeutet 20 Uhr."
+            },
+            {
+              "id": "A1-03-H04",
+              "part": 1,
+              "order": 4,
+              "type": "single_choice",
+              "audio_script": "Mann: Was machen wir Samstag? Frau: Das Wetter ist schön. Wir können im Park picknicken.",
+              "audio_url": null,
+              "prompt": "Was möchten sie machen?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "ins Kino gehen"
+                },
+                {
+                  "id": "B",
+                  "text": "picknicken"
+                },
+                {
+                  "id": "C",
+                  "text": "arbeiten"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Sie möchten im Park picknicken."
+            },
+            {
+              "id": "A1-03-H05",
+              "part": 1,
+              "order": 5,
+              "type": "single_choice",
+              "audio_script": "Frau: Ist deine Wohnung weit vom Bahnhof? Mann: Nein, nur fünf Minuten zu Fuß.",
+              "audio_url": null,
+              "prompt": "Wie kommt man schnell zum Bahnhof?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "zu Fuß"
+                },
+                {
+                  "id": "B",
+                  "text": "mit dem Flugzeug"
+                },
+                {
+                  "id": "C",
+                  "text": "mit dem Zug"
+                }
+              ],
+              "correct_answer": "A",
+              "points": 1,
+              "explanation": "Der Bahnhof ist nur fünf Minuten zu Fuß entfernt."
+            },
+            {
+              "id": "A1-03-H06",
+              "part": 2,
+              "order": 6,
+              "type": "single_choice",
+              "audio_script": "Liebe Besucher, das Schwimmbad schließt heute bereits um 17 Uhr.",
+              "audio_url": null,
+              "prompt": "Wann schließt das Schwimmbad?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "16 Uhr"
+                },
+                {
+                  "id": "B",
+                  "text": "17 Uhr"
+                },
+                {
+                  "id": "C",
+                  "text": "18 Uhr"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Das Schwimmbad schließt um 17 Uhr."
+            },
+            {
+              "id": "A1-03-H07",
+              "part": 2,
+              "order": 7,
+              "type": "single_choice",
+              "audio_script": "Heute Abend beginnt der Film im Kino Saal zwei um 19:30 Uhr.",
+              "audio_url": null,
+              "prompt": "Wo läuft der Film?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Saal 1"
+                },
+                {
+                  "id": "B",
+                  "text": "Saal 2"
+                },
+                {
+                  "id": "C",
+                  "text": "Saal 3"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Der Film läuft in Saal zwei."
+            },
+            {
+              "id": "A1-03-H08",
+              "part": 2,
+              "order": 8,
+              "type": "single_choice",
+              "audio_script": "Hallo Herr Braun. Morgen kommt unser Techniker zwischen 10 und 12 Uhr zu Ihnen.",
+              "audio_url": null,
+              "prompt": "Wann kommt der Techniker?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "morgens zwischen 8 und 9"
+                },
+                {
+                  "id": "B",
+                  "text": "zwischen 10 und 12 Uhr"
+                },
+                {
+                  "id": "C",
+                  "text": "abends"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Der Techniker kommt zwischen 10 und 12 Uhr."
+            },
+            {
+              "id": "A1-03-H09",
+              "part": 2,
+              "order": 9,
+              "type": "single_choice",
+              "audio_script": "Das Fitnessstudio ist heute wegen eines Feiertags geschlossen.",
+              "audio_url": null,
+              "prompt": "Was ist richtig?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Das Studio öffnet später."
+                },
+                {
+                  "id": "B",
+                  "text": "Das Studio ist heute geschlossen."
+                },
+                {
+                  "id": "C",
+                  "text": "Das Studio ist nur morgens geöffnet."
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Das Fitnessstudio bleibt heute geschlossen."
+            },
+            {
+              "id": "A1-03-H10",
+              "part": 2,
+              "order": 10,
+              "type": "single_choice",
+              "audio_script": "Am Samstag findet das Straßenfest nicht im Stadtpark, sondern auf dem Marktplatz statt.",
+              "audio_url": null,
+              "prompt": "Wo ist das Fest?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "im Stadtpark"
+                },
+                {
+                  "id": "B",
+                  "text": "auf dem Marktplatz"
+                },
+                {
+                  "id": "C",
+                  "text": "am Bahnhof"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Das Fest findet auf dem Marktplatz statt."
+            },
+            {
+              "id": "A1-03-H11",
+              "part": 3,
+              "order": 11,
+              "type": "single_choice",
+              "audio_script": "Frau: Möchtest du heute Abend fernsehen? Mann: Nein, ich möchte lieber ein Buch lesen.",
+              "audio_url": null,
+              "prompt": "Was möchte der Mann machen?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "fernsehen"
+                },
+                {
+                  "id": "B",
+                  "text": "lesen"
+                },
+                {
+                  "id": "C",
+                  "text": "schlafen"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Der Mann möchte lieber ein Buch lesen."
+            },
+            {
+              "id": "A1-03-H12",
+              "part": 3,
+              "order": 12,
+              "type": "single_choice",
+              "audio_script": "Mann: Wie viel kostet deine Miete? Frau: 700 Euro im Monat, inklusive Wasser.",
+              "audio_url": null,
+              "prompt": "Wie hoch ist die Miete?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "600 €"
+                },
+                {
+                  "id": "B",
+                  "text": "700 €"
+                },
+                {
+                  "id": "C",
+                  "text": "800 €"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Die Miete beträgt 700 Euro im Monat."
+            },
+            {
+              "id": "A1-03-H13",
+              "part": 3,
+              "order": 13,
+              "type": "single_choice",
+              "audio_script": "Frau: Sollen wir am Sonntag Fahrrad fahren? Mann: Ja, aber am Vormittag. Am Nachmittag besuche ich meine Eltern.",
+              "audio_url": null,
+              "prompt": "Wann fahren sie Fahrrad?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Samstagabend"
+                },
+                {
+                  "id": "B",
+                  "text": "Sonntagvormittag"
+                },
+                {
+                  "id": "C",
+                  "text": "Sonntagnachmittag"
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Sie fahren am Sonntagvormittag Fahrrad."
+            },
+            {
+              "id": "A1-03-H14",
+              "part": 3,
+              "order": 14,
+              "type": "single_choice",
+              "audio_script": "Mann: Wo ist mein Schlüssel? Frau: Er liegt auf dem Tisch in der Küche.",
+              "audio_url": null,
+              "prompt": "Wo ist der Schlüssel?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "im Schlafzimmer"
+                },
+                {
+                  "id": "B",
+                  "text": "im Auto"
+                },
+                {
+                  "id": "C",
+                  "text": "in der Küche"
+                }
+              ],
+              "correct_answer": "C",
+              "points": 1,
+              "explanation": "Der Schlüssel liegt auf dem Tisch in der Küche."
+            },
+            {
+              "id": "A1-03-H15",
+              "part": 3,
+              "order": 15,
+              "type": "single_choice",
+              "audio_script": "Frau: Kommst du heute zum Sport? Mann: Nein, ich habe Kopfschmerzen. Ich bleibe zu Hause.",
+              "audio_url": null,
+              "prompt": "Warum kommt der Mann nicht?",
+              "choices": [
+                {
+                  "id": "A",
+                  "text": "Er arbeitet."
+                },
+                {
+                  "id": "B",
+                  "text": "Er hat Kopfschmerzen."
+                },
+                {
+                  "id": "C",
+                  "text": "Er reist."
+                }
+              ],
+              "correct_answer": "B",
+              "points": 1,
+              "explanation": "Der Mann bleibt wegen Kopfschmerzen zu Hause."
+            }
+          ]
+        },
+        {
+          "id": "A1-03-SCHREIBEN",
+          "type": "schreiben",
+          "title": "Schreiben",
+          "max_points": 20,
+          "questions": [
+            {
+              "id": "A1-03-S01",
+              "part": 1,
+              "order": 1,
+              "type": "form_fill",
+              "automatic_grading": true,
+              "points": 10,
+              "instruction": "Sie möchten Mitglied in einem Sportverein werden. Füllen Sie das Formular aus.",
+              "source_data": {
+                "Vorname": "Lina",
+                "Nachname": "Haddad",
+                "Geburtsdatum": "21.06.2000",
+                "Sport": "Schwimmen",
+                "Telefonnummer": "0162 3378451"
+              },
+              "fields": [
+                {
+                  "key": "Vorname",
+                  "points": 2
+                },
+                {
+                  "key": "Nachname",
+                  "points": 2
+                },
+                {
+                  "key": "Geburtsdatum",
+                  "points": 2
+                },
+                {
+                  "key": "Sport",
+                  "points": 2
+                },
+                {
+                  "key": "Telefonnummer",
+                  "points": 2
+                }
+              ]
+            },
+            {
+              "id": "A1-03-S02",
+              "part": 2,
+              "order": 2,
+              "type": "writing",
+              "automatic_grading": false,
+              "points": 10,
+              "instruction": "Sie machen am Sonntag ein Picknick im Park. Schreiben Sie Ihrem Freund Lukas.",
+              "requirements": [
+                "Laden Sie Lukas ein.",
+                "Sagen Sie die Uhrzeit.",
+                "Sagen Sie, wo Sie sich treffen."
+              ],
+              "recommended_words": "30-40",
+              "sample_answer": "Hallo Lukas, wir machen am Sonntag ein Picknick im Stadtpark. Hast du Zeit? Wir treffen uns um 13 Uhr vor dem Eingang vom Park. Kommst du auch? Liebe Grüße, Sara",
+              "rubric": {
+                "task_completion": 4,
+                "comprehensibility": 2,
+                "vocabulary": 2,
+                "grammar_and_spelling": 2
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

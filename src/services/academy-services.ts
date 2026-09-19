@@ -706,6 +706,10 @@ export const ExamService = {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseExamService.gradeWritingAnswer(input);
   },
+  async getAttemptReview(attemptId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.getAttemptReview(attemptId);
+  },
   async listAttemptsForExam(examId: string) {
     if (!isSupabaseConfigured) return [];
     return SupabaseExamService.listAttemptsForExam(examId);
