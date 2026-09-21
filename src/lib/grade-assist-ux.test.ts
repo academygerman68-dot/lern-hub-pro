@@ -5,6 +5,7 @@ import {
   GRADE_ASSIST_UNCONFIGURED_MESSAGE,
   gradeAssistCriteriaLabel,
   gradeAssistNeedsExploitableText,
+  mapGradeAssistErrorCode,
 } from "./grade-assist-ux";
 
 describe("grade-assist UX helpers", () => {
@@ -12,6 +13,15 @@ describe("grade-assist UX helpers", () => {
     expect(GRADE_ASSIST_UNCONFIGURED_MESSAGE).toBe(
       "Le service de correction IA n'est pas encore configuré.",
     );
+  });
+
+  it("does not map generic Edge Function failures to unconfigured", () => {
+    expect(mapGradeAssistErrorCode("GEMINI_AUTH_ERROR")).not.toBe(GRADE_ASSIST_UNCONFIGURED_MESSAGE);
+    expect(mapGradeAssistErrorCode("GEMINI_MODEL_ERROR")).not.toBe(GRADE_ASSIST_UNCONFIGURED_MESSAGE);
+    expect(mapGradeAssistErrorCode("GEMINI_PROVIDER_ERROR")).not.toBe(
+      GRADE_ASSIST_UNCONFIGURED_MESSAGE,
+    );
+    expect(mapGradeAssistErrorCode("GEMINI_NOT_CONFIGURED")).toBe(GRADE_ASSIST_UNCONFIGURED_MESSAGE);
   });
 
   it("requires exploitable text when only a file is present", () => {

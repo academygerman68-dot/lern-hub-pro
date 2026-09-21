@@ -11,6 +11,13 @@ const cors = {
 };
 const jsonHeaders = { ...cors, "Cache-Control": "no-store", "Content-Type": "application/json" };
 
+/** Prefer current Flash model; fallback if provider returns 404/503 for the primary. */
+const GEMINI_MODELS = [
+  "gemini-3.6-flash",
+  "gemini-flash-latest",
+  "gemini-2.5-flash",
+] as const;
+
 function respond(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
 }
@@ -22,6 +29,66 @@ function asString(value: unknown): string {
 function asNumber(value: unknown, fallback: number): number {
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function logGeminiDiag(payload: Record<string, unknown>) {
+  // Never log API keys, Authorization headers, or full student PII dumps.
+  console.log(JSON.stringify({ scope: "gemini-grade-assist", ...payload }));
+}
+
+function classifyGeminiHttp(status: number, providerMessage: string): {
+  code: string;
+  http: number;
+} {
+  if (status === 401 || status === 403) {
+    return { code: "GEMINI_AUTH_ERROR", http: 502 };
+  }
+  if (status === 429) {
+    return { code: "GEMINI_RATE_LIMIT", http: 429 };
+  }
+  if (status === 404) {
+    return { code: "GEMINI_MODEL_ERROR", http: 502 };
+  }
+  if (status >= 500) {
+    return { code: "GEMINI_PROVIDER_ERROR", http: 502 };
+  }
+  if (/quota|rate.?limit|resource.?exhausted/i.test(providerMessage)) {
+    return { code: "GEMINI_RATE_LIMIT", http: 429 };
+  }
+  if (/API.?key|permission|unauth|invalid.?key/i.test(providerMessage)) {
+    return { code: "GEMINI_AUTH_ERROR", http: 502 };
+  }
+  if (/model|not.?found/i.test(providerMessage)) {
+    return { code: "GEMINI_MODEL_ERROR", http: 502 };
+  }
+  return { code: "GEMINI_PROVIDER_ERROR", http: 502 };
+}
+
+function extractProviderMessage(raw: unknown): string {
+  if (!raw || typeof raw !== "object") return "";
+  const err = (raw as { error?: { message?: string; status?: string } }).error;
+  if (err?.message) return String(err.message).slice(0, 240);
+  if (err?.status) return String(err.status).slice(0, 80);
+  return "";
+}
+
+function parseModelJson(text: string): Record<string, unknown> | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  try {
+    return JSON.parse(trimmed) as Record<string, unknown>;
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(trimmed.slice(start, end + 1)) as Record<string, unknown>;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
 }
 
 Deno.serve(async (req) => {
@@ -64,13 +131,13 @@ Deno.serve(async (req) => {
   const targetId = asString(body.targetId ?? body.target_id);
   const studentId = asString(body.studentId ?? body.student_id) || null;
 
-  const geminiKey = Deno.env.get("GEMINI_API_KEY")?.trim();
-  if (!geminiKey) {
-    // Do not invent a fake correction — UI shows a clear unconfigured message.
-    return respond(200, {
-      unconfigured: true,
-      error: "NOT_CONFIGURED",
-      mock: true,
+  const geminiKey = Deno.env.get("GEMINI_API_KEY")?.trim() ?? "";
+  const secretPresent = geminiKey.length > 0;
+  if (!secretPresent) {
+    logGeminiDiag({ event: "secret_missing", code: "GEMINI_NOT_CONFIGURED" });
+    return respond(503, {
+      error: "GEMINI_NOT_CONFIGURED",
+      secret_present: false,
     });
   }
 
@@ -98,66 +165,156 @@ Deno.serve(async (req) => {
     "Propose une note et un feedback en français. Ne publie jamais la note automatiquement.",
     `Niveau CECR: ${level || "non précisé"}`,
     `Matière / type: ${subject || targetKind}`,
-    `Note maximale: ${maxScore}`,
+    `Note maximale (max_score): ${maxScore}`,
     rubric ? `Barème / critères: ${rubric}` : "",
     instructions ? `Consigne: ${instructions}` : "",
     responseText ? `Réponse de l'étudiant: ${responseText}` : "Réponse vide.",
     "",
-    "Réponds UNIQUEMENT en JSON valide avec les clés:",
-    "suggested_score (number),",
-    "criteria_scores (object with keys task_completion, comprehensibility, vocabulary, grammar_and_spelling),",
-    "strengths (string[]), improvements (string[]), feedback (string).",
-    "Adapte ton exigence au niveau CECR indiqué.",
+    "Réponds UNIQUEMENT en JSON valide avec exactement ces clés:",
+    '{',
+    '  "suggested_score": number,',
+    '  "max_score": number,',
+    '  "criteria": [',
+    '    {"id":"task_completion","label":"Respect de la consigne","score":number,"max":number},',
+    '    {"id":"comprehensibility","label":"Compréhensibilité","score":number,"max":number},',
+    '    {"id":"vocabulary","label":"Vocabulaire","score":number,"max":number},',
+    '    {"id":"grammar_and_spelling","label":"Grammaire / orthographe","score":number,"max":number}',
+    "  ],",
+    '  "strengths": string[],',
+    '  "improvements": string[],',
+    '  "feedback": string',
+    "}",
+    "Adapte ton exigence au niveau CECR indiqué. suggested_score doit être entre 0 et max_score.",
   ]
     .filter(Boolean)
     .join("\n");
 
   try {
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(geminiKey)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.2, responseMimeType: "application/json" },
-        }),
-      },
-    );
+    let lastStatus = 0;
+    let lastProviderMessage = "";
+    let usedModel = GEMINI_MODELS[0];
+    let text = "";
 
-    if (!geminiRes.ok) {
-      return respond(502, { error: "MODEL_UNAVAILABLE" });
+    for (const model of GEMINI_MODELS) {
+      usedModel = model;
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": geminiKey,
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.2,
+              responseMimeType: "application/json",
+            },
+          }),
+        },
+      );
+
+      lastStatus = geminiRes.status;
+      const geminiJson = await geminiRes.json().catch(() => ({}));
+      lastProviderMessage = extractProviderMessage(geminiJson);
+
+      if (!geminiRes.ok) {
+        logGeminiDiag({
+          event: "provider_http_error",
+          model,
+          http_status: geminiRes.status,
+          provider_message: lastProviderMessage || null,
+        });
+        // Try fallback model on not-found or temporary overload.
+        if (geminiRes.status === 404 || geminiRes.status === 503) continue;
+        const classified = classifyGeminiHttp(geminiRes.status, lastProviderMessage);
+        return respond(classified.http, {
+          error: classified.code,
+          secret_present: true,
+          provider_status: geminiRes.status,
+          provider_message: lastProviderMessage || undefined,
+        });
+      }
+
+      text =
+        geminiJson?.candidates?.[0]?.content?.parts
+          ?.map((p: { text?: string }) => p.text ?? "")
+          .join("") ?? "";
+      break;
     }
 
-    const geminiJson = await geminiRes.json();
-    const text =
-      geminiJson?.candidates?.[0]?.content?.parts
-        ?.map((p: { text?: string }) => p.text ?? "")
-        .join("") ?? "";
-    let parsed: Record<string, unknown> = {};
-    try {
-      parsed = JSON.parse(text) as Record<string, unknown>;
-    } catch {
-      return respond(502, { error: "MODEL_PARSE_ERROR" });
+    if (!text && (lastStatus === 404 || lastStatus === 503)) {
+      const classified = classifyGeminiHttp(lastStatus, lastProviderMessage);
+      return respond(classified.http, {
+        error: classified.code,
+        secret_present: true,
+        provider_status: lastStatus,
+        provider_message: lastProviderMessage || undefined,
+      });
+    }
+
+    const parsed = parseModelJson(text);
+    if (!parsed) {
+      logGeminiDiag({
+        event: "invalid_response",
+        code: "GEMINI_INVALID_RESPONSE",
+        model: usedModel,
+        http_status: lastStatus || 200,
+      });
+      return respond(502, {
+        error: "GEMINI_INVALID_RESPONSE",
+        secret_present: true,
+        provider_status: lastStatus || 200,
+      });
     }
 
     const suggested = Math.min(
       maxScore,
-      Math.max(0, asNumber(parsed.suggested_score, maxScore * 0.7)),
+      Math.max(0, asNumber(parsed.suggested_score, Number.NaN)),
     );
-    const criteria =
+    if (!Number.isFinite(suggested)) {
+      return respond(502, {
+        error: "GEMINI_INVALID_RESPONSE",
+        secret_present: true,
+      });
+    }
+
+    const criteriaScores: Record<string, number> = {};
+    if (Array.isArray(parsed.criteria)) {
+      for (const row of parsed.criteria) {
+        if (!row || typeof row !== "object") continue;
+        const id = asString((row as { id?: unknown }).id);
+        const score = asNumber((row as { score?: unknown }).score, Number.NaN);
+        if (id && Number.isFinite(score)) criteriaScores[id] = score;
+      }
+    } else if (
       parsed.criteria_scores &&
       typeof parsed.criteria_scores === "object" &&
       !Array.isArray(parsed.criteria_scores)
-        ? (parsed.criteria_scores as Record<string, number>)
-        : {};
-    const strengths = Array.isArray(parsed.strengths) ? parsed.strengths.map((s) => String(s)) : [];
-    const improvements = Array.isArray(parsed.improvements)
-      ? parsed.improvements.map((s) => String(s))
-      : [];
-    const feedback = asString(parsed.feedback) || "Suggestion à valider avant enregistrement.";
+    ) {
+      for (const [key, value] of Object.entries(
+        parsed.criteria_scores as Record<string, unknown>,
+      )) {
+        const score = asNumber(value, Number.NaN);
+        if (Number.isFinite(score)) criteriaScores[key] = score;
+      }
+    }
 
-    // Optional audit trail (ignore failures).
+    const strengths = Array.isArray(parsed.strengths)
+      ? parsed.strengths.map((s) => String(s)).filter(Boolean)
+      : [];
+    const improvements = Array.isArray(parsed.improvements)
+      ? parsed.improvements.map((s) => String(s)).filter(Boolean)
+      : [];
+    const feedback = asString(parsed.feedback);
+    if (!feedback) {
+      return respond(502, {
+        error: "GEMINI_INVALID_RESPONSE",
+        secret_present: true,
+      });
+    }
+
     if (targetId) {
       void caller.from("ai_grade_suggestions").insert({
         target_kind: targetKind === "exam_writing" ? "exam_writing" : "assignment",
@@ -165,28 +322,49 @@ Deno.serve(async (req) => {
         student_id: studentId,
         requested_by: userData.user.id,
         level_code: level || null,
-        prompt_meta: { subject, maxScore },
+        prompt_meta: { subject, maxScore, model: usedModel },
         suggestion: {
           suggested_score: suggested,
-          criteria_scores: criteria,
+          max_score: maxScore,
+          criteria_scores: criteriaScores,
           strengths,
           improvements,
           feedback,
         },
-        model: "gemini-2.0-flash",
+        model: usedModel,
         status: "proposed",
       });
     }
 
+    logGeminiDiag({
+      event: "success",
+      model: usedModel,
+      http_status: 200,
+      suggested_score: suggested,
+      max_score: maxScore,
+    });
+
     return respond(200, {
       suggested_score: suggested,
-      criteria_scores: criteria,
+      max_score: maxScore,
+      criteria_scores: criteriaScores,
+      criteria: Array.isArray(parsed.criteria) ? parsed.criteria : undefined,
       strengths,
       improvements,
       feedback,
-      mock: false,
+      model: usedModel,
+      secret_present: true,
     });
-  } catch {
-    return respond(502, { error: "MODEL_UNAVAILABLE" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message.slice(0, 160) : "unknown";
+    logGeminiDiag({
+      event: "provider_exception",
+      code: "GEMINI_PROVIDER_ERROR",
+      message,
+    });
+    return respond(502, {
+      error: "GEMINI_PROVIDER_ERROR",
+      secret_present: true,
+    });
   }
 });

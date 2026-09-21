@@ -22,6 +22,38 @@ export function gradeAssistCriteriaLabel(key: string): string {
   return CRITERIA_LABELS[key] ?? key.replace(/_/g, " ");
 }
 
+/** Map Edge Function error codes to user-facing French messages. */
+export function mapGradeAssistErrorCode(
+  code: string | null | undefined,
+  providerMessage?: string | null,
+): string {
+  switch (code) {
+    case "GEMINI_NOT_CONFIGURED":
+    case "NOT_CONFIGURED":
+      return GRADE_ASSIST_UNCONFIGURED_MESSAGE;
+    case "GEMINI_AUTH_ERROR":
+      return "La clé du service de correction IA est refusée. Vérifiez la configuration côté serveur.";
+    case "GEMINI_MODEL_ERROR":
+      return "Le modèle de correction IA est indisponible ou invalide.";
+    case "GEMINI_RATE_LIMIT":
+      return "Le service de correction IA est temporairement saturé. Réessayez dans un instant.";
+    case "GEMINI_INVALID_RESPONSE":
+      return "La réponse du service de correction IA est invalide. Réessayez.";
+    case "GEMINI_PROVIDER_ERROR":
+    case "MODEL_UNAVAILABLE":
+      return "Le fournisseur de correction IA est temporairement indisponible.";
+    case "FORBIDDEN":
+      return "Vous n’avez pas l’autorisation d’utiliser la pré-correction IA.";
+    case "UNAUTHORIZED":
+      return "Session expirée — reconnectez-vous pour utiliser la pré-correction IA.";
+    default:
+      if (providerMessage?.trim()) {
+        return `Correction IA indisponible (${providerMessage.trim().slice(0, 120)}).`;
+      }
+      return "La pré-correction IA est temporairement indisponible.";
+  }
+}
+
 /** True when only a file exists and there is no student text for the model. */
 export function gradeAssistNeedsExploitableText(
   responseText: string | null | undefined,
