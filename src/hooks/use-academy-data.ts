@@ -1022,6 +1022,31 @@ export function useSubscriptions() {
   });
 }
 
+export function useMySubscription(studentId?: string) {
+  return useQuery({
+    queryKey: studentId
+      ? ([...queryKeys.subscriptions.all, "student", studentId] as const)
+      : (["subscriptions", "student", "none"] as const),
+    queryFn: () => SubscriptionService.getByStudent(studentId!),
+    enabled: Boolean(studentId),
+  });
+}
+
+export function useSetStudentBillingPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: SubscriptionService.setBillingPlan,
+    onSuccess: async (_data, vars) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.subscriptions.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.payments.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.payments.byStudent(vars.studentId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.students.all }),
+      ]);
+    },
+  });
+}
+
 export function useAcademicAccess() {
   return useQuery({
     queryKey: queryKeys.access.me,

@@ -31,10 +31,7 @@
               "instruction": "Lesen Sie die Nachricht. Ist die Aussage richtig oder falsch?",
               "passage": "Hallo Karim, mein Zug hat heute Verspätung. Ich komme nicht um 18 Uhr, sondern gegen 19 Uhr. Bis später! Lisa",
               "prompt": "Lisa kommt um 18 Uhr.",
-              "choices": [
-                "Richtig",
-                "Falsch"
-              ],
+              "choices": ["Richtig", "Falsch"],
               "correct_answer": "Falsch",
               "points": 1,
               "explanation": "Lisa schreibt, dass sie erst gegen 19 Uhr kommt."
@@ -47,10 +44,7 @@
               "instruction": "Lesen Sie die Nachricht. Ist die Aussage richtig oder falsch?",
               "passage": "Guten Morgen Sara, ich arbeite heute bis 16 Uhr. Danach können wir zusammen Kaffee trinken. Paul",
               "prompt": "Paul kann vor 16 Uhr Kaffee trinken.",
-              "choices": [
-                "Richtig",
-                "Falsch"
-              ],
+              "choices": ["Richtig", "Falsch"],
               "correct_answer": "Falsch",
               "points": 1,
               "explanation": "Paul arbeitet bis 16 Uhr und kann erst danach Kaffee trinken."
@@ -62,10 +56,7 @@
               "type": "true_false",
               "passage": "Liebe Anna, am Sonntag feiern wir den Geburtstag von meiner Mutter. Kommst du um 15 Uhr zu uns? Viele Grüße Maria",
               "prompt": "Die Geburtstagsfeier ist am Sonntag.",
-              "choices": [
-                "Richtig",
-                "Falsch"
-              ],
+              "choices": ["Richtig", "Falsch"],
               "correct_answer": "Richtig",
               "points": 1,
               "explanation": "Im Text steht ausdrücklich: am Sonntag."
@@ -77,10 +68,7 @@
               "type": "true_false",
               "passage": "Hallo Jonas, heute Abend können wir nicht ins Kino gehen. Ich bin krank. Vielleicht am Freitag? Nina",
               "prompt": "Nina möchte heute Abend ins Kino gehen.",
-              "choices": [
-                "Richtig",
-                "Falsch"
-              ],
+              "choices": ["Richtig", "Falsch"],
               "correct_answer": "Falsch",
               "points": 1,
               "explanation": "Nina ist krank und kann heute Abend nicht ins Kino gehen."
@@ -92,10 +80,7 @@
               "type": "true_false",
               "passage": "Herr Müller, Ihr Termin beim Zahnarzt ist morgen um 10:30 Uhr. Bitte kommen Sie zehn Minuten früher. Praxis Schneider",
               "prompt": "Herr Müller soll um 10:20 Uhr in der Praxis sein.",
-              "choices": [
-                "Richtig",
-                "Falsch"
-              ],
+              "choices": ["Richtig", "Falsch"],
               "correct_answer": "Richtig",
               "points": 1,
               "explanation": "Der Termin ist um 10:30 Uhr. Zehn Minuten früher bedeutet 10:20 Uhr."
@@ -843,10 +828,7 @@
               "type": "true_false",
               "passage": "Hallo Samir, mein Bus kommt heute erst um 17:30 Uhr. Warte bitte nicht um 17 Uhr auf mich. Bis später! Julia",
               "prompt": "Julia kommt um 17 Uhr.",
-              "choices": [
-                "Richtig",
-                "Falsch"
-              ],
+              "choices": ["Richtig", "Falsch"],
               "correct_answer": "Falsch",
               "points": 1,
               "explanation": "Julia kommt erst um 17:30 Uhr."
@@ -858,10 +840,7 @@
               "type": "true_false",
               "passage": "Guten Tag Herr Becker, Ihr Termin ist am Dienstag, den 14. Mai, um 9 Uhr. Praxis Hoffmann",
               "prompt": "Herr Becker hat am Dienstag einen Termin.",
-              "choices": [
-                "Richtig",
-                "Falsch"
-              ],
+              "choices": ["Richtig", "Falsch"],
               "correct_answer": "Richtig",
               "points": 1,
               "explanation": "Der Termin ist am Dienstag."
@@ -873,10 +852,7 @@
               "type": "true_false",
               "passage": "Hallo Mia, unser Zug fährt morgen nicht um 8:10 Uhr, sondern um 8:40 Uhr. Leon",
               "prompt": "Der Zug fährt um 8:40 Uhr.",
-              "choices": [
-                "Richtig",
-                "Falsch"
-              ],
+              "choices": ["Richtig", "Falsch"],
               "correct_answer": "Richtig",
               "points": 1,
               "explanation": "Im Text steht ausdrücklich 8:40 Uhr."
@@ -888,10 +864,7 @@
               "type": "true_false",
               "passage": "Liebe Gäste, das Frühstück ist von 7 bis 10 Uhr im Restaurant im Erdgeschoss.",
               "prompt": "Das Frühstück endet um 10 Uhr.",
-              "choices": [
-                "Richtig",
-                "Falsch"
-              ],
+              "choices": ["Richtig", "Falsch"],
               "correct_answer": "Richtig",
               "points": 1,
               "explanation": "Das Frühstück ist bis 10 Uhr."
@@ -903,10 +876,7 @@
               "type": "true_false",
               "passage": "Hallo Tom, ich kann am Montag nicht zum Arzt gehen. Ich habe jetzt einen neuen Termin am Mittwoch. Lara",
               "prompt": "Lara geht am Montag zum Arzt.",
-              "choices": [
-                "Richtig",
-                "Falsch"
-              ],
+              "choices": ["Richtig", "Falsch"],
               "correct_answer": "Falsch",
               "points": 1,
               "explanation": "Der neue Termin ist am Mittwoch."
@@ -1654,10 +1624,7 @@
               "type": "true_false",
               "passage": "Hallo Emma, ich ziehe am Samstag in meine neue Wohnung. Kannst du mir am Nachmittag helfen? Lena",
               "prompt": "Lena braucht am Samstag Hilfe.",
-              "choices": [
-                "Richtig",
-                "Falsch"
-              ],
+              "choices": ["Richtig", "Falsch"],
               "correct_answer": "Richtig",
               "points": 1,
               "explanation": "Lena fragt Emma, ob sie ihr am Samstag helfen kann."
@@ -1669,10 +1636,7 @@
               "type": "true_false",
               "passage": "Lieber Ben, heute kann ich nicht Fußball spielen. Ich muss bis 19 Uhr arbeiten. Max",
               "prompt": "Max spielt heute Fußball.",
-              "choices": [
-                "Richtig",
-                "Falsch"
-              ],
+              "choices": ["Richtig", "Falsch"],
               "correct_answer": "Falsch",
               "points": 1,
               "explanation": "Max kann heute nicht Fußball spielen, weil er arbeitet."
@@ -1684,10 +1648,7 @@
               "type": "true_false",
               "passage": "Hallo Marie, der Film beginnt um 20 Uhr. Treffen wir uns um 19:30 Uhr vor dem Kino? Anna",
               "prompt": "Der Film beginnt um 19:30 Uhr.",
-              "choices": [
-                "Richtig",
-                "Falsch"
-              ],
+              "choices": ["Richtig", "Falsch"],
               "correct_answer": "Falsch",
               "points": 1,
               "explanation": "Sie treffen sich um 19:30 Uhr, aber der Film beginnt um 20 Uhr."
@@ -1699,10 +1660,7 @@
               "type": "true_false",
               "passage": "Guten Tag Frau Klein, der Techniker kommt morgen zwischen 9 und 11 Uhr wegen Ihrer Heizung.",
               "prompt": "Der Techniker kommt wegen eines Problems mit der Heizung.",
-              "choices": [
-                "Richtig",
-                "Falsch"
-              ],
+              "choices": ["Richtig", "Falsch"],
               "correct_answer": "Richtig",
               "points": 1,
               "explanation": "Der Techniker kommt wegen der Heizung."
@@ -1714,10 +1672,7 @@
               "type": "true_false",
               "passage": "Hi David, am Sonntag machen wir ein Picknick im Stadtpark. Bring bitte etwas zu trinken mit.",
               "prompt": "David soll Getränke mitbringen.",
-              "choices": [
-                "Richtig",
-                "Falsch"
-              ],
+              "choices": ["Richtig", "Falsch"],
               "correct_answer": "Richtig",
               "points": 1,
               "explanation": "David soll etwas zu trinken mitbringen."

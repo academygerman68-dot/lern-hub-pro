@@ -829,6 +829,10 @@ export const PaymentService = {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabasePaymentService.ensureBillingPayment(input);
   },
+  async ensureMySubscriptionPayment(period: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabasePaymentService.ensureMySubscriptionPayment(period);
+  },
   /** Legacy renew button — does not fake activation. Use payment proofs or admin markPaid. */
   async pay(): Promise<never> {
     throw new Error(
@@ -862,6 +866,10 @@ export const SubscriptionService = {
   ) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseSubscriptionService.setStatus(studentId, status, extras);
+  },
+  async setBillingPlan(input: Parameters<typeof SupabaseSubscriptionService.setBillingPlan>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseSubscriptionService.setBillingPlan(input);
   },
 };
 

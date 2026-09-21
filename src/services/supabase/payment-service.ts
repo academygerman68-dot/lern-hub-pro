@@ -176,6 +176,14 @@ export const SupabasePaymentService = {
     return String(data);
   },
 
+  async ensureMySubscriptionPayment(period: string) {
+    const { data, error } = await requireClient().rpc("ensure_my_subscription_payment", {
+      p_period: period,
+    });
+    if (error) throw error;
+    return String(data);
+  },
+
   async uploadAdminReceipt(paymentId: string, file: File) {
     const allowed = new Set(["application/pdf", "image/jpeg", "image/png"]);
     if (!allowed.has(file.type)) {
@@ -393,6 +401,22 @@ export const SupabaseSubscriptionService = {
       .single();
     if (error) throw error;
     return data;
+  },
+
+  async setBillingPlan(input: {
+    studentId: string;
+    billingPlan: string;
+    billingCurrency: string;
+    applyMode?: "immediate" | "next_period";
+  }) {
+    const { data, error } = await requireClient().rpc("set_student_billing_plan", {
+      p_student_id: input.studentId,
+      p_billing_plan: input.billingPlan,
+      p_billing_currency: input.billingCurrency,
+      p_apply_mode: input.applyMode ?? "next_period",
+    });
+    if (error) throw error;
+    return data as Subscription;
   },
 };
 

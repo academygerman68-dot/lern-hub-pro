@@ -725,6 +725,10 @@ export function PremiumStudent360() {
   const setProfileStatus = useSetProfileStatus();
   const student = studentQuery.data ?? null;
   const isDirector = role === "director";
+  const isTeacher = role === "teacher";
+  const studentTabs = isTeacher
+    ? (["Aperçu", "Devoirs", "Examens", "Abonnement"] as const)
+    : (["Aperçu", "Devoirs", "Examens", "Paiements"] as const);
   const assignmentsQuery = useQuery({
     queryKey: student?.classId
       ? queryKeys.assignments.byClass(student.classId)
@@ -956,7 +960,7 @@ export function PremiumStudent360() {
       ) : null}
 
       <nav className="mt-9 flex gap-1 overflow-x-auto border-b border-border">
-        {["Aperçu", "Devoirs", "Examens", "Paiements"].map((item) => (
+        {studentTabs.map((item) => (
           <button
             key={item}
             onClick={() => setTab(item)}
@@ -1108,7 +1112,22 @@ export function PremiumStudent360() {
         </section>
       )}
 
-      {tab === "Paiements" && (
+      {tab === "Abonnement" && isTeacher && (
+        <section className="mt-6">
+          <Surface className="p-5">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              Accès académique
+            </p>
+            <p className="mt-3 text-lg font-semibold">{subscriptionLabel(student.subscription)}</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Les détails financiers (montants, justificatifs, coordonnées bancaires) ne sont pas
+              visibles pour les professeurs.
+            </p>
+          </Surface>
+        </section>
+      )}
+
+      {tab === "Paiements" && !isTeacher && (
         <section className="mt-6">
           <QueryState
             isLoading={paymentsQuery.isLoading}

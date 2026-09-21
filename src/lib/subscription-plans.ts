@@ -19,8 +19,8 @@ export function planAmount(plan: BillingPlan, currency: BillingCurrency): number
 }
 
 export function billingPlanLabel(plan: string | null | undefined): string {
-  if (plan === "monthly") return "Mensuel";
-  if (plan === "quarterly") return "Trimestriel";
+  if (plan === "monthly") return "Mensuelle";
+  if (plan === "quarterly") return "Trimestrielle";
   return "—";
 }
 
@@ -84,6 +84,25 @@ export function listBillingPeriods(plan: BillingPlan, count = 6, from = new Date
   return periods;
 }
 
+/** First upcoming (or current) period for a plan. */
+export function currentBillingPeriod(plan: BillingPlan, from = new Date()): string {
+  return listBillingPeriods(plan, 1, from)[0]!;
+}
+
+/** Next period after the current one (for deferred plan changes). */
+export function nextBillingPeriod(plan: BillingPlan, from = new Date()): string {
+  return listBillingPeriods(plan, 2, from)[1]!;
+}
+
+export function periodSortKey(period: string): string {
+  const quarter = /^(\d{4})-Q([1-4])$/i.exec(period);
+  if (quarter) {
+    const month = (Number(quarter[2]) - 1) * 3 + 1;
+    return `${quarter[1]}-${String(month).padStart(2, "0")}`;
+  }
+  return period;
+}
+
 /** Last day of the billing period as ISO date (YYYY-MM-DD). */
 export function billingPeriodDueDate(period: string, plan: BillingPlan): string {
   const quarter = /^(\d{4})-Q([1-4])$/i.exec(period);
@@ -105,4 +124,36 @@ export function billingPeriodDueDate(period: string, plan: BillingPlan): string 
 
 function toIsoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export function resolveSubscriptionBilling(input: {
+  billing_plan?: string | null;
+  billing_currency?: string | null;
+  pending_billing_plan?: string | null;
+  pending_billing_currency?: string | null;
+  plan_change_effective_period?: string | null;
+  /** When resolving for a specific échéance period, apply pending if due. */
+  forPeriod?: string | null;
+}): { plan: BillingPlan; currency: BillingCurrency; pendingEffectivePeriod: string | null } {
+  let plan: BillingPlan = isBillingPlan(input.billing_plan) ? input.billing_plan : "monthly";
+  let currency: BillingCurrency = isBillingCurrency(input.billing_currency)
+    ? input.billing_currency
+    : "MAD";
+  const pendingPlan = isBillingPlan(input.pending_billing_plan) ? input.pending_billing_plan : null;
+  const pendingCurrency = isBillingCurrency(input.pending_billing_currency)
+    ? input.pending_billing_currency
+    : null;
+  const effective = input.plan_change_effective_period?.trim() || null;
+
+  if (
+    input.forPeriod &&
+    pendingPlan &&
+    effective &&
+    periodSortKey(input.forPeriod) >= periodSortKey(effective)
+  ) {
+    plan = pendingPlan;
+    currency = pendingCurrency ?? currency;
+  }
+
+  return { plan, currency, pendingEffectivePeriod: pendingPlan && effective ? effective : null };
 }

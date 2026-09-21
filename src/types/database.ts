@@ -2088,36 +2088,51 @@ export type Database = {
       };
       student_subscriptions: {
         Row: {
+          billing_currency: string;
+          billing_plan: string;
           created_at: string;
           expires_at: string | null;
           grace_until: string | null;
           id: string;
           manually_extended: boolean;
           notes: string | null;
+          pending_billing_currency: string | null;
+          pending_billing_plan: string | null;
+          plan_change_effective_period: string | null;
           starts_at: string | null;
           status: Database["public"]["Enums"]["subscription_status"];
           student_id: string;
           updated_at: string;
         };
         Insert: {
+          billing_currency?: string;
+          billing_plan?: string;
           created_at?: string;
           expires_at?: string | null;
           grace_until?: string | null;
           id?: string;
           manually_extended?: boolean;
           notes?: string | null;
+          pending_billing_currency?: string | null;
+          pending_billing_plan?: string | null;
+          plan_change_effective_period?: string | null;
           starts_at?: string | null;
           status?: Database["public"]["Enums"]["subscription_status"];
           student_id: string;
           updated_at?: string;
         };
         Update: {
+          billing_currency?: string;
+          billing_plan?: string;
           created_at?: string;
           expires_at?: string | null;
           grace_until?: string | null;
           id?: string;
           manually_extended?: boolean;
           notes?: string | null;
+          pending_billing_currency?: string | null;
+          pending_billing_plan?: string | null;
+          plan_change_effective_period?: string | null;
           starts_at?: string | null;
           status?: Database["public"]["Enums"]["subscription_status"];
           student_id?: string;
@@ -2522,6 +2537,10 @@ export type Database = {
         Args: { p_period: string; p_plan: string };
         Returns: string;
       };
+      ensure_my_subscription_payment: {
+        Args: { p_period: string };
+        Returns: string;
+      };
       ensure_student_billing_payment: {
         Args: {
           p_amount: number;
@@ -2530,6 +2549,15 @@ export type Database = {
           p_period: string;
         };
         Returns: string;
+      };
+      set_student_billing_plan: {
+        Args: {
+          p_student_id: string;
+          p_billing_plan: string;
+          p_billing_currency: string;
+          p_apply_mode?: string;
+        };
+        Returns: Database["public"]["Tables"]["student_subscriptions"]["Row"];
       };
       has_academic_access: { Args: { p_student_id: string }; Returns: boolean };
       record_student_first_login: { Args: Record<string, never>; Returns: string | null };

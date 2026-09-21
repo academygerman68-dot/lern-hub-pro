@@ -16,8 +16,8 @@ describe("subscription plans", () => {
   });
 
   it("labels plans and periods in French", () => {
-    expect(billingPlanLabel("monthly")).toBe("Mensuel");
-    expect(billingPlanLabel("quarterly")).toBe("Trimestriel");
+    expect(billingPlanLabel("monthly")).toBe("Mensuelle");
+    expect(billingPlanLabel("quarterly")).toBe("Trimestrielle");
     expect(billingPeriodLabel("2026-09")).toMatch(/septembre/i);
     expect(billingPeriodLabel("2026-Q3")).toMatch(/T3 2026/);
   });

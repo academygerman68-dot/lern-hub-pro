@@ -47,8 +47,7 @@ export function countCompletedExamAttempts(
 ): number {
   return attempts.filter(
     (attempt) =>
-      attempt.exam_id === examId &&
-      (attempt.status === "submitted" || attempt.status === "graded"),
+      attempt.exam_id === examId && (attempt.status === "submitted" || attempt.status === "graded"),
   ).length;
 }
 

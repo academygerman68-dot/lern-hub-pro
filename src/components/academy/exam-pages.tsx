@@ -193,10 +193,7 @@ function StudentExamCatalog() {
             const isDone =
               progressLabel === "Terminé" || progressLabel === "En attente de correction";
             const maxAttempts = Math.max(1, Number(exam.max_attempts ?? 3));
-            const completedAttempts = countCompletedExamAttempts(
-              attemptsQuery.data ?? [],
-              exam.id,
-            );
+            const completedAttempts = countCompletedExamAttempts(attemptsQuery.data ?? [], exam.id);
             const attemptsLeft = examAttemptsLeft(completedAttempts, maxAttempts);
             const allowRetake = canRetakeExam({
               latestStatus: latest?.status,
@@ -232,7 +229,9 @@ function StudentExamCatalog() {
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Tentatives : {completedAttempts}/{maxAttempts}
-                      {attemptsLeft > 0 ? ` · ${attemptsLeft} restante${attemptsLeft > 1 ? "s" : ""}` : ""}
+                      {attemptsLeft > 0
+                        ? ` · ${attemptsLeft} restante${attemptsLeft > 1 ? "s" : ""}`
+                        : ""}
                     </p>
                   </div>
                   <Status tone={progressTone(progressLabel)}>{progressLabel}</Status>
