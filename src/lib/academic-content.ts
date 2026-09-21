@@ -9,6 +9,7 @@ export const COURSE_KIND_LABELS: Record<CourseKind, string> = {
   link: "Lien",
   image: "Image",
   audio: "Audio",
+  text: "Texte",
 };
 
 export const MEDIA_KIND_LABELS: Record<MediaKind, string> = {
@@ -18,6 +19,7 @@ export const MEDIA_KIND_LABELS: Record<MediaKind, string> = {
   image: "Image",
   audio: "Audio",
   poster: "Affiche",
+  text: "Texte",
 };
 
 export const DOMAIN_LABELS = {
@@ -30,6 +32,15 @@ export const AUDIENCE_LABELS = {
   level: "Niveau",
   class: "Groupe",
 } as const;
+
+export function isTextContentKind(kind: string | null | undefined): boolean {
+  return kind === "text";
+}
+
+/** File upload expected (not link, not inline text, not none). */
+export function isFileContentKind(kind: string | null | undefined): boolean {
+  return Boolean(kind && kind !== "link" && kind !== "text" && kind !== "none");
+}
 
 export function isValidHttpUrl(value: string) {
   try {
@@ -50,6 +61,9 @@ export function acceptForKind(kind: MediaKind | CourseKind) {
 }
 
 export function validateFileForKind(file: File, kind: MediaKind | CourseKind) {
+  if (kind === "text" || kind === "link" || kind === "none") {
+    return "Ce type de contenu n’accepte pas de fichier.";
+  }
   const mime = file.type.toLowerCase();
   const name = file.name.toLowerCase();
   const maxBytes = 25 * 1024 * 1024;
@@ -77,6 +91,16 @@ export function validateFileForKind(file: File, kind: MediaKind | CourseKind) {
   return null;
 }
 
+export function validateTextContentBody(text: string | null | undefined): string | null {
+  if (!text?.trim()) {
+    return "Saisissez le texte (ex. sujet d’expression écrite).";
+  }
+  if (text.trim().length < 3) {
+    return "Le texte est trop court.";
+  }
+  return null;
+}
+
 export function formatFrDate(value: string | null | undefined) {
   if (!value) return "—";
   return new Date(value).toLocaleString("fr-FR", {
@@ -91,11 +115,12 @@ export function libraryCategoryForKind(
   if (kind === "poster") return "announcement";
   if (kind === "pdf") return "pdf";
   if (kind === "audio") return "audio";
+  if (kind === "text") return "course_material";
   return "course_material";
 }
 
 export function courseKindFromMedia(
-  kind: Extract<CourseKind, "pdf" | "link" | "image" | "audio">,
+  kind: Extract<CourseKind, "pdf" | "link" | "image" | "audio" | "text">,
 ): CourseKind {
   return kind;
 }

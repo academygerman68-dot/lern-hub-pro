@@ -6,7 +6,7 @@ describe("exam labels", () => {
     expect(examQuestionTypeLabel("true_false")).toBe("Vrai / Faux");
     expect(examQuestionTypeLabel("single_choice")).toBe("Choix unique");
     expect(examQuestionTypeLabel("multiple_choice")).toBe("Choix multiple");
-    expect(examQuestionTypeLabel("writing")).toBe("Rédaction");
+    expect(examQuestionTypeLabel("writing")).toBe("Expression écrite");
     expect(examQuestionTypeLabel("listening")).toBe("Écoute");
   });
 

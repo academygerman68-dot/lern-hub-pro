@@ -25,13 +25,17 @@ import {
   useStartExam,
   useSubmitExam,
 } from "@/hooks/use-academy-data";
-import { ExamService } from "@/services/academy-services";
+import { ExamService, GradeAssistService } from "@/services/academy-services";
+import type { GradeAssistSuggestion } from "@/services/supabase/grade-assist-service";
 import type { Json } from "@/types/database";
 import {
   formatFrDate,
+  isFileContentKind,
+  isTextContentKind,
   isValidHttpUrl,
   MEDIA_KIND_LABELS,
   validateFileForKind,
+  validateTextContentBody,
   type MediaKind,
 } from "@/lib/academic-content";
 import {
@@ -49,6 +53,12 @@ import {
   studentExamProgressLabel,
 } from "@/lib/exam-writing";
 import { examCatalogAction } from "@/lib/exam-labels";
+import {
+  applySuggestionToWritingRubric,
+  formatGradeAssistRubric,
+  GRADE_ASSIST_NEEDS_TEXT_MESSAGE,
+} from "@/lib/grade-assist-ux";
+import { AiGradeAssistPanel } from "./ai-grade-assist-panel";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { ExamBuilder } from "./exam-builder";
 import { useAcademy } from "./academy-context";
@@ -175,13 +185,17 @@ function StudentExamCatalog() {
         subtitle="Uniquement les examens de votre niveau, avec consignes et documents."
       />
       <QueryState
-        isLoading={examsQuery.isLoading}
-        isError={examsQuery.isError}
-        error={examsQuery.error}
+        isLoading={examsQuery.isLoading || attemptsQuery.isLoading || accessQuery.isLoading}
+        isError={examsQuery.isError || attemptsQuery.isError || accessQuery.isError}
+        error={(examsQuery.error ?? attemptsQuery.error ?? accessQuery.error) as Error | null}
         isEmpty={!examsQuery.data?.length}
-        emptyTitle="Aucun examen"
+        emptyTitle="Aucun examen disponible"
         emptyMessage="Les examens blancs de votre niveau apparaîtront ici."
-        onRetry={() => void examsQuery.refetch()}
+        onRetry={() => {
+          void examsQuery.refetch();
+          void attemptsQuery.refetch();
+          void accessQuery.refetch();
+        }}
       >
         <div className="grid gap-4 md:grid-cols-2">
           {examsQuery.data?.map((exam) => {
@@ -1062,7 +1076,7 @@ function StudentExamResult() {
   );
 }
 
-function ExamWritingGradingPanel({ examId }: { examId: string }) {
+export function ExamWritingGradingPanel({ examId }: { examId: string }) {
   const attemptsQuery = useExamAttemptsForExam(examId);
   const examQuery = useExam(examId);
   const gradeWriting = useGradeWritingAnswer();
@@ -1079,6 +1093,11 @@ function ExamWritingGradingPanel({ examId }: { examId: string }) {
       }
     >
   >({});
+  const [aiBusyKey, setAiBusyKey] = useState<string | null>(null);
+  const [aiSuggestions, setAiSuggestions] = useState<Record<string, GradeAssistSuggestion | null>>(
+    {},
+  );
+  const [aiMessages, setAiMessages] = useState<Record<string, string | null>>({});
 
   const writingQuestions = useMemo(() => {
     return (examQuery.data?.sections ?? []).flatMap((section) =>
@@ -1098,6 +1117,7 @@ function ExamWritingGradingPanel({ examId }: { examId: string }) {
       : null;
 
   const answersQuery = useExamAnswers(expandedId);
+  const levelCode = examQuery.data?.level?.code ?? null;
 
   useEffect(() => {
     if (!answersQuery.data || !expandedId) return;
@@ -1139,6 +1159,53 @@ function ExamWritingGradingPanel({ examId }: { examId: string }) {
     if (status === "graded") return "corrigé";
     if (status === "in_progress") return "en cours";
     return status;
+  };
+
+  const requestWritingAi = async (input: {
+    key: string;
+    attemptId: string;
+    questionId: string;
+    studentId: string | null;
+    prompt: string;
+    text: string;
+    rubric: Record<string, number>;
+    points: number;
+  }) => {
+    setAiMessages((prev) => ({ ...prev, [input.key]: null }));
+    if (!input.text.trim()) {
+      setAiSuggestions((prev) => ({ ...prev, [input.key]: null }));
+      setAiMessages((prev) => ({ ...prev, [input.key]: GRADE_ASSIST_NEEDS_TEXT_MESSAGE }));
+      return;
+    }
+    setAiBusyKey(input.key);
+    try {
+      const outcome = await GradeAssistService.suggest({
+        level: levelCode,
+        subject: "Expression écrite — examen blanc",
+        instructions: input.prompt,
+        response: input.text,
+        rubric: formatGradeAssistRubric(input.rubric),
+        maxScore: input.points,
+        targetKind: "exam_writing",
+        targetId: input.questionId,
+        studentId: input.studentId,
+      });
+      if (!outcome.ok) {
+        setAiSuggestions((prev) => ({ ...prev, [input.key]: null }));
+        setAiMessages((prev) => ({ ...prev, [input.key]: outcome.message }));
+        return;
+      }
+      setAiSuggestions((prev) => ({ ...prev, [input.key]: outcome.suggestion }));
+      setAiMessages((prev) => ({ ...prev, [input.key]: null }));
+    } catch (err) {
+      setAiSuggestions((prev) => ({ ...prev, [input.key]: null }));
+      setAiMessages((prev) => ({
+        ...prev,
+        [input.key]: err instanceof Error ? err.message : "Suggestion indisponible",
+      }));
+    } finally {
+      setAiBusyKey(null);
+    }
   };
 
   return (
@@ -1235,16 +1302,16 @@ function ExamWritingGradingPanel({ examId }: { examId: string }) {
                         Number(draft.grammar_and_spelling || 0);
                       const text = answer ? answerValue(answer.answer) : "";
                       const stats = countWritingStats(text);
+                      const instruction =
+                        typeof meta["instruction"] === "string"
+                          ? meta["instruction"]
+                          : question.prompt;
                       return (
                         <div key={question.id} className="space-y-3 rounded-md bg-muted/40 p-3">
                           <p className="text-xs font-medium text-muted-foreground">
                             {question.sectionTitle}
                           </p>
-                          <p className="text-sm font-medium">
-                            {typeof meta["instruction"] === "string"
-                              ? meta["instruction"]
-                              : question.prompt}
-                          </p>
+                          <p className="text-sm font-medium">{instruction}</p>
                           {requirements.length > 0 ? (
                             <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
                               {requirements.map((req) => (
@@ -1302,6 +1369,65 @@ function ExamWritingGradingPanel({ examId }: { examId: string }) {
                               }
                             />
                           </label>
+                          <AiGradeAssistPanel
+                            busy={aiBusyKey === key}
+                            disabled={gradeWriting.isPending}
+                            suggestion={aiSuggestions[key] ?? null}
+                            statusMessage={aiMessages[key] ?? null}
+                            maxScore={question.points}
+                            onRequest={() =>
+                              void requestWritingAi({
+                                key,
+                                attemptId: attempt.id,
+                                questionId: question.id,
+                                studentId: attempt.student_id,
+                                prompt: instruction,
+                                text,
+                                rubric,
+                                points: question.points,
+                              })
+                            }
+                            onUse={() => {
+                              const suggestion = aiSuggestions[key];
+                              if (!suggestion) return;
+                              const mapped = applySuggestionToWritingRubric({
+                                suggestedScore: suggestion.suggested_score,
+                                criteriaScores: suggestion.criteria_scores,
+                                rubric,
+                                questionPoints: question.points,
+                              });
+                              setDrafts((prev) => ({
+                                ...prev,
+                                [key]: {
+                                  ...draft,
+                                  task_completion: mapped["task_completion"] ?? "",
+                                  comprehensibility: mapped["comprehensibility"] ?? "",
+                                  vocabulary: mapped["vocabulary"] ?? "",
+                                  grammar_and_spelling: mapped["grammar_and_spelling"] ?? "",
+                                  comment: suggestion.feedback || draft.comment,
+                                },
+                              }));
+                              toast.message(
+                                "Proposition appliquée — vérifiez puis enregistrez la correction.",
+                              );
+                            }}
+                            onRegenerate={() =>
+                              void requestWritingAi({
+                                key,
+                                attemptId: attempt.id,
+                                questionId: question.id,
+                                studentId: attempt.student_id,
+                                prompt: instruction,
+                                text,
+                                rubric,
+                                points: question.points,
+                              })
+                            }
+                            onIgnore={() => {
+                              setAiSuggestions((prev) => ({ ...prev, [key]: null }));
+                              setAiMessages((prev) => ({ ...prev, [key]: null }));
+                            }}
+                          />
                           <Button
                             size="sm"
                             disabled={
@@ -1337,7 +1463,7 @@ function ExamWritingGradingPanel({ examId }: { examId: string }) {
                               );
                             }}
                           >
-                            Enregistrer
+                            Enregistrer la correction
                           </Button>
                         </div>
                       );
@@ -1444,9 +1570,10 @@ export function DirectorExamsPage() {
   const [startsAt, setStartsAt] = useState("");
   const [duration, setDuration] = useState("60");
   const [attachment, setAttachment] = useState<AttachmentDraft>({
-    kind: "pdf",
+    kind: "text",
     url: "",
     file: null,
+    text: "",
   });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -1536,7 +1663,8 @@ export function DirectorExamsPage() {
                   >
                     {gradingExamId === exam.id ? "Masquer corrections" : "Corrections"}
                   </Button>
-                  {(exam.content_url || exam.storage_path) && (
+                  {(exam.content_url || exam.storage_path) &&
+                    !isTextContentKind(exam.content_kind) && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -1657,13 +1785,14 @@ export function DirectorExamsPage() {
               />
             </label>
             <ContentAttachmentUploader
-              kinds={["pdf", "document", "image", "link"]}
+              kinds={["text", "pdf", "document", "image", "link"]}
               value={attachment}
               onChange={setAttachment}
               disabled={saving}
               uploading={saving}
               error={formError}
               requiredFileWhenNew={false}
+              textPlaceholder="Sujet d’expression écrite ou consignes textuelles…"
             />
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setOpen(false)}>
@@ -1685,11 +1814,20 @@ export function DirectorExamsPage() {
                       return;
                     }
                     const kind = attachment.kind as MediaKind;
+                    if (isTextContentKind(kind)) {
+                      const textError = validateTextContentBody(
+                        attachment.text || instructions,
+                      );
+                      if (textError) {
+                        setFormError(textError);
+                        return;
+                      }
+                    }
                     if (kind === "link" && attachment.url && !isValidHttpUrl(attachment.url)) {
                       setFormError("Saisissez une URL valide.");
                       return;
                     }
-                    if (attachment.file) {
+                    if (attachment.file && isFileContentKind(kind)) {
                       const fileError = validateFileForKind(attachment.file, kind);
                       if (fileError) {
                         setFormError(fileError);
@@ -1701,18 +1839,22 @@ export function DirectorExamsPage() {
                       let storageBucket: string | null = null;
                       let storagePath: string | null = null;
                       let mimeType: string | null = null;
-                      if (attachment.file && kind !== "link") {
+                      if (attachment.file && isFileContentKind(kind)) {
                         const uploaded = await ExamService.uploadExamMaterial(attachment.file);
                         storageBucket = uploaded.storageBucket;
                         storagePath = uploaded.storagePath;
                         mimeType = uploaded.mimeType;
                       }
+                      const textBody = (attachment.text || instructions).trim();
+                      const resolvedInstructions = isTextContentKind(kind)
+                        ? textBody
+                        : instructions.trim() || null;
                       await createExam.mutateAsync({
                         title: title.trim(),
                         levelId,
                         classId: classId || null,
                         ...(description.trim() ? { description: description.trim() } : {}),
-                        ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
+                        ...(resolvedInstructions ? { instructions: resolvedInstructions } : {}),
                         durationMinutes: Number(duration) || 60,
                         startsAt: startsAt ? new Date(startsAt).toISOString() : null,
                         endsAt: startsAt
@@ -1722,13 +1864,17 @@ export function DirectorExamsPage() {
                           : null,
                         contentKind: kind,
                         contentUrl: kind === "link" ? attachment.url.trim() || null : null,
-                        storageBucket,
-                        storagePath,
-                        mimeType,
+                        storageBucket: isTextContentKind(kind) ? null : storageBucket,
+                        storagePath: isTextContentKind(kind) ? null : storagePath,
+                        mimeType: isTextContentKind(kind) ? "text/plain" : mimeType,
                         isMock: true,
-                        status: "published",
+                        status: "draft",
                       });
-                      toast.success("Examen blanc publié");
+                      toast.success(
+                        isTextContentKind(kind)
+                          ? "Examen créé (brouillon) — ajoutez les questions puis publiez"
+                          : "Examen blanc créé — éditez le QCM puis publiez",
+                      );
                       setOpen(false);
                       setTitle("");
                       setDescription("");
@@ -1737,7 +1883,7 @@ export function DirectorExamsPage() {
                       setClassId("");
                       setStartsAt("");
                       setDuration("60");
-                      setAttachment({ kind: "pdf", url: "", file: null });
+                      setAttachment({ kind: "text", url: "", file: null, text: "" });
                     } catch (err) {
                       setFormError(err instanceof Error ? err.message : "Création impossible");
                     } finally {
@@ -1746,7 +1892,7 @@ export function DirectorExamsPage() {
                   })();
                 }}
               >
-                Publier
+                Créer
               </Button>
             </div>
           </Surface>

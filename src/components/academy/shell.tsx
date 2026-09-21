@@ -120,6 +120,11 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
   ],
 };
 
+/** Exposed for regression tests: Examens blancs must stay in every role sidebar. */
+export function shellNavPageIds(role: "student" | "teacher" | "director"): AcademyPage[] {
+  return menus[role].flatMap((section) => section.items.map(([id]) => id));
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { role, page, navigate, setRole, user, t, locale, setLocale } = useAcademy();
   const [mobile, setMobile] = useState(false);

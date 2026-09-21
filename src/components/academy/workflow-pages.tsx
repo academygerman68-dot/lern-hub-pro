@@ -12,7 +12,7 @@ import {
   useClassRoster,
   useGradeAssignment,
 } from "@/hooks/use-academy-data";
-import { formatFrDate, MEDIA_KIND_LABELS, validateFileForKind } from "@/lib/academic-content";
+import { formatFrDate, isTextContentKind, MEDIA_KIND_LABELS, validateFileForKind } from "@/lib/academic-content";
 import { setLiveSessionId } from "@/lib/live-class-session";
 import { openExternalMeeting } from "@/lib/live-meeting";
 import {
@@ -22,8 +22,14 @@ import {
 } from "@/services/academy-services";
 import { SupabaseAssignmentService as Assignments } from "@/services/supabase/assignment-service";
 import { SupabaseLiveSessionService } from "@/services/supabase/live-session-service";
+import type { GradeAssistSuggestion } from "@/services/supabase/grade-assist-service";
 import type { Database } from "@/types/database";
+import {
+  GRADE_ASSIST_NEEDS_TEXT_MESSAGE,
+  gradeAssistNeedsExploitableText,
+} from "@/lib/grade-assist-ux";
 import { useAcademy } from "./academy-context";
+import { AiGradeAssistPanel } from "./ai-grade-assist-panel";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { DocumentViewer } from "./document-viewer";
 import { PageHeader, Surface, Status, TableScroll, StatCard, AvatarName } from "./primitives";
@@ -267,7 +273,8 @@ function AssignmentSubmission({ assignment }: { assignment: Assignment }) {
       <p className="whitespace-pre-wrap">
         {assignment.instructions || "Suivez les consignes données par votre professeur."}
       </p>
-      {(assignment.content_url || assignment.attachment_path) && (
+      {(assignment.content_url || assignment.attachment_path) &&
+        !isTextContentKind(assignment.content_kind) && (
         <Button
           variant="outline"
           onClick={() => {
@@ -506,16 +513,26 @@ export function AssignmentGrading({
     queryFn: async () => {
       const { data, error } = await getSupabase()
         .from("assignments")
-        .select("max_score, due_at, title, instructions, description")
+        .select(
+          "max_score, due_at, title, instructions, description, level:levels!assignments_level_id_fkey ( code )",
+        )
         .eq("id", assignmentId)
         .single();
       if (error) throw error;
-      return data;
+      return data as {
+        max_score: number | null;
+        due_at: string | null;
+        title: string;
+        instructions: string | null;
+        description: string | null;
+        level: { code: string } | null;
+      };
     },
   });
 
   const dueAt = assignmentQuery.data?.due_at ?? null;
   const maxScore = assignmentQuery.data?.max_score ?? 100;
+  const levelCode = assignmentQuery.data?.level?.code ?? null;
   const rows = (roster.data ?? []).map((student) => {
     const submission =
       (query.data ?? []).find((s) => s.student_id === student.id && s.status !== "draft") ?? null;
@@ -598,6 +615,7 @@ export function AssignmentGrading({
               instructions={
                 assignmentQuery.data?.instructions || assignmentQuery.data?.description || ""
               }
+              levelCode={levelCode}
               sequential
               saved={async () => {
                 await query.refetch();
@@ -698,6 +716,7 @@ export function AssignmentGrading({
                             assignmentQuery.data?.description ||
                             ""
                           }
+                          levelCode={levelCode}
                           saved={() => query.refetch()}
                         />
                       </td>
@@ -719,6 +738,7 @@ function GradeForm({
   name,
   assignmentTitle,
   instructions,
+  levelCode,
   saved,
   sequential = false,
 }: {
@@ -727,6 +747,7 @@ function GradeForm({
   name: string;
   assignmentTitle?: string;
   instructions?: string;
+  levelCode?: string | null;
   saved: () => Promise<unknown>;
   sequential?: boolean;
 }) {
@@ -734,13 +755,29 @@ function GradeForm({
   const [score, setScore] = useState(submission.score?.toString() ?? "");
   const [feedback, setFeedback] = useState(submission.feedback ?? "");
   const [aiBusy, setAiBusy] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<GradeAssistSuggestion | null>(null);
+  const [aiMessage, setAiMessage] = useState<string | null>(null);
   const save = useGradeAssignment();
 
-  const applyAi = async () => {
+  const requestAi = async () => {
+    setAiMessage(null);
+    if (
+      gradeAssistNeedsExploitableText(submission.content_text, Boolean(submission.file_path))
+    ) {
+      setAiSuggestion(null);
+      setAiMessage(GRADE_ASSIST_NEEDS_TEXT_MESSAGE);
+      return;
+    }
+    if (!submission.content_text?.trim()) {
+      setAiSuggestion(null);
+      setAiMessage(GRADE_ASSIST_NEEDS_TEXT_MESSAGE);
+      return;
+    }
+
     setAiBusy(true);
     try {
-      const suggestion = await GradeAssistService.suggest({
-        level: null,
+      const outcome = await GradeAssistService.suggest({
+        level: levelCode ?? null,
         subject: assignmentTitle ?? "Devoir",
         instructions: instructions ?? "",
         response: submission.content_text ?? "",
@@ -749,15 +786,16 @@ function GradeForm({
         targetId: submission.id,
         studentId: submission.student_id,
       });
-      setScore(String(suggestion.suggested_score));
-      setFeedback(suggestion.feedback);
-      toast.message(
-        suggestion.mock
-          ? "Suggestion mock appliquée — à vérifier"
-          : "Suggestion IA appliquée — à vérifier",
-      );
+      if (!outcome.ok) {
+        setAiSuggestion(null);
+        setAiMessage(outcome.message);
+        return;
+      }
+      setAiSuggestion(outcome.suggestion);
+      setAiMessage(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Suggestion indisponible");
+      setAiSuggestion(null);
+      setAiMessage(err instanceof Error ? err.message : "Suggestion indisponible");
     } finally {
       setAiBusy(false);
     }
@@ -798,14 +836,26 @@ function GradeForm({
         Retour au participant
         <Textarea className="mt-1" value={feedback} onChange={(e) => setFeedback(e.target.value)} />
       </label>
+      <AiGradeAssistPanel
+        busy={aiBusy}
+        disabled={save.isPending}
+        suggestion={aiSuggestion}
+        statusMessage={aiMessage}
+        maxScore={maxScore}
+        onRequest={() => void requestAi()}
+        onUse={() => {
+          if (!aiSuggestion) return;
+          setScore(String(aiSuggestion.suggested_score));
+          setFeedback(aiSuggestion.feedback);
+          toast.message("Proposition appliquée — vérifiez puis enregistrez la correction.");
+        }}
+        onRegenerate={() => void requestAi()}
+        onIgnore={() => {
+          setAiSuggestion(null);
+          setAiMessage(null);
+        }}
+      />
       <div className="flex flex-wrap gap-2">
-        <Button
-          variant="outline"
-          disabled={aiBusy || save.isPending}
-          onClick={() => void applyAi()}
-        >
-          {aiBusy ? "Suggestion…" : "Suggestion IA"}
-        </Button>
         <Button
           disabled={
             !score.trim() ||

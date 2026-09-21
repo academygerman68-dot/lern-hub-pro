@@ -5,6 +5,7 @@ import {
   validateExamAudioFile,
   type ExamCompletenessReport,
 } from "@/lib/exam-completeness";
+import { resolvePublishedExamCatalog } from "@/lib/exam-catalog-visibility";
 import { isManualQuestionType } from "@/lib/exam-writing";
 import type { Database, Json } from "@/types/database";
 
@@ -144,21 +145,9 @@ export const SupabaseExamService = {
       .eq("status", "published")
       .order("published_at", { ascending: false });
     if (error) throw error;
-    const rows = (data as ExamListItem[] | null) ?? [];
-    const completeFlags = await Promise.all(
-      rows.map(async (exam) => {
-        try {
-          const { data: ok, error: completeError } = await requireClient().rpc("exam_is_complete", {
-            p_exam_id: exam.id,
-          });
-          if (completeError) return false;
-          return Boolean(ok);
-        } catch {
-          return false;
-        }
-      }),
-    );
-    return rows.filter((_, index) => completeFlags[index]);
+    // Completeness is enforced at publish/start (server) and in the builder UI —
+    // never by silently dropping published rows when exam_is_complete fails/missing.
+    return resolvePublishedExamCatalog((data as ExamListItem[] | null) ?? []);
   },
 
   async getExamCompleteness(examId: string): Promise<ExamCompletenessReport> {

@@ -1,6 +1,7 @@
 /**
- * Gemini grade-assist suggestions for teachers.
+ * Gemini grade-assist suggestions for teachers/admins.
  * Never auto-publishes scores. Reads GEMINI_API_KEY from Deno.env only.
+ * Students must never receive suggestions from this endpoint.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
@@ -21,23 +22,6 @@ function asString(value: unknown): string {
 function asNumber(value: unknown, fallback: number): number {
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : fallback;
-}
-
-function mockSuggestion(maxScore: number) {
-  const suggested = Math.round(maxScore * 0.7 * 10) / 10;
-  return {
-    suggested_score: suggested,
-    criteria_scores: {
-      contenu: Math.round(suggested * 0.4 * 10) / 10,
-      langue: Math.round(suggested * 0.3 * 10) / 10,
-      structure: Math.round(suggested * 0.3 * 10) / 10,
-    },
-    strengths: ["Réponse structurée", "Vocabulaire adapté au niveau"],
-    improvements: ["Préciser davantage les exemples", "Relire l’orthographe"],
-    feedback:
-      "Suggestion locale (mock) — aucune clé GEMINI_API_KEY configurée. Ajustez avant d’enregistrer.",
-    mock: true,
-  };
 }
 
 Deno.serve(async (req) => {
@@ -61,6 +45,14 @@ Deno.serve(async (req) => {
   const { data: userData, error: userError } = await caller.auth.getUser();
   if (userError || !userData.user) return respond(401, { error: "UNAUTHORIZED" });
 
+  const [{ data: isAdmin }, { data: isTeacher }] = await Promise.all([
+    caller.rpc("is_admin"),
+    caller.rpc("is_teacher"),
+  ]);
+  if (!isAdmin && !isTeacher) {
+    return respond(403, { error: "FORBIDDEN" });
+  }
+
   const body = await req.json().catch(() => ({}));
   const level = asString(body.level);
   const subject = asString(body.subject);
@@ -74,13 +66,37 @@ Deno.serve(async (req) => {
 
   const geminiKey = Deno.env.get("GEMINI_API_KEY")?.trim();
   if (!geminiKey) {
-    return respond(200, mockSuggestion(maxScore));
+    // Do not invent a fake correction — UI shows a clear unconfigured message.
+    return respond(200, {
+      unconfigured: true,
+      error: "NOT_CONFIGURED",
+      mock: true,
+    });
+  }
+
+  // Scope: teacher may only assist on rows their RLS can read (own groups). Admin sees all.
+  if (targetId) {
+    if (targetKind === "exam_writing") {
+      const { data: question, error: qErr } = await caller
+        .from("exam_questions")
+        .select("id")
+        .eq("id", targetId)
+        .maybeSingle();
+      if (qErr || !question) return respond(403, { error: "FORBIDDEN" });
+    } else {
+      const { data: submission, error: sErr } = await caller
+        .from("assignment_submissions")
+        .select("id")
+        .eq("id", targetId)
+        .maybeSingle();
+      if (sErr || !submission) return respond(403, { error: "FORBIDDEN" });
+    }
   }
 
   const prompt = [
-    "Tu es un assistant de correction pour une académie de langues.",
+    "Tu es un assistant de correction pour une académie de langues allemandes.",
     "Propose une note et un feedback en français. Ne publie jamais la note automatiquement.",
-    `Niveau: ${level || "non précisé"}`,
+    `Niveau CECR: ${level || "non précisé"}`,
     `Matière / type: ${subject || targetKind}`,
     `Note maximale: ${maxScore}`,
     rubric ? `Barème / critères: ${rubric}` : "",
@@ -88,8 +104,10 @@ Deno.serve(async (req) => {
     responseText ? `Réponse de l'étudiant: ${responseText}` : "Réponse vide.",
     "",
     "Réponds UNIQUEMENT en JSON valide avec les clés:",
-    "suggested_score (number), criteria_scores (object of numbers),",
+    "suggested_score (number),",
+    "criteria_scores (object with keys task_completion, comprehensibility, vocabulary, grammar_and_spelling),",
     "strengths (string[]), improvements (string[]), feedback (string).",
+    "Adapte ton exigence au niveau CECR indiqué.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -108,7 +126,7 @@ Deno.serve(async (req) => {
     );
 
     if (!geminiRes.ok) {
-      return respond(200, { ...mockSuggestion(maxScore), mock: true, model_error: true });
+      return respond(502, { error: "MODEL_UNAVAILABLE" });
     }
 
     const geminiJson = await geminiRes.json();
@@ -120,7 +138,7 @@ Deno.serve(async (req) => {
     try {
       parsed = JSON.parse(text) as Record<string, unknown>;
     } catch {
-      return respond(200, { ...mockSuggestion(maxScore), mock: true, parse_error: true });
+      return respond(502, { error: "MODEL_PARSE_ERROR" });
     }
 
     const suggested = Math.min(
@@ -137,7 +155,7 @@ Deno.serve(async (req) => {
     const improvements = Array.isArray(parsed.improvements)
       ? parsed.improvements.map((s) => String(s))
       : [];
-    const feedback = asString(parsed.feedback) || "Suggestion Gemini — à valider.";
+    const feedback = asString(parsed.feedback) || "Suggestion à valider avant enregistrement.";
 
     // Optional audit trail (ignore failures).
     if (targetId) {
@@ -169,6 +187,6 @@ Deno.serve(async (req) => {
       mock: false,
     });
   } catch {
-    return respond(200, { ...mockSuggestion(maxScore), mock: true });
+    return respond(502, { error: "MODEL_UNAVAILABLE" });
   }
 });

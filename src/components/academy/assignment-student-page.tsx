@@ -147,7 +147,8 @@ export function Assignments({ detail }: { detail: boolean }) {
                       selected.description ||
                       "Suivez les consignes données par votre professeur."}
                   </p>
-                  {(selected.content_url || selected.attachment_path) && (
+                  {(selected.content_url || selected.attachment_path) &&
+                    selected.content_kind !== "text" && (
                     <div className="space-y-2 border-t border-border/70 pt-4">
                       <h3 className="text-sm font-semibold">2. Documents</h3>
                       <p className="text-xs text-muted-foreground">Pièces jointes à consulter</p>

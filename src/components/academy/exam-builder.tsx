@@ -427,14 +427,24 @@ export function ExamBuilder({ examId }: { examId: string }) {
           </select>
         </label>
         <label className="block text-sm">
-          Énoncé
+          {qType === "writing" ? "Consigne d’expression écrite" : "Énoncé"}
           <Textarea
             className="mt-1"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Question ou consigne"
+            placeholder={
+              qType === "writing"
+                ? "Tapez uniquement le sujet / la consigne — aucun fichier requis"
+                : "Question ou consigne"
+            }
           />
         </label>
+        {qType === "writing" ? (
+          <p className="text-xs text-muted-foreground">
+            Type rédaction : saisissez le texte, ajoutez les points, puis publiez l’examen quand
+            il est complet.
+          </p>
+        ) : null}
         <label className="block text-sm">
           Points
           <Input

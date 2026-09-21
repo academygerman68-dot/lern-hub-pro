@@ -1,11 +1,14 @@
 import { useCallback, useRef, useState } from "react";
 import { FileUp, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import {
   acceptForKind,
   COURSE_KIND_LABELS,
+  isFileContentKind,
+  isTextContentKind,
   MEDIA_KIND_LABELS,
   validateFileForKind,
   type CourseKind,
@@ -19,7 +22,13 @@ export type AttachmentDraft = {
   kind: Kind;
   url: string;
   file: File | null;
+  /** Inline body when kind === "text" (e.g. expression écrite). */
+  text?: string;
 };
+
+export function emptyAttachmentDraft(kind: Kind = "pdf"): AttachmentDraft {
+  return { kind, url: "", file: null, text: "" };
+}
 
 function labelForKind(kind: Kind) {
   if (kind in MEDIA_KIND_LABELS) return MEDIA_KIND_LABELS[kind as MediaKind];
@@ -47,6 +56,7 @@ export function ContentAttachmentUploader({
   showKindSelect = true,
   accept,
   validateFile,
+  textPlaceholder = "Sujet ou consignes (expression écrite, etc.)",
 }: {
   kinds: Kind[];
   value: AttachmentDraft;
@@ -65,11 +75,13 @@ export function ContentAttachmentUploader({
   accept?: string;
   /** Override kind-based validation. Return an error message or null. */
   validateFile?: (file: File) => string | null;
+  textPlaceholder?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const isLink = value.kind === "link";
+  const isText = isTextContentKind(value.kind);
   const displayError = error ?? localError;
 
   const applyFile = useCallback(
@@ -95,7 +107,7 @@ export function ContentAttachmentUploader({
   const onDrop = (event: React.DragEvent) => {
     event.preventDefault();
     setDragOver(false);
-    if (disabled || isLink) return;
+    if (disabled || isLink || isText) return;
     const file = event.dataTransfer.files?.[0] ?? null;
     applyFile(file);
   };
@@ -111,7 +123,12 @@ export function ContentAttachmentUploader({
             disabled={disabled}
             onChange={(e) => {
               setLocalError(null);
-              onChange({ kind: e.target.value as Kind, url: "", file: null });
+              onChange({
+                kind: e.target.value as Kind,
+                url: "",
+                file: null,
+                text: "",
+              });
             }}
           >
             {kinds.map((kind) => (
@@ -133,6 +150,20 @@ export function ContentAttachmentUploader({
             disabled={disabled}
             onChange={(e) => onChange({ ...value, url: e.target.value })}
           />
+        </label>
+      ) : isText ? (
+        <label className="block text-sm">
+          Texte
+          <Textarea
+            className="mt-1 min-h-32"
+            placeholder={textPlaceholder}
+            value={value.text ?? ""}
+            disabled={disabled}
+            onChange={(e) => onChange({ ...value, text: e.target.value })}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Aucun fichier requis — saisissez le sujet puis publiez.
+          </p>
         </label>
       ) : (
         <div className="space-y-2">
@@ -214,7 +245,10 @@ export function ContentAttachmentUploader({
             </div>
           ) : null}
 
-          {requiredFileWhenNew && !hasExistingFile && !value.file ? (
+          {requiredFileWhenNew &&
+          isFileContentKind(value.kind) &&
+          !hasExistingFile &&
+          !value.file ? (
             <p className="text-xs text-muted-foreground">Fichier obligatoire.</p>
           ) : null}
         </div>

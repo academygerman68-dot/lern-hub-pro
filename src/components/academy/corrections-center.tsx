@@ -11,8 +11,10 @@ import { queryKeys } from "@/lib/query-keys";
 import { AssignmentService, ExamService } from "@/services/academy-services";
 import { useAllExams, useAssignmentRows, useClasses } from "@/hooks/use-academy-data";
 import { useAcademy } from "./academy-context";
+import { ExamWritingGradingPanel } from "./exam-pages";
 import { PageHeader, Status, Surface } from "./primitives";
 import { QueryState } from "./query-state";
+import { AssignmentGrading } from "./workflow-pages";
 
 type CorrectionItem = {
   id: string;
@@ -26,11 +28,12 @@ type CorrectionItem = {
 };
 
 export function CorrectionsCenter() {
-  const { navigate, role } = useAcademy();
+  const { role } = useAcademy();
   const classesQuery = useClasses();
   const assignmentsQuery = useAssignmentRows();
   const examsQuery = useAllExams();
   const [tab, setTab] = useState<"all" | "assignments" | "exams">("all");
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const teacherScope = useMemo(
     () => buildTeacherScope(classesQuery.data ?? []),
@@ -159,36 +162,40 @@ export function CorrectionsCenter() {
             }}
           >
             <div className="space-y-3">
-              {filtered.map((item) => (
-                <Surface
-                  key={item.id}
-                  className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-sm font-semibold">{item.title}</h3>
-                      <Status tone={item.kind === "assignment" ? "blue" : "amber"}>
-                        {item.kind === "assignment" ? "Devoir" : "Examen"}
-                      </Status>
+              {filtered.map((item) => {
+                const open = openId === item.id;
+                return (
+                  <Surface key={item.id} className="space-y-3 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-semibold">{item.title}</h3>
+                          <Status tone={item.kind === "assignment" ? "blue" : "amber"}>
+                            {item.kind === "assignment" ? "Devoir" : "Examen"}
+                          </Status>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">{item.subtitle}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={open ? "outline" : "default"}
+                        onClick={() => setOpenId(open ? null : item.id)}
+                      >
+                        {open ? "Masquer" : "Corriger"}
+                      </Button>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">{item.subtitle}</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      if (item.kind === "assignment" && item.assignmentId) {
-                        navigate("assignments", { assignmentId: item.assignmentId });
-                        return;
-                      }
-                      if (item.kind === "exam") {
-                        navigate("exams");
-                      }
-                    }}
-                  >
-                    Corriger
-                  </Button>
-                </Surface>
-              ))}
+                    {open && item.kind === "assignment" && item.assignmentId && item.classId ? (
+                      <AssignmentGrading
+                        assignmentId={item.assignmentId}
+                        classId={item.classId}
+                      />
+                    ) : null}
+                    {open && item.kind === "exam" && item.examId ? (
+                      <ExamWritingGradingPanel examId={item.examId} />
+                    ) : null}
+                  </Surface>
+                );
+              })}
             </div>
           </QueryState>
         </TabsContent>

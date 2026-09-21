@@ -2851,7 +2851,7 @@ export type Database = {
       attendance_mark: "present" | "absent" | "late" | "excused";
       class_status: "planned" | "active" | "completed" | "archived";
       content_status: "draft" | "published" | "archived";
-      course_content_kind: "none" | "pdf" | "link" | "image" | "audio";
+      course_content_kind: "none" | "pdf" | "link" | "image" | "audio" | "text";
       enrollment_status: "active" | "completed" | "withdrawn" | "suspended";
       exam_attempt_status: "in_progress" | "submitted" | "graded" | "expired";
       exam_question_type:
@@ -2884,7 +2884,7 @@ export type Database = {
       library_domain: "academic" | "professional";
       library_visibility: "private" | "staff" | "academy" | "published";
       live_session_status: "scheduled" | "live" | "completed" | "cancelled";
-      media_content_kind: "pdf" | "document" | "link" | "image" | "audio" | "poster";
+      media_content_kind: "pdf" | "document" | "link" | "image" | "audio" | "poster" | "text";
       meeting_provider: "jitsi" | "jaas" | "none";
       notification_channel: "in_app" | "email" | "whatsapp";
       notification_status: "unread" | "read" | "archived";
@@ -3025,7 +3025,7 @@ export const Constants = {
       attendance_mark: ["present", "absent", "late", "excused"],
       class_status: ["planned", "active", "completed", "archived"],
       content_status: ["draft", "published", "archived"],
-      course_content_kind: ["none", "pdf", "link", "image", "audio"],
+      course_content_kind: ["none", "pdf", "link", "image", "audio", "text"],
       enrollment_status: ["active", "completed", "withdrawn", "suspended"],
       exam_attempt_status: ["in_progress", "submitted", "graded", "expired"],
       exam_question_type: [
@@ -3060,7 +3060,7 @@ export const Constants = {
       library_domain: ["academic", "professional"],
       library_visibility: ["private", "staff", "academy", "published"],
       live_session_status: ["scheduled", "live", "completed", "cancelled"],
-      media_content_kind: ["pdf", "document", "link", "image", "audio", "poster"],
+      media_content_kind: ["pdf", "document", "link", "image", "audio", "poster", "text"],
       meeting_provider: ["jitsi", "jaas", "none"],
       notification_channel: ["in_app", "email", "whatsapp"],
       notification_status: ["unread", "read", "archived"],

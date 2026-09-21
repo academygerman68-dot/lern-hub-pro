@@ -34,10 +34,13 @@ import {
   COURSE_KIND_LABELS,
   DOMAIN_LABELS,
   formatFrDate,
+  isFileContentKind,
+  isTextContentKind,
   isValidHttpUrl,
   libraryCategoryForKind,
   MEDIA_KIND_LABELS,
   validateFileForKind,
+  validateTextContentBody,
   type CourseKind,
   type MediaKind,
 } from "@/lib/academic-content";
@@ -187,11 +190,12 @@ export function DirectorCoursesPage() {
     setTitle(course.title);
     setDescription(course.description ?? "");
     setAttachment({
-      kind: (course.content_kind === "none" ? "pdf" : course.content_kind) as CourseKind,
+      kind: (course.content_kind === "none" ? "text" : course.content_kind) as CourseKind,
       url: course.content_url ?? "",
       file: null,
+      text: course.content_kind === "text" ? (course.description ?? "") : "",
     });
-    setExistingFile(Boolean(course.storage_path));
+    setExistingFile(Boolean(course.storage_path) && course.content_kind !== "text");
     setOpen(true);
   };
 
@@ -290,16 +294,20 @@ export function DirectorCoursesPage() {
                     </Status>
                     <Button
                       size="sm"
-                      onClick={() =>
+                      onClick={() => {
+                        if (isTextContentKind(course.content_kind)) {
+                          toast.message(course.description?.trim() || "Aucun texte enregistré.");
+                          return;
+                        }
                         void openLinkOrFile(
                           course.title,
                           course.content_kind,
                           course.mime_type,
                           () => CourseService.getCourseMaterialUrl(course),
-                        )
-                      }
+                        );
+                      }}
                     >
-                      Ouvrir
+                      {isTextContentKind(course.content_kind) ? "Voir le texte" : "Ouvrir"}
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -348,13 +356,15 @@ export function DirectorCoursesPage() {
               onChange={(e) => setDescription(e.target.value)}
             />
             <ContentAttachmentUploader
-              kinds={["pdf", "link", "image", "audio"]}
+              kinds={["text", "pdf", "link", "image", "audio"]}
               value={attachment}
               onChange={setAttachment}
               disabled={saving}
               uploading={saving}
               error={formError}
-              hasExistingFile={existingFile}
+              hasExistingFile={existingFile && isFileContentKind(attachment.kind)}
+              requiredFileWhenNew={!isTextContentKind(attachment.kind)}
+              textPlaceholder="Contenu textuel du cours (ex. sujet d’expression écrite)…"
               onClearExisting={() => {
                 setExistingFile(false);
               }}
@@ -377,18 +387,25 @@ export function DirectorCoursesPage() {
                   void (async () => {
                     setFormError(null);
                     const kind = attachment.kind as CourseKind;
+                    if (isTextContentKind(kind)) {
+                      const textError = validateTextContentBody(attachment.text || description);
+                      if (textError) {
+                        setFormError(textError);
+                        return;
+                      }
+                    }
                     if (kind === "link" && !isValidHttpUrl(attachment.url)) {
                       setFormError("Saisissez une URL valide (http ou https).");
                       return;
                     }
-                    if (kind !== "link" && attachment.file) {
+                    if (isFileContentKind(kind) && attachment.file) {
                       const fileError = validateFileForKind(attachment.file, kind);
                       if (fileError) {
                         setFormError(fileError);
                         return;
                       }
                     }
-                    if (kind !== "link" && !attachment.file && !existingFile) {
+                    if (isFileContentKind(kind) && !attachment.file && !existingFile) {
                       if (!editingId) {
                         setFormError("Ajoutez un fichier.");
                         return;
@@ -400,7 +417,7 @@ export function DirectorCoursesPage() {
                       let storagePath: string | null = null;
                       let mimeType: string | null = null;
                       const url: string | null = kind === "link" ? attachment.url.trim() : null;
-                      if (attachment.file && kind !== "link") {
+                      if (attachment.file && isFileContentKind(kind)) {
                         const uploaded = await CourseService.uploadCourseMaterial(
                           attachment.file,
                           `courses/${selectedLevelId}`,
@@ -409,16 +426,24 @@ export function DirectorCoursesPage() {
                         storagePath = uploaded.storagePath;
                         mimeType = uploaded.mimeType;
                       }
+                      const textBody = (attachment.text || description).trim();
+                      const resolvedDescription = isTextContentKind(kind)
+                        ? textBody
+                        : description.trim() || null;
                       if (editingId) {
                         const patch: Database["public"]["Tables"]["courses"]["Update"] = {
                           title: title.trim(),
                           level_id: selectedLevelId,
-                          description: description.trim() || null,
+                          description: resolvedDescription,
                           content_kind: kind,
                           content_url: url,
                           status: "published",
                         };
-                        if (storagePath) {
+                        if (isTextContentKind(kind)) {
+                          patch.storage_bucket = null;
+                          patch.storage_path = null;
+                          patch.mime_type = "text/plain";
+                        } else if (storagePath) {
                           patch.storage_bucket = storageBucket;
                           patch.storage_path = storagePath;
                           patch.mime_type = mimeType;
@@ -433,12 +458,12 @@ export function DirectorCoursesPage() {
                         await createCourse.mutateAsync({
                           title: title.trim(),
                           levelId: selectedLevelId,
-                          ...(description.trim() ? { description: description.trim() } : {}),
+                          ...(resolvedDescription ? { description: resolvedDescription } : {}),
                           contentKind: kind,
                           contentUrl: url,
-                          storageBucket,
-                          storagePath,
-                          mimeType,
+                          storageBucket: isTextContentKind(kind) ? null : storageBucket,
+                          storagePath: isTextContentKind(kind) ? null : storagePath,
+                          mimeType: isTextContentKind(kind) ? "text/plain" : mimeType,
                           status: "published",
                         });
                         toast.success("Cours créé");
@@ -951,17 +976,19 @@ export function StudentLearningPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 {formatFrDate(course.created_at)}
               </p>
-              <Button
-                className="mt-4"
-                variant="outline"
-                onClick={() =>
-                  void openLinkOrFile(course.title, course.content_kind, course.mime_type, () =>
-                    CourseService.getCourseMaterialUrl(course),
-                  )
-                }
-              >
-                {course.content_kind === "link" ? "Ouvrir le lien" : "Ouvrir"}
-              </Button>
+              {course.content_kind === "text" ? null : (
+                <Button
+                  className="mt-4"
+                  variant="outline"
+                  onClick={() =>
+                    void openLinkOrFile(course.title, course.content_kind, course.mime_type, () =>
+                      CourseService.getCourseMaterialUrl(course),
+                    )
+                  }
+                >
+                  {course.content_kind === "link" ? "Ouvrir le lien" : "Ouvrir"}
+                </Button>
+              )}
             </Surface>
           ))}
         </div>
@@ -1044,7 +1071,7 @@ export function DirectorAssignmentsPage() {
     setClassId("");
     setDueAt("");
     setPublishedAt("");
-    setAttachment({ kind: "pdf", url: "", file: null });
+    setAttachment({ kind: "text", url: "", file: null, text: "" });
     setExistingFile(false);
     setFormError(null);
   };
@@ -1064,11 +1091,15 @@ export function DirectorAssignmentsPage() {
     setDueAt(toLocalInput(row.due_at));
     setPublishedAt(toLocalInput(row.published_at));
     setAttachment({
-      kind: (row.content_kind as MediaKind) || "pdf",
+      kind: (row.content_kind as MediaKind) || "text",
       url: row.content_url ?? "",
       file: null,
+      text:
+        row.content_kind === "text" ? row.instructions || row.description || "" : "",
     });
-    setExistingFile(Boolean(row.content_url || row.attachment_path));
+    setExistingFile(
+      Boolean(row.content_url || row.attachment_path) && row.content_kind !== "text",
+    );
     setFormError(null);
     setOpen(true);
   };
@@ -1278,7 +1309,7 @@ export function DirectorAssignmentsPage() {
               />
             </label>
             <ContentAttachmentUploader
-              kinds={["pdf", "document", "image", "link", "audio"]}
+              kinds={["text", "pdf", "document", "image", "link", "audio"]}
               value={attachment}
               onChange={(next) => {
                 setClearAttachment(false);
@@ -1288,11 +1319,12 @@ export function DirectorAssignmentsPage() {
               uploading={saving}
               error={formError}
               requiredFileWhenNew={false}
-              hasExistingFile={existingFile && !clearAttachment}
+              hasExistingFile={existingFile && !clearAttachment && isFileContentKind(attachment.kind)}
+              textPlaceholder="Sujet d’expression écrite ou consignes textuelles…"
               onClearExisting={() => {
                 setClearAttachment(true);
                 setExistingFile(false);
-                setAttachment({ ...attachment, file: null, url: "" });
+                setAttachment({ ...attachment, file: null, url: "", text: "" });
               }}
             />
             {editingId && existingFile && !clearAttachment && attachment.kind !== "link" ? (
@@ -1328,11 +1360,20 @@ export function DirectorAssignmentsPage() {
                       return;
                     }
                     const kind = attachment.kind as MediaKind;
+                    if (isTextContentKind(kind)) {
+                      const textError = validateTextContentBody(
+                        attachment.text || description,
+                      );
+                      if (textError) {
+                        setFormError(textError);
+                        return;
+                      }
+                    }
                     if (kind === "link" && attachment.url && !isValidHttpUrl(attachment.url)) {
                       setFormError("Saisissez une URL valide.");
                       return;
                     }
-                    if (attachment.file) {
+                    if (attachment.file && isFileContentKind(kind)) {
                       const fileError = validateFileForKind(attachment.file, kind);
                       if (fileError) {
                         setFormError(fileError);
@@ -1344,29 +1385,34 @@ export function DirectorAssignmentsPage() {
                       let attachmentBucket: string | null | undefined;
                       let attachmentPath: string | null | undefined;
                       let mimeType: string | null | undefined;
-                      if (attachment.file && kind !== "link") {
+                      if (attachment.file && isFileContentKind(kind)) {
                         const uploaded = await AssignmentService.uploadAttachment(attachment.file);
                         attachmentBucket = uploaded.attachmentBucket;
                         attachmentPath = uploaded.attachmentPath;
                         mimeType = uploaded.mimeType;
                       }
+                      const textBody = (attachment.text || description).trim();
+                      const resolvedDescription = isTextContentKind(kind)
+                        ? textBody
+                        : description.trim() || null;
                       if (editingId) {
                         const patch: Parameters<typeof AssignmentService.update>[1] = {
                           title: title.trim(),
-                          description: description.trim() || null,
-                          instructions: description.trim() || null,
+                          description: resolvedDescription,
+                          instructions: resolvedDescription,
                           levelId,
                           classId: classId || null,
                           dueAt: dueAt ? new Date(dueAt).toISOString() : null,
                           contentKind: kind,
                           contentUrl: kind === "link" ? attachment.url.trim() || null : null,
+                          mimeType: isTextContentKind(kind) ? "text/plain" : mimeType ?? null,
                         };
                         if (publishedAt) {
                           patch.publishedAt = new Date(publishedAt).toISOString();
                         }
-                        if (clearAttachment) {
+                        if (isTextContentKind(kind) || clearAttachment) {
                           patch.clearAttachment = true;
-                        } else if (attachment.file && kind !== "link") {
+                        } else if (attachment.file && isFileContentKind(kind)) {
                           patch.attachmentBucket = attachmentBucket ?? null;
                           patch.attachmentPath = attachmentPath ?? null;
                           patch.mimeType = mimeType ?? null;
@@ -1381,8 +1427,11 @@ export function DirectorAssignmentsPage() {
                           levelId,
                           classId: classId || null,
                           title: title.trim(),
-                          ...(description.trim()
-                            ? { description: description.trim(), instructions: description.trim() }
+                          ...(resolvedDescription
+                            ? {
+                                description: resolvedDescription,
+                                instructions: resolvedDescription,
+                              }
                             : {}),
                           dueAt: dueAt ? new Date(dueAt).toISOString() : null,
                           publishedAt: publishedAt
@@ -1390,9 +1439,15 @@ export function DirectorAssignmentsPage() {
                             : new Date().toISOString(),
                           contentKind: kind,
                           contentUrl: kind === "link" ? attachment.url.trim() || null : null,
-                          mimeType: mimeType ?? null,
-                          attachmentBucket: attachmentBucket ?? null,
-                          attachmentPath: attachmentPath ?? null,
+                          mimeType: isTextContentKind(kind)
+                            ? "text/plain"
+                            : (mimeType ?? null),
+                          attachmentBucket: isTextContentKind(kind)
+                            ? null
+                            : (attachmentBucket ?? null),
+                          attachmentPath: isTextContentKind(kind)
+                            ? null
+                            : (attachmentPath ?? null),
                           createdBy: user?.id ?? null,
                           status: "published",
                         });
