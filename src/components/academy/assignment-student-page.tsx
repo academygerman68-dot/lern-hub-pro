@@ -358,8 +358,8 @@ export function Assignments({ detail }: { detail: boolean }) {
                                         void submissionsQuery.refetch();
                                       },
                                       onError: (err) => {
+                                        // Inline form error only — avoid duplicate toast + form message.
                                         setFormError(err.message);
-                                        toast.error(err.message);
                                       },
                                     },
                                   );
