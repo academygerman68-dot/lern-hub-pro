@@ -32,6 +32,8 @@ describe("form fill helpers", () => {
       passage: "text",
       audio_url: "https://example.com/a.mp3",
       audio_script: "SECRET SCRIPT",
+      media_path: "exam-audio/secret.mp3",
+      media_bucket: "course-materials",
       source_data: { Vorname: "Adam" },
       sample_answer: "secret sample",
       explanation: "secret explanation",
@@ -46,6 +48,8 @@ describe("form fill helpers", () => {
       fields: [{ key: "Vorname", points: 2 }],
     });
     expect(safe).not.toHaveProperty("audio_script");
+    expect(safe).not.toHaveProperty("media_path");
+    expect(safe).not.toHaveProperty("media_bucket");
     expect(safe).not.toHaveProperty("source_data");
     expect(safe).not.toHaveProperty("sample_answer");
     expect(safe).not.toHaveProperty("explanation");

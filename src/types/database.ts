@@ -54,49 +54,61 @@ export type Database = {
           assignment_id: string;
           content_text: string | null;
           created_at: string;
+          edited_after_due: boolean;
           feedback: string | null;
           file_bucket: string | null;
           file_path: string | null;
           graded_at: string | null;
           graded_by: string | null;
           id: string;
+          last_edited_at: string | null;
+          response_versions: Json;
           score: number | null;
           status: Database["public"]["Enums"]["submission_status"];
           student_id: string;
           submitted_at: string | null;
           updated_at: string;
+          version: number;
         };
         Insert: {
           assignment_id: string;
           content_text?: string | null;
           created_at?: string;
+          edited_after_due?: boolean;
           feedback?: string | null;
           file_bucket?: string | null;
           file_path?: string | null;
           graded_at?: string | null;
           graded_by?: string | null;
           id?: string;
+          last_edited_at?: string | null;
+          response_versions?: Json;
           score?: number | null;
           status?: Database["public"]["Enums"]["submission_status"];
           student_id: string;
           submitted_at?: string | null;
           updated_at?: string;
+          version?: number;
         };
         Update: {
           assignment_id?: string;
           content_text?: string | null;
           created_at?: string;
+          edited_after_due?: boolean;
           feedback?: string | null;
           file_bucket?: string | null;
           file_path?: string | null;
           graded_at?: string | null;
           graded_by?: string | null;
           id?: string;
+          last_edited_at?: string | null;
+          response_versions?: Json;
           score?: number | null;
           status?: Database["public"]["Enums"]["submission_status"];
           student_id?: string;
           submitted_at?: string | null;
           updated_at?: string;
+          version?: number;
         };
         Relationships: [
           {
@@ -2704,6 +2716,18 @@ export type Database = {
         };
       };
       secure_promote_admin: { Args: { p_user_id: string }; Returns: undefined };
+      publish_exam: {
+        Args: { p_exam_id: string };
+        Returns: Database["public"]["Tables"]["exams"]["Row"];
+      };
+      exam_completeness_report: {
+        Args: { p_exam_id: string };
+        Returns: Json;
+      };
+      exam_is_complete: {
+        Args: { p_exam_id: string };
+        Returns: boolean;
+      };
       start_exam_attempt: {
         Args: { p_exam_id: string };
         Returns: {

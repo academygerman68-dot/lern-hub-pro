@@ -45,6 +45,8 @@ export function sanitizeQuestionMetadataForStudent(
     correct_answer: _correct,
     explanation: _explanation,
     teacher_payload: _teacher,
+    media_path: _mediaPath,
+    media_bucket: _mediaBucket,
     ...safe
   } = metadata;
   return safe;

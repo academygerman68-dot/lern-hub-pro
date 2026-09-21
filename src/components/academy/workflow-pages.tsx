@@ -6,11 +6,20 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { getSupabase } from "@/lib/supabase";
-import { useAcademicAccess, useCourses, useClassRoster } from "@/hooks/use-academy-data";
+import {
+  useAcademicAccess,
+  useCourses,
+  useClassRoster,
+  useGradeAssignment,
+} from "@/hooks/use-academy-data";
 import { formatFrDate, MEDIA_KIND_LABELS, validateFileForKind } from "@/lib/academic-content";
 import { setLiveSessionId } from "@/lib/live-class-session";
 import { openExternalMeeting } from "@/lib/live-meeting";
-import { AssignmentService, LiveSessionService } from "@/services/academy-services";
+import {
+  AssignmentService,
+  GradeAssistService,
+  LiveSessionService,
+} from "@/services/academy-services";
 import { SupabaseAssignmentService as Assignments } from "@/services/supabase/assignment-service";
 import { SupabaseLiveSessionService } from "@/services/supabase/live-session-service";
 import type { Database } from "@/types/database";
@@ -486,6 +495,8 @@ export function AssignmentGrading({
 }) {
   const roster = useClassRoster(classId);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [sequential, setSequential] = useState(false);
+  const [seqIndex, setSeqIndex] = useState(0);
   const query = useQuery({
     queryKey: ["submissions", assignmentId],
     queryFn: () => Assignments.listSubmissions(assignmentId),
@@ -495,7 +506,7 @@ export function AssignmentGrading({
     queryFn: async () => {
       const { data, error } = await getSupabase()
         .from("assignments")
-        .select("max_score, due_at")
+        .select("max_score, due_at, title, instructions, description")
         .eq("id", assignmentId)
         .single();
       if (error) throw error;
@@ -510,13 +521,17 @@ export function AssignmentGrading({
       (query.data ?? []).find((s) => s.student_id === student.id && s.status !== "draft") ?? null;
     return { student, submission, late: isLateSubmission(submission, dueAt) };
   });
+  const toGrade = rows.filter((r) => r.submission && r.submission.status !== "graded");
   const counters = {
     total: rows.length,
     submitted: rows.filter((r) => r.submission).length,
     missing: rows.filter((r) => !r.submission).length,
     late: rows.filter((r) => r.late).length,
     graded: rows.filter((r) => r.submission?.status === "graded").length,
+    toCorrect: toGrade.length,
   };
+
+  const currentSeq = toGrade[Math.min(seqIndex, Math.max(0, toGrade.length - 1))] ?? null;
 
   return (
     <QueryState
@@ -533,19 +548,76 @@ export function AssignmentGrading({
       }}
     >
       <div className="mt-4 space-y-4">
-        <div>
-          <h3 className="text-base font-semibold tracking-tight">Remises du devoir</h3>
-          <p className="text-sm text-muted-foreground">
-            Limite : {formatFrDate(dueAt)} · Note maximale : {maxScore}
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold tracking-tight">Remises du devoir</h3>
+            <p className="text-sm text-muted-foreground">
+              Limite : {formatFrDate(dueAt)} · Note maximale : {maxScore}
+            </p>
+          </div>
+          <Button
+            size="sm"
+            disabled={!toGrade.length}
+            onClick={() => {
+              setSeqIndex(0);
+              setSequential(true);
+            }}
+          >
+            Corriger les remises
+          </Button>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <StatCard label="Total" value={counters.total} />
           <StatCard label="Remis" value={counters.submitted} tone="success" />
           <StatCard label="Non remis" value={counters.missing} tone="danger" />
           <StatCard label="En retard" value={counters.late} tone="warning" />
+          <StatCard label="À corriger" value={counters.toCorrect} tone="warning" />
           <StatCard label="Corrigés" value={counters.graded} tone="info" />
         </div>
+
+        {sequential && currentSeq?.submission ? (
+          <Surface className="space-y-4 border-primary/30 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h4 className="font-semibold">Correction séquentielle</h4>
+                <p className="text-sm text-muted-foreground">
+                  {Math.min(seqIndex, toGrade.length - 1) + 1} / {toGrade.length} ·{" "}
+                  {currentSeq.student.name}
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setSequential(false)}>
+                Quitter
+              </Button>
+            </div>
+            <GradeForm
+              key={`${currentSeq.submission.id}-${currentSeq.submission.updated_at}-seq`}
+              submission={currentSeq.submission}
+              maxScore={maxScore}
+              name={currentSeq.student.name}
+              assignmentTitle={assignmentQuery.data?.title ?? ""}
+              instructions={
+                assignmentQuery.data?.instructions || assignmentQuery.data?.description || ""
+              }
+              sequential
+              saved={async () => {
+                await query.refetch();
+              }}
+            />
+          </Surface>
+        ) : sequential && !toGrade.length ? (
+          <Surface className="p-4">
+            <p className="text-sm text-muted-foreground">Toutes les remises sont corrigées.</p>
+            <Button
+              className="mt-2"
+              size="sm"
+              variant="outline"
+              onClick={() => setSequential(false)}
+            >
+              Fermer
+            </Button>
+          </Surface>
+        ) : null}
+
         <TableScroll>
           <table className="w-full min-w-[46rem] text-sm">
             <thead className="sticky top-0 z-10 bg-card text-left text-muted-foreground">
@@ -576,6 +648,9 @@ export function AssignmentGrading({
                           <Status tone="red">Non remis</Status>
                         )}
                         {late && <Status tone="amber">En retard</Status>}
+                        {submission?.edited_after_due ? (
+                          <Status tone="amber">Modifié après l’échéance</Status>
+                        ) : null}
                       </div>
                     </td>
                     <td className="p-3 text-muted-foreground">
@@ -617,6 +692,12 @@ export function AssignmentGrading({
                           submission={submission}
                           maxScore={maxScore}
                           name={student.name}
+                          assignmentTitle={assignmentQuery.data?.title ?? ""}
+                          instructions={
+                            assignmentQuery.data?.instructions ||
+                            assignmentQuery.data?.description ||
+                            ""
+                          }
                           saved={() => query.refetch()}
                         />
                       </td>
@@ -636,33 +717,65 @@ function GradeForm({
   submission,
   maxScore,
   name,
+  assignmentTitle,
+  instructions,
   saved,
+  sequential = false,
 }: {
   submission: Submission;
   maxScore: number;
   name: string;
+  assignmentTitle?: string;
+  instructions?: string;
   saved: () => Promise<unknown>;
+  sequential?: boolean;
 }) {
   const { user } = useAcademy();
   const [score, setScore] = useState(submission.score?.toString() ?? "");
   const [feedback, setFeedback] = useState(submission.feedback ?? "");
-  const save = useMutation({
-    mutationFn: () =>
-      Assignments.grade({
-        submissionId: submission.id,
-        score: Number(score),
-        feedback,
-        gradedBy: user?.id ?? null,
-      }),
-    onSuccess: async () => {
-      await saved();
-      toast.success("Correction enregistrée");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const [aiBusy, setAiBusy] = useState(false);
+  const save = useGradeAssignment();
+
+  const applyAi = async () => {
+    setAiBusy(true);
+    try {
+      const suggestion = await GradeAssistService.suggest({
+        level: null,
+        subject: assignmentTitle ?? "Devoir",
+        instructions: instructions ?? "",
+        response: submission.content_text ?? "",
+        maxScore,
+        targetKind: "assignment",
+        targetId: submission.id,
+        studentId: submission.student_id,
+      });
+      setScore(String(suggestion.suggested_score));
+      setFeedback(suggestion.feedback);
+      toast.message(
+        suggestion.mock
+          ? "Suggestion mock appliquée — à vérifier"
+          : "Suggestion IA appliquée — à vérifier",
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Suggestion indisponible");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold">{name}</h3>
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="font-semibold">{name}</h3>
+        {submission.edited_after_due ? (
+          <Status tone="amber">Modifié après l’échéance</Status>
+        ) : null}
+      </div>
+      {submission.submitted_at ? (
+        <p className="text-sm text-muted-foreground">
+          Remis le {formatFrDate(submission.submitted_at)}
+        </p>
+      ) : null}
       <div>
         <p className="text-sm text-muted-foreground">Réponse écrite</p>
         <p className="whitespace-pre-wrap">
@@ -685,18 +798,50 @@ function GradeForm({
         Retour au participant
         <Textarea className="mt-1" value={feedback} onChange={(e) => setFeedback(e.target.value)} />
       </label>
-      <Button
-        disabled={
-          !score.trim() ||
-          !Number.isFinite(Number(score)) ||
-          Number(score) < 0 ||
-          Number(score) > maxScore ||
-          save.isPending
-        }
-        onClick={() => save.mutate()}
-      >
-        {submission.status === "graded" ? "Mettre à jour la correction" : "Marquer comme corrigé"}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          disabled={aiBusy || save.isPending}
+          onClick={() => void applyAi()}
+        >
+          {aiBusy ? "Suggestion…" : "Suggestion IA"}
+        </Button>
+        <Button
+          disabled={
+            !score.trim() ||
+            !Number.isFinite(Number(score)) ||
+            Number(score) < 0 ||
+            Number(score) > maxScore ||
+            save.isPending
+          }
+          onClick={() =>
+            save.mutate(
+              {
+                submissionId: submission.id,
+                score: Number(score),
+                feedback,
+                gradedBy: user?.id ?? null,
+                assignmentId: submission.assignment_id,
+              },
+              {
+                onSuccess: async () => {
+                  await saved();
+                  toast.success(
+                    sequential ? "Correction enregistrée — suivant" : "Correction enregistrée",
+                  );
+                },
+                onError: (e: Error) => toast.error(e.message),
+              },
+            )
+          }
+        >
+          {sequential
+            ? "Enregistrer et suivant"
+            : submission.status === "graded"
+              ? "Mettre à jour la correction"
+              : "Marquer comme corrigé"}
+        </Button>
+      </div>
     </div>
   );
 }

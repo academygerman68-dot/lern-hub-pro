@@ -43,6 +43,14 @@ export const queryKeys = {
     all: ["assignments"] as const,
     byClass: (classId: string) => ["assignments", "class", classId] as const,
   },
+  submissions: {
+    all: ["submissions"] as const,
+    byAssignment: (assignmentId: string) => ["submissions", assignmentId] as const,
+    byStudent: (studentId: string) => ["submissions", "student", studentId] as const,
+  },
+  corrections: {
+    all: ["corrections"] as const,
+  },
   exams: {
     all: ["exams"] as const,
     published: ["exams", "published"] as const,

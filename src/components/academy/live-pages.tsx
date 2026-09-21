@@ -33,7 +33,7 @@ import {
   zoomHrefForViewer,
   zoomMeetingDurationMinutes,
 } from "@/lib/live-meeting";
-import { LiveSessionService } from "@/services/academy-services";
+import { LiveSessionService, RecordingService } from "@/services/academy-services";
 import type { LiveSessionListItem } from "@/services/supabase/live-session-service";
 import { useAcademy } from "./academy-context";
 import { JitsiMeetingEmbed } from "./jitsi-meeting";
@@ -259,6 +259,7 @@ function LiveSessionLobby() {
   const [monthOpen, setMonthOpen] = useState(false);
   const [monthClassId, setMonthClassId] = useState("");
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [liveTab, setLiveTab] = useState<"upcoming" | "replays">("upcoming");
 
   const myTeacherId = useMemo(
     () =>
@@ -381,8 +382,8 @@ function LiveSessionLobby() {
         title="En direct"
         subtitle={
           isStaff
-            ? "Prochaine séance, planning et replays — Jitsi par défaut, Zoom d’urgence si besoin."
-            : "Rejoignez le cours de votre groupe et consultez le planning."
+            ? "Séances à venir et replays — le calendrier reste dédié au planning."
+            : "Rejoignez le cours de votre groupe et retrouvez les replays."
         }
         action={
           isStaff ? (
@@ -396,238 +397,322 @@ function LiveSessionLobby() {
         }
       />
 
-      <QueryState
-        isLoading={sessionsQuery.isLoading}
-        isError={sessionsQuery.isError}
-        error={sessionsQuery.error}
-        isEmpty={!hasAny && !sessionsQuery.isLoading}
-        emptyTitle="Aucune séance"
-        emptyMessage={
-          isStaff
-            ? "Planifiez une séance en direct pour un groupe."
-            : "Les séances de votre groupe apparaîtront ici."
-        }
-        onRetry={() => void sessionsQuery.refetch()}
-      >
-        <div className="space-y-10">
-          {/* A. Hero */}
-          {hero ? (
-            <Surface className="overflow-hidden border-primary/15 p-0">
-              <div className="bg-primary px-5 py-6 text-primary-foreground sm:px-8 sm:py-8">
-                <p className="text-xs font-medium tracking-wide text-primary-foreground/70 uppercase">
-                  {hero.status === "live" ? "En cours maintenant" : "Prochaine séance"}
-                </p>
-                <h2 className="mt-2 font-display text-2xl font-normal tracking-tight sm:text-3xl">
-                  {hero.title}
-                </h2>
-                <p className="mt-2 text-sm text-primary-foreground/75">
-                  {formatLiveDate(hero.starts_at)} · {formatLiveTime(hero.starts_at)}
-                  {hero.ends_at ? ` – ${formatLiveTime(hero.ends_at)}` : ""}
-                </p>
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <span className="rounded-md bg-primary-foreground/15 px-2 py-0.5 text-xs">
-                    {teacherLabel(hero)}
-                  </span>
-                  {hero.class?.level?.code ? (
-                    <span className="rounded-md bg-primary-foreground/15 px-2 py-0.5 text-xs font-semibold">
-                      {hero.class.level.code}
-                    </span>
-                  ) : null}
-                  {hero.class?.name ? (
+      <div className="mb-5 flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant={liveTab === "upcoming" ? "default" : "outline"}
+          onClick={() => setLiveTab("upcoming")}
+        >
+          À venir
+        </Button>
+        <Button
+          size="sm"
+          variant={liveTab === "replays" ? "default" : "outline"}
+          onClick={() => setLiveTab("replays")}
+        >
+          Replays
+        </Button>
+      </div>
+
+      {liveTab === "replays" ? (
+        <QueryState
+          isLoading={recordingsQuery.isLoading}
+          isError={recordingsQuery.isError}
+          error={recordingsQuery.error}
+          isEmpty={!recordingsQuery.data?.length}
+          emptyTitle="Aucun replay"
+          emptyMessage="Les enregistrements prêts apparaîtront ici."
+          onRetry={() => void recordingsQuery.refetch()}
+        >
+          <div className="space-y-3">
+            {(recordingsQuery.data ?? []).map((row) => (
+              <Surface
+                key={row.id}
+                className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="font-medium">{row.title || "Replay"}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(row.created_at).toLocaleString("fr-FR")}
+                    {row.class_id ? ` · Groupe` : ""}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={row.status !== "ready"}
+                  onClick={() => {
+                    void (async () => {
+                      try {
+                        const url = await RecordingService.getSignedUrl(row);
+                        window.open(url, "_blank", "noopener,noreferrer");
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : "Lecture impossible");
+                      }
+                    })();
+                  }}
+                >
+                  {row.status === "ready" ? "Lire" : "Indisponible"}
+                </Button>
+              </Surface>
+            ))}
+          </div>
+        </QueryState>
+      ) : null}
+
+      {liveTab === "upcoming" ? (
+        <QueryState
+          isLoading={sessionsQuery.isLoading}
+          isError={sessionsQuery.isError}
+          error={sessionsQuery.error}
+          isEmpty={!hasAny && !sessionsQuery.isLoading}
+          emptyTitle="Aucune séance"
+          emptyMessage={
+            isStaff
+              ? "Planifiez une séance en direct pour un groupe."
+              : "Les séances de votre groupe apparaîtront ici."
+          }
+          onRetry={() => void sessionsQuery.refetch()}
+        >
+          <div className="space-y-10">
+            {/* A. Hero */}
+            {hero ? (
+              <Surface className="overflow-hidden border-primary/15 p-0">
+                <div className="bg-primary px-5 py-6 text-primary-foreground sm:px-8 sm:py-8">
+                  <p className="text-xs font-medium tracking-wide text-primary-foreground/70 uppercase">
+                    {hero.status === "live" ? "En cours maintenant" : "Prochaine séance"}
+                  </p>
+                  <h2 className="mt-2 font-display text-2xl font-normal tracking-tight sm:text-3xl">
+                    {hero.title}
+                  </h2>
+                  <p className="mt-2 text-sm text-primary-foreground/75">
+                    {formatLiveDate(hero.starts_at)} · {formatLiveTime(hero.starts_at)}
+                    {hero.ends_at ? ` – ${formatLiveTime(hero.ends_at)}` : ""}
+                  </p>
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
                     <span className="rounded-md bg-primary-foreground/15 px-2 py-0.5 text-xs">
-                      {hero.class.name}
+                      {teacherLabel(hero)}
                     </span>
+                    {hero.class?.level?.code ? (
+                      <span className="rounded-md bg-primary-foreground/15 px-2 py-0.5 text-xs font-semibold">
+                        {hero.class.level.code}
+                      </span>
+                    ) : null}
+                    {hero.class?.name ? (
+                      <span className="rounded-md bg-primary-foreground/15 px-2 py-0.5 text-xs">
+                        {hero.class.name}
+                      </span>
+                    ) : null}
+                    <span className="rounded-md bg-primary-foreground/15 px-2 py-0.5 text-xs">
+                      {liveStatusLabel(hero.status)}
+                    </span>
+                    <span className="rounded-md bg-primary-foreground/10 px-2 py-0.5 text-xs opacity-80">
+                      {videoProviderLabel(hero.video_provider, isZoomActive(hero.video_provider))}
+                    </span>
+                  </div>
+                  {hero.status === "scheduled" ? (
+                    <p className="mt-4 text-sm text-primary-foreground/80">
+                      Début dans {formatCountdown(new Date(hero.starts_at).getTime(), nowTick)}
+                    </p>
                   ) : null}
-                  <span className="rounded-md bg-primary-foreground/15 px-2 py-0.5 text-xs">
-                    {liveStatusLabel(hero.status)}
-                  </span>
-                  <span className="rounded-md bg-primary-foreground/10 px-2 py-0.5 text-xs opacity-80">
-                    {videoProviderLabel(hero.video_provider, isZoomActive(hero.video_provider))}
-                  </span>
-                </div>
-                {hero.status === "scheduled" ? (
-                  <p className="mt-4 text-sm text-primary-foreground/80">
-                    Début dans {formatCountdown(new Date(hero.starts_at).getTime(), nowTick)}
-                  </p>
-                ) : null}
-                {heroJoinState && !heroJoinState.allowed ? (
-                  <p className="mt-4 text-sm text-primary-foreground/80">
-                    {heroJoinState.reason === "too_early"
-                      ? "Accès disponible à partir de l’heure du créneau."
-                      : heroJoinState.reason === "ended" || heroJoinState.reason === "closed"
-                        ? "Cette séance est fermée."
-                        : "Rejoindre n’est pas encore disponible."}
-                  </p>
-                ) : null}
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    className="min-h-11"
-                    disabled={!heroJoinState?.allowed}
-                    title={
-                      !heroJoinState?.allowed
-                        ? heroJoinState?.reason === "too_early"
-                          ? "Accès disponible à partir de l’heure du créneau."
-                          : "Rejoindre indisponible"
-                        : undefined
-                    }
-                    onClick={() => void startSession(hero)}
-                  >
-                    <Video className="size-4" />
-                    {isStaff ? (hero.status === "live" ? "Rejoindre" : "Démarrer") : "Rejoindre"}
-                  </Button>
-                  {canEditLiveSession(role, hero, myTeacherId) && hero.status !== "cancelled" ? (
+                  {heroJoinState && !heroJoinState.allowed ? (
+                    <p className="mt-4 text-sm text-primary-foreground/80">
+                      {heroJoinState.reason === "too_early"
+                        ? "Accès disponible à partir de l’heure du créneau."
+                        : heroJoinState.reason === "ended" || heroJoinState.reason === "closed"
+                          ? "Cette séance est fermée."
+                          : "Rejoindre n’est pas encore disponible."}
+                    </p>
+                  ) : null}
+                  <div className="mt-5 flex flex-wrap gap-2">
                     <Button
-                      variant="outline"
-                      className="min-h-11 border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                      onClick={() => setEditSession(hero)}
+                      variant="secondary"
+                      className="min-h-11"
+                      disabled={!heroJoinState?.allowed}
+                      title={
+                        !heroJoinState?.allowed
+                          ? heroJoinState?.reason === "too_early"
+                            ? "Accès disponible à partir de l’heure du créneau."
+                            : "Rejoindre indisponible"
+                          : undefined
+                      }
+                      onClick={() => void startSession(hero)}
                     >
-                      Modifier la séance
+                      <Video className="size-4" />
+                      {isStaff ? (hero.status === "live" ? "Rejoindre" : "Démarrer") : "Rejoindre"}
                     </Button>
-                  ) : null}
-                  {isStaff && hero.status === "live" ? (
-                    <Button
-                      variant="outline"
-                      className="min-h-11 border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                      onClick={() => endSession(hero)}
-                    >
-                      Terminer
-                    </Button>
-                  ) : null}
+                    {canEditLiveSession(role, hero, myTeacherId) && hero.status !== "cancelled" ? (
+                      <Button
+                        variant="outline"
+                        className="min-h-11 border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+                        onClick={() => setEditSession(hero)}
+                      >
+                        Modifier la séance
+                      </Button>
+                    ) : null}
+                    {isStaff && hero.status === "live" ? (
+                      <Button
+                        variant="outline"
+                        className="min-h-11 border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+                        onClick={() => endSession(hero)}
+                      >
+                        Terminer
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            </Surface>
-          ) : (
-            <Surface className="p-6 text-center sm:p-8">
-              <Video className="mx-auto size-8 text-muted-foreground" />
-              <h2 className="mt-3 text-base font-semibold">Aucune séance à venir</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Consultez le planning ci-dessous ou les séances récentes.
-              </p>
-            </Surface>
-          )}
-
-          {/* B. Upcoming */}
-          <section className="space-y-3">
-            <h2 className="text-base font-semibold tracking-tight">Séances à venir</h2>
-            {upcomingList.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucune autre séance planifiée.</p>
+              </Surface>
             ) : (
-              <div className="space-y-2">
-                {upcomingList.map((item) => {
-                  const joinState = getLiveSessionJoinState({
-                    startsAt: item.starts_at,
-                    endsAt: item.ends_at,
-                    status: item.status,
-                    isStaff,
-                  });
-                  return (
-                    <Surface
-                      key={item.id}
-                      className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{item.title}</p>
-                          <Status tone="amber">{liveStatusLabel(item.status)}</Status>
-                        </div>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {formatLiveTime(item.starts_at)}
-                          {item.ends_at ? ` – ${formatLiveTime(item.ends_at)}` : ""} ·{" "}
-                          {formatLiveDate(item.starts_at)}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          <GroupBadge label={item.class?.name ?? null} />
-                          {item.class?.level?.code ? (
-                            <LevelBadge code={item.class.level.code} />
-                          ) : null}
-                          <span className="text-xs text-muted-foreground">
-                            {teacherLabel(item)}
-                          </span>
-                        </div>
-                        {!joinState.allowed && joinState.reason === "too_early" ? (
-                          <p className="mt-2 text-xs text-muted-foreground">
-                            Accès à partir de l’heure du créneau.
+              <Surface className="p-6 text-center sm:p-8">
+                <Video className="mx-auto size-8 text-muted-foreground" />
+                <h2 className="mt-3 text-base font-semibold">Aucune séance à venir</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Consultez le planning ci-dessous ou les séances récentes.
+                </p>
+              </Surface>
+            )}
+
+            {/* B. Upcoming */}
+            <section className="space-y-3">
+              <h2 className="text-base font-semibold tracking-tight">Séances à venir</h2>
+              {upcomingList.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aucune autre séance planifiée.</p>
+              ) : (
+                <div className="space-y-2">
+                  {upcomingList.map((item) => {
+                    const joinState = getLiveSessionJoinState({
+                      startsAt: item.starts_at,
+                      endsAt: item.ends_at,
+                      status: item.status,
+                      isStaff,
+                    });
+                    return (
+                      <Surface
+                        key={item.id}
+                        className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium">{item.title}</p>
+                            <Status tone="amber">{liveStatusLabel(item.status)}</Status>
+                          </div>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {formatLiveTime(item.starts_at)}
+                            {item.ends_at ? ` – ${formatLiveTime(item.ends_at)}` : ""} ·{" "}
+                            {formatLiveDate(item.starts_at)}
                           </p>
-                        ) : null}
-                      </div>
-                      <div className="flex shrink-0 flex-wrap gap-2">
-                        {canEditLiveSession(role, item, myTeacherId) ? (
-                          <Button size="sm" variant="outline" onClick={() => setEditSession(item)}>
-                            Modifier
-                          </Button>
-                        ) : null}
-                        <Button
-                          size="sm"
-                          className="min-h-11"
-                          disabled={!joinState.allowed}
-                          title={
-                            !joinState.allowed
-                              ? joinState.reason === "too_early"
-                                ? "Accès disponible à partir de l’heure du créneau."
-                                : "Rejoindre indisponible"
-                              : undefined
-                          }
-                          onClick={() => void startSession(item)}
-                        >
-                          {isStaff ? "Démarrer" : "Rejoindre"}
-                        </Button>
-                      </div>
-                    </Surface>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* C. Planning */}
-          <LiveScheduleSection />
-
-          {/* D. Recent */}
-          <section className="space-y-3">
-            <h2 className="text-base font-semibold tracking-tight">Séances récentes</h2>
-            {recent.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Aucune séance terminée pour l’instant.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {recent.map((item) => {
-                  const replay = (recordingsQuery.data ?? []).find(
-                    (r) => r.live_session_id === item.id && r.status === "ready",
-                  );
-                  return (
-                    <Surface
-                      key={item.id}
-                      className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{item.title}</p>
-                          <Status tone="gray">{liveStatusLabel(item.status)}</Status>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            <GroupBadge label={item.class?.name ?? null} />
+                            {item.class?.level?.code ? (
+                              <LevelBadge code={item.class.level.code} />
+                            ) : null}
+                            <span className="text-xs text-muted-foreground">
+                              {teacherLabel(item)}
+                            </span>
+                          </div>
+                          {!joinState.allowed && joinState.reason === "too_early" ? (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Accès à partir de l’heure du créneau.
+                            </p>
+                          ) : null}
                         </div>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {formatLiveDate(item.starts_at)} · {item.class?.name ?? "—"}
-                        </p>
-                      </div>
-                      {replay ? (
-                        <Button size="sm" variant="outline" onClick={() => navigate("recordings")}>
-                          Voir le replay
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Terminée</span>
-                      )}
-                    </Surface>
-                  );
-                })}
-              </div>
-            )}
-            {recordingProvider.data?.configured === false ? (
-              <p className="text-xs text-muted-foreground">Enregistrement non configuré</p>
-            ) : null}
-          </section>
-        </div>
-      </QueryState>
+                        <div className="flex shrink-0 flex-wrap gap-2">
+                          {canEditLiveSession(role, item, myTeacherId) ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditSession(item)}
+                            >
+                              Modifier
+                            </Button>
+                          ) : null}
+                          <Button
+                            size="sm"
+                            className="min-h-11"
+                            disabled={!joinState.allowed}
+                            title={
+                              !joinState.allowed
+                                ? joinState.reason === "too_early"
+                                  ? "Accès disponible à partir de l’heure du créneau."
+                                  : "Rejoindre indisponible"
+                                : undefined
+                            }
+                            onClick={() => void startSession(item)}
+                          >
+                            {isStaff ? "Démarrer" : "Rejoindre"}
+                          </Button>
+                        </div>
+                      </Surface>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            {/* C. Planning */}
+            <LiveScheduleSection />
+
+            {/* D. Recent */}
+            <section className="space-y-3">
+              <h2 className="text-base font-semibold tracking-tight">Séances récentes</h2>
+              {recent.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Aucune séance terminée pour l’instant.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {recent.map((item) => {
+                    const replay = (recordingsQuery.data ?? []).find(
+                      (r) => r.live_session_id === item.id && r.status === "ready",
+                    );
+                    return (
+                      <Surface
+                        key={item.id}
+                        className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium">{item.title}</p>
+                            <Status tone="gray">{liveStatusLabel(item.status)}</Status>
+                          </div>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {formatLiveDate(item.starts_at)} · {item.class?.name ?? "—"}
+                          </p>
+                        </div>
+                        {replay ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              void (async () => {
+                                try {
+                                  const url = await RecordingService.getSignedUrl(replay);
+                                  window.open(url, "_blank", "noopener,noreferrer");
+                                } catch (err) {
+                                  toast.error(
+                                    err instanceof Error ? err.message : "Lecture impossible",
+                                  );
+                                }
+                              })();
+                            }}
+                          >
+                            Voir le replay
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Terminée</span>
+                        )}
+                      </Surface>
+                    );
+                  })}
+                </div>
+              )}
+              {recordingProvider.data?.configured === false ? (
+                <p className="text-xs text-muted-foreground">Enregistrement non configuré</p>
+              ) : null}
+            </section>
+          </div>
+        </QueryState>
+      ) : null}
 
       {open && (
         <div className="mobile-modal">

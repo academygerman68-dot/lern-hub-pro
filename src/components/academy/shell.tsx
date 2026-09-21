@@ -14,7 +14,6 @@ import {
   LogOut,
   Menu,
   MessageSquare,
-  Film,
   Settings,
   UserRound,
   Users,
@@ -50,7 +49,6 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
         ["progress", "nav.progress", BarChart3],
         ["live", "nav.live", Video],
         ["calendar", "nav.calendar", CalendarDays],
-        ["recordings", "nav.recordings", Film],
       ],
     },
     {
@@ -74,8 +72,8 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
         ["materials", "nav.materials", Library],
         ["assignments", "nav.assignments", ClipboardCheck],
         ["exams", "nav.exams", FileText],
+        ["corrections", "nav.corrections", ClipboardCheck],
         ["live", "nav.live", Video],
-        ["recordings", "nav.recordings", Film],
       ],
     },
     {
@@ -105,8 +103,8 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
       items: [
         ["assignments", "nav.assignments", ClipboardCheck],
         ["exams", "nav.exams", FileText],
+        ["corrections", "nav.corrections", ClipboardCheck],
         ["live", "nav.live", Video],
-        ["recordings", "nav.recordings", Film],
       ],
     },
     {

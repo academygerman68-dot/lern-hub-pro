@@ -1,5 +1,10 @@
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { sanitizeQuestionMetadataForStudent } from "@/lib/exam-form-fill";
+import {
+  parseCompletenessReport,
+  validateExamAudioFile,
+  type ExamCompletenessReport,
+} from "@/lib/exam-completeness";
 import { isManualQuestionType } from "@/lib/exam-writing";
 import type { Database, Json } from "@/types/database";
 
@@ -139,7 +144,124 @@ export const SupabaseExamService = {
       .eq("status", "published")
       .order("published_at", { ascending: false });
     if (error) throw error;
-    return (data as ExamListItem[] | null) ?? [];
+    const rows = (data as ExamListItem[] | null) ?? [];
+    const completeFlags = await Promise.all(
+      rows.map(async (exam) => {
+        try {
+          const { data: ok, error: completeError } = await requireClient().rpc("exam_is_complete", {
+            p_exam_id: exam.id,
+          });
+          if (completeError) return false;
+          return Boolean(ok);
+        } catch {
+          return false;
+        }
+      }),
+    );
+    return rows.filter((_, index) => completeFlags[index]);
+  },
+
+  async getExamCompleteness(examId: string): Promise<ExamCompletenessReport> {
+    const { data, error } = await requireClient().rpc("exam_completeness_report", {
+      p_exam_id: examId,
+    });
+    if (error) throw error;
+    return parseCompletenessReport(data);
+  },
+
+  async getQuestionAudioSignedUrl(
+    question: Pick<ExamQuestion, "media_bucket" | "media_path" | "metadata">,
+    expiresIn = 3600,
+  ): Promise<string | null> {
+    const meta = asMetaRecord(question.metadata);
+    if (question.media_bucket && question.media_path) {
+      const { data, error } = await requireClient()
+        .storage.from(question.media_bucket)
+        .createSignedUrl(question.media_path, expiresIn);
+      if (error) throw error;
+      return data.signedUrl;
+    }
+    const external = meta["audio_url"];
+    if (typeof external === "string" && external.trim()) return external.trim();
+    return null;
+  },
+
+  async uploadQuestionAudio(questionId: string, file: File) {
+    const fileError = validateExamAudioFile(file);
+    if (fileError) throw new Error(fileError);
+    const supabase = requireClient();
+    const { data: existing, error: loadError } = await supabase
+      .from("exam_questions")
+      .select("id, media_bucket, media_path, metadata")
+      .eq("id", questionId)
+      .maybeSingle();
+    if (loadError) throw loadError;
+    if (!existing) throw new Error("Question introuvable.");
+
+    const ext = file.name.split(".").pop()?.toLowerCase() || "mp3";
+    const path = `exam-audio/${questionId}/${crypto.randomUUID()}.${ext}`;
+    const contentType =
+      file.type ||
+      (ext === "wav" ? "audio/wav" : ext === "m4a" ? "audio/mp4" : "audio/mpeg");
+    const { error: uploadError } = await supabase.storage
+      .from("course-materials")
+      .upload(path, file, {
+        upsert: false,
+        contentType,
+      });
+    if (uploadError) throw uploadError;
+
+    if (existing.media_bucket && existing.media_path) {
+      void supabase.storage.from(existing.media_bucket).remove([existing.media_path]);
+    }
+
+    const meta = asMetaRecord(existing.metadata);
+    delete meta["audio_url"];
+    const { data, error } = await supabase
+      .from("exam_questions")
+      .update({
+        media_bucket: "course-materials",
+        media_path: path,
+        metadata: meta as Json,
+      })
+      .eq("id", questionId)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async clearQuestionAudio(questionId: string) {
+    const supabase = requireClient();
+    const { data: existing, error: loadError } = await supabase
+      .from("exam_questions")
+      .select("id, media_bucket, media_path, metadata")
+      .eq("id", questionId)
+      .maybeSingle();
+    if (loadError) throw loadError;
+    if (!existing) throw new Error("Question introuvable.");
+
+    if (existing.media_bucket && existing.media_path) {
+      const { error: removeError } = await supabase.storage
+        .from(existing.media_bucket)
+        .remove([existing.media_path]);
+      if (removeError) throw removeError;
+    }
+
+    const meta = asMetaRecord(existing.metadata);
+    delete meta["audio_url"];
+    const { data, error } = await supabase
+      .from("exam_questions")
+      .update({
+        media_bucket: null,
+        media_path: null,
+        metadata: meta as Json,
+      })
+      .eq("id", questionId)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data;
   },
 
   async listAll(): Promise<ExamListItem[]> {
@@ -176,18 +298,41 @@ export const SupabaseExamService = {
     if (!data) return null;
 
     const detail = data as ExamDetail;
-    detail.sections = (detail.sections ?? [])
-      .map((section) => ({
-        ...section,
-        questions: (section.questions ?? [])
-          .map((q) => ({
-            ...q,
-            metadata: (sanitizeQuestionMetadataForStudent(asMetaRecord(q.metadata)) ?? {}) as Json,
-            options: (q.options ?? []).slice().sort((a, b) => a.sort_order - b.sort_order),
-          }))
-          .sort((a, b) => a.sort_order - b.sort_order),
-      }))
-      .sort((a, b) => a.sort_order - b.sort_order);
+    detail.sections = await Promise.all(
+      (detail.sections ?? [])
+        .slice()
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map(async (section) => ({
+          ...section,
+          questions: await Promise.all(
+            (section.questions ?? [])
+              .slice()
+              .sort((a, b) => a.sort_order - b.sort_order)
+              .map(async (q) => {
+                const safeMeta = sanitizeQuestionMetadataForStudent(asMetaRecord(q.metadata)) ?? {};
+                // Never expose storage paths or scripts — inject a short-lived signed URL when needed.
+                delete safeMeta["audio_script"];
+                delete safeMeta["media_path"];
+                delete safeMeta["media_bucket"];
+                try {
+                  const signed = await this.getQuestionAudioSignedUrl(q);
+                  if (signed) safeMeta["audio_url"] = signed;
+                  else delete safeMeta["audio_url"];
+                } catch {
+                  delete safeMeta["audio_url"];
+                  safeMeta["audio_error"] = "Lecture audio indisponible";
+                }
+                return {
+                  ...q,
+                  media_bucket: null,
+                  media_path: null,
+                  metadata: safeMeta as Json,
+                  options: (q.options ?? []).slice().sort((a, b) => a.sort_order - b.sort_order),
+                };
+              }),
+          ),
+        })),
+    );
 
     return detail;
   },
@@ -283,7 +428,18 @@ export const SupabaseExamService = {
   },
 
   async publishExam(id: string) {
-    return this.updateExam(id, { status: "published", published_at: new Date().toISOString() });
+    const { data, error } = await requireClient().rpc("publish_exam", { p_exam_id: id });
+    if (error) {
+      const message = error.message ?? "";
+      if (message.includes("EXAM_INCOMPLETE")) {
+        const detail = error.details || message.replace(/^EXAM_INCOMPLETE:\s*/i, "");
+        throw new Error(
+          `Examen incomplet — publication impossible.${detail ? ` ${detail}` : ""}`,
+        );
+      }
+      throw error;
+    }
+    return data as Exam;
   },
 
   async archiveExam(id: string) {
@@ -438,6 +594,11 @@ export const SupabaseExamService = {
       }
       if (message.includes("EXAM_NOT_PUBLISHED")) {
         throw new Error("Cet examen n’est plus publié.");
+      }
+      if (message.includes("EXAM_INCOMPLETE")) {
+        throw new Error(
+          "Cet examen n’est pas prêt (audio Hören ou contenu incomplet). Contactez votre professeur.",
+        );
       }
       throw error;
     }

@@ -60,6 +60,7 @@ import { FinancePages } from "./finance-pages";
 import { useClassSelection } from "./class-selection";
 import { PeoplePicker } from "./people-picker";
 import { AuditPage } from "./workflow-pages";
+import { CorrectionsCenter } from "./corrections-center";
 
 function trimTime(value: string | null | undefined) {
   if (!value) return "21:00";
@@ -73,6 +74,7 @@ export function TeacherPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "students") return <TeacherStudents />;
   if (page === "courses" || page === "lessons") return <DirectorCoursesPage />;
   if (page === "assignments") return <DirectorAssignmentsPage />;
+  if (page === "corrections") return <CorrectionsCenter />;
   if (page === "calendar") return <CalendarPage />;
   if (page === "materials") return <MaterialsLibraryPage />;
   if (page === "exams") return <DirectorExamsPage />;
@@ -229,6 +231,7 @@ export function DirectorPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "audit") return <AuditPage />;
   if (page === "materials") return <MaterialsLibraryPage />;
   if (page === "assignments") return <DirectorAssignmentsPage />;
+  if (page === "corrections") return <CorrectionsCenter />;
   if (page === "calendar") return <CalendarPage />;
   if (page === "live" || page === "meeting")
     return <LiveClassesPage meeting={page === "meeting"} />;

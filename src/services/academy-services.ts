@@ -16,6 +16,7 @@ import { SupabaseNotificationService } from "@/services/supabase/notification-se
 import { SupabaseLiveSessionService } from "@/services/supabase/live-session-service";
 import { AuthError, SupabaseAuthService } from "@/services/supabase/auth-service";
 import { SupabaseProfileService } from "@/services/supabase/profile-service";
+import { SupabaseGradeAssistService } from "@/services/supabase/grade-assist-service";
 import { isDemoAuthAllowed } from "@/lib/auth-config";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { authenticate } from "@/lib/academy-logic";
@@ -662,6 +663,16 @@ export const AssignmentService = {
     if (!isSupabaseConfigured) return [];
     return SupabaseAssignmentService.listSubmissions(assignmentId);
   },
+  async listSubmissionsForStudent(studentId: string) {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseAssignmentService.listSubmissionsForStudent(studentId);
+  },
+};
+
+export const GradeAssistService = {
+  async suggest(input: Parameters<typeof SupabaseGradeAssistService.suggest>[0]) {
+    return SupabaseGradeAssistService.suggest(input);
+  },
 };
 
 export const ExamService = {
@@ -741,6 +752,33 @@ export const ExamService = {
   async publishExam(id: string) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseExamService.publishExam(id);
+  },
+  async getExamCompleteness(examId: string) {
+    if (!isSupabaseConfigured) {
+      return {
+        ok: false,
+        issues: ["Supabase non configuré"],
+        horenReady: 0,
+        horenTotal: 0,
+        questionCount: 0,
+      };
+    }
+    return SupabaseExamService.getExamCompleteness(examId);
+  },
+  async uploadQuestionAudio(questionId: string, file: File) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.uploadQuestionAudio(questionId, file);
+  },
+  async clearQuestionAudio(questionId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.clearQuestionAudio(questionId);
+  },
+  async getQuestionAudioSignedUrl(
+    question: Parameters<typeof SupabaseExamService.getQuestionAudioSignedUrl>[0],
+    expiresIn?: number,
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.getQuestionAudioSignedUrl(question, expiresIn);
   },
   async archiveExam(id: string) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");

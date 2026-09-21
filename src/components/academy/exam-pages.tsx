@@ -48,6 +48,7 @@ import {
   isManualQuestionType,
   studentExamProgressLabel,
 } from "@/lib/exam-writing";
+import { examCatalogAction } from "@/lib/exam-labels";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { ExamBuilder } from "./exam-builder";
 import { useAcademy } from "./academy-context";
@@ -187,11 +188,11 @@ function StudentExamCatalog() {
             const latest = latestByExam.get(exam.id);
             const hasUngradedWriting =
               latest?.status === "submitted" || latest?.status === "expired";
-            const progressLabel = studentExamProgressLabel(latest?.status, hasUngradedWriting);
-            const isTodo = progressLabel === "À faire";
-            const isInProgress = progressLabel === "En cours";
-            const isDone =
-              progressLabel === "Terminé" || progressLabel === "En attente de correction";
+            const catalog = examCatalogAction({
+              latestStatus: latest?.status,
+              hasUngradedWriting,
+            });
+            const progressLabel = catalog.label;
             const maxAttempts = Math.max(1, Number(exam.max_attempts ?? 3));
             const completedAttempts = countCompletedExamAttempts(attemptsQuery.data ?? [], exam.id);
             const attemptsLeft = examAttemptsLeft(completedAttempts, maxAttempts);
@@ -236,15 +237,15 @@ function StudentExamCatalog() {
                   </div>
                   <Status tone={progressTone(progressLabel)}>{progressLabel}</Status>
                 </div>
-                {latest && isDone && (
+                {latest && (catalog.action === "final" || catalog.action === "provisional") ? (
                   <p className="mt-4 text-sm text-muted-foreground">
-                    {progressLabel === "Terminé" && latest.percentage != null
+                    {catalog.action === "final" && latest.percentage != null
                       ? `Score : ${Number(latest.percentage).toFixed(0)} %`
-                      : progressLabel === "En attente de correction"
+                      : catalog.action === "provisional"
                         ? "Score partiel disponible — écrit en attente de correction"
                         : null}
                   </p>
-                )}
+                ) : null}
                 <div className="mt-5 flex flex-wrap gap-2">
                   {(exam.content_url || exam.storage_path) && (
                     <Button
@@ -260,27 +261,23 @@ function StudentExamCatalog() {
                       Ouvrir le document
                     </Button>
                   )}
-                  {isTodo ? (
+                  {catalog.action === "start" ? (
                     <Button disabled={startExam.isPending} onClick={launchExam}>
-                      Commencer
+                      {catalog.cta}
                     </Button>
                   ) : null}
-                  {isInProgress ? (
+                  {catalog.action === "resume" && latest?.status === "in_progress" ? (
                     <Button
                       disabled={startExam.isPending}
                       onClick={() => {
-                        if (latest) {
-                          persistExamSession(exam.id, latest.id);
-                          navigate("mock-exam");
-                          return;
-                        }
-                        launchExam();
+                        persistExamSession(exam.id, latest.id);
+                        navigate("mock-exam");
                       }}
                     >
-                      Reprendre
+                      {catalog.cta}
                     </Button>
                   ) : null}
-                  {isDone ? (
+                  {catalog.action === "provisional" || catalog.action === "final" ? (
                     <>
                       {latest ? (
                         <Button
@@ -290,7 +287,7 @@ function StudentExamCatalog() {
                             navigate("exam-result");
                           }}
                         >
-                          Voir le résultat
+                          {catalog.cta}
                         </Button>
                       ) : null}
                       {allowRetake ? (
@@ -497,18 +494,28 @@ function StudentExamRunner() {
               {current?.prompt}
             </h2>
 
-            {current?.type === "listening" && (
+            {(current?.type === "listening" || current?.skill === "hoeren") && (
               <div className="mt-5 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2 font-medium text-foreground">
                   <Headphones className="size-4" />
                   Audio
                 </div>
                 {audioUrl ? (
-                  <audio className="mt-3 w-full" controls src={audioUrl} preload="none">
+                  <audio
+                    key={audioUrl}
+                    className="mt-3 w-full"
+                    controls
+                    src={audioUrl}
+                    preload="metadata"
+                  >
                     Votre navigateur ne prend pas en charge l’audio.
                   </audio>
                 ) : (
-                  <p className="mt-2">Audio bientôt disponible</p>
+                  <p className="mt-2 text-destructive">
+                    {typeof currentMeta["audio_error"] === "string"
+                      ? currentMeta["audio_error"]
+                      : "Audio indisponible pour cette question. Contactez votre professeur."}
+                  </p>
                 )}
               </div>
             )}
@@ -707,6 +714,8 @@ function StudentExamResult() {
   const session = readExamSession();
   const resultQuery = useExamResult(session.attemptId);
   const [showReview, setShowReview] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState<"all" | "correct" | "incorrect">("all");
+  const [reviewIndex, setReviewIndex] = useState(0);
   const reviewQuery = useExamAttemptReview(showReview ? session.attemptId : null);
 
   const skills = resultQuery.data?.skills ?? {};
@@ -718,6 +727,26 @@ function StudentExamResult() {
     ? (resultQuery.data?.automaticMax ?? 40)
     : (resultQuery.data?.maxScore ?? 50);
   const displayPct = displayMax > 0 ? Math.round((displayScore / displayMax) * 10000) / 100 : 0;
+
+  const objectiveItems = useMemo(
+    () => (reviewQuery.data?.items ?? []).filter((item) => !isManualQuestionType(item.type)),
+    [reviewQuery.data?.items],
+  );
+  const writingItems = useMemo(
+    () => (reviewQuery.data?.items ?? []).filter((item) => isManualQuestionType(item.type)),
+    [reviewQuery.data?.items],
+  );
+  const filteredObjective = useMemo(() => {
+    if (reviewFilter === "correct") return objectiveItems.filter((i) => i.is_correct === true);
+    if (reviewFilter === "incorrect") return objectiveItems.filter((i) => i.is_correct === false);
+    return objectiveItems;
+  }, [objectiveItems, reviewFilter]);
+
+  useEffect(() => {
+    setReviewIndex(0);
+  }, [reviewFilter, showReview]);
+
+  const currentReview = filteredObjective[reviewIndex] ?? null;
 
   const formatStudentAnswer = (item: {
     type: string;
@@ -774,25 +803,31 @@ function StudentExamResult() {
           Examens blancs
         </button>
         <section className="grid items-center gap-8 rounded-2xl bg-primary p-8 text-primary-foreground md:grid-cols-[auto_1fr] md:p-12">
-          <div className="grid size-36 place-items-center rounded-full border-4 border-primary-foreground/20">
-            <span className="font-display text-4xl">{displayPct.toFixed(0)}%</span>
-          </div>
+          {awaiting ? (
+            <div className="grid size-36 place-items-center rounded-full border-4 border-primary-foreground/20">
+              <span className="font-display text-3xl">
+                {displayScore}/{displayMax}
+              </span>
+            </div>
+          ) : (
+            <div className="grid size-36 place-items-center rounded-full border-4 border-primary-foreground/20">
+              <span className="font-display text-4xl">{displayPct.toFixed(0)}%</span>
+            </div>
+          )}
           <div>
             <p className="text-xs tracking-wide uppercase text-primary-foreground/70">
-              Votre résultat
+              {awaiting ? "Résultat provisoire" : "Résultat final"}
             </p>
             <h1 className="mt-2 font-display text-3xl md:text-4xl">
               {awaiting
-                ? "En attente de correction"
-                : resultQuery.data?.passed
-                  ? "Réussi"
-                  : "À améliorer"}
+                ? `Score auto ${displayScore}/${displayMax}`
+                : `${displayScore}/${displayMax}`}
             </h1>
             <p className="mt-3 max-w-lg text-sm leading-6 text-primary-foreground/75">
               {resultQuery.data?.exam?.title}
               {awaiting
-                ? ` · Score auto ${displayScore}/${displayMax}`
-                : ` · Score final ${displayScore}/${displayMax}`}
+                ? " · Les parties objectives sont corrigées ; l’écrit est en attente."
+                : ` · ${displayPct.toFixed(0)} %`}
             </p>
           </div>
         </section>
@@ -895,41 +930,130 @@ function StudentExamResult() {
               emptyMessage="La correction n’est pas encore disponible."
               onRetry={() => void reviewQuery.refetch()}
             >
-              <div className="space-y-3">
-                {(reviewQuery.data?.items ?? [])
-                  .filter((item) => !isManualQuestionType(item.type))
-                  .map((item) => (
-                    <Surface className="space-y-2 p-4" key={item.question_id}>
+              <div className="mb-4 flex flex-wrap gap-2">
+                {(
+                  [
+                    ["all", "Toutes"],
+                    ["correct", "Correctes"],
+                    ["incorrect", "Incorrectes"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <Button
+                    key={value}
+                    size="sm"
+                    variant={reviewFilter === value ? "default" : "outline"}
+                    onClick={() => setReviewFilter(value)}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+
+              {filteredObjective.length ? (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={reviewIndex <= 0}
+                      onClick={() => setReviewIndex((i) => Math.max(0, i - 1))}
+                    >
+                      Précédent
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      {reviewIndex + 1} / {filteredObjective.length}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={reviewIndex >= filteredObjective.length - 1}
+                      onClick={() =>
+                        setReviewIndex((i) => Math.min(filteredObjective.length - 1, i + 1))
+                      }
+                    >
+                      Suivant
+                    </Button>
+                  </div>
+                  {currentReview ? (
+                    <Surface className="space-y-2 p-4" key={currentReview.question_id}>
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                          {SKILL_LABELS[item.skill] ?? item.section_title}
-                          {item.external_id ? ` · ${shortBankId(item.external_id, "")}` : ""}
+                          {SKILL_LABELS[currentReview.skill] ?? currentReview.section_title}
+                          {currentReview.external_id
+                            ? ` · ${shortBankId(currentReview.external_id, "")}`
+                            : ""}
                         </p>
-                        <Status tone={item.is_correct ? "green" : "amber"}>
-                          {item.is_correct ? "Correct" : "Incorrect"}
+                        <Status tone={currentReview.is_correct ? "green" : "amber"}>
+                          {currentReview.is_correct ? "Correct" : "Incorrect"}
                         </Status>
                       </div>
-                      {item.instruction ? (
-                        <p className="text-sm text-muted-foreground">{item.instruction}</p>
+                      {currentReview.instruction ? (
+                        <p className="text-sm text-muted-foreground">{currentReview.instruction}</p>
                       ) : null}
-                      <p className="text-sm font-medium">{item.prompt}</p>
+                      <p className="text-sm font-medium">{currentReview.prompt}</p>
                       <p className="text-sm">
                         Votre réponse :{" "}
-                        <span className="text-muted-foreground">{formatStudentAnswer(item)}</span>
+                        <span className="text-muted-foreground">
+                          {formatStudentAnswer(currentReview)}
+                        </span>
                       </p>
                       <p className="text-sm">
                         Bonne réponse :{" "}
-                        <span className="text-muted-foreground">{formatCorrectAnswer(item)}</span>
+                        <span className="text-muted-foreground">
+                          {formatCorrectAnswer(currentReview)}
+                        </span>
                       </p>
-                      {item.explanation ? (
-                        <p className="text-sm text-muted-foreground">{item.explanation}</p>
+                      {currentReview.explanation ? (
+                        <p className="text-sm text-muted-foreground">{currentReview.explanation}</p>
                       ) : null}
                       <p className="text-xs text-muted-foreground">
-                        {Number(item.points_awarded ?? 0)}/{item.points} pts
+                        {Number(currentReview.points_awarded ?? 0)}/{currentReview.points} pts
                       </p>
                     </Surface>
-                  ))}
-              </div>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Aucune question pour ce filtre.</p>
+              )}
+
+              {writingItems.length ? (
+                <div className="mt-6 space-y-3">
+                  <h3 className="text-base font-semibold">Écriture</h3>
+                  {writingItems.map((item) => {
+                    const detail =
+                      item.grading_detail &&
+                      typeof item.grading_detail === "object" &&
+                      !Array.isArray(item.grading_detail)
+                        ? (item.grading_detail as Record<string, unknown>)
+                        : {};
+                    return (
+                      <Surface className="space-y-2 p-4" key={item.question_id}>
+                        <p className="text-sm font-medium">{item.prompt}</p>
+                        <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                          {answerValue(item.student_answer) || "—"}
+                        </p>
+                        <p className="text-sm">
+                          Score : {Number(item.points_awarded ?? 0)}/{item.points}
+                        </p>
+                        {Object.keys(detail).length ? (
+                          <div className="space-y-1 text-sm text-muted-foreground">
+                            {Object.entries(RUBRIC_LABELS).map(([key, label]) =>
+                              detail[key] != null ? (
+                                <p key={key}>
+                                  {label} : {String(detail[key])}
+                                </p>
+                              ) : null,
+                            )}
+                          </div>
+                        ) : null}
+                        {item.teacher_comment ? (
+                          <p className="text-sm">Commentaire : {item.teacher_comment}</p>
+                        ) : null}
+                      </Surface>
+                    );
+                  })}
+                </div>
+              ) : null}
             </QueryState>
           </div>
         ) : null}

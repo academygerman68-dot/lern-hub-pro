@@ -1,17 +1,167 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  countHorenAudioReady,
+  EXAM_AUDIO_ACCEPT,
+  questionHasAudio,
+  questionNeedsHorenAudio,
+  validateExamAudioFile,
+  validateExamCompleteness,
+} from "@/lib/exam-completeness";
+import { examQuestionTypeLabel, examSkillLabel } from "@/lib/exam-labels";
 import { ExamService } from "@/services/academy-services";
 import type {
   ExamQuestionType,
   ExamSkill,
+  ExamStructureQuestion,
   ExamStructureSection,
 } from "@/services/supabase/exam-service";
-import { Surface } from "./primitives";
+import { Status, Surface } from "./primitives";
 
 type ChoiceDraft = { label: string; correct: boolean };
+
+const SKILL_GROUP_ORDER = ["lesen", "hoeren", "schreiben"] as const;
+
+function HorenQuestionAudioRow({
+  question,
+  skill,
+  onChanged,
+}: {
+  question: ExamStructureQuestion;
+  skill: string;
+  onChanged: () => Promise<void>;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const ready = questionHasAudio(question);
+  const needsAudio = questionNeedsHorenAudio(skill, question.type);
+
+  if (!needsAudio) {
+    return (
+      <li className="text-sm text-muted-foreground">
+        [{examQuestionTypeLabel(question.type)}] {question.prompt.slice(0, 80)}
+        {question.prompt.length > 80 ? "…" : ""} · {question.points} pt
+      </li>
+    );
+  }
+
+  const listen = async () => {
+    setPreviewError(null);
+    setPreviewUrl(null);
+    setBusy(true);
+    try {
+      const url = await ExamService.getQuestionAudioSignedUrl(question);
+      if (!url) throw new Error("Aucun audio disponible");
+      setPreviewUrl(url);
+    } catch (err) {
+      setPreviewError(err instanceof Error ? err.message : "Lecture impossible");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const upload = async (file: File | null) => {
+    if (!file) return;
+    const reason = validateExamAudioFile(file);
+    if (reason) {
+      toast.error(reason);
+      return;
+    }
+    setBusy(true);
+    try {
+      await ExamService.uploadQuestionAudio(question.id, file);
+      toast.success(ready ? "Audio remplacé" : "Audio ajouté");
+      setPreviewUrl(null);
+      await onChanged();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Téléversement impossible");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <li className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-3 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-medium text-foreground">
+            [{examQuestionTypeLabel(question.type)}] {question.prompt.slice(0, 80)}
+            {question.prompt.length > 80 ? "…" : ""} · {question.points} pt
+          </p>
+          <p className="mt-1">
+            {ready ? (
+              <Status tone="green">✓ Audio disponible</Status>
+            ) : (
+              <Status tone="amber">⚠ Audio manquant</Status>
+            )}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            className="hidden"
+            accept={EXAM_AUDIO_ACCEPT}
+            onChange={(e) => {
+              const file = e.target.files?.[0] ?? null;
+              e.target.value = "";
+              void upload(file);
+            }}
+          />
+          {!ready ? (
+            <Button size="sm" disabled={busy} onClick={() => fileRef.current?.click()}>
+              Ajouter l’audio
+            </Button>
+          ) : (
+            <>
+              <Button size="sm" variant="secondary" disabled={busy} onClick={() => void listen()}>
+                Écouter
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() => fileRef.current?.click()}
+              >
+                Remplacer
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() => {
+                  if (!window.confirm("Supprimer l’audio de cette question ?")) return;
+                  setBusy(true);
+                  void ExamService.clearQuestionAudio(question.id)
+                    .then(async () => {
+                      toast.success("Audio supprimé");
+                      setPreviewUrl(null);
+                      await onChanged();
+                    })
+                    .catch((err: Error) => toast.error(err.message))
+                    .finally(() => setBusy(false));
+                }}
+              >
+                Supprimer
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+      {previewError ? <p className="text-xs text-destructive">{previewError}</p> : null}
+      {previewUrl ? (
+        <audio className="w-full" controls src={previewUrl} preload="metadata">
+          Votre navigateur ne prend pas en charge l’audio.
+        </audio>
+      ) : null}
+    </li>
+  );
+}
 
 export function ExamBuilder({ examId }: { examId: string }) {
   const [sections, setSections] = useState<ExamStructureSection[]>([]);
@@ -46,15 +196,72 @@ export function ExamBuilder({ examId }: { examId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [examId]);
 
-  const isQcm = qType === "single_choice" || qType === "multiple_choice";
+  const isQcm = qType === "single_choice" || qType === "multiple_choice" || qType === "true_false";
+
+  const flatQuestions = useMemo(
+    () =>
+      sections.flatMap((section) =>
+        (section.questions ?? []).map((q) => ({
+          id: q.id,
+          prompt: q.prompt,
+          type: q.type,
+          points: Number(q.points),
+          media_path: q.media_path,
+          media_bucket: q.media_bucket,
+          metadata:
+            q.metadata && typeof q.metadata === "object" && !Array.isArray(q.metadata)
+              ? (q.metadata as Record<string, unknown>)
+              : null,
+          skill: section.skill,
+          sectionTitle: section.title,
+          correct_values: q.answer_key?.correct_values ?? null,
+          teacher_payload:
+            q.answer_key?.teacher_payload &&
+            typeof q.answer_key.teacher_payload === "object" &&
+            !Array.isArray(q.answer_key.teacher_payload)
+              ? (q.answer_key.teacher_payload as Record<string, unknown>)
+              : null,
+        })),
+      ),
+    [sections],
+  );
+
+  const completeness = useMemo(() => validateExamCompleteness(flatQuestions), [flatQuestions]);
+  const horenStats = useMemo(() => countHorenAudioReady(flatQuestions), [flatQuestions]);
+
+  const skillGroups = useMemo(() => {
+    const groups = new Map<
+      string,
+      { skill: string; count: number; points: number; sections: ExamStructureSection[] }
+    >();
+    for (const section of sections) {
+      const key = section.skill || "other";
+      const existing = groups.get(key) ?? {
+        skill: key,
+        count: 0,
+        points: 0,
+        sections: [] as ExamStructureSection[],
+      };
+      const qs = section.questions ?? [];
+      existing.count += qs.length;
+      existing.points += qs.reduce((sum, q) => sum + Number(q.points ?? 0), 0);
+      existing.sections.push(section);
+      groups.set(key, existing);
+    }
+    const ordered = SKILL_GROUP_ORDER.filter((s) => groups.has(s)).map((s) => groups.get(s)!);
+    for (const [key, value] of groups) {
+      if (!(SKILL_GROUP_ORDER as readonly string[]).includes(key)) ordered.push(value);
+    }
+    return ordered;
+  }, [sections]);
 
   return (
     <Surface className="mt-4 space-y-4 border-dashed p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="font-semibold">Constructeur QCM / Writing</h3>
+          <h3 className="font-semibold">Constructeur d’examen</h3>
           <p className="text-sm text-muted-foreground">
-            Ajoutez des sections, questions et réponses. Les QCM sont corrigés automatiquement.
+            Sections, questions, barème et audios Hören. Publication bloquée si incomplet.
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={() => void reload()} disabled={loading}>
@@ -62,25 +269,68 @@ export function ExamBuilder({ examId }: { examId: string }) {
         </Button>
       </div>
 
+      {!loading ? (
+        <div
+          className={`rounded-lg border p-3 text-sm ${
+            completeness.ok
+              ? "border-success/30 bg-success-soft/40"
+              : "border-amber-200 bg-warning-soft/50"
+          }`}
+        >
+          <p className="font-medium">
+            {completeness.ok ? "Examen complet — prêt à publier" : "Examen incomplet"}
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            Écoute : {horenStats.ready} / {horenStats.total} audios prêts
+          </p>
+          {!completeness.ok ? (
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+              {completeness.issues.slice(0, 8).map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+              {completeness.issues.length > 8 ? (
+                <li>+ {completeness.issues.length - 8} autre(s)…</li>
+              ) : null}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+
       {loading ? <p className="text-sm text-muted-foreground">Chargement…</p> : null}
 
-      <div className="space-y-3">
-        {sections.map((section) => (
-          <div key={section.id} className="rounded-lg border border-border p-3">
-            <p className="font-medium">
-              {section.title}{" "}
-              <span className="text-xs text-muted-foreground">
-                · {section.skill} · {section.questions?.length ?? 0} question(s)
+      <div className="space-y-4">
+        {skillGroups.map((group) => (
+          <div key={group.skill} className="space-y-2">
+            <p className="text-sm font-semibold">
+              {examSkillLabel(group.skill)}{" "}
+              <span className="font-normal text-muted-foreground">
+                · {group.count} question{group.count > 1 ? "s" : ""} · {group.points} pt
+                {group.points > 1 ? "s" : ""}
+                {group.skill === "hoeren"
+                  ? ` · ${horenStats.ready}/${horenStats.total} audios prêts`
+                  : ""}
               </span>
             </p>
-            <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-              {(section.questions ?? []).map((q) => (
-                <li key={q.id}>
-                  [{q.type}] {q.prompt.slice(0, 80)}
-                  {q.prompt.length > 80 ? "…" : ""} · {q.points} pt
-                </li>
-              ))}
-            </ul>
+            {group.sections.map((section) => (
+              <div key={section.id} className="rounded-lg border border-border p-3">
+                <p className="font-medium">
+                  {section.title}{" "}
+                  <span className="text-xs text-muted-foreground">
+                    · {examSkillLabel(section.skill)} · {section.questions?.length ?? 0} question(s)
+                  </span>
+                </p>
+                <ul className="mt-2 space-y-2">
+                  {(section.questions ?? []).map((q) => (
+                    <HorenQuestionAudioRow
+                      key={q.id}
+                      question={q}
+                      skill={section.skill}
+                      onChanged={reload}
+                    />
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         ))}
         {!loading && sections.length === 0 ? (
@@ -107,10 +357,10 @@ export function ExamBuilder({ examId }: { examId: string }) {
             value={sectionSkill}
             onChange={(e) => setSectionSkill(e.target.value as ExamSkill)}
           >
-            <option value="lesen">Lecture (Lesen)</option>
-            <option value="hoeren">Écoute (Hören)</option>
-            <option value="schreiben">Écriture (Schreiben)</option>
-            <option value="sprechen">Oral (Sprechen)</option>
+            <option value="lesen">{examSkillLabel("lesen")}</option>
+            <option value="hoeren">{examSkillLabel("hoeren")}</option>
+            <option value="schreiben">{examSkillLabel("schreiben")}</option>
+            <option value="sprechen">{examSkillLabel("sprechen")}</option>
             <option value="grammatik">Grammaire</option>
             <option value="wortschatz">Vocabulaire</option>
           </select>
@@ -169,9 +419,11 @@ export function ExamBuilder({ examId }: { examId: string }) {
             value={qType}
             onChange={(e) => setQType(e.target.value as ExamQuestionType)}
           >
-            <option value="single_choice">QCM — une bonne réponse</option>
-            <option value="multiple_choice">QCM — plusieurs bonnes réponses</option>
-            <option value="writing">Writing — texte libre</option>
+            <option value="true_false">{examQuestionTypeLabel("true_false")}</option>
+            <option value="single_choice">{examQuestionTypeLabel("single_choice")}</option>
+            <option value="multiple_choice">{examQuestionTypeLabel("multiple_choice")}</option>
+            <option value="listening">{examQuestionTypeLabel("listening")}</option>
+            <option value="writing">{examQuestionTypeLabel("writing")}</option>
           </select>
         </label>
         <label className="block text-sm">

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft,
   CheckCircle2,
   Download,
   FileText,
@@ -9,7 +8,6 @@ import {
   Upload,
   Video,
 } from "lucide-react";
-import { useSearch } from "@tanstack/react-router";
 import {
   Area,
   AreaChart,
@@ -39,13 +37,11 @@ import { DangerZoneAccountDeletion } from "./danger-zone-account-deletion";
 import { DocumentViewer } from "./document-viewer";
 import { LiveCalendar, LiveCalendarErrorBoundary } from "./live-calendar";
 import { PeoplePicker } from "./people-picker";
-import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { ProfileEditor } from "./profile/profile-editor";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useAddConversationMember,
   useAllExamAttempts,
-  useAssignmentRows,
   useAssignments,
   useClasses,
   useConversationMessages,
@@ -61,12 +57,10 @@ import {
   useRemoveConversationMember,
   useSendMessage,
   useStudents,
-  useSubmitAssignment,
   useTeachers,
   useUploadRecording,
 } from "@/hooks/use-academy-data";
 import type { ClassDetail } from "@/lib/academy-mappers";
-import { resolveOwnStudent } from "@/lib/payment-proof";
 import type { Student } from "@/types/academy";
 import { Metric, PageHeader, ProgressLine, Status, Surface } from "./primitives";
 import { useAcademy } from "./academy-context";
@@ -205,382 +199,7 @@ export function CalendarPage() {
   );
 }
 
-export function Assignments({ detail }: { detail: boolean }) {
-  const { navigate, user, profile } = useAcademy();
-  const search = useSearch({ from: "/app/$role/$page" });
-  const studentsQuery = useStudents();
-  const myStudent = resolveOwnStudent(studentsQuery.data ?? [], {
-    profileId: profile?.id ?? user?.id ?? null,
-    email: user?.email ?? null,
-  });
-  const listQuery = useAssignmentRows(myStudent?.classId);
-  const submit = useSubmitAssignment();
-  const published = useMemo(
-    () => (listQuery.data ?? []).filter((row) => row.status === "published"),
-    [listQuery.data],
-  );
-  const selected =
-    published.find((a) => a.id === search.assignmentId) ?? (detail ? published[0] : undefined);
-  const [text, setText] = useState("");
-  const [attachment, setAttachment] = useState<AttachmentDraft>({
-    kind: "document",
-    url: "",
-    file: null,
-  });
-  const [formError, setFormError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{
-    title: string;
-    url: string | null;
-    mimeType: string | null;
-    loading: boolean;
-    error: string | null;
-  } | null>(null);
-
-  const submissionsQuery = useQuery({
-    queryKey: ["submissions", selected?.id, myStudent?.id],
-    queryFn: async () => {
-      if (!selected?.id || !myStudent?.id) return null;
-      const rows = await AssignmentService.listSubmissions(selected.id);
-      return rows.find((r) => r.student_id === myStudent.id) ?? null;
-    },
-    enabled: Boolean(detail && selected?.id && myStudent?.id),
-  });
-
-  useEffect(() => {
-    setText(submissionsQuery.data?.content_text ?? "");
-    setAttachment({ kind: "document", url: "", file: null });
-    setFormError(null);
-  }, [selected?.id, submissionsQuery.data?.content_text, submissionsQuery.data?.updated_at]);
-
-  if (detail) {
-    const submission = submissionsQuery.data;
-    const pastDue = selected?.due_at != null && new Date(selected.due_at).getTime() < Date.now();
-    const locked =
-      !selected ||
-      selected.status !== "published" ||
-      pastDue ||
-      submission?.status === "submitted" ||
-      submission?.status === "graded";
-    const lockReason = !myStudent?.id
-      ? "Profil étudiant introuvable."
-      : submission?.status === "graded"
-        ? "Ce devoir est corrigé — lecture seule."
-        : submission?.status === "submitted"
-          ? "Devoir déjà remis. Vous pouvez consulter votre réponse."
-          : pastDue
-            ? "Échéance dépassée — la remise est fermée."
-            : selected?.status !== "published"
-              ? "Ce devoir n’est pas encore ouvert."
-              : null;
-
-    return (
-      <>
-        <button
-          onClick={() => navigate("assignments")}
-          className="mb-5 flex items-center gap-2 text-sm text-muted-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Devoirs
-        </button>
-        <PageHeader
-          title={selected?.title ?? "Devoir"}
-          subtitle={
-            selected
-              ? `${selected.level?.code ?? "—"} · Limite ${selected.due_at ? new Date(selected.due_at).toLocaleString("fr-FR") : "—"}`
-              : "Consigne, pièce jointe et remise."
-          }
-        />
-        <QueryState
-          isLoading={listQuery.isLoading || studentsQuery.isLoading}
-          isError={listQuery.isError || studentsQuery.isError}
-          error={listQuery.error ?? studentsQuery.error}
-          isEmpty={!selected}
-          emptyTitle="Devoir introuvable"
-          emptyMessage="Sélectionnez un devoir depuis la liste."
-          onRetry={() => void listQuery.refetch()}
-        >
-          {selected ? (
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
-              <div className="space-y-5">
-                <Surface className="space-y-4 p-6">
-                  <h2 className="text-base font-semibold tracking-tight">1. Consigne</h2>
-                  <p className="text-xs text-muted-foreground">Instructions du professeur</p>
-                  <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
-                    {selected.instructions ||
-                      selected.description ||
-                      "Suivez les consignes données par votre professeur."}
-                  </p>
-                  {(selected.content_url || selected.attachment_path) && (
-                    <div className="space-y-2 border-t border-border/70 pt-4">
-                      <h3 className="text-sm font-semibold">2. Documents</h3>
-                      <p className="text-xs text-muted-foreground">Pièces jointes à consulter</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setPreview({
-                              title: selected.title,
-                              url: null,
-                              mimeType: selected.mime_type,
-                              loading: true,
-                              error: null,
-                            });
-                            void AssignmentService.getAttachmentUrl(selected)
-                              .then((url) => {
-                                if (selected.content_kind === "link") {
-                                  window.open(url, "_blank", "noopener,noreferrer");
-                                  setPreview(null);
-                                  return;
-                                }
-                                setPreview({
-                                  title: selected.title,
-                                  url,
-                                  mimeType: selected.mime_type,
-                                  loading: false,
-                                  error: null,
-                                });
-                              })
-                              .catch((err: Error) =>
-                                setPreview({
-                                  title: selected.title,
-                                  url: null,
-                                  mimeType: selected.mime_type,
-                                  loading: false,
-                                  error: err.message,
-                                }),
-                              );
-                          }}
-                        >
-                          Voir
-                        </Button>
-                        {selected.content_kind !== "link" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              void (async () => {
-                                try {
-                                  const url = await AssignmentService.getAttachmentUrl(selected);
-                                  const response = await fetch(url);
-                                  const blob = await response.blob();
-                                  const objectUrl = URL.createObjectURL(blob);
-                                  const a = document.createElement("a");
-                                  a.href = objectUrl;
-                                  a.download = selected.title;
-                                  a.click();
-                                  URL.revokeObjectURL(objectUrl);
-                                } catch (err) {
-                                  toast.error(
-                                    err instanceof Error
-                                      ? err.message
-                                      : "Téléchargement impossible",
-                                  );
-                                }
-                              })()
-                            }
-                          >
-                            Télécharger
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </Surface>
-
-                <Surface className="space-y-4 p-6">
-                  <h2 className="text-base font-semibold tracking-tight">3. Ma réponse</h2>
-                  <p className="text-xs text-muted-foreground">Texte et/ou fichier à remettre</p>
-                  {lockReason ? (
-                    <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                      {lockReason}
-                    </p>
-                  ) : null}
-                  {!myStudent?.id ? (
-                    <p className="text-sm text-destructive">Profil étudiant introuvable.</p>
-                  ) : (
-                    <>
-                      <label className="block text-sm">
-                        Réponse écrite
-                        <Textarea
-                          className="mt-2 min-h-40 text-base"
-                          value={text}
-                          disabled={locked || submit.isPending}
-                          onChange={(e) => setText(e.target.value)}
-                          placeholder="Rédigez votre réponse ici…"
-                        />
-                      </label>
-                      {!locked && (
-                        <div className="rounded-xl border-2 border-dashed border-primary/25 bg-primary/[0.03] p-3">
-                          <ContentAttachmentUploader
-                            kinds={["document", "pdf", "image"]}
-                            value={attachment}
-                            onChange={setAttachment}
-                            disabled={submit.isPending}
-                            uploading={submit.isPending}
-                            error={formError}
-                            requiredFileWhenNew={false}
-                          />
-                        </div>
-                      )}
-                      {submission?.file_path ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            void (async () => {
-                              try {
-                                const url =
-                                  await AssignmentService.getSubmissionFileUrl(submission);
-                                window.open(url, "_blank", "noopener,noreferrer");
-                              } catch (err) {
-                                toast.error(
-                                  err instanceof Error ? err.message : "Fichier indisponible",
-                                );
-                              }
-                            })()
-                          }
-                        >
-                          Voir mon fichier
-                        </Button>
-                      ) : null}
-                      {!locked && (
-                        <Button
-                          className="w-full"
-                          disabled={submit.isPending || (!text.trim() && !attachment.file)}
-                          onClick={() => {
-                            if (!myStudent?.id) return;
-                            setFormError(null);
-                            if (!text.trim() && !attachment.file) {
-                              setFormError("Ajoutez une réponse écrite ou un fichier.");
-                              return;
-                            }
-                            submit.mutate(
-                              {
-                                assignmentId: selected.id,
-                                studentId: myStudent.id,
-                                contentText: text.trim(),
-                                ...(attachment.file ? { file: attachment.file } : {}),
-                              },
-                              {
-                                onSuccess: () => {
-                                  toast.success("Devoir remis");
-                                  void submissionsQuery.refetch();
-                                },
-                                onError: (err) => {
-                                  setFormError(err.message);
-                                  toast.error(err.message);
-                                },
-                              },
-                            );
-                          }}
-                        >
-                          Remettre le devoir
-                        </Button>
-                      )}
-                    </>
-                  )}
-                </Surface>
-              </div>
-
-              <Surface className="h-fit space-y-4 p-6">
-                <h2 className="text-base font-semibold tracking-tight">4. Soumission</h2>
-                <p className="text-xs text-muted-foreground">Statut, note et commentaires</p>
-                {submission ? (
-                  <div className="space-y-1 text-sm">
-                    <Status>
-                      {submission.status === "graded"
-                        ? "Corrigé"
-                        : submission.status === "submitted"
-                          ? "Remis"
-                          : submission.status}
-                    </Status>
-                    {submission.submitted_at ? (
-                      <p className="text-muted-foreground">
-                        Remis le {new Date(submission.submitted_at).toLocaleString("fr-FR")}
-                      </p>
-                    ) : null}
-                    {submission.score != null ? (
-                      <p>
-                        Note : {submission.score}
-                        {selected.max_score != null ? ` / ${selected.max_score}` : ""}
-                      </p>
-                    ) : null}
-                    {submission.feedback ? (
-                      <p className="whitespace-pre-wrap">Commentaire : {submission.feedback}</p>
-                    ) : null}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Aucune remise pour l’instant.</p>
-                )}
-              </Surface>
-            </div>
-          ) : null}
-        </QueryState>
-        <DocumentViewer
-          open={Boolean(preview)}
-          onClose={() => setPreview(null)}
-          title={preview?.title ?? ""}
-          url={preview?.url ?? null}
-          mimeType={preview?.mimeType}
-          loading={preview?.loading}
-          error={preview?.error}
-        />
-      </>
-    );
-  }
-
-  return (
-    <>
-      <PageHeader
-        title="Devoirs"
-        subtitle="Consultez les consignes, remettez et suivez vos notes."
-      />
-      <QueryState
-        isLoading={listQuery.isLoading}
-        isError={listQuery.isError}
-        error={listQuery.error}
-        isEmpty={!published.length}
-        emptyTitle="Aucun devoir"
-        emptyMessage="Les devoirs publiés apparaîtront ici."
-        onRetry={() => void listQuery.refetch()}
-      >
-        <div className="overflow-x-auto rounded-lg border bg-card">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Devoir</th>
-                <th>Échéance</th>
-                <th>Statut</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {published.map((row) => (
-                <tr key={row.id}>
-                  <td className="font-medium">{row.title}</td>
-                  <td>{row.due_at ? new Date(row.due_at).toLocaleString("fr-FR") : "—"}</td>
-                  <td>
-                    <Status tone="green">Publié</Status>
-                  </td>
-                  <td>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => navigate("assignment-detail", { assignmentId: row.id })}
-                    >
-                      Ouvrir
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </QueryState>
-    </>
-  );
-}
+export { Assignments } from "./assignment-student-page";
 
 export function Progress() {
   const attemptsQuery = useMyExamAttempts();

@@ -555,8 +555,48 @@ export function useSubmitAssignment() {
   return useMutation({
     mutationFn: AssignmentService.submit,
     onSuccess: async (_data, vars) => {
-      await qc.invalidateQueries({ queryKey: queryKeys.assignments.all });
-      await qc.invalidateQueries({ queryKey: ["submissions", vars.assignmentId] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.assignments.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.submissions.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.submissions.byAssignment(vars.assignmentId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.submissions.byStudent(vars.studentId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.corrections.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.unread }),
+      ]);
+    },
+  });
+}
+
+export function useGradeAssignment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      submissionId: string;
+      score: number;
+      feedback?: string;
+      gradedBy?: string | null;
+      assignmentId?: string;
+    }) =>
+      AssignmentService.grade({
+        submissionId: input.submissionId,
+        score: input.score,
+        ...(input.feedback !== undefined ? { feedback: input.feedback } : {}),
+        ...(input.gradedBy !== undefined ? { gradedBy: input.gradedBy } : {}),
+      }),
+    onSuccess: async (_data, vars) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.assignments.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.submissions.all }),
+        vars.assignmentId
+          ? qc.invalidateQueries({
+              queryKey: queryKeys.submissions.byAssignment(vars.assignmentId),
+            })
+          : Promise.resolve(),
+        qc.invalidateQueries({ queryKey: queryKeys.corrections.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.unread }),
+      ]);
     },
   });
 }
@@ -725,6 +765,9 @@ export function useGradeWritingAnswer() {
         qc.invalidateQueries({ queryKey: queryKeys.exams.review(attempt.id) }),
         qc.invalidateQueries({ queryKey: queryKeys.exams.attemptsByExam(attempt.exam_id) }),
         qc.invalidateQueries({ queryKey: queryKeys.exams.allAttempts }),
+        qc.invalidateQueries({ queryKey: queryKeys.corrections.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.notifications.unread }),
       ]);
     },
   });

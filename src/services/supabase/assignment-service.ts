@@ -216,12 +216,23 @@ export const SupabaseAssignmentService = {
     contentText?: string;
     file?: File;
     status?: SubmissionStatus;
+    dueAt?: string | null;
   }) {
     const status = input.status ?? "submitted";
     const text = input.contentText?.trim() ?? "";
     if (!text && !input.file) {
       throw new Error("Ajoutez une réponse écrite ou un fichier avant de remettre le devoir.");
     }
+
+    const existing = await requireClient()
+      .from("assignment_submissions")
+      .select("*")
+      .eq("assignment_id", input.assignmentId)
+      .eq("student_id", input.studentId)
+      .maybeSingle();
+    if (existing.error) throw existing.error;
+    const previous = existing.data;
+
     const uploaded = input.file
       ? await this.uploadSubmissionFile({
           assignmentId: input.assignmentId,
@@ -229,6 +240,46 @@ export const SupabaseAssignmentService = {
           file: input.file,
         })
       : null;
+
+    const nowIso = new Date().toISOString();
+    const dueMs = input.dueAt ? new Date(input.dueAt).getTime() : null;
+    const editedAfterDue =
+      dueMs != null && !Number.isNaN(dueMs)
+        ? Date.now() > dueMs
+        : Boolean(previous?.edited_after_due);
+
+    let version = Number(previous?.version ?? 1);
+    let responseVersions = previous?.response_versions ?? [];
+    let submittedAt = previous?.submitted_at ?? null;
+
+    if (
+      previous &&
+      (previous.status === "submitted" || previous.status === "graded" || previous.submitted_at)
+    ) {
+      // Preserve history — never silent overwrite.
+      const history = Array.isArray(responseVersions) ? responseVersions : [];
+      responseVersions = [
+        ...history,
+        {
+          version,
+          content_text: previous.content_text,
+          file_bucket: previous.file_bucket,
+          file_path: previous.file_path,
+          saved_at:
+            previous.last_edited_at ?? previous.updated_at ?? previous.submitted_at ?? nowIso,
+        },
+      ];
+      version += 1;
+      submittedAt = previous.submitted_at ?? nowIso;
+    } else if (!previous || !previous.submitted_at) {
+      submittedAt = status === "submitted" || status === "graded" ? nowIso : null;
+      version = 1;
+    }
+
+    // Re-open graded work as submitted when student edits again.
+    const nextStatus: SubmissionStatus =
+      previous?.status === "graded" ? "submitted" : status === "draft" ? "draft" : "submitted";
+
     const { data, error } = await requireClient()
       .from("assignment_submissions")
       .upsert(
@@ -236,9 +287,16 @@ export const SupabaseAssignmentService = {
           assignment_id: input.assignmentId,
           student_id: input.studentId,
           content_text: text || null,
-          status,
-          submitted_at: status === "submitted" ? new Date().toISOString() : null,
-          // Omitted when no new file so a previous upload is preserved.
+          status: nextStatus,
+          submitted_at: submittedAt ?? (nextStatus === "submitted" ? nowIso : null),
+          last_edited_at: nowIso,
+          version,
+          edited_after_due: editedAfterDue,
+          response_versions: responseVersions,
+          // Clear grade when student revises after correction so teacher re-reviews.
+          ...(previous?.status === "graded"
+            ? { score: null, feedback: null, graded_at: null, graded_by: null }
+            : {}),
           ...(uploaded ? { file_bucket: uploaded.fileBucket, file_path: uploaded.filePath } : {}),
         },
         { onConflict: "assignment_id,student_id" },
@@ -247,6 +305,16 @@ export const SupabaseAssignmentService = {
       .single();
     if (error) throw error;
     return data;
+  },
+
+  async listSubmissionsForStudent(studentId: string): Promise<Submission[]> {
+    const { data, error } = await requireClient()
+      .from("assignment_submissions")
+      .select("*")
+      .eq("student_id", studentId)
+      .order("updated_at", { ascending: false });
+    if (error) throw error;
+    return data ?? [];
   },
 
   async getSubmissionFileUrl(

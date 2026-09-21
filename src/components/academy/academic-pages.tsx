@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearch } from "@tanstack/react-router";
 import { MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -988,6 +989,7 @@ function toLocalInput(iso: string | null | undefined) {
 
 export function DirectorAssignmentsPage() {
   const { user, role } = useAcademy();
+  const search = useSearch({ from: "/app/$role/$page" });
   const classesQuery = useClasses();
   const levelsQuery = useLevels();
   const listQuery = useAssignmentRows();
@@ -1002,7 +1004,12 @@ export function DirectorAssignmentsPage() {
   );
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [gradingId, setGradingId] = useState<string | null>(null);
+  const [gradingId, setGradingId] = useState<string | null>(search.assignmentId ?? null);
+
+  useEffect(() => {
+    if (search.assignmentId) setGradingId(search.assignmentId);
+  }, [search.assignmentId]);
+
   const [clearAttachment, setClearAttachment] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
