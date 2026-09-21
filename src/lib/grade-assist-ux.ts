@@ -1,10 +1,38 @@
-/** UX helpers for AI grade-assist (never auto-publishes scores). */
+/** UX + parsing helpers for AI grade-assist (never auto-publishes scores). */
 
 export const GRADE_ASSIST_UNCONFIGURED_MESSAGE =
   "Le service de correction IA n'est pas encore configuré.";
 
 export const GRADE_ASSIST_NEEDS_TEXT_MESSAGE =
   "La pré-correction IA nécessite une réponse textuelle exploitable. Ouvrez le fichier manuellement, puis saisissez ou collez le texte à évaluer.";
+
+export const GRADE_ASSIST_ERROR_CATEGORIES = [
+  "Ordre des mots",
+  "Conjugaison",
+  "Grammaire",
+  "Orthographe",
+  "Vocabulaire",
+  "Cas / déclinaison",
+  "Temps verbal",
+  "Ponctuation",
+  "Autre",
+] as const;
+
+export type GradeAssistErrorCategory = (typeof GRADE_ASSIST_ERROR_CATEGORIES)[number];
+
+export type GradeAssistCriterion = {
+  label: string;
+  score: number;
+  max_score: number;
+  id?: string;
+};
+
+export type GradeAssistErrorItem = {
+  category: string;
+  original: string;
+  correction: string;
+  explanation: string;
+};
 
 const CRITERIA_LABELS: Record<string, string> = {
   task_completion: "Respect de la consigne",
@@ -18,8 +46,109 @@ const CRITERIA_LABELS: Record<string, string> = {
   structure: "Structure",
 };
 
+const ERROR_CATEGORY_ALIASES: Record<string, GradeAssistErrorCategory> = {
+  "ordre des mots": "Ordre des mots",
+  word_order: "Ordre des mots",
+  conjugaison: "Conjugaison",
+  conjugation: "Conjugaison",
+  grammaire: "Grammaire",
+  grammar: "Grammaire",
+  orthographe: "Orthographe",
+  spelling: "Orthographe",
+  vocabulaire: "Vocabulaire",
+  vocabulary: "Vocabulaire",
+  "cas / déclinaison": "Cas / déclinaison",
+  cas: "Cas / déclinaison",
+  declinaison: "Cas / déclinaison",
+  déclinaison: "Cas / déclinaison",
+  case: "Cas / déclinaison",
+  "temps verbal": "Temps verbal",
+  tense: "Temps verbal",
+  ponctuation: "Ponctuation",
+  punctuation: "Ponctuation",
+  autre: "Autre",
+  other: "Autre",
+};
+
 export function gradeAssistCriteriaLabel(key: string): string {
   return CRITERIA_LABELS[key] ?? key.replace(/_/g, " ");
+}
+
+export function normalizeGradeAssistErrorCategory(raw: string | null | undefined): string {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return "Autre";
+  const exact = GRADE_ASSIST_ERROR_CATEGORIES.find(
+    (item) => item.toLowerCase() === trimmed.toLowerCase(),
+  );
+  if (exact) return exact;
+  const alias = ERROR_CATEGORY_ALIASES[trimmed.toLowerCase()];
+  return alias ?? "Autre";
+}
+
+export function clampGradeAssistScore(score: number, maxScore: number): number {
+  const max = Math.max(1, maxScore);
+  if (!Number.isFinite(score)) return 0;
+  return Math.min(max, Math.max(0, Math.round(score * 10) / 10));
+}
+
+export function parseGradeAssistCriteria(raw: unknown, maxScore: number): GradeAssistCriterion[] {
+  if (!Array.isArray(raw)) return [];
+  const out: GradeAssistCriterion[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+    const record = row as Record<string, unknown>;
+    const id = typeof record["id"] === "string" ? record["id"].trim() : "";
+    const labelRaw = typeof record["label"] === "string" ? record["label"].trim() : "";
+    const label = labelRaw || (id ? gradeAssistCriteriaLabel(id) : "");
+    const score = Number(record["score"]);
+    const max = Number(record["max_score"] ?? record["max"] ?? maxScore);
+    if (!label || !Number.isFinite(score) || !Number.isFinite(max) || max <= 0) continue;
+    out.push({
+      ...(id ? { id } : {}),
+      label,
+      score: clampGradeAssistScore(score, max),
+      max_score: Math.max(1, max),
+    });
+  }
+  return out;
+}
+
+export function criteriaToScoreMap(criteria: GradeAssistCriterion[]): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const item of criteria) {
+    const key = item.id || item.label;
+    map[key] = item.score;
+  }
+  return map;
+}
+
+export function parseGradeAssistErrors(raw: unknown): GradeAssistErrorItem[] {
+  if (!Array.isArray(raw)) return [];
+  const out: GradeAssistErrorItem[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+    const record = row as Record<string, unknown>;
+    const original = typeof record["original"] === "string" ? record["original"].trim() : "";
+    const correction = typeof record["correction"] === "string" ? record["correction"].trim() : "";
+    const explanation =
+      typeof record["explanation"] === "string" ? record["explanation"].trim() : "";
+    if (!original || !correction || !explanation) continue;
+    out.push({
+      category: normalizeGradeAssistErrorCategory(
+        typeof record["category"] === "string" ? record["category"] : "",
+      ),
+      original,
+      correction,
+      explanation,
+    });
+  }
+  return out;
+}
+
+export function parseOptionalModelAnswer(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  return trimmed || null;
 }
 
 /** Map Edge Function error codes to user-facing French messages. */
@@ -93,7 +222,8 @@ export function applySuggestionToWritingRubric(input: {
     return next;
   }
 
-  const totalMax = keys.reduce((sum, key) => sum + Number(input.rubric[key] ?? 0), 0) || input.questionPoints;
+  const totalMax =
+    keys.reduce((sum, key) => sum + Number(input.rubric[key] ?? 0), 0) || input.questionPoints;
   const capped = Math.min(input.questionPoints, Math.max(0, input.suggestedScore));
   const next: Record<string, string> = {};
   let remaining = capped;

@@ -1,3 +1,8 @@
+import {
+  ASSIGNMENT_SUBMISSION_BUCKET,
+  buildAssignmentSubmissionStoragePath,
+  mapAssignmentSubmissionError,
+} from "@/lib/assignment-submission-storage";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { Database } from "@/types/database";
 
@@ -17,7 +22,30 @@ function requireClient() {
   return getSupabase();
 }
 
-const SUBMISSION_BUCKET = "course-materials";
+const SUBMISSION_BUCKET = ASSIGNMENT_SUBMISSION_BUCKET;
+
+async function resolveCurrentStudentId(preferredStudentId?: string): Promise<string> {
+  const supabase = requireClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  if (!user) throw new Error("NOT_AUTHENTICATED");
+
+  const { data, error } = await supabase
+    .from("students")
+    .select("id")
+    .eq("profile_id", user.id)
+    .neq("status", "archived")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.id) throw new Error("STUDENT_PROFILE_REQUIRED");
+  if (preferredStudentId && preferredStudentId !== data.id) {
+    throw new Error("STUDENT_ID_MISMATCH");
+  }
+  return data.id;
+}
 
 const ASSIGNMENT_SELECT = `
   *,
@@ -197,16 +225,20 @@ export const SupabaseAssignmentService = {
 
   async uploadSubmissionFile(input: { assignmentId: string; studentId: string; file: File }) {
     const supabase = requireClient();
-    const ext = input.file.name.split(".").pop() ?? "bin";
-    const path = `submissions/${input.assignmentId}/${input.studentId}/${crypto.randomUUID()}.${ext}`;
+    const studentId = await resolveCurrentStudentId(input.studentId);
+    const path = buildAssignmentSubmissionStoragePath({
+      assignmentId: input.assignmentId,
+      studentId,
+      fileName: input.file.name,
+    });
     const uploadOptions = input.file.type
       ? { upsert: false as const, contentType: input.file.type }
       : { upsert: false as const };
     const { error } = await supabase.storage
       .from(SUBMISSION_BUCKET)
       .upload(path, input.file, uploadOptions);
-    if (error) throw error;
-    return { fileBucket: SUBMISSION_BUCKET, filePath: path };
+    if (error) throw mapAssignmentSubmissionError(error, "storage");
+    return { fileBucket: SUBMISSION_BUCKET, filePath: path, studentId };
   },
 
   /** Accepts a text answer, a file, or both — at least one is required. */
@@ -218,93 +250,109 @@ export const SupabaseAssignmentService = {
     status?: SubmissionStatus;
     dueAt?: string | null;
   }) {
-    const status = input.status ?? "submitted";
-    const text = input.contentText?.trim() ?? "";
-    if (!text && !input.file) {
-      throw new Error("Ajoutez une réponse écrite ou un fichier avant de remettre le devoir.");
+    try {
+      const status = input.status ?? "submitted";
+      const text = input.contentText?.trim() ?? "";
+      if (!text && !input.file) {
+        throw new Error("Ajoutez une réponse écrite ou un fichier avant de remettre le devoir.");
+      }
+
+      // Always derive student_id from the authenticated session (RLS: current_student_id()).
+      const studentId = await resolveCurrentStudentId(input.studentId);
+
+      const existing = await requireClient()
+        .from("assignment_submissions")
+        .select("*")
+        .eq("assignment_id", input.assignmentId)
+        .eq("student_id", studentId)
+        .maybeSingle();
+      if (existing.error) throw mapAssignmentSubmissionError(existing.error, "insert");
+      const previous = existing.data;
+
+      // Upload first, then upsert submission so file_path is coherent when present.
+      const uploaded = input.file
+        ? await this.uploadSubmissionFile({
+            assignmentId: input.assignmentId,
+            studentId,
+            file: input.file,
+          })
+        : null;
+
+      const nowIso = new Date().toISOString();
+      const dueMs = input.dueAt ? new Date(input.dueAt).getTime() : null;
+      const editedAfterDue =
+        dueMs != null && !Number.isNaN(dueMs)
+          ? Date.now() > dueMs
+          : Boolean(previous?.edited_after_due);
+
+      let version = Number(previous?.version ?? 1);
+      let responseVersions = previous?.response_versions ?? [];
+      let submittedAt = previous?.submitted_at ?? null;
+
+      if (
+        previous &&
+        (previous.status === "submitted" || previous.status === "graded" || previous.submitted_at)
+      ) {
+        // Preserve history — never silent overwrite.
+        const history = Array.isArray(responseVersions) ? responseVersions : [];
+        responseVersions = [
+          ...history,
+          {
+            version,
+            content_text: previous.content_text,
+            file_bucket: previous.file_bucket,
+            file_path: previous.file_path,
+            saved_at:
+              previous.last_edited_at ?? previous.updated_at ?? previous.submitted_at ?? nowIso,
+          },
+        ];
+        version += 1;
+        submittedAt = previous.submitted_at ?? nowIso;
+      } else if (!previous || !previous.submitted_at) {
+        submittedAt = status === "submitted" || status === "graded" ? nowIso : null;
+        version = 1;
+      }
+
+      // Re-open graded work as submitted when student edits again.
+      const nextStatus: SubmissionStatus =
+        previous?.status === "graded" ? "submitted" : status === "draft" ? "draft" : "submitted";
+
+      const { data, error } = await requireClient()
+        .from("assignment_submissions")
+        .upsert(
+          {
+            assignment_id: input.assignmentId,
+            student_id: studentId,
+            content_text: text || null,
+            status: nextStatus,
+            submitted_at: submittedAt ?? (nextStatus === "submitted" ? nowIso : null),
+            last_edited_at: nowIso,
+            version,
+            edited_after_due: editedAfterDue,
+            response_versions: responseVersions,
+            // Clear grade when student revises after correction so teacher re-reviews.
+            ...(previous?.status === "graded"
+              ? { score: null, feedback: null, graded_at: null, graded_by: null }
+              : {}),
+            ...(uploaded ? { file_bucket: uploaded.fileBucket, file_path: uploaded.filePath } : {}),
+          },
+          { onConflict: "assignment_id,student_id" },
+        )
+        .select("*")
+        .single();
+      if (error) throw mapAssignmentSubmissionError(error, "insert");
+      return data;
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        (error.message.startsWith("Ajoutez une réponse") ||
+          error.message.startsWith("Impossible d'") ||
+          error.message.startsWith("Impossible d’"))
+      ) {
+        throw error;
+      }
+      throw mapAssignmentSubmissionError(error, input.file ? "storage" : "insert");
     }
-
-    const existing = await requireClient()
-      .from("assignment_submissions")
-      .select("*")
-      .eq("assignment_id", input.assignmentId)
-      .eq("student_id", input.studentId)
-      .maybeSingle();
-    if (existing.error) throw existing.error;
-    const previous = existing.data;
-
-    const uploaded = input.file
-      ? await this.uploadSubmissionFile({
-          assignmentId: input.assignmentId,
-          studentId: input.studentId,
-          file: input.file,
-        })
-      : null;
-
-    const nowIso = new Date().toISOString();
-    const dueMs = input.dueAt ? new Date(input.dueAt).getTime() : null;
-    const editedAfterDue =
-      dueMs != null && !Number.isNaN(dueMs)
-        ? Date.now() > dueMs
-        : Boolean(previous?.edited_after_due);
-
-    let version = Number(previous?.version ?? 1);
-    let responseVersions = previous?.response_versions ?? [];
-    let submittedAt = previous?.submitted_at ?? null;
-
-    if (
-      previous &&
-      (previous.status === "submitted" || previous.status === "graded" || previous.submitted_at)
-    ) {
-      // Preserve history — never silent overwrite.
-      const history = Array.isArray(responseVersions) ? responseVersions : [];
-      responseVersions = [
-        ...history,
-        {
-          version,
-          content_text: previous.content_text,
-          file_bucket: previous.file_bucket,
-          file_path: previous.file_path,
-          saved_at:
-            previous.last_edited_at ?? previous.updated_at ?? previous.submitted_at ?? nowIso,
-        },
-      ];
-      version += 1;
-      submittedAt = previous.submitted_at ?? nowIso;
-    } else if (!previous || !previous.submitted_at) {
-      submittedAt = status === "submitted" || status === "graded" ? nowIso : null;
-      version = 1;
-    }
-
-    // Re-open graded work as submitted when student edits again.
-    const nextStatus: SubmissionStatus =
-      previous?.status === "graded" ? "submitted" : status === "draft" ? "draft" : "submitted";
-
-    const { data, error } = await requireClient()
-      .from("assignment_submissions")
-      .upsert(
-        {
-          assignment_id: input.assignmentId,
-          student_id: input.studentId,
-          content_text: text || null,
-          status: nextStatus,
-          submitted_at: submittedAt ?? (nextStatus === "submitted" ? nowIso : null),
-          last_edited_at: nowIso,
-          version,
-          edited_after_due: editedAfterDue,
-          response_versions: responseVersions,
-          // Clear grade when student revises after correction so teacher re-reviews.
-          ...(previous?.status === "graded"
-            ? { score: null, feedback: null, graded_at: null, graded_by: null }
-            : {}),
-          ...(uploaded ? { file_bucket: uploaded.fileBucket, file_path: uploaded.filePath } : {}),
-        },
-        { onConflict: "assignment_id,student_id" },
-      )
-      .select("*")
-      .single();
-    if (error) throw error;
-    return data;
   },
 
   async listSubmissionsForStudent(studentId: string): Promise<Submission[]> {

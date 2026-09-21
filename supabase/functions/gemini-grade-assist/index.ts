@@ -13,9 +13,52 @@ const jsonHeaders = { ...cors, "Cache-Control": "no-store", "Content-Type": "app
 
 /** Prefer current Flash model; fallback if provider returns 404/503 for the primary. */
 const GEMINI_MODELS = [
-  "gemini-3.6-flash",
   "gemini-flash-latest",
+  "gemini-3.6-flash",
   "gemini-2.5-flash",
+] as const;
+
+const ERROR_CATEGORIES = [
+  "Ordre des mots",
+  "Conjugaison",
+  "Grammaire",
+  "Orthographe",
+  "Vocabulaire",
+  "Cas / déclinaison",
+  "Temps verbal",
+  "Ponctuation",
+  "Autre",
+] as const;
+
+const ERROR_CATEGORY_ALIASES: Record<string, (typeof ERROR_CATEGORIES)[number]> = {
+  "ordre des mots": "Ordre des mots",
+  word_order: "Ordre des mots",
+  conjugaison: "Conjugaison",
+  conjugation: "Conjugaison",
+  grammaire: "Grammaire",
+  grammar: "Grammaire",
+  orthographe: "Orthographe",
+  spelling: "Orthographe",
+  vocabulaire: "Vocabulaire",
+  vocabulary: "Vocabulaire",
+  "cas / déclinaison": "Cas / déclinaison",
+  cas: "Cas / déclinaison",
+  declinaison: "Cas / déclinaison",
+  déclinaison: "Cas / déclinaison",
+  case: "Cas / déclinaison",
+  "temps verbal": "Temps verbal",
+  tense: "Temps verbal",
+  ponctuation: "Ponctuation",
+  punctuation: "Ponctuation",
+  autre: "Autre",
+  other: "Autre",
+};
+
+const DEFAULT_CRITERIA = [
+  { id: "task_completion", label: "Respect de la consigne" },
+  { id: "comprehensibility", label: "Compréhensibilité" },
+  { id: "vocabulary", label: "Vocabulaire" },
+  { id: "grammar_and_spelling", label: "Grammaire / orthographe" },
 ] as const;
 
 function respond(status: number, body: Record<string, unknown>) {
@@ -29,6 +72,12 @@ function asString(value: unknown): string {
 function asNumber(value: unknown, fallback: number): number {
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function clampScore(score: number, maxScore: number): number {
+  const max = Math.max(1, maxScore);
+  if (!Number.isFinite(score)) return 0;
+  return Math.min(max, Math.max(0, Math.round(score * 10) / 10));
 }
 
 function logGeminiDiag(payload: Record<string, unknown>) {
@@ -89,6 +138,77 @@ function parseModelJson(text: string): Record<string, unknown> | null {
     }
     return null;
   }
+}
+
+function normalizeCategory(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "Autre";
+  const exact = ERROR_CATEGORIES.find((c) => c.toLowerCase() === trimmed.toLowerCase());
+  if (exact) return exact;
+  return ERROR_CATEGORY_ALIASES[trimmed.toLowerCase()] ?? "Autre";
+}
+
+function normalizeCriteria(raw: unknown, maxScore: number) {
+  const out: Array<{ id?: string; label: string; score: number; max_score: number }> = [];
+  if (Array.isArray(raw)) {
+    for (const row of raw) {
+      if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+      const record = row as Record<string, unknown>;
+      const id = asString(record.id);
+      const label =
+        asString(record.label) ||
+        (id
+          ? DEFAULT_CRITERIA.find((c) => c.id === id)?.label || id.replace(/_/g, " ")
+          : "");
+      const max = Math.max(1, asNumber(record.max_score ?? record.max, maxScore / 4));
+      const score = clampScore(asNumber(record.score, Number.NaN), max);
+      if (!label || !Number.isFinite(asNumber(record.score, Number.NaN))) continue;
+      out.push({ ...(id ? { id } : {}), label, score, max_score: max });
+    }
+  }
+  if (out.length > 0) return out;
+
+  // Fallback equal split when Gemini omitted criteria.
+  const part = Math.floor((maxScore / DEFAULT_CRITERIA.length) * 10) / 10;
+  let remaining = maxScore;
+  return DEFAULT_CRITERIA.map((item, index) => {
+    const max =
+      index === DEFAULT_CRITERIA.length - 1
+        ? Math.max(1, Math.round(remaining * 10) / 10)
+        : Math.max(1, part);
+    remaining = Math.round((remaining - max) * 10) / 10;
+    return {
+      id: item.id,
+      label: item.label,
+      score: clampScore(max * 0.7, max),
+      max_score: max,
+    };
+  });
+}
+
+function normalizeErrors(raw: unknown) {
+  if (!Array.isArray(raw)) return [];
+  const out: Array<{
+    category: string;
+    original: string;
+    correction: string;
+    explanation: string;
+  }> = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+    const record = row as Record<string, unknown>;
+    const original = asString(record.original);
+    const correction = asString(record.correction);
+    const explanation = asString(record.explanation);
+    if (!original || !correction || !explanation) continue;
+    out.push({
+      category: normalizeCategory(asString(record.category)),
+      original,
+      correction,
+      explanation,
+    });
+  }
+  return out;
 }
 
 Deno.serve(async (req) => {
@@ -161,30 +281,47 @@ Deno.serve(async (req) => {
   }
 
   const prompt = [
-    "Tu es un assistant de correction pour une académie de langues allemandes.",
-    "Propose une note et un feedback en français. Ne publie jamais la note automatiquement.",
-    `Niveau CECR: ${level || "non précisé"}`,
-    `Matière / type: ${subject || targetKind}`,
+    "Tu es un assistant de correction pédagogique pour une académie d'allemand.",
+    "Tu aides un professeur : propose une note, une analyse précise et un feedback.",
+    "Ne publie jamais la note automatiquement.",
+    "",
+    `Niveau CECR de l'étudiant: ${level || "non précisé"}`,
+    `Type: ${subject || targetKind}`,
     `Note maximale (max_score): ${maxScore}`,
-    rubric ? `Barème / critères: ${rubric}` : "",
+    rubric ? `Barème / critères existants: ${rubric}` : "",
     instructions ? `Consigne: ${instructions}` : "",
     responseText ? `Réponse de l'étudiant: ${responseText}` : "Réponse vide.",
     "",
-    "Réponds UNIQUEMENT en JSON valide avec exactement ces clés:",
-    '{',
+    "Exigences d'analyse:",
+    "- Analyse pédagogique adaptée STRICTEMENT au niveau CECR.",
+    "- Liste UNIQUEMENT de vraies erreurs présentes dans le texte de l'étudiant.",
+    "- Ne jamais inventer une erreur absente du texte.",
+    "- Pour chaque erreur: reprendre le segment fautif exact (original), donner la correction allemande, expliquer brièvement en français.",
+    "- category doit être l'une de: Ordre des mots | Conjugaison | Grammaire | Orthographe | Vocabulaire | Cas / déclinaison | Temps verbal | Ponctuation | Autre.",
+    "- feedback: français, utile au professeur/étudiant.",
+    "- model_answer: UNE version améliorée en allemand, respectant la consigne, le niveau CECR, les idées de l'étudiant, et la longueur demandée. Pas trop avancée.",
+    "- Les phrases allemandes corrigées restent en allemand; les explications restent en français.",
+    "",
+    "Réponds UNIQUEMENT en JSON valide avec ce schéma:",
+    "{",
     '  "suggested_score": number,',
     '  "max_score": number,',
     '  "criteria": [',
-    '    {"id":"task_completion","label":"Respect de la consigne","score":number,"max":number},',
-    '    {"id":"comprehensibility","label":"Compréhensibilité","score":number,"max":number},',
-    '    {"id":"vocabulary","label":"Vocabulaire","score":number,"max":number},',
-    '    {"id":"grammar_and_spelling","label":"Grammaire / orthographe","score":number,"max":number}',
+    '    {"label":"Respect de la consigne","score":number,"max_score":number},',
+    '    {"label":"Compréhensibilité","score":number,"max_score":number},',
+    '    {"label":"Vocabulaire","score":number,"max_score":number},',
+    '    {"label":"Grammaire / orthographe","score":number,"max_score":number}',
     "  ],",
     '  "strengths": string[],',
+    '  "errors": [',
+    '    {"category":"Ordre des mots","original":"...","correction":"...","explanation":"..."}',
+    "  ],",
     '  "improvements": string[],',
-    '  "feedback": string',
+    '  "feedback": string,',
+    '  "model_answer": string',
     "}",
-    "Adapte ton exigence au niveau CECR indiqué. suggested_score doit être entre 0 et max_score.",
+    "suggested_score doit être entre 0 et max_score.",
+    "Si aucune erreur: errors = [].",
   ]
     .filter(Boolean)
     .join("\n");
@@ -226,9 +363,15 @@ Deno.serve(async (req) => {
           http_status: geminiRes.status,
           provider_message: lastProviderMessage || null,
         });
-        // Try fallback model on not-found or temporary overload.
-        if (geminiRes.status === 404 || geminiRes.status === 503) continue;
         const classified = classifyGeminiHttp(geminiRes.status, lastProviderMessage);
+        // Try next model on not-found / temporary overload.
+        if (
+          geminiRes.status === 404 ||
+          geminiRes.status === 503 ||
+          classified.code === "GEMINI_MODEL_ERROR"
+        ) {
+          continue;
+        }
         return respond(classified.http, {
           error: classified.code,
           secret_present: true,
@@ -269,44 +412,28 @@ Deno.serve(async (req) => {
       });
     }
 
-    const suggested = Math.min(
-      maxScore,
-      Math.max(0, asNumber(parsed.suggested_score, Number.NaN)),
-    );
-    if (!Number.isFinite(suggested)) {
+    const suggested = clampScore(asNumber(parsed.suggested_score, Number.NaN), maxScore);
+    if (!Number.isFinite(asNumber(parsed.suggested_score, Number.NaN))) {
       return respond(502, {
         error: "GEMINI_INVALID_RESPONSE",
         secret_present: true,
       });
     }
 
+    const criteria = normalizeCriteria(parsed.criteria, maxScore);
     const criteriaScores: Record<string, number> = {};
-    if (Array.isArray(parsed.criteria)) {
-      for (const row of parsed.criteria) {
-        if (!row || typeof row !== "object") continue;
-        const id = asString((row as { id?: unknown }).id);
-        const score = asNumber((row as { score?: unknown }).score, Number.NaN);
-        if (id && Number.isFinite(score)) criteriaScores[id] = score;
-      }
-    } else if (
-      parsed.criteria_scores &&
-      typeof parsed.criteria_scores === "object" &&
-      !Array.isArray(parsed.criteria_scores)
-    ) {
-      for (const [key, value] of Object.entries(
-        parsed.criteria_scores as Record<string, unknown>,
-      )) {
-        const score = asNumber(value, Number.NaN);
-        if (Number.isFinite(score)) criteriaScores[key] = score;
-      }
+    for (const item of criteria) {
+      criteriaScores[item.id || item.label] = item.score;
     }
 
     const strengths = Array.isArray(parsed.strengths)
-      ? parsed.strengths.map((s) => String(s)).filter(Boolean)
+      ? parsed.strengths.map((s) => String(s).trim()).filter(Boolean)
       : [];
     const improvements = Array.isArray(parsed.improvements)
-      ? parsed.improvements.map((s) => String(s)).filter(Boolean)
+      ? parsed.improvements.map((s) => String(s).trim()).filter(Boolean)
       : [];
+    const errors = normalizeErrors(parsed.errors);
+    const modelAnswer = asString(parsed.model_answer) || null;
     const feedback = asString(parsed.feedback);
     if (!feedback) {
       return respond(502, {
@@ -326,10 +453,13 @@ Deno.serve(async (req) => {
         suggestion: {
           suggested_score: suggested,
           max_score: maxScore,
+          criteria,
           criteria_scores: criteriaScores,
           strengths,
+          errors,
           improvements,
           feedback,
+          model_answer: modelAnswer,
         },
         model: usedModel,
         status: "proposed",
@@ -342,16 +472,20 @@ Deno.serve(async (req) => {
       http_status: 200,
       suggested_score: suggested,
       max_score: maxScore,
+      errors_count: errors.length,
+      has_model_answer: Boolean(modelAnswer),
     });
 
     return respond(200, {
       suggested_score: suggested,
       max_score: maxScore,
+      criteria,
       criteria_scores: criteriaScores,
-      criteria: Array.isArray(parsed.criteria) ? parsed.criteria : undefined,
       strengths,
+      errors,
       improvements,
       feedback,
+      ...(modelAnswer ? { model_answer: modelAnswer } : {}),
       model: usedModel,
       secret_present: true,
     });

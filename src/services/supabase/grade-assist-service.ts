@@ -1,16 +1,25 @@
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import {
+  criteriaToScoreMap,
   GRADE_ASSIST_UNCONFIGURED_MESSAGE,
   mapGradeAssistErrorCode,
+  parseGradeAssistCriteria,
+  parseGradeAssistErrors,
+  parseOptionalModelAnswer,
+  type GradeAssistCriterion,
+  type GradeAssistErrorItem,
 } from "@/lib/grade-assist-ux";
 
 export type GradeAssistSuggestion = {
   suggested_score: number;
   criteria_scores: Record<string, number>;
+  criteria: GradeAssistCriterion[];
   strengths: string[];
+  errors: GradeAssistErrorItem[];
   improvements: string[];
   feedback: string;
   max_score?: number;
+  model_answer?: string;
   model?: string;
 };
 
@@ -38,10 +47,13 @@ export type GradeAssistOutcome =
 type AssistPayload = {
   suggested_score?: number;
   max_score?: number;
+  criteria?: unknown;
   criteria_scores?: Record<string, number>;
   strengths?: string[];
+  errors?: unknown;
   improvements?: string[];
   feedback?: string;
+  model_answer?: string | null;
   model?: string;
   error?: string;
   secret_present?: boolean;
@@ -59,7 +71,10 @@ async function readInvokeErrorPayload(error: unknown): Promise<AssistPayload | n
   }
 }
 
-function failureFromPayload(payload: AssistPayload | null, fallbackMessage?: string): GradeAssistOutcome {
+function failureFromPayload(
+  payload: AssistPayload | null,
+  fallbackMessage?: string,
+): GradeAssistOutcome {
   const code = payload?.error;
   if (code === "FORBIDDEN" || code === "UNAUTHORIZED") {
     return {
@@ -89,6 +104,31 @@ function failureFromPayload(payload: AssistPayload | null, fallbackMessage?: str
     ok: false,
     reason: "error",
     message: fallbackMessage || "La pré-correction IA est temporairement indisponible.",
+  };
+}
+
+function toSuggestion(data: AssistPayload, fallbackMax: number): GradeAssistSuggestion | null {
+  if (typeof data.suggested_score !== "number") return null;
+  const maxScore =
+    typeof data.max_score === "number" && data.max_score > 0 ? data.max_score : fallbackMax;
+  const criteria = parseGradeAssistCriteria(data.criteria, maxScore);
+  const criteriaScores =
+    Object.keys(data.criteria_scores ?? {}).length > 0
+      ? (data.criteria_scores ?? {})
+      : criteriaToScoreMap(criteria);
+  const modelAnswer = parseOptionalModelAnswer(data.model_answer);
+
+  return {
+    suggested_score: data.suggested_score,
+    criteria_scores: criteriaScores,
+    criteria,
+    strengths: Array.isArray(data.strengths) ? data.strengths.map(String) : [],
+    errors: parseGradeAssistErrors(data.errors),
+    improvements: Array.isArray(data.improvements) ? data.improvements.map(String) : [],
+    feedback: typeof data.feedback === "string" ? data.feedback : "",
+    ...(typeof data.max_score === "number" ? { max_score: data.max_score } : {}),
+    ...(modelAnswer ? { model_answer: modelAnswer } : {}),
+    ...(typeof data.model === "string" ? { model: data.model } : {}),
   };
 }
 
@@ -140,7 +180,6 @@ export const SupabaseGradeAssistService = {
             message: mapGradeAssistErrorCode("UNAUTHORIZED"),
           };
         }
-        // Only treat as unconfigured when the Edge Function explicitly says so.
         if (
           payload?.error === "GEMINI_NOT_CONFIGURED" ||
           payload?.error === "NOT_CONFIGURED" ||
@@ -177,7 +216,10 @@ export const SupabaseGradeAssistService = {
         return failureFromPayload(data);
       }
 
-      if (!data || typeof data.suggested_score !== "number") {
+      const suggestion = data
+        ? toSuggestion(data, Math.max(1, Number(input.maxScore ?? 20)))
+        : null;
+      if (!suggestion || !suggestion.feedback) {
         return {
           ok: false,
           reason: "error",
@@ -186,18 +228,7 @@ export const SupabaseGradeAssistService = {
         };
       }
 
-      return {
-        ok: true,
-        suggestion: {
-          suggested_score: data.suggested_score,
-          criteria_scores: data.criteria_scores ?? {},
-          strengths: Array.isArray(data.strengths) ? data.strengths : [],
-          improvements: Array.isArray(data.improvements) ? data.improvements : [],
-          feedback: typeof data.feedback === "string" ? data.feedback : "",
-          ...(typeof data.max_score === "number" ? { max_score: data.max_score } : {}),
-          ...(typeof data.model === "string" ? { model: data.model } : {}),
-        },
-      };
+      return { ok: true, suggestion };
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
       return {

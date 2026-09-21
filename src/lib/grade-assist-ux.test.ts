@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   applySuggestionToWritingRubric,
+  clampGradeAssistScore,
   GRADE_ASSIST_NEEDS_TEXT_MESSAGE,
   GRADE_ASSIST_UNCONFIGURED_MESSAGE,
   gradeAssistCriteriaLabel,
   gradeAssistNeedsExploitableText,
   mapGradeAssistErrorCode,
+  normalizeGradeAssistErrorCategory,
+  parseGradeAssistCriteria,
+  parseGradeAssistErrors,
+  parseOptionalModelAnswer,
 } from "./grade-assist-ux";
 
 describe("grade-assist UX helpers", () => {
@@ -37,6 +42,65 @@ describe("grade-assist UX helpers", () => {
     expect(gradeAssistCriteriaLabel("comprehensibility")).toBe("Compréhensibilité");
     expect(gradeAssistCriteriaLabel("vocabulary")).toBe("Vocabulaire");
     expect(gradeAssistCriteriaLabel("grammar_and_spelling")).toBe("Grammaire / orthographe");
+  });
+
+  it("clamps suggested scores within 0..max_score", () => {
+    expect(clampGradeAssistScore(-2, 10)).toBe(0);
+    expect(clampGradeAssistScore(12, 10)).toBe(10);
+    expect(clampGradeAssistScore(7.26, 10)).toBe(7.3);
+  });
+
+  it("parses criteria with labels and max_score", () => {
+    const criteria = parseGradeAssistCriteria(
+      [
+        { label: "Respect de la consigne", score: 22, max_score: 25 },
+        { id: "vocabulary", score: 18, max: 25 },
+        { label: "bad", score: "x", max_score: 25 },
+      ],
+      100,
+    );
+    expect(criteria).toEqual([
+      { label: "Respect de la consigne", score: 22, max_score: 25 },
+      { id: "vocabulary", label: "Vocabulaire", score: 18, max_score: 25 },
+    ]);
+  });
+
+  it("parses errors[] and drops incomplete rows", () => {
+    const errors = parseGradeAssistErrors([
+      {
+        category: "word_order",
+        original: "Am Samstag wir gehen",
+        correction: "Am Samstag gehen wir",
+        explanation: "Verbe en 2e position.",
+      },
+      {
+        category: "Temps verbal",
+        original: "wir haben Fußball spielen",
+        correction: "haben wir Fußball gespielt",
+        explanation: "Participe passé requis.",
+      },
+      { category: "Autre", original: "x", correction: "", explanation: "y" },
+    ]);
+    expect(errors).toHaveLength(2);
+    expect(errors[0]?.category).toBe("Ordre des mots");
+    expect(errors[1]?.category).toBe("Temps verbal");
+  });
+
+  it("returns empty errors when omitted", () => {
+    expect(parseGradeAssistErrors(undefined)).toEqual([]);
+    expect(parseGradeAssistErrors(null)).toEqual([]);
+  });
+
+  it("treats missing model_answer as optional", () => {
+    expect(parseOptionalModelAnswer(undefined)).toBeNull();
+    expect(parseOptionalModelAnswer("")).toBeNull();
+    expect(parseOptionalModelAnswer("  Am Wochenende...  ")).toBe("Am Wochenende...");
+  });
+
+  it("normalizes error categories", () => {
+    expect(normalizeGradeAssistErrorCategory("Cas / déclinaison")).toBe("Cas / déclinaison");
+    expect(normalizeGradeAssistErrorCategory("conjugation")).toBe("Conjugaison");
+    expect(normalizeGradeAssistErrorCategory("")).toBe("Autre");
   });
 
   it("maps criteria scores onto the writing rubric without exceeding maxima", () => {
