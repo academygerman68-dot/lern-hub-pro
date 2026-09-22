@@ -166,7 +166,9 @@ export function mapGradeAssistErrorCode(
     case "GEMINI_AUTH_ERROR":
       return "La clé du service de correction IA est refusée. Vérifiez la configuration côté serveur.";
     case "GEMINI_MODEL_ERROR":
-      return "Le modèle de correction IA est indisponible ou invalide.";
+      return providerMessage?.trim()
+        ? `Le modèle de correction IA est indisponible (${providerMessage.trim().slice(0, 120)}).`
+        : "Le modèle de correction IA est indisponible ou invalide.";
     case "GEMINI_RATE_LIMIT":
       return "Le service de correction IA est temporairement saturé. Réessayez dans un instant.";
     case "GEMINI_INVALID_RESPONSE":

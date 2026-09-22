@@ -12,11 +12,14 @@ const cors = {
 };
 const jsonHeaders = { ...cors, "Cache-Control": "no-store", "Content-Type": "application/json" };
 
-/** Prefer current Flash model; fallback if provider returns 404/503 for the primary. */
+/** Prefer current Flash models; skip legacy 2.5 for new API keys (404). */
 const GEMINI_MODELS = [
-  "gemini-flash-latest",
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
   "gemini-3.6-flash",
-  "gemini-2.5-flash",
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-flash-latest",
 ] as const;
 
 const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
@@ -75,7 +78,7 @@ const DEFAULT_CRITERIA = [
 
 type GeminiPart =
   | { text: string }
-  | { inline_data: { mime_type: string; data: string } };
+  | { inlineData: { mimeType: string; data: string } };
 
 function respond(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
@@ -111,7 +114,10 @@ function classifyGeminiHttp(status: number, providerMessage: string): {
   if (status === 429) {
     return { code: "GEMINI_RATE_LIMIT", http: 429 };
   }
-  if (status === 404) {
+  if (status === 503 || /high demand|try again later|unavailable|overloaded/i.test(providerMessage)) {
+    return { code: "GEMINI_RATE_LIMIT", http: 429 };
+  }
+  if (status === 404 || /no longer available|not found|not supported for/i.test(providerMessage)) {
     return { code: "GEMINI_MODEL_ERROR", http: 502 };
   }
   if (status >= 500) {
@@ -123,10 +129,14 @@ function classifyGeminiHttp(status: number, providerMessage: string): {
   if (/API.?key|permission|unauth|invalid.?key/i.test(providerMessage)) {
     return { code: "GEMINI_AUTH_ERROR", http: 502 };
   }
-  if (/model|not.?found/i.test(providerMessage)) {
+  if (/model/i.test(providerMessage) && /not|unavailable|invalid/i.test(providerMessage)) {
     return { code: "GEMINI_MODEL_ERROR", http: 502 };
   }
   return { code: "GEMINI_PROVIDER_ERROR", http: 502 };
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function extractProviderMessage(raw: unknown): string {
@@ -382,7 +392,7 @@ Deno.serve(async (req) => {
         } else {
           const bytes = new Uint8Array(await blob.arrayBuffer());
           mediaParts.push({
-            inline_data: { mime_type: mime, data: bytesToBase64(bytes) },
+            inlineData: { mimeType: mime, data: bytesToBase64(bytes) },
           });
           analyzedAttachments.push({
             mime,
@@ -465,70 +475,91 @@ Deno.serve(async (req) => {
   try {
     let lastStatus = 0;
     let lastProviderMessage = "";
+    let lastCode = "GEMINI_PROVIDER_ERROR";
     let usedModel = GEMINI_MODELS[0];
     let text = "";
+    let sawRateLimit = false;
+    let sawModelError = false;
 
     for (const model of GEMINI_MODELS) {
       usedModel = model;
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": geminiKey,
-          },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts }],
-            generationConfig: {
-              temperature: 0.2,
-              responseMimeType: "application/json",
+      let attempt = 0;
+      while (attempt < 2) {
+        attempt += 1;
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": geminiKey,
             },
-          }),
-        },
-      );
+            body: JSON.stringify({
+              contents: [{ role: "user", parts }],
+              generationConfig: {
+                temperature: 0.2,
+                responseMimeType: "application/json",
+              },
+            }),
+          },
+        );
 
-      lastStatus = geminiRes.status;
-      const geminiJson = await geminiRes.json().catch(() => ({}));
-      lastProviderMessage = extractProviderMessage(geminiJson);
+        lastStatus = geminiRes.status;
+        const geminiJson = await geminiRes.json().catch(() => ({}));
+        lastProviderMessage = extractProviderMessage(geminiJson);
 
-      if (!geminiRes.ok) {
-        logGeminiDiag({
-          event: "provider_http_error",
-          model,
-          http_status: geminiRes.status,
-          provider_message: lastProviderMessage || null,
-          multimodal: mediaParts.length > 0,
-        });
-        const classified = classifyGeminiHttp(geminiRes.status, lastProviderMessage);
-        if (
-          geminiRes.status === 404 ||
-          geminiRes.status === 503 ||
-          classified.code === "GEMINI_MODEL_ERROR"
-        ) {
-          continue;
+        if (!geminiRes.ok) {
+          const classified = classifyGeminiHttp(geminiRes.status, lastProviderMessage);
+          lastCode = classified.code;
+          logGeminiDiag({
+            event: "provider_http_error",
+            model,
+            http_status: geminiRes.status,
+            provider_message: lastProviderMessage || null,
+            multimodal: mediaParts.length > 0,
+            attempt,
+            classified: classified.code,
+          });
+          if (classified.code === "GEMINI_RATE_LIMIT") {
+            sawRateLimit = true;
+            if (attempt < 2) {
+              await sleep(700 * attempt);
+              continue;
+            }
+            break;
+          }
+          if (classified.code === "GEMINI_MODEL_ERROR") {
+            sawModelError = true;
+            break;
+          }
+          return respond(classified.http, {
+            error: classified.code,
+            secret_present: true,
+            provider_status: geminiRes.status,
+            provider_message: lastProviderMessage || undefined,
+          });
         }
-        return respond(classified.http, {
-          error: classified.code,
-          secret_present: true,
-          provider_status: geminiRes.status,
-          provider_message: lastProviderMessage || undefined,
-        });
-      }
 
-      text =
-        geminiJson?.candidates?.[0]?.content?.parts
-          ?.map((p: { text?: string }) => p.text ?? "")
-          .join("") ?? "";
-      break;
+        text =
+          geminiJson?.candidates?.[0]?.content?.parts
+            ?.map((p: { text?: string }) => p.text ?? "")
+            .join("") ?? "";
+        break;
+      }
+      if (text) break;
     }
 
-    if (!text && (lastStatus === 404 || lastStatus === 503)) {
+    if (!text) {
+      const code = sawRateLimit
+        ? "GEMINI_RATE_LIMIT"
+        : sawModelError
+          ? "GEMINI_MODEL_ERROR"
+          : lastCode;
       const classified = classifyGeminiHttp(lastStatus, lastProviderMessage);
-      return respond(classified.http, {
-        error: classified.code,
+      return respond(code === "GEMINI_RATE_LIMIT" ? 429 : classified.http, {
+        error: code,
         secret_present: true,
-        provider_status: lastStatus,
+        provider_status: lastStatus || undefined,
         provider_message: lastProviderMessage || undefined,
       });
     }
