@@ -945,6 +945,18 @@ export const PaymentService = {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabasePaymentService.ensureFlexibleBilling(input);
   },
+  async quoteBillingDeclaration(
+    input: Parameters<typeof SupabasePaymentService.quoteBillingDeclaration>[0],
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabasePaymentService.quoteBillingDeclaration(input);
+  },
+  async ensureBillingDeclaration(
+    input: Parameters<typeof SupabasePaymentService.ensureBillingDeclaration>[0],
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabasePaymentService.ensureBillingDeclaration(input);
+  },
   /** Legacy renew button — does not fake activation. Use payment proofs or admin markPaid. */
   async pay(): Promise<never> {
     throw new Error(

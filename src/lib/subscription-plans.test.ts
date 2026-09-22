@@ -3,17 +3,19 @@ import {
   amountToMad,
   billingPeriodDueDate,
   billingPeriodLabel,
+  billingPeriodMonths,
+  billingPlanCoveredMonths,
   billingPlanLabel,
   listBillingPeriods,
   parseBillingTariffSettings,
   planAmount,
-  quoteFlexibleBillingPack,
+  quoteBillingDeclaration,
   resolvePlanAmount,
 } from "./subscription-plans";
 
 describe("subscription plans", () => {
-  it("returns catalogue MAD/EUR fallbacks (1200/100 monthly, 2400/240 quarterly)", () => {
-    expect(planAmount("monthly", "MAD")).toBe(1200);
+  it("returns catalogue MAD/EUR fallbacks (1000/100 monthly, 2400/240 quarterly)", () => {
+    expect(planAmount("monthly", "MAD")).toBe(1000);
     expect(planAmount("monthly", "EUR")).toBe(100);
     expect(planAmount("quarterly", "MAD")).toBe(2400);
     expect(planAmount("quarterly", "EUR")).toBe(240);
@@ -22,66 +24,76 @@ describe("subscription plans", () => {
   it("converts EUR to MAD at 1 EUR = 10 MAD for CA", () => {
     expect(amountToMad(100, "EUR")).toBe(1000);
     expect(amountToMad(240, "EUR")).toBe(2400);
-    expect(amountToMad(1200, "MAD")).toBe(1200);
+    expect(amountToMad(1000, "MAD")).toBe(1000);
   });
 
-  it("quotes flexible monthly + 3 future months at quarterly pack (3600 MAD)", () => {
-    const quote = quoteFlexibleBillingPack({
+  it("quotes independent monthly and quarterly declarations (never cumulative)", () => {
+    const monthly = quoteBillingDeclaration({
+      plan: "monthly",
       currency: "MAD",
-      currentMonth: "2026-09",
-      includeFuturePack: true,
+      startMonth: "2026-09",
     });
-    expect(quote.currentAmount).toBe(1200);
-    expect(quote.futureMonths).toEqual(["2026-10", "2026-11", "2026-12"]);
-    expect(quote.futurePackAmount).toBe(2400);
-    expect(quote.totalAmount).toBe(3600);
-    expect(quote.currentIsAcquired).toBe(false);
+    expect(monthly.expectedAmount).toBe(1000);
+    expect(monthly.coveredMonths).toEqual(["2026-09"]);
+
+    const quarterly = quoteBillingDeclaration({
+      plan: "quarterly",
+      currency: "MAD",
+      startMonth: "2026-10",
+      occupiedMonths: ["2026-09"],
+    });
+    expect(quarterly.expectedAmount).toBe(2400);
+    expect(quarterly.coveredMonths).toEqual(["2026-10", "2026-11", "2026-12"]);
+    expect(quarterly.available).toBe(true);
+    expect(quarterly.billingPeriod).toBe("2026-10/2026-12");
   });
 
-  it("preserves acquired current échéance amount in the flexible quote", () => {
-    const quote = quoteFlexibleBillingPack({
+  it("rejects quarterly start when any of the three months is occupied", () => {
+    const quote = quoteBillingDeclaration({
+      plan: "quarterly",
       currency: "MAD",
-      currentMonth: "2026-09",
-      includeFuturePack: true,
-      acquiredCurrentAmount: 1000,
-      tariffs: parseBillingTariffSettings([
-        { key: "billing_tariff_monthly_MAD", value: 1200 },
-        { key: "billing_tariff_quarterly_MAD", value: 2400 },
-      ]),
+      startMonth: "2026-09",
+      occupiedMonths: ["2026-09"],
     });
-    expect(quote.currentAmount).toBe(1000);
-    expect(quote.monthlyTariff).toBe(1200);
-    expect(quote.futurePackAmount).toBe(2400);
-    expect(quote.totalAmount).toBe(3400);
-    expect(quote.currentIsAcquired).toBe(true);
+    expect(quote.available).toBe(false);
+    expect(quote.conflictMonths).toEqual(["2026-09"]);
+    expect(quote.firstEligibleStart).toBe("2026-10");
+  });
+
+  it("covers rolling quarters starting in November across year boundary", () => {
+    expect(billingPlanCoveredMonths("quarterly", "2026-11")).toEqual([
+      "2026-11",
+      "2026-12",
+      "2027-01",
+    ]);
+  });
+
+  it("expands stored period labels into months", () => {
+    expect(billingPeriodMonths("2026-09")).toEqual(["2026-09"]);
+    expect(billingPeriodMonths("2026-10/2026-12")).toEqual(["2026-10", "2026-11", "2026-12"]);
+    expect(billingPeriodMonths("2026-Q4")).toEqual(["2026-10", "2026-11", "2026-12"]);
   });
 
   it("resolves plan amounts from app_settings tariffs when provided", () => {
     const tariffs = parseBillingTariffSettings([
-      { key: "billing_tariff_monthly_MAD", value: 1200 },
+      { key: "billing_tariff_monthly_MAD", value: 1000 },
       { key: "billing_tariff_quarterly_MAD", value: 2400 },
     ]);
-    expect(resolvePlanAmount("monthly", "MAD", tariffs)).toBe(1200);
+    expect(resolvePlanAmount("monthly", "MAD", tariffs)).toBe(1000);
     expect(resolvePlanAmount("quarterly", "MAD", tariffs)).toBe(2400);
   });
 
-  /**
-   * Regression: BrandingProvider caches SettingsService.getMap() under
-   * queryKeys.branding.settings. Billing pages reused that key with listPublic
-   * expectations → parseBillingTariffSettings threw "rows is not iterable"
-   * and hit the root Error Boundary on /payments.
-   */
   it("parses tariff map shape from branding getMap cache without throwing", () => {
     const map = {
       academy_name: "German Academy",
-      billing_tariff_monthly_MAD: 1200,
+      billing_tariff_monthly_MAD: 1000,
       billing_tariff_quarterly_MAD: 2400,
       billing_tariff_monthly_EUR: 100,
       billing_tariff_quarterly_EUR: 240,
     };
     expect(() => parseBillingTariffSettings(map)).not.toThrow();
     const tariffs = parseBillingTariffSettings(map);
-    expect(resolvePlanAmount("monthly", "MAD", tariffs)).toBe(1200);
+    expect(resolvePlanAmount("monthly", "MAD", tariffs)).toBe(1000);
     expect(resolvePlanAmount("quarterly", "MAD", tariffs)).toBe(2400);
     expect(resolvePlanAmount("monthly", "EUR", tariffs)).toBe(100);
   });
@@ -96,6 +108,7 @@ describe("subscription plans", () => {
     expect(billingPlanLabel("monthly")).toBe("Mensuelle");
     expect(billingPlanLabel("quarterly")).toBe("Trimestrielle");
     expect(billingPeriodLabel("2026-09")).toMatch(/septembre/i);
+    expect(billingPeriodLabel("2026-10/2026-12")).toMatch(/octobre/i);
     expect(billingPeriodLabel("2026-Q3")).toMatch(/T3 2026/);
   });
 

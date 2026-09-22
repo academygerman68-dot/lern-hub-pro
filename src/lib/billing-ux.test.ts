@@ -99,7 +99,7 @@ describe("billing UX statuses", () => {
 
 describe("subscription billing plans", () => {
   it("covers fixed commercial tariffs", () => {
-    expect(planAmount("monthly", "MAD")).toBe(1200);
+    expect(planAmount("monthly", "MAD")).toBe(1000);
     expect(planAmount("monthly", "EUR")).toBe(100);
     expect(planAmount("quarterly", "MAD")).toBe(2400);
     expect(planAmount("quarterly", "EUR")).toBe(240);

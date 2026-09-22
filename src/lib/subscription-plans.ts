@@ -4,9 +4,9 @@ export type BillingCurrency = "MAD" | "EUR";
 /** Fixed reporting FX: 1 EUR = 10 MAD (chiffre d'affaires). */
 export const EUR_TO_MAD_RATE = 10;
 
-/** Fallback when settings are unavailable — prod catalogue (monthly 1200 MAD). */
+/** Fallback when settings are unavailable — catalogue commercial courant. */
 export const BILLING_PLAN_AMOUNT_FALLBACKS: Record<BillingPlan, Record<BillingCurrency, number>> = {
-  monthly: { MAD: 1200, EUR: 100 },
+  monthly: { MAD: 1000, EUR: 100 },
   quarterly: { MAD: 2400, EUR: 240 },
 };
 
@@ -123,41 +123,141 @@ export function parseEurToMadRate(
   return Number.isFinite(n) && n > 0 ? n : EUR_TO_MAD_RATE;
 }
 
-/** Current month + optional 3 consecutive future months at quarterly pack price. */
+/** Expand stored billing_period into calendar months YYYY-MM. */
+export function billingPeriodMonths(period: string | null | undefined): string[] {
+  if (!period?.trim()) return [];
+  if (/^\d{4}-\d{2}$/.test(period)) return [period];
+  const range = /^(\d{4}-\d{2})\/(\d{4}-\d{2})$/.exec(period);
+  if (range) {
+    const [sy, sm] = range[1]!.split("-").map(Number);
+    const [ey, em] = range[2]!.split("-").map(Number);
+    const months: string[] = [];
+    let y = sy!;
+    let m = sm!;
+    while (y < ey! || (y === ey && m <= em!)) {
+      months.push(`${y}-${String(m).padStart(2, "0")}`);
+      m += 1;
+      if (m > 12) {
+        m = 1;
+        y += 1;
+      }
+    }
+    return months;
+  }
+  const quarter = /^(\d{4})-Q([1-4])$/i.exec(period);
+  if (quarter) {
+    const year = Number(quarter[1]);
+    const q = Number(quarter[2]);
+    const start = (q - 1) * 3 + 1;
+    return [0, 1, 2].map((i) => `${year}-${String(start + i).padStart(2, "0")}`);
+  }
+  return [];
+}
+
+/** Months covered by an independent plan choice (not cumulative pack). */
+export function billingPlanCoveredMonths(plan: BillingPlan, startMonth: string): string[] {
+  if (!/^\d{4}-\d{2}$/.test(startMonth)) return [];
+  if (plan === "monthly") return [startMonth];
+  const [y, m] = startMonth.split("-").map(Number);
+  const months: string[] = [];
+  for (let i = 0; i < 3; i += 1) {
+    const d = new Date(y!, m! - 1 + i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  return months;
+}
+
+export function listCandidateStartMonths(count = 12, from = new Date()): string[] {
+  const months: string[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const d = new Date(from.getFullYear(), from.getMonth() + i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  return months;
+}
+
+export type BillingDeclarationQuote = {
+  plan: BillingPlan;
+  currency: BillingCurrency;
+  startMonth: string;
+  coveredMonths: string[];
+  billingPeriod: string;
+  expectedAmount: number;
+  monthlyTariff: number;
+  quarterlyTariff: number;
+  available: boolean;
+  conflictMonths: string[];
+  firstEligibleStart: string | null;
+};
+
+/** Client-side preview — server quote_billing_declaration is authoritative. */
+export function quoteBillingDeclaration(input: {
+  plan: BillingPlan;
+  currency: BillingCurrency;
+  startMonth: string;
+  tariffs?: BillingTariffMap | null;
+  occupiedMonths?: string[] | null;
+}): BillingDeclarationQuote {
+  const coveredMonths = billingPlanCoveredMonths(input.plan, input.startMonth);
+  const occupied = new Set(input.occupiedMonths ?? []);
+  const conflictMonths = coveredMonths.filter((m) => occupied.has(m));
+  const expectedAmount = resolvePlanAmount(input.plan, input.currency, input.tariffs);
+  const billingPeriod =
+    input.plan === "monthly"
+      ? input.startMonth
+      : `${coveredMonths[0]}/${coveredMonths[coveredMonths.length - 1]}`;
+
+  let firstEligibleStart: string | null = null;
+  const [y, m] = input.startMonth.split("-").map(Number);
+  for (let i = 0; i < 18; i += 1) {
+    const d = new Date(y!, m! - 1 + i, 1);
+    const probe = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const cover = billingPlanCoveredMonths(input.plan, probe);
+    if (cover.every((month) => !occupied.has(month))) {
+      firstEligibleStart = probe;
+      break;
+    }
+  }
+
+  return {
+    plan: input.plan,
+    currency: input.currency,
+    startMonth: input.startMonth,
+    coveredMonths,
+    billingPeriod,
+    expectedAmount,
+    monthlyTariff: resolvePlanAmount("monthly", input.currency, input.tariffs),
+    quarterlyTariff: resolvePlanAmount("quarterly", input.currency, input.tariffs),
+    available: conflictMonths.length === 0,
+    conflictMonths,
+    firstEligibleStart,
+  };
+}
+
+/** @deprecated Cumulative pack removed — use quoteBillingDeclaration. */
 export function quoteFlexibleBillingPack(input: {
   currency: BillingCurrency;
   currentMonth: string;
   includeFuturePack: boolean;
   tariffs?: BillingTariffMap | null;
-  /** Acquired / already issued échéance amount for the current month (do not overwrite). */
   acquiredCurrentAmount?: number | null;
 }) {
-  const monthly = resolvePlanAmount("monthly", input.currency, input.tariffs);
-  const quarterly = resolvePlanAmount("quarterly", input.currency, input.tariffs);
-  const acquired = Number(input.acquiredCurrentAmount);
-  const currentAmount =
-    Number.isFinite(acquired) && acquired > 0 ? acquired : monthly;
-  const currentIsAcquired =
-    Number.isFinite(acquired) && acquired > 0 && Math.abs(acquired - monthly) > 0.009;
-  const futureMonths: string[] = [];
-  if (input.includeFuturePack) {
-    const [y, m] = input.currentMonth.split("-").map(Number);
-    for (let i = 1; i <= 3; i += 1) {
-      const d = new Date(y!, m! - 1 + i, 1);
-      futureMonths.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
-    }
-  }
-  const futurePackAmount = input.includeFuturePack ? quarterly : 0;
-  return {
+  const quote = quoteBillingDeclaration({
+    plan: "monthly",
     currency: input.currency,
+    startMonth: input.currentMonth,
+    ...(input.tariffs !== undefined ? { tariffs: input.tariffs } : {}),
+  });
+  return {
+    currency: quote.currency,
     currentMonth: input.currentMonth,
-    currentAmount,
-    futureMonths,
-    futurePackAmount,
-    totalAmount: currentAmount + futurePackAmount,
-    monthlyTariff: monthly,
-    quarterlyTariff: quarterly,
-    currentIsAcquired,
+    currentAmount: quote.expectedAmount,
+    futureMonths: [] as string[],
+    futurePackAmount: 0,
+    totalAmount: quote.expectedAmount,
+    monthlyTariff: quote.monthlyTariff,
+    quarterlyTariff: quote.quarterlyTariff,
+    currentIsAcquired: false,
   };
 }
 
@@ -186,6 +286,12 @@ export function billingPeriodLabel(
   plan?: string | null,
 ): string {
   if (!period) return "—";
+  const range = /^(\d{4}-\d{2})\/(\d{4}-\d{2})$/.exec(period);
+  if (range) {
+    const start = billingPeriodLabel(range[1], "monthly");
+    const end = billingPeriodLabel(range[2], "monthly");
+    return `${start} → ${end}`;
+  }
   const quarter = /^(\d{4})-Q([1-4])$/i.exec(period);
   if (quarter) {
     const year = quarter[1];

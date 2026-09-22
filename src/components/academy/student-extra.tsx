@@ -1417,7 +1417,7 @@ export function DirectorSettings() {
   const [defaultCapacity, setDefaultCapacity] = useState("20");
   const [courseDuration, setCourseDuration] = useState("90");
   const [meetingProvider, setMeetingProvider] = useState("jitsi");
-  const [defaultPrice, setDefaultPrice] = useState("1200");
+  const [defaultPrice, setDefaultPrice] = useState("1000");
   const [paymentDueDay, setPaymentDueDay] = useState("1");
   const [notifyEmail, setNotifyEmail] = useState(true);
   const [notifyWhatsapp, setNotifyWhatsapp] = useState(false);
@@ -1438,7 +1438,7 @@ export function DirectorSettings() {
     setDefaultCapacity(settingString(map, "default_class_capacity", "20"));
     setCourseDuration(settingString(map, "default_course_duration_minutes", "90"));
     setMeetingProvider(settingString(map, "default_meeting_provider", "jitsi"));
-    setDefaultPrice(settingString(map, "default_payment_amount", "1200"));
+    setDefaultPrice(settingString(map, "default_payment_amount", "1000"));
     setPaymentDueDay(settingString(map, "payment_due_day", "1"));
     setNotifyEmail(settingString(map, "notifications_email_enabled", "true") === "true");
     setNotifyWhatsapp(settingString(map, "notifications_whatsapp_enabled", "false") === "true");

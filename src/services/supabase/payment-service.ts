@@ -224,6 +224,68 @@ export const SupabasePaymentService = {
     };
   },
 
+  async quoteBillingDeclaration(input: {
+    plan: "monthly" | "quarterly";
+    currency: string;
+    startMonth: string;
+  }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (requireClient() as any).rpc("quote_billing_declaration", {
+      p_plan: input.plan,
+      p_currency: input.currency,
+      p_start_month: input.startMonth,
+    });
+    if (error) throw error;
+    const row = (data ?? {}) as {
+      plan?: string;
+      currency?: string;
+      start_month?: string;
+      covered_months?: string[];
+      billing_period?: string;
+      expected_amount?: number;
+      monthly_tariff?: number;
+      quarterly_tariff?: number;
+      available?: boolean;
+      conflict_months?: string[];
+      first_eligible_start?: string | null;
+      occupied_months?: string[];
+    };
+    return {
+      plan: String(row.plan) as "monthly" | "quarterly",
+      currency: String(row.currency),
+      startMonth: String(row.start_month),
+      coveredMonths: Array.isArray(row.covered_months) ? row.covered_months : [],
+      billingPeriod: String(row.billing_period),
+      expectedAmount: Number(row.expected_amount),
+      monthlyTariff: Number(row.monthly_tariff),
+      quarterlyTariff: Number(row.quarterly_tariff),
+      available: Boolean(row.available),
+      conflictMonths: Array.isArray(row.conflict_months) ? row.conflict_months : [],
+      firstEligibleStart:
+        typeof row.first_eligible_start === "string" ? row.first_eligible_start : null,
+      occupiedMonths: Array.isArray(row.occupied_months) ? row.occupied_months : [],
+    };
+  },
+
+  async ensureBillingDeclaration(input: {
+    plan: "monthly" | "quarterly";
+    startMonth: string;
+    currency?: string | null;
+  }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (requireClient() as any).rpc("ensure_billing_declaration", {
+      p_plan: input.plan,
+      p_start_month: input.startMonth,
+      p_currency: input.currency ?? null,
+    });
+    if (error) throw error;
+    const row = data as { quote: Record<string, unknown>; payment_id: string };
+    return {
+      paymentId: String(row.payment_id),
+      quote: row.quote,
+    };
+  },
+
   async uploadAdminReceipt(paymentId: string, file: File) {
     const allowed = new Set(["application/pdf", "image/jpeg", "image/png"]);
     if (!allowed.has(file.type)) {

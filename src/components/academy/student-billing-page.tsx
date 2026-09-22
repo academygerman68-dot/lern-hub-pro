@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -42,11 +42,14 @@ import {
   summarizePaymentRow,
 } from "@/lib/billing-ux";
 import {
+  type BillingPlan,
   billingPeriodLabel,
+  billingPeriodMonths,
   billingPlanLabel,
   formatMoneyAmount,
+  listCandidateStartMonths,
   parseBillingTariffSettings,
-  quoteFlexibleBillingPack,
+  quoteBillingDeclaration,
 } from "@/lib/subscription-plans";
 import { queryKeys } from "@/lib/query-keys";
 import { useAcademy } from "./academy-context";
@@ -57,6 +60,10 @@ import { FilterBar, PageHeader, SectionHeader, Status, Surface } from "./primiti
 
 function currentMonthKey(from = new Date()) {
   return `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthOptionLabel(monthKey: string) {
+  return billingPeriodLabel(monthKey, "monthly");
 }
 
 type DocPreview = {
@@ -114,7 +121,12 @@ export function StudentPaymentsPage() {
   const [operationDate, setOperationDate] = useState("");
   const [accountHint, setAccountHint] = useState("");
   const [note, setNote] = useState("");
-  const [includeFuturePack, setIncludeFuturePack] = useState(false);
+  const [declarePlan, setDeclarePlan] = useState<BillingPlan>("monthly");
+  const [startMonth, setStartMonth] = useState(currentMonthKey());
+  const [serverQuote, setServerQuote] = useState<Awaited<
+    ReturnType<typeof PaymentService.quoteBillingDeclaration>
+  > | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [attachment, setAttachment] = useState<AttachmentDraft>({
     kind: "pdf",
     url: "",
@@ -182,14 +194,92 @@ export function StudentPaymentsPage() {
       ? "Profil étudiant introuvable. Contactez l’administration."
       : null;
 
-  const canDeclare =
-    nextInstallment.status === "due" ||
-    nextInstallment.status === "overdue" ||
-    nextInstallment.status === "rejected";
+  const occupiedMonths = useMemo(() => {
+    const set = new Set<string>();
+    for (const payment of payments) {
+      for (const month of billingPeriodMonths(payment.billing_period)) {
+        if (["pending", "partial", "overdue", "paid"].includes(payment.status)) {
+          set.add(month);
+        }
+      }
+    }
+    return [...set].sort();
+  }, [payments]);
+
+  const localQuote = useMemo(() => {
+    const currency =
+      billing.currency === "EUR" || billing.currency === "MAD" ? billing.currency : "MAD";
+    return quoteBillingDeclaration({
+      plan: declarePlan,
+      currency,
+      startMonth,
+      tariffs,
+      occupiedMonths,
+    });
+  }, [declarePlan, startMonth, billing.currency, tariffs, occupiedMonths]);
+
+  const effectiveQuote = serverQuote
+    ? {
+        plan: serverQuote.plan,
+        currency: (serverQuote.currency === "EUR" || serverQuote.currency === "MAD"
+          ? serverQuote.currency
+          : "MAD") as "MAD" | "EUR",
+        startMonth: serverQuote.startMonth,
+        coveredMonths: serverQuote.coveredMonths,
+        billingPeriod: serverQuote.billingPeriod,
+        expectedAmount: serverQuote.expectedAmount,
+        monthlyTariff: serverQuote.monthlyTariff,
+        quarterlyTariff: serverQuote.quarterlyTariff,
+        available: serverQuote.available,
+        conflictMonths: serverQuote.conflictMonths,
+        firstEligibleStart: serverQuote.firstEligibleStart,
+      }
+    : localQuote;
+
+  const startMonthOptions = useMemo(() => listCandidateStartMonths(14), []);
+
+  useEffect(() => {
+    if (!declareOpen) return;
+    let cancelled = false;
+    setQuoteLoading(true);
+    void PaymentService.quoteBillingDeclaration({
+      plan: declarePlan,
+      currency: billing.currency,
+      startMonth,
+    })
+      .then((quote) => {
+        if (cancelled) return;
+        setServerQuote(quote);
+        setDeclaredAmount(String(quote.expectedAmount));
+        if (!quote.available && quote.firstEligibleStart && quote.firstEligibleStart !== startMonth) {
+          setFormError(
+            `Mois de départ indisponible (${quote.conflictMonths.join(", ") || "chevauchement"}). Premier mois éligible : ${monthOptionLabel(quote.firstEligibleStart)}.`,
+          );
+        } else {
+          setFormError(null);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setServerQuote(null);
+        setDeclaredAmount(String(localQuote.expectedAmount));
+        setFormError(err instanceof Error ? err.message : "Devis serveur indisponible.");
+      })
+      .finally(() => {
+        if (!cancelled) setQuoteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [declareOpen, declarePlan, startMonth, billing.currency, localQuote.expectedAmount]);
+
+  const canDeclare = !identityHint;
 
   const openDeclare = () => {
-    setIncludeFuturePack(false);
-    setDeclaredAmount(String(nextInstallment.amount));
+    setDeclarePlan("monthly");
+    setStartMonth(currentMonthKey());
+    setServerQuote(null);
+    setDeclaredAmount("");
     setOperationDate("");
     setAccountHint("");
     setNote("");
@@ -199,46 +289,29 @@ export function StudentPaymentsPage() {
   };
 
   const resetDeclareForm = () => {
-    setIncludeFuturePack(false);
+    setDeclarePlan("monthly");
+    setStartMonth(currentMonthKey());
+    setServerQuote(null);
     setAttachment({ kind: "pdf", url: "", file: null });
     setNote("");
-    setDeclaredAmount(String(nextInstallment.amount));
+    setDeclaredAmount("");
     setOperationDate("");
     setAccountHint("");
     setFormError(null);
   };
-
-  const flexibleQuote = useMemo(() => {
-    const currency =
-      nextInstallment.currency === "EUR" || nextInstallment.currency === "MAD"
-        ? nextInstallment.currency
-        : "MAD";
-    const currentMonth =
-      /^\d{4}-\d{2}$/.test(nextInstallment.period) ? nextInstallment.period : currentMonthKey();
-    return quoteFlexibleBillingPack({
-      currency,
-      currentMonth,
-      includeFuturePack,
-      tariffs,
-      acquiredCurrentAmount:
-        nextInstallment.kind === "existing" ? nextInstallment.amount : null,
-    });
-  }, [
-    includeFuturePack,
-    nextInstallment.currency,
-    nextInstallment.period,
-    nextInstallment.kind,
-    nextInstallment.amount,
-    tariffs,
-  ]);
 
   const handleSubmitProof = async () => {
     if (!studentId) {
       setFormError("Profil étudiant introuvable. Contactez l’administration.");
       return;
     }
-    if (!nextInstallment.period || nextInstallment.period === "—") {
-      setFormError("Aucune échéance disponible. Contactez l’administration.");
+    if (!effectiveQuote.available) {
+      const eligible = effectiveQuote.firstEligibleStart;
+      setFormError(
+        eligible
+          ? `Période indisponible. Choisissez ${monthOptionLabel(eligible)}.`
+          : "Aucun mois éligible pour cette formule.",
+      );
       return;
     }
     if (!attachment.file) {
@@ -252,17 +325,16 @@ export function StudentPaymentsPage() {
     setFormError(null);
     setEnsuringPayment(true);
     try {
-      let paymentId = nextInstallment.paymentId;
-      if (includeFuturePack || !paymentId) {
-        const ensured = await PaymentService.ensureFlexibleBilling({
-          includeFuturePack,
-          currency: flexibleQuote.currency,
-        });
-        paymentId = ensured.current_payment_id;
-      }
-      if (!paymentId) {
-        paymentId = await PaymentService.ensureMySubscriptionPayment(nextInstallment.period);
-      }
+      const ensured = await PaymentService.ensureBillingDeclaration({
+        plan: declarePlan,
+        startMonth,
+        currency: billing.currency,
+      });
+      const paymentId = ensured.paymentId;
+      const expected = Number(
+        (ensured.quote as { expected_amount?: number })?.expected_amount ??
+          effectiveQuote.expectedAmount,
+      );
       const reason = validatePaymentProofSubmitInput({
         studentId,
         paymentId,
@@ -273,6 +345,13 @@ export function StudentPaymentsPage() {
       if (reason) {
         setFormError(reason);
         return;
+      }
+      const declared = Number(declaredAmount);
+      if (Number.isFinite(expected) && Number.isFinite(declared) && Math.abs(declared - expected) > 0.009) {
+        // Keep submitting — admin reviews amount mismatch via declared vs expected.
+        toast.message(
+          `Montant déclaré (${declared}) différent du prix attendu (${expected}). L’administration vérifiera l’écart.`,
+        );
       }
       await new Promise<void>((resolve, reject) => {
         submitProof.mutate(
@@ -289,8 +368,8 @@ export function StudentPaymentsPage() {
           {
             onSuccess: () => {
               toast.success(
-                includeFuturePack
-                  ? "Justificatif envoyé — mois courant + pack 3 mois créés (vérification 48 h)"
+                declarePlan === "quarterly"
+                  ? "Justificatif envoyé — trimestre en vérification (48 h)"
                   : "Justificatif envoyé — vérification sous 48 h",
               );
               resetDeclareForm();
@@ -311,7 +390,8 @@ export function StudentPaymentsPage() {
       const mapped = toPaymentProofUserError(err, "generic");
       const message =
         err instanceof Error && /PERIOD_OVERLAP/i.test(err.message)
-          ? "Période déjà payée ou en cours — aucun chevauchement autorisé."
+          ? err.message.replace(/^PERIOD_OVERLAP:\s*/i, "") ||
+            "Période déjà payée ou réservée — chevauchement interdit."
           : mapped.message;
       setFormError(message);
       toast.error(message);
@@ -486,16 +566,16 @@ export function StudentPaymentsPage() {
               </div>
               {canDeclare ? (
                 <Button size="lg" className="w-full shrink-0 lg:w-auto" onClick={openDeclare}>
-                  Déclarer mon paiement
+                  Déclarer un paiement
                 </Button>
-              ) : nextInstallment.status === "pending_review" ? (
-                <p className="text-sm text-muted-foreground">
-                  Justificatif en cours de vérification (48 h).
-                </p>
               ) : (
-                <p className="text-sm text-muted-foreground">Échéance déjà validée.</p>
+                <p className="text-sm text-destructive">{identityHint}</p>
               )}
             </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Choisissez une formule mensuelle ou trimestrielle et un mois de départ. Les formules
+              sont exclusives (jamais cumulées).
+            </p>
           </Surface>
         </section>
 
@@ -540,6 +620,9 @@ export function StudentPaymentsPage() {
                         <p className="font-semibold">{summary.periodLabel}</p>
                         <p className="text-sm text-muted-foreground">
                           {summary.expected} · {summary.planLabel}
+                          {billingPeriodMonths(payment.billing_period).length > 1
+                            ? ` · ${billingPeriodMonths(payment.billing_period).length} mois`
+                            : ""}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {payment.payment_date ||
@@ -692,128 +775,175 @@ export function StudentPaymentsPage() {
           <DialogHeader>
             <DialogTitle>Déclarer mon paiement</DialogTitle>
             <DialogDescription>
-              Les informations d’abonnement sont préremplies. Joignez uniquement le justificatif du
-              virement.
+              Choisissez une formule (mensuelle ou trimestrielle), le mois de départ, puis joignez le
+              justificatif. Le prix est calculé côté serveur.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 rounded-lg border border-border/80 bg-muted/40 p-3 text-sm">
-            <p className="font-medium">1. Formule</p>
-            <p>
-              <span className="text-muted-foreground">Échéance sélectionnée · </span>
-              {billingPeriodLabel(nextInstallment.period, nextInstallment.plan)}
-              {" · "}
-              {formatMoneyAmount(flexibleQuote.currentAmount, flexibleQuote.currency)}
-              {flexibleQuote.currentIsAcquired ? (
-                <span className="text-muted-foreground"> (tarif acquis)</span>
-              ) : (
-                <span className="text-muted-foreground"> (catalogue)</span>
-              )}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Catalogue mensuel · </span>
-              {formatMoneyAmount(flexibleQuote.monthlyTariff, flexibleQuote.currency)}
-              <span className="text-muted-foreground"> · Pack 3 mois · </span>
-              {formatMoneyAmount(flexibleQuote.quarterlyTariff, flexibleQuote.currency)}
-            </p>
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={includeFuturePack}
-                disabled={formBusy}
-                onChange={(e) => {
-                  const next = e.target.checked;
-                  setIncludeFuturePack(next);
-                  const quote = quoteFlexibleBillingPack({
-                    currency: flexibleQuote.currency,
-                    currentMonth: flexibleQuote.currentMonth,
-                    includeFuturePack: next,
-                    tariffs,
-                    acquiredCurrentAmount:
-                      nextInstallment.kind === "existing" ? nextInstallment.amount : null,
-                  });
-                  setDeclaredAmount(String(quote.totalAmount));
-                }}
-              />
-              <span>
-                Ajouter 3 mois futurs consécutifs au tarif trimestriel catalogue (
-                {formatMoneyAmount(flexibleQuote.quarterlyTariff, flexibleQuote.currency)}
-                {flexibleQuote.futureMonths.length
-                  ? ` · ${flexibleQuote.futureMonths.join(", ")}`
-                  : ""}
-                ). Sans chevauchement avec les périodes déjà validées.
-              </span>
-            </label>
-            <p className="font-medium">2. Récapitulatif</p>
-            <p>
-              <span className="text-muted-foreground">Total attendu (serveur) · </span>
-              {formatMoneyAmount(flexibleQuote.totalAmount, flexibleQuote.currency)}
-            </p>
-            <p className="font-medium">3. Justificatif</p>
-          </div>
+          <div className="space-y-4">
+            <div>
+              <p className="mb-2 text-sm font-medium">1. Formule</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {(
+                  [
+                    ["monthly", "Mensuelle", effectiveQuote.monthlyTariff],
+                    ["quarterly", "Trimestrielle", effectiveQuote.quarterlyTariff],
+                  ] as const
+                ).map(([plan, label, amount]) => (
+                  <button
+                    key={plan}
+                    type="button"
+                    disabled={formBusy}
+                    onClick={() => setDeclarePlan(plan)}
+                    className={`rounded-lg border p-3 text-left transition ${
+                      declarePlan === plan
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "border-border hover:bg-muted/40"
+                    }`}
+                  >
+                    <p className="font-semibold">{label}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {formatMoneyAmount(amount, billing.currency)}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {plan === "monthly"
+                        ? "Couvre uniquement le mois choisi"
+                        : "Couvre le mois choisi + les 2 suivants"}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          <div className="space-y-3">
-            {identityHint ? <p className="text-sm text-destructive">{identityHint}</p> : null}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-sm">
-                Montant versé ({nextInstallment.currency})
+            <label className="block text-sm">
+              2. Mois de départ
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={startMonth}
+                disabled={formBusy || quoteLoading}
+                onChange={(e) => setStartMonth(e.target.value)}
+              >
+                {startMonthOptions.map((month) => (
+                  <option key={month} value={month}>
+                    {monthOptionLabel(month)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="space-y-1 rounded-lg border border-border/80 bg-muted/40 p-3 text-sm">
+              <p className="font-medium">3. Aperçu</p>
+              {quoteLoading ? (
+                <p className="text-muted-foreground">Calcul du devis…</p>
+              ) : (
+                <>
+                  <p>
+                    <span className="text-muted-foreground">Mois couverts · </span>
+                    {effectiveQuote.coveredMonths.map(monthOptionLabel).join(", ") || "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Période · </span>
+                    {billingPeriodLabel(effectiveQuote.billingPeriod, declarePlan)}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Prix attendu · </span>
+                    {formatMoneyAmount(effectiveQuote.expectedAmount, effectiveQuote.currency)}
+                  </p>
+                  {!effectiveQuote.available ? (
+                    <p className="text-destructive">
+                      Indisponible
+                      {effectiveQuote.conflictMonths.length
+                        ? ` (conflit : ${effectiveQuote.conflictMonths.join(", ")})`
+                        : ""}
+                      {effectiveQuote.firstEligibleStart
+                        ? ` — premier mois éligible : ${monthOptionLabel(effectiveQuote.firstEligibleStart)}`
+                        : ""}
+                      .
+                    </p>
+                  ) : (
+                    <p className="text-muted-foreground">Période confirmée, sans chevauchement.</p>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-medium">4. Justificatif</p>
+              {identityHint ? <p className="mb-2 text-sm text-destructive">{identityHint}</p> : null}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm">
+                  Montant versé ({billing.currency})
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={declaredAmount}
+                    onChange={(event) => setDeclaredAmount(event.target.value)}
+                    className="mt-1"
+                    disabled={formBusy}
+                  />
+                </label>
+                <label className="block text-sm">
+                  Date du virement
+                  <Input
+                    type="date"
+                    value={operationDate}
+                    onChange={(event) => setOperationDate(event.target.value)}
+                    className="mt-1"
+                    disabled={formBusy}
+                  />
+                </label>
+              </div>
+              <label className="mt-3 block text-sm">
+                Identification du compte (nom / référence / IBAN partiel)
                 <Input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={declaredAmount}
-                  onChange={(event) => setDeclaredAmount(event.target.value)}
+                  value={accountHint}
+                  onChange={(event) => setAccountHint(event.target.value)}
                   className="mt-1"
                   disabled={formBusy}
+                  placeholder="Ex. Ahmed B. · fin 4521"
                 />
               </label>
-              <label className="block text-sm">
-                Date du virement
+              <div className="mt-3">
+                <ContentAttachmentUploader
+                  kinds={["pdf", "image"]}
+                  showKindSelect={false}
+                  accept={PAYMENT_PROOF_ACCEPT}
+                  validateFile={validatePaymentProofFile}
+                  value={attachment}
+                  onChange={(next) => {
+                    setAttachment(next);
+                    setFormError(null);
+                  }}
+                  disabled={formBusy}
+                  uploading={formBusy}
+                />
+              </div>
+              <label className="mt-3 block text-sm">
+                Note (optionnel)
                 <Input
-                  type="date"
-                  value={operationDate}
-                  onChange={(event) => setOperationDate(event.target.value)}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
                   className="mt-1"
                   disabled={formBusy}
                 />
               </label>
             </div>
-            <label className="block text-sm">
-              Identification du compte (nom / référence / IBAN partiel)
-              <Input
-                value={accountHint}
-                onChange={(event) => setAccountHint(event.target.value)}
-                className="mt-1"
-                disabled={formBusy}
-                placeholder="Ex. Ahmed B. · fin 4521"
-              />
-            </label>
-            <ContentAttachmentUploader
-              kinds={["pdf", "image"]}
-              showKindSelect={false}
-              accept={PAYMENT_PROOF_ACCEPT}
-              validateFile={validatePaymentProofFile}
-              value={attachment}
-              onChange={(next) => {
-                setAttachment(next);
-                setFormError(null);
-              }}
-              disabled={formBusy}
-              uploading={formBusy}
-            />
-            <label className="block text-sm">
-              Note (optionnel)
-              <Input
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                className="mt-1"
-                disabled={formBusy}
-              />
-            </label>
+
             {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
             {blockReason && !formError && !formBusy ? (
               <p className="text-sm text-muted-foreground">{blockReason}</p>
+            ) : null}
+            {!effectiveQuote.available && effectiveQuote.firstEligibleStart ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={formBusy}
+                onClick={() => setStartMonth(effectiveQuote.firstEligibleStart!)}
+              >
+                Utiliser {monthOptionLabel(effectiveQuote.firstEligibleStart)}
+              </Button>
             ) : null}
           </div>
 
@@ -822,7 +952,12 @@ export function StudentPaymentsPage() {
               Annuler
             </Button>
             <Button
-              disabled={Boolean(blockReason) || formBusy}
+              disabled={
+                Boolean(blockReason) ||
+                formBusy ||
+                quoteLoading ||
+                !effectiveQuote.available
+              }
               onClick={() => void handleSubmitProof()}
             >
               {formBusy ? "Envoi…" : "Envoyer le justificatif"}
