@@ -65,6 +65,33 @@ describe("subscription plans", () => {
     expect(resolvePlanAmount("quarterly", "MAD", tariffs)).toBe(2400);
   });
 
+  /**
+   * Regression: BrandingProvider caches SettingsService.getMap() under
+   * queryKeys.branding.settings. Billing pages reused that key with listPublic
+   * expectations → parseBillingTariffSettings threw "rows is not iterable"
+   * and hit the root Error Boundary on /payments.
+   */
+  it("parses tariff map shape from branding getMap cache without throwing", () => {
+    const map = {
+      academy_name: "German Academy",
+      billing_tariff_monthly_MAD: 1200,
+      billing_tariff_quarterly_MAD: 2400,
+      billing_tariff_monthly_EUR: 100,
+      billing_tariff_quarterly_EUR: 240,
+    };
+    expect(() => parseBillingTariffSettings(map)).not.toThrow();
+    const tariffs = parseBillingTariffSettings(map);
+    expect(resolvePlanAmount("monthly", "MAD", tariffs)).toBe(1200);
+    expect(resolvePlanAmount("quarterly", "MAD", tariffs)).toBe(2400);
+    expect(resolvePlanAmount("monthly", "EUR", tariffs)).toBe(100);
+  });
+
+  it("returns empty tariffs for null, undefined, or non-iterable settings payloads", () => {
+    expect(parseBillingTariffSettings(null)).toEqual({});
+    expect(parseBillingTariffSettings(undefined)).toEqual({});
+    expect(parseBillingTariffSettings("broken" as never)).toEqual({});
+  });
+
   it("labels plans and periods in French", () => {
     expect(billingPlanLabel("monthly")).toBe("Mensuelle");
     expect(billingPlanLabel("quarterly")).toBe("Trimestrielle");

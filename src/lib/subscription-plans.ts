@@ -57,11 +57,31 @@ export function amountToMad(
   return n;
 }
 
+/** Normalize public settings from listPublic (rows) or getMap (Record) — never throw. */
+export function normalizeAppSettingRows(
+  rows:
+    | Array<{ key: string; value: unknown }>
+    | Record<string, unknown>
+    | null
+    | undefined,
+): Array<{ key: string; value: unknown }> {
+  if (rows == null) return [];
+  if (Array.isArray(rows)) return rows;
+  if (typeof rows === "object") {
+    return Object.entries(rows).map(([key, value]) => ({ key, value }));
+  }
+  return [];
+}
+
 export function parseBillingTariffSettings(
-  rows: Array<{ key: string; value: unknown }>,
+  rows:
+    | Array<{ key: string; value: unknown }>
+    | Record<string, unknown>
+    | null
+    | undefined,
 ): BillingTariffMap {
   const out: BillingTariffMap = {};
-  for (const row of rows) {
+  for (const row of normalizeAppSettingRows(rows)) {
     const match = /^billing_tariff_(monthly|quarterly)_(MAD|EUR)$/.exec(row.key);
     if (!match) continue;
     const plan = match[1] as BillingPlan;
@@ -71,7 +91,11 @@ export function parseBillingTariffSettings(
     if (typeof raw === "number") amount = raw;
     else if (typeof raw === "string") amount = Number(raw);
     else if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-      amount = Number(raw as never);
+      // jsonb number sometimes stored as plain JSON number already handled above;
+      // object shapes are ignored (no silent invented amount from {}.value).
+      const nested = (raw as { amount?: unknown; value?: unknown }).amount
+        ?? (raw as { value?: unknown }).value;
+      amount = typeof nested === "number" || typeof nested === "string" ? Number(nested) : null;
     }
     if (amount == null || !Number.isFinite(amount) || amount <= 0) continue;
     out[plan] = { ...(out[plan] ?? {}), [currency]: amount };
@@ -79,8 +103,15 @@ export function parseBillingTariffSettings(
   return out;
 }
 
-export function parseEurToMadRate(rows: Array<{ key: string; value: unknown }>): number {
-  const row = rows.find((r) => r.key === "billing_fx_eur_to_mad");
+export function parseEurToMadRate(
+  rows:
+    | Array<{ key: string; value: unknown }>
+    | Record<string, unknown>
+    | null
+    | undefined,
+): number {
+  const list = normalizeAppSettingRows(rows);
+  const row = list.find((r) => r.key === "billing_fx_eur_to_mad");
   if (!row) return EUR_TO_MAD_RATE;
   const raw = row.value;
   const n =

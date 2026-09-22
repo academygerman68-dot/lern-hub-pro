@@ -334,12 +334,13 @@ export function FinancePages({ mode }: { mode: string }) {
   const studentsQuery = useStudents();
   const pendingQuery = usePendingPaymentProofs();
   const allProofsQuery = usePaymentProofs();
+  // Share BrandingProvider cache (getMap Record). listPublic array on same key crashed parse.
   const settingsQuery = useQuery({
     queryKey: queryKeys.branding.settings,
-    queryFn: () => SettingsService.listPublic(),
+    queryFn: () => SettingsService.getMap(),
   });
   const tariffs = useMemo(
-    () => parseBillingTariffSettings(settingsQuery.data ?? []),
+    () => parseBillingTariffSettings(settingsQuery.data),
     [settingsQuery.data],
   );
   const catalogAmount = (plan: BillingPlan, currency: BillingCurrency) =>

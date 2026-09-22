@@ -98,12 +98,13 @@ export function StudentPaymentsPage() {
   const proofsQuery = usePaymentProofs(studentId || undefined);
   const subscriptionQuery = useMySubscription(studentId || undefined);
   const submitProof = useSubmitPaymentProof();
+  // Must share BrandingProvider's getMap cache — listPublic([]) shape collided and crashed.
   const settingsQuery = useQuery({
     queryKey: queryKeys.branding.settings,
-    queryFn: () => SettingsService.listPublic(),
+    queryFn: () => SettingsService.getMap(),
   });
   const tariffs = useMemo(
-    () => parseBillingTariffSettings(settingsQuery.data ?? []),
+    () => parseBillingTariffSettings(settingsQuery.data),
     [settingsQuery.data],
   );
 
@@ -170,8 +171,8 @@ export function StudentPaymentsPage() {
       })
       .filter((row) => matchesInstallmentFilter(row.status, historyFilter))
       .sort((a, b) => {
-        const aKey = a.payment.billing_period ?? a.payment.due_date ?? a.payment.created_at;
-        const bKey = b.payment.billing_period ?? b.payment.due_date ?? b.payment.created_at;
+        const aKey = a.payment.billing_period ?? a.payment.due_date ?? a.payment.created_at ?? "";
+        const bKey = b.payment.billing_period ?? b.payment.due_date ?? b.payment.created_at ?? "";
         return bKey.localeCompare(aKey);
       });
   }, [payments, proofs, historyFilter]);
@@ -543,7 +544,8 @@ export function StudentPaymentsPage() {
                         <p className="text-xs text-muted-foreground">
                           {payment.payment_date ||
                             payment.due_date ||
-                            payment.created_at.slice(0, 10)}
+                            payment.created_at?.slice(0, 10) ||
+                            "—"}
                         </p>
                       </div>
                       <Status tone={installmentUxTone(status)}>{installmentUxLabel(status)}</Status>
@@ -619,7 +621,8 @@ export function StudentPaymentsPage() {
                         <td>
                           {payment.payment_date ||
                             payment.due_date ||
-                            payment.created_at.slice(0, 10)}
+                            payment.created_at?.slice(0, 10) ||
+                            "—"}
                         </td>
                         <td>
                           <Status tone={installmentUxTone(status)}>
