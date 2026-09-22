@@ -28,6 +28,10 @@ import {
   GRADE_ASSIST_NEEDS_TEXT_MESSAGE,
   gradeAssistNeedsExploitableText,
 } from "@/lib/grade-assist-ux";
+import {
+  formatGradedScore,
+  scoreScaleChangedWarning,
+} from "@/lib/assignment-score-scale";
 import { useAcademy } from "./academy-context";
 import { AiGradeAssistPanel } from "./ai-grade-assist-panel";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
@@ -389,9 +393,28 @@ function SubmissionForm({
       {submission && <Status>{submissionStatusLabel(submission.status)}</Status>}
       {submission?.score != null && (
         <p>
-          Note : {submission.score} / {assignment.max_score}
+          Note :{" "}
+          {formatGradedScore({
+            score: submission.score,
+            gradedMaxScore:
+              (submission as { graded_max_score?: number | null }).graded_max_score ?? null,
+            currentMaxScore: assignment.max_score,
+          })}
         </p>
       )}
+      {scoreScaleChangedWarning({
+        gradedMaxScore:
+          (submission as { graded_max_score?: number | null } | null)?.graded_max_score ?? null,
+        currentMaxScore: assignment.max_score,
+      }) ? (
+        <p className="text-xs text-amber-800">
+          {scoreScaleChangedWarning({
+            gradedMaxScore:
+              (submission as { graded_max_score?: number | null }).graded_max_score ?? null,
+            currentMaxScore: assignment.max_score,
+          })}
+        </p>
+      ) : null}
       {submission?.feedback && (
         <p className="whitespace-pre-wrap">Correction : {submission.feedback}</p>
       )}

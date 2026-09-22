@@ -24,6 +24,9 @@ export const queryKeys = {
     modules: ["courses", "modules"] as const,
     lessons: ["courses", "lessons"] as const,
   },
+  groupProgress: {
+    byClass: (classId: string) => ["group-progress", classId] as const,
+  },
   library: {
     all: ["library"] as const,
   },

@@ -20,6 +20,20 @@ function sanitizeFileName(name: string) {
   return name.replace(/[^\w.\-()+ ]+/g, "_").slice(0, 120);
 }
 
+function validateExternalUrl(raw: string): string {
+  const externalUrl = raw.trim();
+  if (!externalUrl) throw new Error("Le lien de rediffusion est obligatoire.");
+  try {
+    const url = new URL(externalUrl);
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      throw new Error("URL invalide");
+    }
+  } catch {
+    throw new Error("URL de rediffusion invalide.");
+  }
+  return externalUrl;
+}
+
 export const SupabaseRecordingService = {
   async getProviderStatus(): Promise<RecordingProviderStatus> {
     const map = await SettingsService.getMap();
@@ -60,24 +74,20 @@ export const SupabaseRecordingService = {
     classId?: string | null;
     teacherId?: string | null;
     createdBy?: string | null;
+    description?: string | null;
+    recordedOn?: string | null;
   }) {
     const title = input.title.trim();
-    const externalUrl = input.externalUrl.trim();
     if (!title) throw new Error("Le titre est obligatoire.");
-    if (!externalUrl) throw new Error("Le lien de rediffusion est obligatoire.");
-    try {
-      const url = new URL(externalUrl);
-      if (url.protocol !== "https:" && url.protocol !== "http:") {
-        throw new Error("URL invalide");
-      }
-    } catch {
-      throw new Error("URL de rediffusion invalide.");
-    }
+    if (!input.classId) throw new Error("Choisissez le groupe concerné.");
+    const externalUrl = validateExternalUrl(input.externalUrl);
 
     const { data, error } = await requireClient()
       .from("meeting_recordings")
       .insert({
         title,
+        description: input.description?.trim() || null,
+        recorded_on: input.recordedOn || null,
         external_url: externalUrl,
         storage_bucket: RECORDINGS_BUCKET,
         storage_path: null,
@@ -93,6 +103,47 @@ export const SupabaseRecordingService = {
     return data as MeetingRecording;
   },
 
+  async update(input: {
+    id: string;
+    title?: string;
+    externalUrl?: string | null;
+    liveSessionId?: string | null;
+    classId?: string | null;
+    teacherId?: string | null;
+    description?: string | null;
+    recordedOn?: string | null;
+  }) {
+    const patch: Record<string, unknown> = {};
+    if (input.title !== undefined) {
+      const title = input.title.trim();
+      if (!title) throw new Error("Le titre est obligatoire.");
+      patch["title"] = title;
+    }
+    if (input.externalUrl !== undefined) {
+      patch["external_url"] =
+        input.externalUrl === null || input.externalUrl === ""
+          ? null
+          : validateExternalUrl(input.externalUrl);
+    }
+    if (input.liveSessionId !== undefined) patch["live_session_id"] = input.liveSessionId;
+    if (input.classId !== undefined) {
+      if (!input.classId) throw new Error("Choisissez le groupe concerné.");
+      patch["class_id"] = input.classId;
+    }
+    if (input.teacherId !== undefined) patch["teacher_id"] = input.teacherId;
+    if (input.description !== undefined) patch["description"] = input.description?.trim() || null;
+    if (input.recordedOn !== undefined) patch["recorded_on"] = input.recordedOn || null;
+
+    const { data, error } = await requireClient()
+      .from("meeting_recordings")
+      .update(patch)
+      .eq("id", input.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data as MeetingRecording;
+  },
+
   async uploadRecording(input: {
     title: string;
     file: File;
@@ -100,9 +151,12 @@ export const SupabaseRecordingService = {
     classId?: string | null;
     teacherId?: string | null;
     createdBy: string;
+    description?: string | null;
+    recordedOn?: string | null;
   }) {
     const title = input.title.trim();
     if (!title) throw new Error("Le titre est obligatoire.");
+    if (!input.classId) throw new Error("Choisissez le groupe concerné.");
     if (!input.file) throw new Error("Fichier requis.");
     const maxBytes = 500 * 1024 * 1024;
     if (input.file.size > maxBytes) throw new Error("Fichier trop volumineux (max 500 Mo).");
@@ -121,6 +175,8 @@ export const SupabaseRecordingService = {
       .from("meeting_recordings")
       .insert({
         title,
+        description: input.description?.trim() || null,
+        recorded_on: input.recordedOn || null,
         storage_bucket: RECORDINGS_BUCKET,
         storage_path: path,
         external_url: null,

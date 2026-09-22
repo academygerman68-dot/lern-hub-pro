@@ -17,6 +17,7 @@ import { SupabaseLiveSessionService } from "@/services/supabase/live-session-ser
 import { AuthError, SupabaseAuthService } from "@/services/supabase/auth-service";
 import { SupabaseProfileService } from "@/services/supabase/profile-service";
 import { SupabaseGradeAssistService } from "@/services/supabase/grade-assist-service";
+import { SupabaseGroupProgressService } from "@/services/supabase/group-progress-service";
 import { isDemoAuthAllowed } from "@/lib/auth-config";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { authenticate } from "@/lib/academy-logic";
@@ -572,6 +573,14 @@ export const LibraryService = {
     if (!isSupabaseConfigured) return [];
     return SupabaseLibraryService.list();
   },
+  async listClassTargets(libraryItemId: string) {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseLibraryService.listClassTargets(libraryItemId);
+  },
+  async listSubtypes(domain?: Parameters<typeof SupabaseLibraryService.listSubtypes>[0]) {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseLibraryService.listSubtypes(domain);
+  },
   async uploadAndCreate(input: Parameters<typeof SupabaseLibraryService.uploadAndCreate>[0]) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseLibraryService.uploadAndCreate(input);
@@ -591,6 +600,21 @@ export const LibraryService = {
   async archive(id: string) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseLibraryService.archive(id);
+  },
+};
+
+export const GroupProgressService = {
+  async listForClass(classId: string, levelCode?: string | null) {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseGroupProgressService.listForClass(classId, levelCode);
+  },
+  async markCompleted(input: Parameters<typeof SupabaseGroupProgressService.markCompleted>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseGroupProgressService.markCompleted(input);
+  },
+  async unlockUnit(input: Parameters<typeof SupabaseGroupProgressService.unlockUnit>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseGroupProgressService.unlockUnit(input);
   },
 };
 
@@ -632,6 +656,17 @@ export const AssignmentService = {
   async uploadAttachment(file: File) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseAssignmentService.uploadAttachment(file);
+  },
+  async listAttachments(assignmentId: string) {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseAssignmentService.listAttachments(assignmentId);
+  },
+  async replaceAttachments(
+    assignmentId: string,
+    items: Parameters<typeof SupabaseAssignmentService.replaceAttachments>[1],
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseAssignmentService.replaceAttachments(assignmentId, items);
   },
   async getAttachmentUrl(row: Parameters<typeof SupabaseAssignmentService.getAttachmentUrl>[0]) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
@@ -724,6 +759,10 @@ export const ExamService = {
   async listAttemptsForExam(examId: string) {
     if (!isSupabaseConfigured) return [];
     return SupabaseExamService.listAttemptsForExam(examId);
+  },
+  async listExamParticipantRoster(examId: string) {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseExamService.listExamParticipantRoster(examId);
   },
   async getResult(attemptId: string) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");

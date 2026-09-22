@@ -36,6 +36,8 @@ export type MeetingRecording = {
   class_id: string | null;
   teacher_id: string | null;
   title: string;
+  description?: string | null;
+  recorded_on?: string | null;
   storage_bucket: string;
   storage_path: string | null;
   external_url: string | null;

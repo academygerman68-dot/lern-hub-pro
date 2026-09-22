@@ -28,9 +28,10 @@ export const DOMAIN_LABELS = {
 } as const;
 
 export const AUDIENCE_LABELS = {
-  everyone: "Tout le monde",
+  everyone: "Tous les étudiants autorisés",
   level: "Niveau",
-  class: "Groupe",
+  class: "Groupe précis",
+  classes: "Groupes précis",
 } as const;
 
 export function isTextContentKind(kind: string | null | undefined): boolean {

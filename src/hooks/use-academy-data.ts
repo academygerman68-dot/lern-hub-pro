@@ -21,6 +21,7 @@ import {
   StudentService,
   SubscriptionService,
   TeacherService,
+  GroupProgressService,
 } from "@/services/academy-services";
 import { SupabaseAssignmentService } from "@/services/supabase/assignment-service";
 import type { Json } from "@/types/database";
@@ -376,6 +377,36 @@ export function useCourseModules() {
   return useQuery({
     queryKey: queryKeys.courses.modules,
     queryFn: () => CourseService.listModules(),
+  });
+}
+
+export function useGroupProgress(classId?: string, levelCode?: string | null) {
+  return useQuery({
+    queryKey: classId
+      ? ([...queryKeys.groupProgress.byClass(classId), levelCode ?? ""] as const)
+      : (["group-progress", "none"] as const),
+    queryFn: () => GroupProgressService.listForClass(classId!, levelCode ?? null),
+    enabled: Boolean(classId),
+  });
+}
+
+export function useMarkGroupUnitCompleted() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: GroupProgressService.markCompleted,
+    onSuccess: async (_data, vars) => {
+      await qc.invalidateQueries({ queryKey: queryKeys.groupProgress.byClass(vars.classId) });
+    },
+  });
+}
+
+export function useUnlockGroupUnit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: GroupProgressService.unlockUnit,
+    onSuccess: async (_data, vars) => {
+      await qc.invalidateQueries({ queryKey: queryKeys.groupProgress.byClass(vars.classId) });
+    },
   });
 }
 
@@ -747,6 +778,14 @@ export function useExamAttemptsForExam(examId: string | null | undefined) {
   });
 }
 
+export function useExamParticipantRoster(examId: string | null | undefined) {
+  return useQuery({
+    queryKey: [...queryKeys.exams.attemptsByExam(examId ?? ""), "roster"] as const,
+    queryFn: () => ExamService.listExamParticipantRoster(examId!),
+    enabled: Boolean(examId),
+  });
+}
+
 export function useGradeWritingAnswer() {
   const qc = useQueryClient();
   return useMutation({
@@ -764,6 +803,9 @@ export function useGradeWritingAnswer() {
         qc.invalidateQueries({ queryKey: queryKeys.exams.result(attempt.id) }),
         qc.invalidateQueries({ queryKey: queryKeys.exams.review(attempt.id) }),
         qc.invalidateQueries({ queryKey: queryKeys.exams.attemptsByExam(attempt.exam_id) }),
+        qc.invalidateQueries({
+          queryKey: [...queryKeys.exams.attemptsByExam(attempt.exam_id), "roster"] as const,
+        }),
         qc.invalidateQueries({ queryKey: queryKeys.exams.allAttempts }),
         qc.invalidateQueries({ queryKey: queryKeys.corrections.all }),
         qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
@@ -1042,6 +1084,26 @@ export function useCreateRecordingFromUrl() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: RecordingService.createFromExternalUrl,
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.recordings.all });
+    },
+  });
+}
+
+export function useUpdateRecording() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: RecordingService.update,
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.recordings.all });
+    },
+  });
+}
+
+export function useDeleteRecording() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => RecordingService.delete(id),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: queryKeys.recordings.all });
     },

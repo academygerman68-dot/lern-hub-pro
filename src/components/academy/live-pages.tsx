@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Video } from "lucide-react";
+import { ChevronDown, ChevronUp, Video } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,12 +35,24 @@ import {
 } from "@/lib/live-meeting";
 import { LiveSessionService, RecordingService } from "@/services/academy-services";
 import type { LiveSessionListItem } from "@/services/supabase/live-session-service";
+import type { MeetingRecording } from "@/types/phase3";
 import { useAcademy } from "./academy-context";
 import { JitsiMeetingEmbed } from "./jitsi-meeting";
 import { QueryState } from "./query-state";
 import { LiveCalendar, LiveCalendarErrorBoundary } from "./live-calendar";
 import { canEditLiveSession, EditLiveSessionModal } from "./live/edit-session-modal";
 import { PageHeader, Status, Surface, LevelBadge, GroupBadge } from "./primitives";
+import { ReplayEditorModal, ReplayRowActions } from "./replay-editor";
+
+const UPCOMING_COLLAPSE_KEY = "ga.live.upcomingSessionsCollapsed";
+
+function readUpcomingCollapsed(): boolean {
+  try {
+    return sessionStorage.getItem(UPCOMING_COLLAPSE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export function LiveClassesPage({ meeting }: { meeting: boolean }) {
   const accessQuery = useAcademicAccess();
@@ -260,6 +272,9 @@ function LiveSessionLobby() {
   const [monthClassId, setMonthClassId] = useState("");
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [liveTab, setLiveTab] = useState<"upcoming" | "replays">("upcoming");
+  const [upcomingCollapsed, setUpcomingCollapsed] = useState(readUpcomingCollapsed);
+  const [replayEditorOpen, setReplayEditorOpen] = useState(false);
+  const [editingReplay, setEditingReplay] = useState<MeetingRecording | null>(null);
 
   const myTeacherId = useMemo(
     () =>
@@ -421,44 +436,91 @@ function LiveSessionLobby() {
           error={recordingsQuery.error}
           isEmpty={!recordingsQuery.data?.length}
           emptyTitle="Aucun replay"
-          emptyMessage="Les enregistrements prêts apparaîtront ici."
+          emptyMessage={
+            isStaff
+              ? "Ajoutez une rediffusion via URL pour un groupe."
+              : "Les enregistrements de votre groupe apparaîtront ici."
+          }
           onRetry={() => void recordingsQuery.refetch()}
         >
-          <div className="space-y-3">
-            {(recordingsQuery.data ?? []).map((row) => (
-              <Surface
-                key={row.id}
-                className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">
+              {(recordingsQuery.data ?? []).length} rediffusion
+              {(recordingsQuery.data ?? []).length > 1 ? "s" : ""}
+            </p>
+            {isStaff ? (
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEditingReplay(null);
+                  setReplayEditorOpen(true);
+                }}
               >
-                <div>
-                  <p className="font-medium">{row.title || "Replay"}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(row.created_at).toLocaleString("fr-FR")}
-                    {row.class_id ? ` · Groupe` : ""}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={row.status !== "ready"}
-                  onClick={() => {
-                    void (async () => {
-                      try {
-                        const url = await RecordingService.getSignedUrl(row);
-                        window.open(url, "_blank", "noopener,noreferrer");
-                      } catch (err) {
-                        toast.error(err instanceof Error ? err.message : "Lecture impossible");
-                      }
-                    })();
-                  }}
+                + Ajouter une rediffusion
+              </Button>
+            ) : null}
+          </div>
+          <div className="space-y-3">
+            {(recordingsQuery.data ?? []).map((row) => {
+              const klass = (classesQuery.data ?? []).find((c) => c.id === row.class_id);
+              const canManage =
+                role === "director" ||
+                (role === "teacher" &&
+                  Boolean(row.class_id) &&
+                  (classesQuery.data ?? []).some((c) => c.id === row.class_id));
+              return (
+                <Surface
+                  key={row.id}
+                  className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  {row.status === "ready" ? "Lire" : "Indisponible"}
-                </Button>
-              </Surface>
-            ))}
+                  <div className="min-w-0">
+                    <p className="font-medium">{row.title || "Replay"}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {row.recorded_on
+                        ? new Date(row.recorded_on).toLocaleDateString("fr-FR")
+                        : new Date(row.created_at).toLocaleString("fr-FR")}
+                      {klass ? ` · ${klass.reference || klass.name}` : ""}
+                      {klass?.level ? ` · ${klass.level}` : ""}
+                    </p>
+                    {row.description ? (
+                      <p className="mt-1 text-sm text-muted-foreground">{row.description}</p>
+                    ) : null}
+                  </div>
+                  <ReplayRowActions
+                    recording={row}
+                    canManage={canManage}
+                    onEdit={() => {
+                      setEditingReplay(row);
+                      setReplayEditorOpen(true);
+                    }}
+                    onPlay={() => {
+                      void (async () => {
+                        try {
+                          const url = await RecordingService.getSignedUrl(row);
+                          window.open(url, "_blank", "noopener,noreferrer");
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : "Lecture impossible");
+                        }
+                      })();
+                    }}
+                  />
+                </Surface>
+              );
+            })}
           </div>
         </QueryState>
       ) : null}
+
+      <ReplayEditorModal
+        open={replayEditorOpen}
+        editing={editingReplay}
+        role={role}
+        userId={user?.id ?? null}
+        onClose={() => {
+          setReplayEditorOpen(false);
+          setEditingReplay(null);
+        }}
+      />
 
       {liveTab === "upcoming" ? (
         <QueryState
@@ -572,11 +634,45 @@ function LiveSessionLobby() {
               </Surface>
             )}
 
-            {/* B. Upcoming */}
+            {/* B. Upcoming — collapsible */}
             <section className="space-y-3">
-              <h2 className="text-base font-semibold tracking-tight">Séances à venir</h2>
-              {upcomingList.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Aucune autre séance planifiée.</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base font-semibold tracking-tight">
+                  Séances à venir
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    ({upcomingList.length})
+                  </span>
+                </h2>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setUpcomingCollapsed((prev) => {
+                      const next = !prev;
+                      try {
+                        sessionStorage.setItem(UPCOMING_COLLAPSE_KEY, next ? "1" : "0");
+                      } catch {
+                        /* ignore */
+                      }
+                      return next;
+                    });
+                  }}
+                >
+                  {upcomingCollapsed ? (
+                    <>
+                      <ChevronDown className="size-4" /> Afficher
+                    </>
+                  ) : (
+                    <>
+                      <ChevronUp className="size-4" /> Masquer
+                    </>
+                  )}
+                </Button>
+              </div>
+              {upcomingCollapsed ? null : upcomingList.length === 0 ? (
+                <Surface className="p-5 text-center">
+                  <p className="text-sm text-muted-foreground">Aucune autre séance planifiée.</p>
+                </Surface>
               ) : (
                 <div className="space-y-2">
                   {upcomingList.map((item) => {

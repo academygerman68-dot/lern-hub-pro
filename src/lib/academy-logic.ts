@@ -144,7 +144,7 @@ export function scopedLibraryItemVisible(
   if (item.audience === "level") {
     return Boolean(item.level_code && scope.levelCodes.has(item.level_code));
   }
-  if (item.audience === "class") {
+  if (item.audience === "class" || item.audience === "classes") {
     return Boolean(item.class_id && scope.classIds.has(item.class_id));
   }
   return false;

@@ -77,6 +77,7 @@ export const SupabaseAssignmentService = {
     instructions?: string;
     dueAt?: string | null;
     publishedAt?: string | null;
+    maxScore?: number | null;
     contentKind?: MediaKind;
     contentUrl?: string | null;
     mimeType?: string | null;
@@ -97,6 +98,7 @@ export const SupabaseAssignmentService = {
         due_at: input.dueAt ?? null,
         published_at:
           input.publishedAt ?? (status === "published" ? new Date().toISOString() : null),
+        max_score: input.maxScore ?? 20,
         content_kind: input.contentKind ?? "pdf",
         content_url: input.contentUrl ?? null,
         mime_type: input.mimeType ?? null,
@@ -127,6 +129,90 @@ export const SupabaseAssignmentService = {
       attachmentPath: path,
       mimeType: file.type || null,
     };
+  },
+
+  async listAttachments(assignmentId: string) {
+    const { data, error } = await (requireClient() as unknown as {
+      from: (t: string) => ReturnType<ReturnType<typeof getSupabase>["from"]>;
+    })
+      .from("assignment_attachments")
+      .select("*")
+      .eq("assignment_id", assignmentId)
+      .order("sort_order", { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as Array<{
+      id: string;
+      assignment_id: string;
+      sort_order: number;
+      content_kind: MediaKind;
+      title: string | null;
+      content_text: string | null;
+      content_url: string | null;
+      storage_bucket: string | null;
+      storage_path: string | null;
+      mime_type: string | null;
+      file_size: number | null;
+    }>;
+  },
+
+  async replaceAttachments(
+    assignmentId: string,
+    items: Array<{
+      contentKind: MediaKind;
+      title?: string | null;
+      contentText?: string | null;
+      contentUrl?: string | null;
+      storageBucket?: string | null;
+      storagePath?: string | null;
+      mimeType?: string | null;
+      fileSize?: number | null;
+    }>,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = requireClient() as any;
+    const { error: delError } = await client
+      .from("assignment_attachments")
+      .delete()
+      .eq("assignment_id", assignmentId);
+    if (delError) throw delError;
+    if (!items.length) return [];
+    const { data, error } = await client
+      .from("assignment_attachments")
+      .insert(
+        items.map((item, index) => ({
+          assignment_id: assignmentId,
+          sort_order: index,
+          content_kind: item.contentKind,
+          title: item.title ?? null,
+          content_text: item.contentText ?? null,
+          content_url: item.contentUrl ?? null,
+          storage_bucket: item.storageBucket ?? null,
+          storage_path: item.storagePath ?? null,
+          mime_type: item.mimeType ?? null,
+          file_size: item.fileSize ?? null,
+        })),
+      )
+      .select("*");
+    if (error) throw error;
+
+    // Mirror first file/link into legacy columns for backward compatibility.
+    const first = items[0];
+    if (first) {
+      await requireClient()
+        .from("assignments")
+        .update({
+          content_kind: first.contentKind,
+          content_url: first.contentUrl ?? null,
+          attachment_bucket: first.storageBucket ?? null,
+          attachment_path: first.storagePath ?? null,
+          mime_type: first.mimeType ?? null,
+          ...(first.contentKind === "text" && first.contentText
+            ? { instructions: first.contentText, description: first.contentText }
+            : {}),
+        })
+        .eq("id", assignmentId);
+    }
+    return data ?? [];
   },
 
   async getAttachmentUrl(
@@ -164,6 +250,7 @@ export const SupabaseAssignmentService = {
       publishedAt?: string | null;
       levelId?: string;
       classId?: string | null;
+      maxScore?: number | null;
       contentKind?: MediaKind;
       contentUrl?: string | null;
       mimeType?: string | null;
@@ -180,6 +267,9 @@ export const SupabaseAssignmentService = {
     if (patch.publishedAt !== undefined) update.published_at = patch.publishedAt;
     if (patch.levelId !== undefined) update.level_id = patch.levelId;
     if (patch.classId !== undefined) update.class_id = patch.classId;
+    if (patch.maxScore !== undefined && patch.maxScore != null) {
+      update.max_score = patch.maxScore;
+    }
     if (patch.contentKind !== undefined) update.content_kind = patch.contentKind;
     if (patch.contentUrl !== undefined) update.content_url = patch.contentUrl;
     if (patch.mimeType !== undefined) update.mime_type = patch.mimeType;
@@ -384,7 +474,25 @@ export const SupabaseAssignmentService = {
     score: number;
     feedback?: string;
     gradedBy?: string | null;
+    maxScore?: number | null;
   }) {
+    let gradedMax = input.maxScore ?? null;
+    if (gradedMax == null) {
+      const { data: submission } = await requireClient()
+        .from("assignment_submissions")
+        .select("assignment_id")
+        .eq("id", input.submissionId)
+        .maybeSingle();
+      if (submission?.assignment_id) {
+        const { data: assignment } = await requireClient()
+          .from("assignments")
+          .select("max_score")
+          .eq("id", submission.assignment_id)
+          .maybeSingle();
+        gradedMax = assignment?.max_score ?? null;
+      }
+    }
+
     const { data, error } = await requireClient()
       .from("assignment_submissions")
       .update({
@@ -393,7 +501,8 @@ export const SupabaseAssignmentService = {
         status: "graded",
         graded_at: new Date().toISOString(),
         graded_by: input.gradedBy ?? null,
-      })
+        graded_max_score: gradedMax,
+      } as never)
       .eq("id", input.submissionId)
       .select("*")
       .single();

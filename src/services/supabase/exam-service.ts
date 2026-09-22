@@ -6,6 +6,11 @@ import {
   type ExamCompletenessReport,
 } from "@/lib/exam-completeness";
 import { resolvePublishedExamCatalog } from "@/lib/exam-catalog-visibility";
+import {
+  pickLatestAttempt,
+  resolveExamParticipantStatus,
+  type ExamParticipantRow,
+} from "@/lib/exam-participant-status";
 import { isManualQuestionType } from "@/lib/exam-writing";
 import type { Database, Json } from "@/types/database";
 
@@ -716,6 +721,102 @@ export const SupabaseExamService = {
         } | null;
       }
     >;
+  },
+
+  async listExamParticipantRoster(examId: string): Promise<ExamParticipantRow[]> {
+    const { data: exam, error: examError } = await requireClient()
+      .from("exams")
+      .select("id, class_id, level_id, ends_at")
+      .eq("id", examId)
+      .single();
+    if (examError) throw examError;
+
+    type StudentLite = {
+      id: string;
+      profile: { first_name: string | null; last_name: string | null; email: string | null } | null;
+    };
+
+    let students: StudentLite[] = [];
+    if (exam.class_id) {
+      const { data, error } = await requireClient()
+        .from("enrollments")
+        .select(
+          `
+          student:students!enrollments_student_id_fkey (
+            id,
+            profile:profiles!students_profile_id_fkey ( first_name, last_name, email )
+          )
+        `,
+        )
+        .eq("class_id", exam.class_id)
+        .eq("status", "active");
+      if (error) throw error;
+      students = (data ?? [])
+        .map((row) => row.student as unknown as StudentLite | null)
+        .filter((s): s is StudentLite => Boolean(s?.id));
+    } else if (exam.level_id) {
+      const { data: level } = await requireClient()
+        .from("levels")
+        .select("code")
+        .eq("id", exam.level_id)
+        .maybeSingle();
+      let query = requireClient()
+        .from("students")
+        .select(
+          `
+          id,
+          profile:profiles!students_profile_id_fkey ( first_name, last_name, email )
+        `,
+        )
+        .neq("status", "archived");
+      if (level?.code) query = query.eq("level_code", level.code);
+      const { data, error } = await query;
+      if (error) throw error;
+      students = (data ?? []) as StudentLite[];
+    }
+
+    const { data: attempts, error: attemptsError } = await requireClient()
+      .from("exam_attempts")
+      .select("*")
+      .eq("exam_id", examId)
+      .order("started_at", { ascending: false });
+    if (attemptsError) throw attemptsError;
+
+    const byStudent = new Map<string, ExamAttempt[]>();
+    for (const attempt of attempts ?? []) {
+      const list = byStudent.get(attempt.student_id) ?? [];
+      list.push(attempt as ExamAttempt);
+      byStudent.set(attempt.student_id, list);
+    }
+
+    const rows: ExamParticipantRow[] = students.map((student) => {
+      const latest = pickLatestAttempt(byStudent.get(student.id) ?? []);
+      const status = resolveExamParticipantStatus({
+        attempt: latest,
+        endsAt: exam.ends_at,
+      });
+      const profile = student.profile;
+      const displayName =
+        `${profile?.first_name ?? ""} ${profile?.last_name ?? ""}`.trim() ||
+        profile?.email ||
+        "Étudiant";
+      return {
+        studentId: student.id,
+        displayName,
+        email: profile?.email ?? null,
+        status,
+        attemptId: latest?.id ?? null,
+        attemptStatus: latest?.status ?? null,
+        score: latest?.score != null ? Number(latest.score) : null,
+        maxScore: latest?.max_score != null ? Number(latest.max_score) : null,
+        percentage: latest?.percentage != null ? Number(latest.percentage) : null,
+        startedAt: latest?.started_at ?? null,
+        submittedAt: latest?.submitted_at ?? null,
+      };
+    });
+
+    rows.sort((a, b) => a.displayName.localeCompare(b.displayName, "fr"));
+    return rows;
   },
 
   async listMyAttempts(examId?: string): Promise<ExamAttempt[]> {

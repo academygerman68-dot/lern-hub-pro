@@ -28,6 +28,7 @@ import {
 import { ExamService, GradeAssistService } from "@/services/academy-services";
 import type { GradeAssistSuggestion } from "@/services/supabase/grade-assist-service";
 import type { Json } from "@/types/database";
+import { ExamParticipantRosterPanel } from "./exam-participant-roster";
 import {
   formatFrDate,
   isFileContentKind,
@@ -1537,7 +1538,12 @@ export function StaffExamsPage() {
                   </Button>
                 </div>
               </div>
-              {gradingExamId === exam.id ? <ExamWritingGradingPanel examId={exam.id} /> : null}
+              {gradingExamId === exam.id ? (
+                <>
+                  <ExamParticipantRosterPanel examId={exam.id} />
+                  <ExamWritingGradingPanel examId={exam.id} />
+                </>
+              ) : null}
             </Surface>
           ))}
         </div>
@@ -1707,7 +1713,12 @@ export function DirectorExamsPage() {
                 </div>
               </div>
               {builderExamId === exam.id ? <ExamBuilder examId={exam.id} /> : null}
-              {gradingExamId === exam.id ? <ExamWritingGradingPanel examId={exam.id} /> : null}
+              {gradingExamId === exam.id ? (
+                <>
+                  <ExamParticipantRosterPanel examId={exam.id} />
+                  <ExamWritingGradingPanel examId={exam.id} />
+                </>
+              ) : null}
             </Surface>
           ))}
         </div>

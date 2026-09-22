@@ -22,13 +22,17 @@ import {
   useCreateAssignment,
   useCreateCourse,
   useDeleteCourse,
+  useGroupProgress,
   useLevels,
   useLibrary,
+  useStudents,
   useUpdateAssignment,
   useUpdateCourse,
   useUpdateLibraryItem,
   useUploadLibraryItem,
 } from "@/hooks/use-academy-data";
+import { groupProgressSummary } from "@/lib/group-progress";
+import { resolveOwnStudent } from "@/lib/payment-proof";
 import {
   AUDIENCE_LABELS,
   COURSE_KIND_LABELS,
@@ -44,6 +48,7 @@ import {
   type CourseKind,
   type MediaKind,
 } from "@/lib/academic-content";
+import { PRESET_SCORE_SCALES, parseCustomMaxScore } from "@/lib/assignment-score-scale";
 import {
   buildTeacherScope,
   hideArchivedStatus,
@@ -55,8 +60,15 @@ import {
 import { AssignmentService, CourseService, LibraryService } from "@/services/academy-services";
 import type { Database } from "@/types/database";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
+import {
+  createMultiAttachmentItem,
+  MultiAttachmentComposer,
+  type MultiAttachmentItem,
+} from "./multi-attachment-composer";
 import { DocumentViewer } from "./document-viewer";
 import { useAcademy } from "./academy-context";
+import { MultiClassPicker } from "./multi-class-picker";
+import { GroupProgressPage } from "./group-progress-page";
 import { PageHeader, Status, Surface, LevelBadge, GroupBadge, FormSection } from "./primitives";
 import { QueryState } from "./query-state";
 import { AssignmentGrading } from "./workflow-pages";
@@ -121,6 +133,70 @@ async function downloadFromUrl(url: string, filename: string) {
   }
 }
 
+async function persistAssignmentAttachments(
+  assignmentId: string,
+  input: {
+    kind: MediaKind;
+    attachment: AttachmentDraft;
+    attachmentBucket: string | null;
+    attachmentPath: string | null;
+    mimeType: string | null;
+    textBody: string;
+    extraAttachments: MultiAttachmentItem[];
+  },
+) {
+  const items: Parameters<typeof AssignmentService.replaceAttachments>[1] = [];
+
+  if (isTextContentKind(input.kind) && input.textBody.trim()) {
+    items.push({
+      contentKind: "text",
+      contentText: input.textBody.trim(),
+      title: "Consigne texte",
+    });
+  } else if (input.kind === "link" && input.attachment.url.trim()) {
+    items.push({
+      contentKind: "link",
+      contentUrl: input.attachment.url.trim(),
+      title: "Lien",
+    });
+  } else if (input.attachmentPath || input.attachment.url) {
+    items.push({
+      contentKind: input.kind,
+      contentUrl: input.kind === "link" ? input.attachment.url.trim() || null : null,
+      storageBucket: input.attachmentBucket,
+      storagePath: input.attachmentPath,
+      mimeType: input.mimeType,
+      fileSize: input.attachment.file?.size ?? null,
+      title: input.attachment.file?.name ?? null,
+    });
+  }
+
+  for (const extra of input.extraAttachments) {
+    const kind = extra.kind as MediaKind;
+    if (isTextContentKind(kind) && (extra.text ?? "").trim()) {
+      items.push({ contentKind: "text", contentText: (extra.text ?? "").trim() });
+      continue;
+    }
+    if (kind === "link" && extra.url.trim()) {
+      items.push({ contentKind: "link", contentUrl: extra.url.trim() });
+      continue;
+    }
+    if (extra.file && isFileContentKind(kind)) {
+      const uploaded = await AssignmentService.uploadAttachment(extra.file);
+      items.push({
+        contentKind: kind,
+        storageBucket: uploaded.attachmentBucket,
+        storagePath: uploaded.attachmentPath,
+        mimeType: uploaded.mimeType,
+        fileSize: extra.file.size,
+        title: extra.file.name,
+      });
+    }
+  }
+
+  await AssignmentService.replaceAttachments(assignmentId, items);
+}
+
 function statusLabel(status: string) {
   if (status === "published" || status === "Open") return "Publié";
   if (status === "draft") return "Brouillon";
@@ -142,6 +218,7 @@ export function DirectorCoursesPage() {
     () => buildTeacherScope(classesQuery.data ?? []),
     [classesQuery.data],
   );
+  const [view, setView] = useState<"catalog" | "group-progress">("catalog");
   const [selectedLevelId, setSelectedLevelId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -201,6 +278,25 @@ export function DirectorCoursesPage() {
 
   return (
     <>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant={view === "catalog" ? "default" : "outline"}
+          onClick={() => setView("catalog")}
+        >
+          Catalogue (niveau)
+        </Button>
+        <Button
+          size="sm"
+          variant={view === "group-progress" ? "default" : "outline"}
+          onClick={() => setView("group-progress")}
+        >
+          Progression des groupes
+        </Button>
+      </div>
+      {view === "group-progress" ? <GroupProgressPage /> : null}
+      {view === "catalog" ? (
+        <>
       <PageHeader
         title="Cours"
         subtitle={
@@ -495,6 +591,8 @@ export function DirectorCoursesPage() {
         loading={preview?.loading}
         error={preview?.error}
       />
+        </>
+      ) : null}
     </>
   );
 }
@@ -516,11 +614,13 @@ export function MaterialsLibraryPage() {
   const [description, setDescription] = useState("");
   const [domain, setDomain] = useState<"academic" | "professional">("academic");
   const isTeacher = role === "teacher";
-  const [audience, setAudience] = useState<"everyone" | "level" | "class">(
-    isTeacher ? "class" : "everyone",
+  const [audience, setAudience] = useState<"everyone" | "level" | "class" | "classes">(
+    isTeacher ? "classes" : "everyone",
   );
   const [levelCode, setLevelCode] = useState("");
   const [classId, setClassId] = useState("");
+  const [classIds, setClassIds] = useState<string[]>([]);
+  const [subtype, setSubtype] = useState("");
   const [attachment, setAttachment] = useState<AttachmentDraft>({
     kind: "document",
     url: "",
@@ -544,6 +644,23 @@ export function MaterialsLibraryPage() {
       });
   }, [libraryQuery.data, domainTab, role, teacherScope]);
   const classesForLevel = scopedClasses.filter((item) => !levelCode || item.level === levelCode);
+  const subtypeOptions = useMemo(() => {
+    if (domain === "professional") {
+      return [
+        { code: "visa", label: "Visa" },
+        { code: "demarches", label: "Démarches administratives" },
+        { code: "documents", label: "Documents requis" },
+        { code: "rendez_vous", label: "Rendez-vous" },
+        { code: "logement", label: "Logement" },
+        { code: "autre", label: "Autres" },
+      ];
+    }
+    return [
+      { code: "cours", label: "Cours" },
+      { code: "exercices", label: "Exercices" },
+      { code: "annonce", label: "Annonces" },
+    ];
+  }, [domain]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -552,6 +669,8 @@ export function MaterialsLibraryPage() {
     setTitle("");
     setDescription("");
     setAttachment({ kind: "document", url: "", file: null });
+    setClassIds([]);
+    setSubtype("");
     setFormError(null);
     if (!isTeacher) setAudience("everyone");
   };
@@ -562,9 +681,18 @@ export function MaterialsLibraryPage() {
     setTitle(item.title);
     setDescription(item.description ?? "");
     setDomain(item.domain);
-    setAudience(item.audience);
+    const rawAudience = String(item.audience);
+    const nextAudience =
+      rawAudience === "classes" ||
+      rawAudience === "class" ||
+      rawAudience === "level" ||
+      rawAudience === "everyone"
+        ? (rawAudience as typeof audience)
+        : "everyone";
+    setAudience(nextAudience);
     setLevelCode(item.level_code ?? "");
     setClassId(item.class_id ?? "");
+    setSubtype((item as { subtype?: string | null }).subtype ?? "");
     setAttachment({
       kind: (item.content_kind as MediaKind) || "document",
       url: item.external_url ?? "",
@@ -573,18 +701,22 @@ export function MaterialsLibraryPage() {
     setExistingFile(Boolean(item.storage_path || item.external_url));
     setFormError(null);
     setDomainTab(item.domain);
+    void LibraryService.listClassTargets(item.id)
+      .then((ids) => setClassIds(ids.length ? ids : item.class_id ? [item.class_id] : []))
+      .catch(() => setClassIds(item.class_id ? [item.class_id] : []));
   };
 
   useEffect(() => {
     if (!isTeacher || editingId) return;
-    setAudience("class");
-    if (classId) return;
+    setAudience("classes");
+    if (classIds.length) return;
     const first = classesQuery.data?.[0];
     if (first) {
       setLevelCode(first.level);
+      setClassIds([first.id]);
       setClassId(first.id);
     }
-  }, [isTeacher, classId, classesQuery.data, editingId]);
+  }, [isTeacher, classIds.length, classesQuery.data, editingId]);
 
   return (
     <>
@@ -652,18 +784,38 @@ export function MaterialsLibraryPage() {
                 className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={audience}
                 onChange={(e) => {
-                  setAudience(e.target.value as typeof audience);
+                  const next = e.target.value as typeof audience;
+                  setAudience(next);
                   setClassId("");
+                  if (next !== "classes") setClassIds([]);
                 }}
                 disabled={isTeacher}
               >
-                {!isTeacher ? <option value="everyone">Tout le monde</option> : null}
-                {!isTeacher ? <option value="level">Un niveau spécifique</option> : null}
-                <option value="class">Un groupe spécifique</option>
+                {!isTeacher ? (
+                  <option value="everyone">Tous les étudiants autorisés</option>
+                ) : null}
+                {!isTeacher ? <option value="level">Un niveau</option> : null}
+                <option value="class">Un groupe précis</option>
+                <option value="classes">Groupes précis (multi)</option>
               </select>
             </label>
           </div>
-          {(audience === "level" || audience === "class") && (
+          <label className="block text-sm">
+            Sous-type
+            <select
+              className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={subtype}
+              onChange={(e) => setSubtype(e.target.value)}
+            >
+              <option value="">Sans sous-type</option>
+              {subtypeOptions.map((opt) => (
+                <option key={opt.code} value={opt.code}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {(audience === "level" || audience === "class" || audience === "classes") && (
             <label className="block text-sm">
               Niveau
               <select
@@ -672,9 +824,12 @@ export function MaterialsLibraryPage() {
                 onChange={(e) => {
                   setLevelCode(e.target.value);
                   setClassId("");
+                  setClassIds([]);
                 }}
               >
-                <option value="">Choisir le niveau</option>
+                <option value="">
+                  {audience === "level" ? "Choisir le niveau" : "Niveau (filtre facultatif)"}
+                </option>
                 {(levelsQuery.data ?? [])
                   .filter(
                     (level) => isDirectorRole(role) || teacherScope.levelCodes.has(level.code),
@@ -698,11 +853,27 @@ export function MaterialsLibraryPage() {
                 <option value="">Choisir le groupe</option>
                 {classesForLevel.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.name} · {item.level}
+                    {(item.reference || item.name) + (item.level ? ` · ${item.level}` : "")}
                   </option>
                 ))}
               </select>
             </label>
+          )}
+          {audience === "classes" && (
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Groupes précis</p>
+              <MultiClassPicker
+                classes={classesForLevel.map((c) => ({
+                  id: c.id,
+                  name: c.name,
+                  level: c.level,
+                  reference: c.reference,
+                }))}
+                selectedIds={classIds}
+                onChange={setClassIds}
+                disabled={saving}
+              />
+            </div>
           )}
           <ContentAttachmentUploader
             kinds={["poster", "document", "link", "image"]}
@@ -727,12 +898,22 @@ export function MaterialsLibraryPage() {
               !title.trim() ||
               saving ||
               (audience === "level" && !levelCode) ||
-              (audience === "class" && (!levelCode || !classId))
+              (audience === "class" && !classId) ||
+              (audience === "classes" && classIds.length === 0)
             }
             onClick={() => {
               setFormError(null);
-              if (isTeacher && (!classId || audience !== "class")) {
-                setFormError("Choisissez un de vos groupes pour partager cette ressource.");
+              const effectiveAudience = isTeacher ? "classes" : audience;
+              if (
+                isTeacher &&
+                (effectiveAudience !== "classes" || classIds.length === 0) &&
+                !classId
+              ) {
+                setFormError("Choisissez au moins un de vos groupes pour partager cette ressource.");
+                return;
+              }
+              if (effectiveAudience === "classes" && classIds.length === 0) {
+                setFormError("Sélectionnez au moins un groupe.");
                 return;
               }
               const kind = attachment.kind as MediaKind;
@@ -753,6 +934,12 @@ export function MaterialsLibraryPage() {
                   return;
                 }
               }
+              const targetClassIds =
+                effectiveAudience === "classes"
+                  ? classIds
+                  : effectiveAudience === "class" && classId
+                    ? [classId]
+                    : [];
               if (editingId) {
                 updateItem.mutate(
                   {
@@ -763,9 +950,16 @@ export function MaterialsLibraryPage() {
                       title: title.trim(),
                       description: description.trim() || null,
                       domain,
-                      audience: isTeacher ? "class" : audience,
-                      levelCode: audience === "everyone" ? null : levelCode || null,
-                      classId: audience === "class" || isTeacher ? classId || null : null,
+                      audience: effectiveAudience,
+                      levelCode: effectiveAudience === "everyone" ? null : levelCode || null,
+                      classId:
+                        effectiveAudience === "class"
+                          ? classId || null
+                          : effectiveAudience === "classes"
+                            ? targetClassIds[0] ?? null
+                            : null,
+                      classIds: targetClassIds,
+                      subtype: subtype || null,
                       contentKind: kind,
                       externalUrl: kind === "link" ? attachment.url.trim() : null,
                       ...(clearFile && kind !== "link" ? { clearFile: true } : {}),
@@ -787,11 +981,18 @@ export function MaterialsLibraryPage() {
                   title: title.trim(),
                   ...(description.trim() ? { description: description.trim() } : {}),
                   domain,
-                  audience: isTeacher ? "class" : audience,
+                  audience: effectiveAudience,
                   category: libraryCategoryForKind(kind),
                   contentKind: kind,
-                  levelCode: audience === "everyone" ? null : levelCode || null,
-                  classId: audience === "class" || isTeacher ? classId || null : null,
+                  levelCode: effectiveAudience === "everyone" ? null : levelCode || null,
+                  classId:
+                    effectiveAudience === "class"
+                      ? classId || null
+                      : effectiveAudience === "classes"
+                        ? targetClassIds[0] ?? null
+                        : null,
+                  classIds: targetClassIds,
+                  subtype: subtype || null,
                   externalUrl: kind === "link" ? attachment.url.trim() : null,
                   createdBy: user?.id ?? null,
                 },
@@ -844,7 +1045,8 @@ export function MaterialsLibraryPage() {
                   </div>
                   <h2 className="mt-1.5 font-semibold tracking-tight">{item.title}</h2>
                   <p className="text-sm text-muted-foreground">
-                    {AUDIENCE_LABELS[item.audience]}
+                    {AUDIENCE_LABELS[item.audience as keyof typeof AUDIENCE_LABELS] ??
+                      item.audience}
                     {` · ${formatFrDate(item.created_at)}`}
                   </p>
                   {item.description ? (
@@ -930,9 +1132,22 @@ export function MaterialsLibraryPage() {
 }
 
 export function StudentLearningPage() {
+  const { user, profile } = useAcademy();
   const coursesQuery = useCourses();
   const accessQuery = useAcademicAccess();
+  const studentsQuery = useStudents();
   const { preview, setPreview, openLinkOrFile } = usePreview();
+  const myStudent = resolveOwnStudent(studentsQuery.data ?? [], {
+    profileId: profile?.id ?? user?.id ?? null,
+    email: user?.email ?? null,
+  });
+  const classId = myStudent?.classId ?? null;
+  const levelCode = myStudent?.level ?? null;
+  const progressQuery = useGroupProgress(classId ?? undefined, levelCode);
+  const summary = useMemo(
+    () => groupProgressSummary(progressQuery.data ?? []),
+    [progressQuery.data],
+  );
 
   if (accessQuery.data === false) {
     return (
@@ -949,11 +1164,49 @@ export function StudentLearningPage() {
     );
   }
 
-  const courses = (coursesQuery.data ?? []).filter((course) => course.status === "published");
+  const courses = (coursesQuery.data ?? []).filter((course) => {
+    if (course.status !== "published") return false;
+    if (levelCode && course.level?.code && course.level.code !== levelCode) return false;
+    return true;
+  });
 
   return (
     <>
-      <PageHeader title="Cours" subtitle="Uniquement les cours de votre niveau." />
+      <PageHeader
+        title="Cours"
+        subtitle={
+          classId
+            ? `Niveau ${levelCode || "—"} · progression groupe ${summary.completed}/${summary.total} (${summary.percent} %)`
+            : "Uniquement les cours de votre niveau."
+        }
+      />
+      {classId ? (
+        <Surface className="mb-5 space-y-2 p-4">
+          <p className="text-sm font-medium">Progression de votre groupe</p>
+          <p className="text-xs text-muted-foreground">
+            Distincte du niveau catalogue. Les chapitres verrouillés restent fermés jusqu’au
+            déblocage par l’équipe pédagogique.
+          </p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            {(progressQuery.data ?? []).map((row) => (
+              <Status
+                key={row.unitId}
+                tone={
+                  row.status === "completed" ? "green" : row.status === "unlocked" ? "blue" : "gray"
+                }
+              >
+                {row.title}
+                {row.status === "locked" ? " (verrouillé)" : ""}
+              </Status>
+            ))}
+            {!progressQuery.isLoading && !(progressQuery.data ?? []).length ? (
+              <p className="text-sm text-muted-foreground">
+                Aucun chapitre de parcours pour ce niveau pour l’instant.
+              </p>
+            ) : null}
+          </div>
+        </Surface>
+      ) : null}
       <QueryState
         isLoading={coursesQuery.isLoading}
         isError={coursesQuery.isError}
@@ -1044,11 +1297,14 @@ export function DirectorAssignmentsPage() {
   const [classId, setClassId] = useState("");
   const [dueAt, setDueAt] = useState("");
   const [publishedAt, setPublishedAt] = useState("");
+  const [maxScorePreset, setMaxScorePreset] = useState<string>("20");
+  const [customMaxScore, setCustomMaxScore] = useState("");
   const [attachment, setAttachment] = useState<AttachmentDraft>({
     kind: "pdf",
     url: "",
     file: null,
   });
+  const [extraAttachments, setExtraAttachments] = useState<MultiAttachmentItem[]>([]);
   const [existingFile, setExistingFile] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -1062,6 +1318,12 @@ export function DirectorAssignmentsPage() {
     );
   }, [listQuery.data, role, teacherScope]);
 
+  const resolvedMaxScore = (): number | null => {
+    if (maxScorePreset === "custom") return parseCustomMaxScore(customMaxScore);
+    const n = Number(maxScorePreset);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+
   const resetForm = () => {
     setEditingId(null);
     setClearAttachment(false);
@@ -1071,7 +1333,10 @@ export function DirectorAssignmentsPage() {
     setClassId("");
     setDueAt("");
     setPublishedAt("");
+    setMaxScorePreset("20");
+    setCustomMaxScore("");
     setAttachment({ kind: "text", url: "", file: null, text: "" });
+    setExtraAttachments([]);
     setExistingFile(false);
     setFormError(null);
   };
@@ -1090,6 +1355,17 @@ export function DirectorAssignmentsPage() {
     setClassId(row.class_id ?? "");
     setDueAt(toLocalInput(row.due_at));
     setPublishedAt(toLocalInput(row.published_at));
+    const max = Number(row.max_score);
+    if (PRESET_SCORE_SCALES.includes(max as (typeof PRESET_SCORE_SCALES)[number])) {
+      setMaxScorePreset(String(max));
+      setCustomMaxScore("");
+    } else if (Number.isFinite(max) && max > 0) {
+      setMaxScorePreset("custom");
+      setCustomMaxScore(String(max));
+    } else {
+      setMaxScorePreset("20");
+      setCustomMaxScore("");
+    }
     setAttachment({
       kind: (row.content_kind as MediaKind) || "text",
       url: row.content_url ?? "",
@@ -1308,6 +1584,35 @@ export function DirectorAssignmentsPage() {
                 onChange={(e) => setDueAt(e.target.value)}
               />
             </label>
+            <label className="block text-sm">
+              Barème
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={maxScorePreset}
+                onChange={(e) => setMaxScorePreset(e.target.value)}
+              >
+                {PRESET_SCORE_SCALES.map((n) => (
+                  <option key={n} value={String(n)}>
+                    /{n}
+                  </option>
+                ))}
+                <option value="custom">Personnalisé</option>
+              </select>
+            </label>
+            {maxScorePreset === "custom" ? (
+              <label className="block text-sm">
+                Note maximale
+                <Input
+                  className="mt-1"
+                  type="number"
+                  min={1}
+                  step="0.5"
+                  placeholder="Ex. 25"
+                  value={customMaxScore}
+                  onChange={(e) => setCustomMaxScore(e.target.value)}
+                />
+              </label>
+            ) : null}
             <ContentAttachmentUploader
               kinds={["text", "pdf", "document", "image", "link", "audio"]}
               value={attachment}
@@ -1327,6 +1632,23 @@ export function DirectorAssignmentsPage() {
                 setAttachment({ ...attachment, file: null, url: "", text: "" });
               }}
             />
+            <MultiAttachmentComposer
+              items={extraAttachments}
+              onChange={setExtraAttachments}
+              disabled={saving}
+              uploading={saving}
+            />
+            {extraAttachments.length === 0 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={saving}
+                onClick={() => setExtraAttachments([createMultiAttachmentItem("pdf")])}
+              >
+                + Ajouter d’autres pièces (PDF, image, audio, lien…)
+              </Button>
+            ) : null}
             {editingId && existingFile && !clearAttachment && attachment.kind !== "link" ? (
               <p className="text-xs text-muted-foreground">
                 Déposez un fichier pour le remplacer, ou utilisez « Supprimer » pour retirer la
@@ -1382,6 +1704,11 @@ export function DirectorAssignmentsPage() {
                     }
                     setSaving(true);
                     try {
+                      const maxScore = resolvedMaxScore();
+                      if (maxScore == null) {
+                        setFormError("Indiquez un barème positif (/10, /20, /50, /100 ou personnalisé).");
+                        return;
+                      }
                       let attachmentBucket: string | null | undefined;
                       let attachmentPath: string | null | undefined;
                       let mimeType: string | null | undefined;
@@ -1403,6 +1730,7 @@ export function DirectorAssignmentsPage() {
                           levelId,
                           classId: classId || null,
                           dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+                          maxScore,
                           contentKind: kind,
                           contentUrl: kind === "link" ? attachment.url.trim() || null : null,
                           mimeType: isTextContentKind(kind) ? "text/plain" : mimeType ?? null,
@@ -1421,12 +1749,22 @@ export function DirectorAssignmentsPage() {
                           id: editingId,
                           patch,
                         });
+                        await persistAssignmentAttachments(editingId, {
+                          kind,
+                          attachment,
+                          attachmentBucket: attachmentBucket ?? null,
+                          attachmentPath: attachmentPath ?? null,
+                          mimeType: mimeType ?? null,
+                          textBody,
+                          extraAttachments,
+                        });
                         toast.success("Devoir mis à jour");
                       } else {
-                        await create.mutateAsync({
+                        const created = await create.mutateAsync({
                           levelId,
                           classId: classId || null,
                           title: title.trim(),
+                          maxScore,
                           ...(resolvedDescription
                             ? {
                                 description: resolvedDescription,
@@ -1450,6 +1788,15 @@ export function DirectorAssignmentsPage() {
                             : (attachmentPath ?? null),
                           createdBy: user?.id ?? null,
                           status: "published",
+                        });
+                        await persistAssignmentAttachments(created.id, {
+                          kind,
+                          attachment,
+                          attachmentBucket: attachmentBucket ?? null,
+                          attachmentPath: attachmentPath ?? null,
+                          mimeType: mimeType ?? null,
+                          textBody,
+                          extraAttachments,
                         });
                         toast.success("Devoir publié");
                       }

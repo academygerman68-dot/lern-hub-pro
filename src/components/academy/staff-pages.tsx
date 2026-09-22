@@ -21,6 +21,7 @@ import {
   useTeachers,
   useUpdateClass,
 } from "@/hooks/use-academy-data";
+import { formatGroupCodeWithTeacher, suggestGroupCode } from "@/lib/group-code";
 import { AuthService } from "@/services/academy-services";
 import { WEEKDAY_OPTIONS } from "@/services/supabase/class-schedule-service";
 import type { AccountStatus, AcademyPage, Level, Student } from "@/types/academy";
@@ -54,6 +55,7 @@ import {
   DirectorCoursesPage,
   MaterialsLibraryPage,
 } from "./academic-pages";
+import { GroupProgressPage } from "./group-progress-page";
 import { DirectorExamsPage } from "./exam-pages";
 import { LiveClassesPage } from "./live-pages";
 import { FinancePages } from "./finance-pages";
@@ -72,7 +74,8 @@ export function TeacherPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   const page = pageProp ?? contextPage;
   if (page === "classes") return <TeacherClass />;
   if (page === "students") return <TeacherStudents />;
-  if (page === "courses" || page === "lessons") return <DirectorCoursesPage />;
+  if (page === "courses") return <DirectorCoursesPage />;
+  if (page === "lessons") return <GroupProgressPage />;
   if (page === "assignments") return <DirectorAssignmentsPage />;
   if (page === "corrections") return <CorrectionsCenter />;
   if (page === "calendar") return <CalendarPage />;
@@ -895,6 +898,32 @@ function Classes() {
     setEndTimeDraft(trimTime(rows[0]?.end_time) || "23:00");
   }, [selectedId, schedulesQuery.data, schedulesQuery.isLoading]);
 
+  // Suggest a readable group code on create when level/teacher/start change.
+  // Never overwrite an existing reference while editing.
+  useEffect(() => {
+    if (!open || editingId) return;
+    const level = levelOptions.find((row) => row.id === levelId);
+    if (!level?.code) return;
+    const teacher = teacherOptions.find((row) => row.id === teacherId);
+    const asOf = startDate ? new Date(`${startDate}T12:00:00`) : new Date();
+    const next = suggestGroupCode({
+      levelCode: level.code,
+      teacherName: teacher?.name ?? null,
+      existingReferences: (classesQuery.data ?? []).map((c) => c.reference),
+      asOf: Number.isNaN(asOf.getTime()) ? new Date() : asOf,
+    });
+    setReference(next);
+  }, [
+    open,
+    editingId,
+    levelId,
+    teacherId,
+    startDate,
+    levelOptions,
+    teacherOptions,
+    classesQuery.data,
+  ]);
+
   const resetForm = () => {
     setName("");
     setReference("");
@@ -1023,6 +1052,9 @@ function Classes() {
                 <div className="flex flex-wrap items-center gap-2">
                   <LevelBadge code={item.level} />
                   <GroupBadge label={item.reference || item.name} />
+                  {item.teacher && item.teacher !== "—" ? (
+                    <span className="text-xs text-muted-foreground">{item.teacher}</span>
+                  ) : null}
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">
                   {item.capacity > 0 && item.size >= item.capacity && (
@@ -1077,13 +1109,23 @@ function Classes() {
               {editingId ? "Modifier le groupe" : "Créer un groupe"}
             </h2>
             <label className="block text-sm">
-              Référence du groupe
+              Code du groupe
               <Input
                 className="mt-1"
-                placeholder="Ex. A1-SEP-2026"
+                placeholder="Ex. A1-SEP26-WB-01"
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
               />
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Format suggéré : niveau-période-initiales-numéro. Les codes existants restent
+                inchangés si vous changez de professeur.
+                {teacherId
+                  ? ` Affichage : ${formatGroupCodeWithTeacher(
+                      reference,
+                      teacherOptions.find((t) => t.id === teacherId)?.name,
+                    )}`
+                  : ""}
+              </span>
             </label>
             <label className="block text-sm">
               Niveau
