@@ -10,6 +10,8 @@ import {
   isBillingCurrency,
   isBillingPlan,
   planAmount,
+  resolvePlanAmount,
+  type BillingTariffMap,
   resolveSubscriptionBilling,
 } from "./subscription-plans";
 
@@ -135,6 +137,7 @@ export function buildVirtualNextInstallment(input: {
   plan: BillingPlan;
   currency: BillingCurrency;
   period?: string;
+  tariffs?: BillingTariffMap | null;
 }): {
   period: string;
   amount: number;
@@ -146,7 +149,7 @@ export function buildVirtualNextInstallment(input: {
   const period = input.period ?? currentBillingPeriod(input.plan);
   return {
     period,
-    amount: planAmount(input.plan, input.currency),
+    amount: resolvePlanAmount(input.plan, input.currency, input.tariffs),
     currency: input.currency,
     plan: input.plan,
     dueDate: billingPeriodDueDate(period, input.plan),
@@ -202,6 +205,7 @@ export function resolveActiveBillingFromSubscription(
       }
     | null
     | undefined,
+  tariffs?: BillingTariffMap | null,
 ): {
   plan: BillingPlan;
   currency: BillingCurrency;
@@ -214,7 +218,7 @@ export function resolveActiveBillingFromSubscription(
   return {
     plan: resolved.plan,
     currency: resolved.currency,
-    amount: planAmount(resolved.plan, resolved.currency),
+    amount: resolvePlanAmount(resolved.plan, resolved.currency, tariffs),
     pendingEffectivePeriod: resolved.pendingEffectivePeriod,
     pendingPlan: isBillingPlan(sub?.pending_billing_plan) ? sub!.pending_billing_plan : null,
     pendingCurrency: isBillingCurrency(sub?.pending_billing_currency)

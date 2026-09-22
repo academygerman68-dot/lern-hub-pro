@@ -4,9 +4,9 @@ export type BillingCurrency = "MAD" | "EUR";
 /** Fixed reporting FX: 1 EUR = 10 MAD (chiffre d'affaires). */
 export const EUR_TO_MAD_RATE = 10;
 
-/** Fallback when settings are unavailable — validated catalogue. */
+/** Fallback when settings are unavailable — prod catalogue (monthly 1200 MAD). */
 export const BILLING_PLAN_AMOUNT_FALLBACKS: Record<BillingPlan, Record<BillingCurrency, number>> = {
-  monthly: { MAD: 1000, EUR: 100 },
+  monthly: { MAD: 1200, EUR: 100 },
   quarterly: { MAD: 2400, EUR: 240 },
 };
 
@@ -98,9 +98,16 @@ export function quoteFlexibleBillingPack(input: {
   currentMonth: string;
   includeFuturePack: boolean;
   tariffs?: BillingTariffMap | null;
+  /** Acquired / already issued échéance amount for the current month (do not overwrite). */
+  acquiredCurrentAmount?: number | null;
 }) {
   const monthly = resolvePlanAmount("monthly", input.currency, input.tariffs);
   const quarterly = resolvePlanAmount("quarterly", input.currency, input.tariffs);
+  const acquired = Number(input.acquiredCurrentAmount);
+  const currentAmount =
+    Number.isFinite(acquired) && acquired > 0 ? acquired : monthly;
+  const currentIsAcquired =
+    Number.isFinite(acquired) && acquired > 0 && Math.abs(acquired - monthly) > 0.009;
   const futureMonths: string[] = [];
   if (input.includeFuturePack) {
     const [y, m] = input.currentMonth.split("-").map(Number);
@@ -113,12 +120,13 @@ export function quoteFlexibleBillingPack(input: {
   return {
     currency: input.currency,
     currentMonth: input.currentMonth,
-    currentAmount: monthly,
+    currentAmount,
     futureMonths,
     futurePackAmount,
-    totalAmount: monthly + futurePackAmount,
+    totalAmount: currentAmount + futurePackAmount,
     monthlyTariff: monthly,
     quarterlyTariff: quarterly,
+    currentIsAcquired,
   };
 }
 

@@ -17,7 +17,7 @@ describe("billing UX statuses", () => {
         {
           id: "1",
           status: "pending",
-          amount: 1000,
+          amount: 1200,
           currency: "MAD",
           due_date: "2099-12-31",
         },
@@ -30,7 +30,7 @@ describe("billing UX statuses", () => {
         {
           id: "1",
           status: "pending",
-          amount: 1000,
+          amount: 1200,
           currency: "MAD",
           due_date: "2020-01-01",
         },
@@ -76,7 +76,7 @@ describe("billing UX statuses", () => {
         {
           id: "paid",
           status: "paid",
-          amount: 1000,
+          amount: 1200,
           currency: "MAD",
           billing_period: "2026-08",
           due_date: "2026-08-31",
@@ -84,7 +84,7 @@ describe("billing UX statuses", () => {
         {
           id: "open",
           status: "pending",
-          amount: 1000,
+          amount: 1200,
           currency: "MAD",
           billing_period: "2026-09",
           due_date: "2026-09-30",
@@ -99,7 +99,7 @@ describe("billing UX statuses", () => {
 
 describe("subscription billing plans", () => {
   it("covers fixed commercial tariffs", () => {
-    expect(planAmount("monthly", "MAD")).toBe(1000);
+    expect(planAmount("monthly", "MAD")).toBe(1200);
     expect(planAmount("monthly", "EUR")).toBe(100);
     expect(planAmount("quarterly", "MAD")).toBe(2400);
     expect(planAmount("quarterly", "EUR")).toBe(240);

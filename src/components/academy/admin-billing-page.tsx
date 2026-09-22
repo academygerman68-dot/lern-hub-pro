@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ import {
 import { PaymentProofService } from "@/services/academy-services";
 import type { PaymentProofListItem } from "@/services/supabase/payment-proof-service";
 import { computeFinalAmount } from "@/services/supabase/payment-service";
+import { SettingsService } from "@/services/supabase/settings-service";
 import {
   type BillingCurrency,
   type BillingPlan,
@@ -43,12 +45,16 @@ import {
   installmentUxLabel,
   installmentUxTone,
   latestProofForPayment,
-  planAmount,
   resolveActiveBillingFromSubscription,
   resolveInstallmentUxStatus,
   summarizePaymentRow,
 } from "@/lib/billing-ux";
-import { listBillingPeriods } from "@/lib/subscription-plans";
+import {
+  listBillingPeriods,
+  parseBillingTariffSettings,
+  resolvePlanAmount,
+} from "@/lib/subscription-plans";
+import { queryKeys } from "@/lib/query-keys";
 import type { Database } from "@/types/database";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { DocumentViewer } from "./document-viewer";
@@ -328,6 +334,16 @@ export function FinancePages({ mode }: { mode: string }) {
   const studentsQuery = useStudents();
   const pendingQuery = usePendingPaymentProofs();
   const allProofsQuery = usePaymentProofs();
+  const settingsQuery = useQuery({
+    queryKey: queryKeys.branding.settings,
+    queryFn: () => SettingsService.listPublic(),
+  });
+  const tariffs = useMemo(
+    () => parseBillingTariffSettings(settingsQuery.data ?? []),
+    [settingsQuery.data],
+  );
+  const catalogAmount = (plan: BillingPlan, currency: BillingCurrency) =>
+    resolvePlanAmount(plan, currency, tariffs);
   const createPayment = useCreatePayment();
   const markOverdue = useMarkPaymentOverdue();
   const remindPayment = useRemindPayment();
@@ -355,7 +371,7 @@ export function FinancePages({ mode }: { mode: string }) {
   const [billingPeriod, setBillingPeriod] = useState(
     () => listBillingPeriods("monthly", 1)[0] ?? "",
   );
-  const [initialAmount, setInitialAmount] = useState(String(planAmount("monthly", "MAD")));
+  const [initialAmount, setInitialAmount] = useState(String(catalogAmount("monthly", "MAD")));
   const [discountMode, setDiscountMode] = useState<"none" | "percent" | "fixed">("none");
   const [discountValue, setDiscountValue] = useState("");
   const [amountPaid, setAmountPaid] = useState("");
@@ -438,7 +454,7 @@ export function FinancePages({ mode }: { mode: string }) {
   const applyPlanDefaults = (plan: BillingPlan, nextCurrency: BillingCurrency) => {
     setBillingPlanForm(plan);
     setCurrency(nextCurrency);
-    setInitialAmount(String(planAmount(plan, nextCurrency)));
+    setInitialAmount(String(catalogAmount(plan, nextCurrency)));
     const periods = listBillingPeriods(plan, 6);
     setBillingPeriod((prev) => (periods.includes(prev) ? prev : (periods[0] ?? "")));
   };
@@ -478,7 +494,7 @@ export function FinancePages({ mode }: { mode: string }) {
     setBillingPlanForm("monthly");
     setCurrency("MAD");
     setBillingPeriod(listBillingPeriods("monthly", 1)[0] ?? "");
-    setInitialAmount(String(planAmount("monthly", "MAD")));
+    setInitialAmount(String(catalogAmount("monthly", "MAD")));
     setDiscountMode("none");
     setDiscountValue("");
     setAmountPaid("");
@@ -850,7 +866,7 @@ export function FinancePages({ mode }: { mode: string }) {
           >
             <div className="space-y-3 md:hidden">
               {subscriptionsQuery.data?.map((row) => {
-                const billing = resolveActiveBillingFromSubscription(row);
+                const billing = resolveActiveBillingFromSubscription(row, tariffs);
                 return (
                   <Surface key={row.id} className="space-y-3 p-4">
                     <div className="flex items-start justify-between gap-3">
@@ -915,7 +931,7 @@ export function FinancePages({ mode }: { mode: string }) {
                 </thead>
                 <tbody>
                   {subscriptionsQuery.data?.map((row) => {
-                    const billing = resolveActiveBillingFromSubscription(row);
+                    const billing = resolveActiveBillingFromSubscription(row, tariffs);
                     return (
                       <tr key={row.id}>
                         <td className="font-medium">{studentLabel(row)}</td>
@@ -995,10 +1011,10 @@ export function FinancePages({ mode }: { mode: string }) {
                   onChange={(e) => applyPlanDefaults(e.target.value as BillingPlan, currency)}
                 >
                   <option value="monthly">
-                    Mensuelle ({formatMoneyAmount(planAmount("monthly", currency), currency)})
+                    Mensuelle ({formatMoneyAmount(catalogAmount("monthly", currency), currency)})
                   </option>
                   <option value="quarterly">
-                    Trimestrielle ({formatMoneyAmount(planAmount("quarterly", currency), currency)})
+                    Trimestrielle ({formatMoneyAmount(catalogAmount("quarterly", currency), currency)})
                   </option>
                 </select>
                 <select
@@ -1227,7 +1243,7 @@ export function FinancePages({ mode }: { mode: string }) {
               </select>
               <p className="text-sm text-muted-foreground">
                 Tarif :{" "}
-                {formatMoneyAmount(planAmount(planEdit.plan, planEdit.currency), planEdit.currency)}
+                {formatMoneyAmount(catalogAmount(planEdit.plan, planEdit.currency), planEdit.currency)}
               </p>
             </div>
           ) : null}

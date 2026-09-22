@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ import {
   useSubmitPaymentProof,
 } from "@/hooks/use-academy-data";
 import { PaymentProofService, PaymentService } from "@/services/academy-services";
+import { SettingsService } from "@/services/supabase/settings-service";
 import {
   PAYMENT_PROOF_ACCEPT,
   resolveOwnStudent,
@@ -39,7 +41,14 @@ import {
   resolveInstallmentUxStatus,
   summarizePaymentRow,
 } from "@/lib/billing-ux";
-import { billingPeriodLabel, billingPlanLabel, formatMoneyAmount, quoteFlexibleBillingPack } from "@/lib/subscription-plans";
+import {
+  billingPeriodLabel,
+  billingPlanLabel,
+  formatMoneyAmount,
+  parseBillingTariffSettings,
+  quoteFlexibleBillingPack,
+} from "@/lib/subscription-plans";
+import { queryKeys } from "@/lib/query-keys";
 import { useAcademy } from "./academy-context";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { DocumentViewer } from "./document-viewer";
@@ -89,6 +98,14 @@ export function StudentPaymentsPage() {
   const proofsQuery = usePaymentProofs(studentId || undefined);
   const subscriptionQuery = useMySubscription(studentId || undefined);
   const submitProof = useSubmitPaymentProof();
+  const settingsQuery = useQuery({
+    queryKey: queryKeys.branding.settings,
+    queryFn: () => SettingsService.listPublic(),
+  });
+  const tariffs = useMemo(
+    () => parseBillingTariffSettings(settingsQuery.data ?? []),
+    [settingsQuery.data],
+  );
 
   const [declareOpen, setDeclareOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<InstallmentUxFilter>("all");
@@ -107,7 +124,7 @@ export function StudentPaymentsPage() {
   const [preview, setPreview] = useState<DocPreview | null>(null);
 
   const accessBlocked = accessQuery.data === false;
-  const billing = resolveActiveBillingFromSubscription(subscriptionQuery.data);
+  const billing = resolveActiveBillingFromSubscription(subscriptionQuery.data, tariffs);
   const payments = paymentsQuery.data ?? [];
   const proofs = proofsQuery.data ?? [];
 
@@ -129,6 +146,7 @@ export function StudentPaymentsPage() {
     const virtual = buildVirtualNextInstallment({
       plan: billing.plan,
       currency: billing.currency,
+      tariffs,
     });
     return {
       kind: "virtual" as const,
@@ -141,7 +159,7 @@ export function StudentPaymentsPage() {
       status: virtual.status as InstallmentUxStatus,
       proof: null,
     };
-  }, [payments, proofs, billing.plan, billing.currency]);
+  }, [payments, proofs, billing.plan, billing.currency, tariffs]);
 
   const historyRows = useMemo(() => {
     return payments
@@ -200,8 +218,18 @@ export function StudentPaymentsPage() {
       currency,
       currentMonth,
       includeFuturePack,
+      tariffs,
+      acquiredCurrentAmount:
+        nextInstallment.kind === "existing" ? nextInstallment.amount : null,
     });
-  }, [includeFuturePack, nextInstallment.currency, nextInstallment.period]);
+  }, [
+    includeFuturePack,
+    nextInstallment.currency,
+    nextInstallment.period,
+    nextInstallment.kind,
+    nextInstallment.amount,
+    tariffs,
+  ]);
 
   const handleSubmitProof = async () => {
     if (!studentId) {
@@ -667,21 +695,23 @@ export function StudentPaymentsPage() {
           </DialogHeader>
 
           <div className="space-y-3 rounded-lg border border-border/80 bg-muted/40 p-3 text-sm">
+            <p className="font-medium">1. Formule</p>
             <p>
-              <span className="text-muted-foreground">Échéance · </span>
+              <span className="text-muted-foreground">Échéance sélectionnée · </span>
               {billingPeriodLabel(nextInstallment.period, nextInstallment.plan)}
+              {" · "}
+              {formatMoneyAmount(flexibleQuote.currentAmount, flexibleQuote.currency)}
+              {flexibleQuote.currentIsAcquired ? (
+                <span className="text-muted-foreground"> (tarif acquis)</span>
+              ) : (
+                <span className="text-muted-foreground"> (catalogue)</span>
+              )}
             </p>
             <p>
-              <span className="text-muted-foreground">Formule · </span>
-              {billingPlanLabel(String(nextInstallment.plan))}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Devise · </span>
-              {flexibleQuote.currency}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Mensuel catalogue · </span>
+              <span className="text-muted-foreground">Catalogue mensuel · </span>
               {formatMoneyAmount(flexibleQuote.monthlyTariff, flexibleQuote.currency)}
+              <span className="text-muted-foreground"> · Pack 3 mois · </span>
+              {formatMoneyAmount(flexibleQuote.quarterlyTariff, flexibleQuote.currency)}
             </p>
             <label className="flex items-start gap-2 text-sm">
               <input
@@ -696,12 +726,15 @@ export function StudentPaymentsPage() {
                     currency: flexibleQuote.currency,
                     currentMonth: flexibleQuote.currentMonth,
                     includeFuturePack: next,
+                    tariffs,
+                    acquiredCurrentAmount:
+                      nextInstallment.kind === "existing" ? nextInstallment.amount : null,
                   });
                   setDeclaredAmount(String(quote.totalAmount));
                 }}
               />
               <span>
-                Ajouter 3 mois futurs consécutifs au tarif trimestriel (
+                Ajouter 3 mois futurs consécutifs au tarif trimestriel catalogue (
                 {formatMoneyAmount(flexibleQuote.quarterlyTariff, flexibleQuote.currency)}
                 {flexibleQuote.futureMonths.length
                   ? ` · ${flexibleQuote.futureMonths.join(", ")}`
@@ -709,10 +742,12 @@ export function StudentPaymentsPage() {
                 ). Sans chevauchement avec les périodes déjà validées.
               </span>
             </label>
+            <p className="font-medium">2. Récapitulatif</p>
             <p>
-              <span className="text-muted-foreground">Total attendu · </span>
+              <span className="text-muted-foreground">Total attendu (serveur) · </span>
               {formatMoneyAmount(flexibleQuote.totalAmount, flexibleQuote.currency)}
             </p>
+            <p className="font-medium">3. Justificatif</p>
           </div>
 
           <div className="space-y-3">
