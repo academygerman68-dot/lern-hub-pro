@@ -1,5 +1,6 @@
 /**
  * Gemini grade-assist suggestions for teachers/admins.
+ * Supports text + multimodal (images / PDF) from private submission storage.
  * Never auto-publishes scores. Reads GEMINI_API_KEY from Deno.env only.
  * Students must never receive suggestions from this endpoint.
  */
@@ -17,6 +18,17 @@ const GEMINI_MODELS = [
   "gemini-3.6-flash",
   "gemini-2.5-flash",
 ] as const;
+
+const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
+
+const MULTIMODAL_MIME = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
 
 const ERROR_CATEGORIES = [
   "Ordre des mots",
@@ -60,6 +72,10 @@ const DEFAULT_CRITERIA = [
   { id: "vocabulary", label: "Vocabulaire" },
   { id: "grammar_and_spelling", label: "Grammaire / orthographe" },
 ] as const;
+
+type GeminiPart =
+  | { text: string }
+  | { inline_data: { mime_type: string; data: string } };
 
 function respond(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
@@ -168,7 +184,6 @@ function normalizeCriteria(raw: unknown, maxScore: number) {
   }
   if (out.length > 0) return out;
 
-  // Fallback equal split when Gemini omitted criteria.
   const part = Math.floor((maxScore / DEFAULT_CRITERIA.length) * 10) / 10;
   let remaining = maxScore;
   return DEFAULT_CRITERIA.map((item, index) => {
@@ -211,12 +226,40 @@ function normalizeErrors(raw: unknown) {
   return out;
 }
 
+function inferMimeFromPath(path: string): string | null {
+  const lower = path.toLowerCase();
+  if (lower.endsWith(".pdf")) return "application/pdf";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  return null;
+}
+
+function normalizeMime(raw: string | null | undefined, path?: string | null): string | null {
+  const mime = (raw ?? "").split(";")[0]?.trim().toLowerCase() || "";
+  if (mime === "image/jpg") return "image/jpeg";
+  if (MULTIMODAL_MIME.has(mime)) return mime;
+  if (path) return inferMimeFromPath(path);
+  return null;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return respond(405, { error: "METHOD_NOT_ALLOWED" });
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !supabaseAnonKey) {
     return respond(503, { error: "SERVICE_UNAVAILABLE" });
   }
@@ -261,6 +304,9 @@ Deno.serve(async (req) => {
     });
   }
 
+  const mediaParts: GeminiPart[] = [];
+  const analyzedAttachments: Array<{ mime: string; size: number; path: string }> = [];
+
   // Scope: teacher may only assist on rows their RLS can read (own groups). Admin sees all.
   if (targetId) {
     if (targetKind === "exam_writing") {
@@ -273,11 +319,88 @@ Deno.serve(async (req) => {
     } else {
       const { data: submission, error: sErr } = await caller
         .from("assignment_submissions")
-        .select("id")
+        .select("id, file_bucket, file_path, student_id, content_text")
         .eq("id", targetId)
         .maybeSingle();
       if (sErr || !submission) return respond(403, { error: "FORBIDDEN" });
+
+      if (submission.file_bucket && submission.file_path) {
+        if (!serviceRoleKey) {
+          logGeminiDiag({ event: "service_role_missing", code: "SERVICE_UNAVAILABLE" });
+          return respond(503, { error: "SERVICE_UNAVAILABLE", secret_present: true });
+        }
+
+        const admin = createClient(supabaseUrl, serviceRoleKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
+        const { data: blob, error: dlErr } = await admin.storage
+          .from(submission.file_bucket)
+          .download(submission.file_path);
+
+        if (dlErr || !blob) {
+          logGeminiDiag({
+            event: "attachment_download_failed",
+            code: "UNREADABLE_ATTACHMENT",
+            reason: dlErr?.message?.slice(0, 120) ?? "empty",
+          });
+          return respond(422, {
+            error: "UNREADABLE_ATTACHMENT",
+            secret_present: true,
+            message:
+              "Le fichier de remise n’a pas pu être lu. Ouvrez-le manuellement ; aucune analyse inventée.",
+          });
+        }
+
+        const size = blob.size;
+        if (size <= 0 || size > MAX_ATTACHMENT_BYTES) {
+          return respond(422, {
+            error: "UNREADABLE_ATTACHMENT",
+            secret_present: true,
+            message:
+              size > MAX_ATTACHMENT_BYTES
+                ? "Fichier trop volumineux pour l’analyse multimodale (max 15 Mo)."
+                : "Fichier vide ou illisible.",
+          });
+        }
+
+        const mime = normalizeMime(blob.type, submission.file_path);
+        if (!mime || !MULTIMODAL_MIME.has(mime)) {
+          // File present but not multimodal — require text; do not pretend to read it.
+          if (!responseText && !asString(submission.content_text)) {
+            return respond(422, {
+              error: "UNREADABLE_ATTACHMENT",
+              secret_present: true,
+              message:
+                "Ce type de fichier n’est pas analysable par l’IA (images JPEG/PNG/WEBP/GIF ou PDF uniquement). Ouvrez-le manuellement.",
+            });
+          }
+          logGeminiDiag({
+            event: "attachment_skipped_non_multimodal",
+            mime: blob.type || null,
+            path_ext: submission.file_path.split(".").pop() ?? null,
+          });
+        } else {
+          const bytes = new Uint8Array(await blob.arrayBuffer());
+          mediaParts.push({
+            inline_data: { mime_type: mime, data: bytesToBase64(bytes) },
+          });
+          analyzedAttachments.push({
+            mime,
+            size,
+            path: submission.file_path.split("/").pop() ?? "attachment",
+          });
+        }
+      }
     }
+  }
+
+  if (!responseText && mediaParts.length === 0) {
+    return respond(422, {
+      error: "UNREADABLE_ATTACHMENT",
+      secret_present: true,
+      message:
+        "Aucune réponse textuelle ni fichier image/PDF lisible pour la pré-correction IA.",
+    });
   }
 
   const prompt = [
@@ -290,11 +413,22 @@ Deno.serve(async (req) => {
     `Note maximale (max_score): ${maxScore}`,
     rubric ? `Barème / critères existants: ${rubric}` : "",
     instructions ? `Consigne: ${instructions}` : "",
-    responseText ? `Réponse de l'étudiant: ${responseText}` : "Réponse vide.",
+    responseText
+      ? `Réponse textuelle de l'étudiant: ${responseText}`
+      : mediaParts.length
+        ? "Réponse textuelle: absente — analyse le(s) fichier(s) joints (image ou PDF)."
+        : "Réponse vide.",
+    analyzedAttachments.length
+      ? `Fichiers joints analysés: ${analyzedAttachments
+          .map((a) => `${a.path} (${a.mime}, ${a.size} octets)`)
+          .join("; ")}`
+      : "",
     "",
     "Exigences d'analyse:",
     "- Analyse pédagogique adaptée STRICTEMENT au niveau CECR.",
-    "- Liste UNIQUEMENT de vraies erreurs présentes dans le texte de l'étudiant.",
+    "- Si un fichier image/PDF est fourni, lis réellement son contenu visible (texte manuscrit ou imprimé).",
+    "- Si le fichier est illisible ou hors sujet, dis-le clairement dans feedback et ne fabrique pas d'erreurs.",
+    "- Liste UNIQUEMENT de vraies erreurs présentes dans le texte (saisi ou lu dans le fichier).",
     "- Ne jamais inventer une erreur absente du texte.",
     "- Pour chaque erreur: reprendre le segment fautif exact (original), donner la correction allemande, expliquer brièvement en français.",
     "- category doit être l'une de: Ordre des mots | Conjugaison | Grammaire | Orthographe | Vocabulaire | Cas / déclinaison | Temps verbal | Ponctuation | Autre.",
@@ -326,6 +460,8 @@ Deno.serve(async (req) => {
     .filter(Boolean)
     .join("\n");
 
+  const parts: GeminiPart[] = [{ text: prompt }, ...mediaParts];
+
   try {
     let lastStatus = 0;
     let lastProviderMessage = "";
@@ -343,7 +479,7 @@ Deno.serve(async (req) => {
             "x-goog-api-key": geminiKey,
           },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
+            contents: [{ role: "user", parts }],
             generationConfig: {
               temperature: 0.2,
               responseMimeType: "application/json",
@@ -362,9 +498,9 @@ Deno.serve(async (req) => {
           model,
           http_status: geminiRes.status,
           provider_message: lastProviderMessage || null,
+          multimodal: mediaParts.length > 0,
         });
         const classified = classifyGeminiHttp(geminiRes.status, lastProviderMessage);
-        // Try next model on not-found / temporary overload.
         if (
           geminiRes.status === 404 ||
           geminiRes.status === 503 ||
@@ -449,7 +585,12 @@ Deno.serve(async (req) => {
         student_id: studentId,
         requested_by: userData.user.id,
         level_code: level || null,
-        prompt_meta: { subject, maxScore, model: usedModel },
+        prompt_meta: {
+          subject,
+          maxScore,
+          model: usedModel,
+          multimodal: analyzedAttachments,
+        },
         suggestion: {
           suggested_score: suggested,
           max_score: maxScore,
@@ -474,6 +615,7 @@ Deno.serve(async (req) => {
       max_score: maxScore,
       errors_count: errors.length,
       has_model_answer: Boolean(modelAnswer),
+      multimodal_count: analyzedAttachments.length,
     });
 
     return respond(200, {
@@ -488,6 +630,7 @@ Deno.serve(async (req) => {
       ...(modelAnswer ? { model_answer: modelAnswer } : {}),
       model: usedModel,
       secret_present: true,
+      multimodal: analyzedAttachments.length > 0,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message.slice(0, 160) : "unknown";

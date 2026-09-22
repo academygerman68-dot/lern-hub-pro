@@ -29,12 +29,18 @@ describe("grade-assist UX helpers", () => {
     expect(mapGradeAssistErrorCode("GEMINI_NOT_CONFIGURED")).toBe(GRADE_ASSIST_UNCONFIGURED_MESSAGE);
   });
 
-  it("requires exploitable text when only a file is present", () => {
-    expect(gradeAssistNeedsExploitableText("", true)).toBe(true);
-    expect(gradeAssistNeedsExploitableText("  ", true)).toBe(true);
+  it("requires exploitable text only for non-multimodal file-only remises", () => {
+    expect(gradeAssistNeedsExploitableText("", true, "doc.docx")).toBe(true);
+    expect(gradeAssistNeedsExploitableText("  ", true, "notes.bin")).toBe(true);
+    expect(gradeAssistNeedsExploitableText("", true, "scan.png")).toBe(false);
+    expect(gradeAssistNeedsExploitableText("", true, "devoir.pdf")).toBe(false);
     expect(gradeAssistNeedsExploitableText("Hallo", true)).toBe(false);
     expect(gradeAssistNeedsExploitableText("", false)).toBe(false);
     expect(GRADE_ASSIST_NEEDS_TEXT_MESSAGE.length).toBeGreaterThan(20);
+  });
+
+  it("maps unreadable attachment errors", () => {
+    expect(mapGradeAssistErrorCode("UNREADABLE_ATTACHMENT")).toMatch(/analysable|manuellement/i);
   });
 
   it("labels writing criteria in French", () => {

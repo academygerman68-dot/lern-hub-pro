@@ -27,6 +27,7 @@ import type { Database } from "@/types/database";
 import {
   GRADE_ASSIST_NEEDS_TEXT_MESSAGE,
   gradeAssistNeedsExploitableText,
+  isGradeAssistMultimodalPath,
 } from "@/lib/grade-assist-ux";
 import {
   formatGradedScore,
@@ -785,13 +786,20 @@ function GradeForm({
   const requestAi = async () => {
     setAiMessage(null);
     if (
-      gradeAssistNeedsExploitableText(submission.content_text, Boolean(submission.file_path))
+      gradeAssistNeedsExploitableText(
+        submission.content_text,
+        Boolean(submission.file_path),
+        submission.file_path,
+      )
     ) {
       setAiSuggestion(null);
       setAiMessage(GRADE_ASSIST_NEEDS_TEXT_MESSAGE);
       return;
     }
-    if (!submission.content_text?.trim()) {
+    if (
+      !submission.content_text?.trim() &&
+      !isGradeAssistMultimodalPath(submission.file_path)
+    ) {
       setAiSuggestion(null);
       setAiMessage(GRADE_ASSIST_NEEDS_TEXT_MESSAGE);
       return;

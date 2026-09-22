@@ -4,7 +4,10 @@ export const GRADE_ASSIST_UNCONFIGURED_MESSAGE =
   "Le service de correction IA n'est pas encore configuré.";
 
 export const GRADE_ASSIST_NEEDS_TEXT_MESSAGE =
-  "La pré-correction IA nécessite une réponse textuelle exploitable. Ouvrez le fichier manuellement, puis saisissez ou collez le texte à évaluer.";
+  "La pré-correction IA nécessite une réponse textuelle exploitable, ou un fichier image/PDF lisible. Ouvrez le fichier manuellement si le format n’est pas supporté.";
+
+export const GRADE_ASSIST_UNREADABLE_ATTACHMENT_MESSAGE =
+  "Le fichier de remise n’est pas analysable par l’IA. Ouvrez-le manuellement ; aucune analyse inventée.";
 
 export const GRADE_ASSIST_ERROR_CATEGORIES = [
   "Ordre des mots",
@@ -171,6 +174,10 @@ export function mapGradeAssistErrorCode(
     case "GEMINI_PROVIDER_ERROR":
     case "MODEL_UNAVAILABLE":
       return "Le fournisseur de correction IA est temporairement indisponible.";
+    case "UNREADABLE_ATTACHMENT":
+      return providerMessage?.trim()
+        ? providerMessage.trim().slice(0, 200)
+        : GRADE_ASSIST_UNREADABLE_ATTACHMENT_MESSAGE;
     case "FORBIDDEN":
       return "Vous n’avez pas l’autorisation d’utiliser la pré-correction IA.";
     case "UNAUTHORIZED":
@@ -183,12 +190,39 @@ export function mapGradeAssistErrorCode(
   }
 }
 
-/** True when only a file exists and there is no student text for the model. */
+/** True when only a non-multimodal file exists and there is no student text for the model. */
+export function isGradeAssistMultimodalPath(pathOrMime: string | null | undefined): boolean {
+  const value = (pathOrMime ?? "").toLowerCase();
+  if (!value) return false;
+  if (
+    value.includes("application/pdf") ||
+    value.includes("image/jpeg") ||
+    value.includes("image/jpg") ||
+    value.includes("image/png") ||
+    value.includes("image/webp") ||
+    value.includes("image/gif")
+  ) {
+    return true;
+  }
+  return (
+    value.endsWith(".pdf") ||
+    value.endsWith(".jpg") ||
+    value.endsWith(".jpeg") ||
+    value.endsWith(".png") ||
+    value.endsWith(".webp") ||
+    value.endsWith(".gif")
+  );
+}
+
 export function gradeAssistNeedsExploitableText(
   responseText: string | null | undefined,
   hasAttachment: boolean,
+  attachmentHint?: string | null,
 ): boolean {
-  return !Boolean(responseText?.trim()) && hasAttachment;
+  if (responseText?.trim()) return false;
+  if (!hasAttachment) return false;
+  if (isGradeAssistMultimodalPath(attachmentHint)) return false;
+  return true;
 }
 
 export function formatGradeAssistRubric(rubric: Record<string, number> | null | undefined): string {
