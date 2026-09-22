@@ -177,11 +177,51 @@ export const SupabasePaymentService = {
   },
 
   async ensureMySubscriptionPayment(period: string) {
+    // Prefer settings-driven amount via billing_catalog_amount when available.
+    const currency = "MAD";
+    const plan = /^\d{4}-Q[1-4]$/i.test(period) ? "quarterly" : "monthly";
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: amount, error: amountError } = await (requireClient() as any).rpc(
+        "billing_catalog_amount",
+        {
+          p_plan: plan,
+          p_currency: currency,
+        },
+      );
+      if (!amountError && amount != null) {
+        return this.ensureBillingPayment({
+          billingPlan: plan,
+          currency,
+          period,
+          amount: Number(amount),
+        });
+      }
+    } catch {
+      /* fall through */
+    }
     const { data, error } = await requireClient().rpc("ensure_my_subscription_payment", {
       p_period: period,
     });
     if (error) throw error;
     return String(data);
+  },
+
+  async ensureFlexibleBilling(input: {
+    includeFuturePack: boolean;
+    currency?: string | null;
+  }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (requireClient() as any).rpc("ensure_flexible_billing_payments", {
+      p_include_future_pack: input.includeFuturePack,
+      p_currency: input.currency ?? null,
+    });
+    if (error) throw error;
+    return data as {
+      quote: Record<string, unknown>;
+      current_payment_id: string;
+      pack_payment_id: string | null;
+    };
   },
 
   async uploadAdminReceipt(paymentId: string, file: File) {

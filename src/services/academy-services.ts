@@ -920,6 +920,10 @@ export const PaymentService = {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabasePaymentService.ensureMySubscriptionPayment(period);
   },
+  async ensureFlexibleBilling(input: Parameters<typeof SupabasePaymentService.ensureFlexibleBilling>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabasePaymentService.ensureFlexibleBilling(input);
+  },
   /** Legacy renew button — does not fake activation. Use payment proofs or admin markPaid. */
   async pay(): Promise<never> {
     throw new Error(

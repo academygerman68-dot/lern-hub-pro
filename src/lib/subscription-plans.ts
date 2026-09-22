@@ -1,10 +1,18 @@
 export type BillingPlan = "monthly" | "quarterly";
 export type BillingCurrency = "MAD" | "EUR";
 
-export const BILLING_PLAN_AMOUNTS: Record<BillingPlan, Record<BillingCurrency, number>> = {
-  monthly: { MAD: 1000, EUR: 100 },
+/** Fallback only when settings are unavailable — matches production MAD monthly 1200. */
+export const BILLING_PLAN_AMOUNT_FALLBACKS: Record<BillingPlan, Record<BillingCurrency, number>> = {
+  monthly: { MAD: 1200, EUR: 100 },
   quarterly: { MAD: 2400, EUR: 240 },
 };
+
+/** @deprecated Use resolvePlanAmount / settings; kept as alias of fallbacks for older imports. */
+export const BILLING_PLAN_AMOUNTS = BILLING_PLAN_AMOUNT_FALLBACKS;
+
+export type BillingTariffMap = Partial<
+  Record<BillingPlan, Partial<Record<BillingCurrency, number>>>
+>;
 
 export function isBillingPlan(value: string | null | undefined): value is BillingPlan {
   return value === "monthly" || value === "quarterly";
@@ -15,7 +23,72 @@ export function isBillingCurrency(value: string | null | undefined): value is Bi
 }
 
 export function planAmount(plan: BillingPlan, currency: BillingCurrency): number {
-  return BILLING_PLAN_AMOUNTS[plan][currency];
+  return BILLING_PLAN_AMOUNT_FALLBACKS[plan][currency];
+}
+
+export function resolvePlanAmount(
+  plan: BillingPlan,
+  currency: BillingCurrency,
+  tariffs?: BillingTariffMap | null,
+): number {
+  const configured = tariffs?.[plan]?.[currency];
+  if (typeof configured === "number" && Number.isFinite(configured) && configured > 0) {
+    return configured;
+  }
+  return planAmount(plan, currency);
+}
+
+export function parseBillingTariffSettings(
+  rows: Array<{ key: string; value: unknown }>,
+): BillingTariffMap {
+  const out: BillingTariffMap = {};
+  for (const row of rows) {
+    const match = /^billing_tariff_(monthly|quarterly)_(MAD|EUR)$/.exec(row.key);
+    if (!match) continue;
+    const plan = match[1] as BillingPlan;
+    const currency = match[2] as BillingCurrency;
+    let amount: number | null = null;
+    const raw = row.value;
+    if (typeof raw === "number") amount = raw;
+    else if (typeof raw === "string") amount = Number(raw);
+    else if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      // jsonb number may arrive already parsed
+      amount = Number(raw as never);
+    }
+    if (amount == null || !Number.isFinite(amount) || amount <= 0) continue;
+    out[plan] = { ...(out[plan] ?? {}), [currency]: amount };
+  }
+  return out;
+}
+
+/** Current month + optional 3 consecutive future months at quarterly pack price. */
+export function quoteFlexibleBillingPack(input: {
+  currency: BillingCurrency;
+  currentMonth: string;
+  includeFuturePack: boolean;
+  tariffs?: BillingTariffMap | null;
+}) {
+  const monthly = resolvePlanAmount("monthly", input.currency, input.tariffs);
+  const quarterly = resolvePlanAmount("quarterly", input.currency, input.tariffs);
+  const futureMonths: string[] = [];
+  if (input.includeFuturePack) {
+    const [y, m] = input.currentMonth.split("-").map(Number);
+    for (let i = 1; i <= 3; i += 1) {
+      const d = new Date(y!, m! - 1 + i, 1);
+      futureMonths.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    }
+  }
+  const futurePackAmount = input.includeFuturePack ? quarterly : 0;
+  return {
+    currency: input.currency,
+    currentMonth: input.currentMonth,
+    currentAmount: monthly,
+    futureMonths,
+    futurePackAmount,
+    totalAmount: monthly + futurePackAmount,
+    monthlyTariff: monthly,
+    quarterlyTariff: quarterly,
+  };
 }
 
 export function billingPlanLabel(plan: string | null | undefined): string {

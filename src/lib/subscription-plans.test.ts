@@ -5,14 +5,27 @@ import {
   billingPlanLabel,
   listBillingPeriods,
   planAmount,
+  quoteFlexibleBillingPack,
 } from "./subscription-plans";
 
 describe("subscription plans", () => {
-  it("returns fixed MAD/EUR amounts", () => {
-    expect(planAmount("monthly", "MAD")).toBe(1000);
+  it("returns settings-aligned MAD/EUR fallbacks (prod monthly MAD 1200)", () => {
+    expect(planAmount("monthly", "MAD")).toBe(1200);
     expect(planAmount("monthly", "EUR")).toBe(100);
     expect(planAmount("quarterly", "MAD")).toBe(2400);
     expect(planAmount("quarterly", "EUR")).toBe(240);
+  });
+
+  it("quotes flexible monthly + 3 future months at quarterly pack", () => {
+    const quote = quoteFlexibleBillingPack({
+      currency: "MAD",
+      currentMonth: "2026-09",
+      includeFuturePack: true,
+    });
+    expect(quote.currentAmount).toBe(1200);
+    expect(quote.futureMonths).toEqual(["2026-10", "2026-11", "2026-12"]);
+    expect(quote.futurePackAmount).toBe(2400);
+    expect(quote.totalAmount).toBe(3600);
   });
 
   it("labels plans and periods in French", () => {

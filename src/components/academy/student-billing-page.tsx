@@ -39,12 +39,16 @@ import {
   resolveInstallmentUxStatus,
   summarizePaymentRow,
 } from "@/lib/billing-ux";
-import { billingPeriodLabel, billingPlanLabel, formatMoneyAmount } from "@/lib/subscription-plans";
+import { billingPeriodLabel, billingPlanLabel, formatMoneyAmount, quoteFlexibleBillingPack } from "@/lib/subscription-plans";
 import { useAcademy } from "./academy-context";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { DocumentViewer } from "./document-viewer";
 import { QueryState } from "./query-state";
 import { FilterBar, PageHeader, SectionHeader, Status, Surface } from "./primitives";
+
+function currentMonthKey(from = new Date()) {
+  return `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}`;
+}
 
 type DocPreview = {
   title: string;
@@ -92,6 +96,7 @@ export function StudentPaymentsPage() {
   const [operationDate, setOperationDate] = useState("");
   const [accountHint, setAccountHint] = useState("");
   const [note, setNote] = useState("");
+  const [includeFuturePack, setIncludeFuturePack] = useState(false);
   const [attachment, setAttachment] = useState<AttachmentDraft>({
     kind: "pdf",
     url: "",
@@ -164,6 +169,7 @@ export function StudentPaymentsPage() {
     nextInstallment.status === "rejected";
 
   const openDeclare = () => {
+    setIncludeFuturePack(false);
     setDeclaredAmount(String(nextInstallment.amount));
     setOperationDate("");
     setAccountHint("");
@@ -174,6 +180,7 @@ export function StudentPaymentsPage() {
   };
 
   const resetDeclareForm = () => {
+    setIncludeFuturePack(false);
     setAttachment({ kind: "pdf", url: "", file: null });
     setNote("");
     setDeclaredAmount(String(nextInstallment.amount));
@@ -181,6 +188,20 @@ export function StudentPaymentsPage() {
     setAccountHint("");
     setFormError(null);
   };
+
+  const flexibleQuote = useMemo(() => {
+    const currency =
+      nextInstallment.currency === "EUR" || nextInstallment.currency === "MAD"
+        ? nextInstallment.currency
+        : "MAD";
+    const currentMonth =
+      /^\d{4}-\d{2}$/.test(nextInstallment.period) ? nextInstallment.period : currentMonthKey();
+    return quoteFlexibleBillingPack({
+      currency,
+      currentMonth,
+      includeFuturePack,
+    });
+  }, [includeFuturePack, nextInstallment.currency, nextInstallment.period]);
 
   const handleSubmitProof = async () => {
     if (!studentId) {
@@ -202,9 +223,17 @@ export function StudentPaymentsPage() {
     setFormError(null);
     setEnsuringPayment(true);
     try {
-      const paymentId =
-        nextInstallment.paymentId ??
-        (await PaymentService.ensureMySubscriptionPayment(nextInstallment.period));
+      let paymentId = nextInstallment.paymentId;
+      if (includeFuturePack || !paymentId) {
+        const ensured = await PaymentService.ensureFlexibleBilling({
+          includeFuturePack,
+          currency: flexibleQuote.currency,
+        });
+        paymentId = ensured.current_payment_id;
+      }
+      if (!paymentId) {
+        paymentId = await PaymentService.ensureMySubscriptionPayment(nextInstallment.period);
+      }
       const reason = validatePaymentProofSubmitInput({
         studentId,
         paymentId,
@@ -230,9 +259,14 @@ export function StudentPaymentsPage() {
           },
           {
             onSuccess: () => {
-              toast.success("Justificatif envoyé — vérification sous 48 h");
+              toast.success(
+                includeFuturePack
+                  ? "Justificatif envoyé — mois courant + pack 3 mois créés (vérification 48 h)"
+                  : "Justificatif envoyé — vérification sous 48 h",
+              );
               resetDeclareForm();
               setDeclareOpen(false);
+              void paymentsQuery.refetch();
               resolve();
             },
             onError: (err) => {
@@ -246,8 +280,12 @@ export function StudentPaymentsPage() {
       });
     } catch (err) {
       const mapped = toPaymentProofUserError(err, "generic");
-      setFormError(mapped.message);
-      toast.error(mapped.message);
+      const message =
+        err instanceof Error && /PERIOD_OVERLAP/i.test(err.message)
+          ? "Période déjà payée ou en cours — aucun chevauchement autorisé."
+          : mapped.message;
+      setFormError(message);
+      toast.error(message);
     } finally {
       setEnsuringPayment(false);
     }
@@ -639,11 +677,41 @@ export function StudentPaymentsPage() {
             </p>
             <p>
               <span className="text-muted-foreground">Devise · </span>
-              {nextInstallment.currency}
+              {flexibleQuote.currency}
             </p>
             <p>
-              <span className="text-muted-foreground">Montant attendu · </span>
-              {formatMoneyAmount(nextInstallment.amount, nextInstallment.currency)}
+              <span className="text-muted-foreground">Mensuel catalogue · </span>
+              {formatMoneyAmount(flexibleQuote.monthlyTariff, flexibleQuote.currency)}
+            </p>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={includeFuturePack}
+                disabled={formBusy}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setIncludeFuturePack(next);
+                  const quote = quoteFlexibleBillingPack({
+                    currency: flexibleQuote.currency,
+                    currentMonth: flexibleQuote.currentMonth,
+                    includeFuturePack: next,
+                  });
+                  setDeclaredAmount(String(quote.totalAmount));
+                }}
+              />
+              <span>
+                Ajouter 3 mois futurs consécutifs au tarif trimestriel (
+                {formatMoneyAmount(flexibleQuote.quarterlyTariff, flexibleQuote.currency)}
+                {flexibleQuote.futureMonths.length
+                  ? ` · ${flexibleQuote.futureMonths.join(", ")}`
+                  : ""}
+                ). Sans chevauchement avec les périodes déjà validées.
+              </span>
+            </label>
+            <p>
+              <span className="text-muted-foreground">Total attendu · </span>
+              {formatMoneyAmount(flexibleQuote.totalAmount, flexibleQuote.currency)}
             </p>
           </div>
 
