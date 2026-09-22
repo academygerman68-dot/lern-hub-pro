@@ -577,9 +577,20 @@ export const LibraryService = {
     if (!isSupabaseConfigured) return [];
     return SupabaseLibraryService.listClassTargets(libraryItemId);
   },
-  async listSubtypes(domain?: Parameters<typeof SupabaseLibraryService.listSubtypes>[0]) {
+  async listSubtypes(
+    domain?: Parameters<typeof SupabaseLibraryService.listSubtypes>[0],
+    opts?: Parameters<typeof SupabaseLibraryService.listSubtypes>[1],
+  ) {
     if (!isSupabaseConfigured) return [];
-    return SupabaseLibraryService.listSubtypes(domain);
+    return SupabaseLibraryService.listSubtypes(domain, opts);
+  },
+  async upsertSubtype(input: Parameters<typeof SupabaseLibraryService.upsertSubtype>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseLibraryService.upsertSubtype(input);
+  },
+  async setSubtypeActive(id: string, active: boolean) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseLibraryService.setSubtypeActive(id, active);
   },
   async uploadAndCreate(input: Parameters<typeof SupabaseLibraryService.uploadAndCreate>[0]) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");

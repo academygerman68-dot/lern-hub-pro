@@ -43,12 +43,12 @@ export const SupabaseLibraryService = {
     return data ?? [];
   },
 
-  async listSubtypes(domain?: LibraryDomain) {
+  async listSubtypes(domain?: LibraryDomain, opts?: { includeInactive?: boolean }) {
     let query = fromPending("library_subtypes")
       .select("*")
-      .eq("active", true)
       .order("sort_order", { ascending: true });
     if (domain) query = query.eq("domain", domain);
+    if (!opts?.includeInactive) query = query.eq("active", true);
     const { data, error } = await query;
     if (error) throw error;
     return (data ?? []) as Array<{
@@ -59,6 +59,52 @@ export const SupabaseLibraryService = {
       sort_order: number;
       active: boolean;
     }>;
+  },
+
+  async upsertSubtype(input: {
+    id?: string;
+    domain: LibraryDomain;
+    code: string;
+    labelFr: string;
+    sortOrder?: number;
+    active?: boolean;
+  }) {
+    const code = input.code.trim().toLowerCase().replace(/\s+/g, "_");
+    if (!code) throw new Error("Code sous-type requis.");
+    const label = input.labelFr.trim();
+    if (!label) throw new Error("Libellé sous-type requis.");
+    const row = {
+      domain: input.domain,
+      code,
+      label_fr: label,
+      sort_order: input.sortOrder ?? 0,
+      active: input.active ?? true,
+    };
+    if (input.id) {
+      const { data, error } = await fromPending("library_subtypes")
+        .update(row)
+        .eq("id", input.id)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data;
+    }
+    const { data, error } = await fromPending("library_subtypes")
+      .upsert(row, { onConflict: "domain,code" })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async setSubtypeActive(id: string, active: boolean) {
+    const { data, error } = await fromPending("library_subtypes")
+      .update({ active })
+      .eq("id", id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return data;
   },
 
   async listClassTargets(libraryItemId: string): Promise<string[]> {

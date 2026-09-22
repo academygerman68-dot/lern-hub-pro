@@ -424,6 +424,34 @@ export function useLibrary() {
   });
 }
 
+export function useLibrarySubtypes(domain?: "academic" | "professional", includeInactive = false) {
+  return useQuery({
+    queryKey: [...queryKeys.library.subtypes(domain), includeInactive ? "all" : "active"],
+    queryFn: () => LibraryService.listSubtypes(domain, { includeInactive }),
+  });
+}
+
+export function useUpsertLibrarySubtype() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: LibraryService.upsertSubtype,
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["library", "subtypes"] });
+    },
+  });
+}
+
+export function useSetLibrarySubtypeActive() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; active: boolean }) =>
+      LibraryService.setSubtypeActive(input.id, input.active),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["library", "subtypes"] });
+    },
+  });
+}
+
 export function useAssignments(classId?: string) {
   return useQuery({
     queryKey: classId ? queryKeys.assignments.byClass(classId) : queryKeys.assignments.all,

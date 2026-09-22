@@ -25,11 +25,14 @@ import {
   useGroupProgress,
   useLevels,
   useLibrary,
+  useLibrarySubtypes,
+  useSetLibrarySubtypeActive,
   useStudents,
   useUpdateAssignment,
   useUpdateCourse,
   useUpdateLibraryItem,
   useUploadLibraryItem,
+  useUpsertLibrarySubtype,
 } from "@/hooks/use-academy-data";
 import { groupProgressSummary } from "@/lib/group-progress";
 import { resolveOwnStudent } from "@/lib/payment-proof";
@@ -613,6 +616,10 @@ export function MaterialsLibraryPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [domain, setDomain] = useState<"academic" | "professional">("academic");
+  const subtypesQuery = useLibrarySubtypes(domain);
+  const adminSubtypesQuery = useLibrarySubtypes(undefined, true);
+  const upsertSubtype = useUpsertLibrarySubtype();
+  const setSubtypeActive = useSetLibrarySubtypeActive();
   const isTeacher = role === "teacher";
   const [audience, setAudience] = useState<"everyone" | "level" | "class" | "classes">(
     isTeacher ? "classes" : "everyone",
@@ -621,6 +628,12 @@ export function MaterialsLibraryPage() {
   const [classId, setClassId] = useState("");
   const [classIds, setClassIds] = useState<string[]>([]);
   const [subtype, setSubtype] = useState("");
+  const [subtypeDraft, setSubtypeDraft] = useState({
+    domain: "academic" as "academic" | "professional",
+    code: "",
+    labelFr: "",
+    sortOrder: "10",
+  });
   const [attachment, setAttachment] = useState<AttachmentDraft>({
     kind: "document",
     url: "",
@@ -645,22 +658,27 @@ export function MaterialsLibraryPage() {
   }, [libraryQuery.data, domainTab, role, teacherScope]);
   const classesForLevel = scopedClasses.filter((item) => !levelCode || item.level === levelCode);
   const subtypeOptions = useMemo(() => {
-    if (domain === "professional") {
-      return [
-        { code: "visa", label: "Visa" },
-        { code: "demarches", label: "Démarches administratives" },
-        { code: "documents", label: "Documents requis" },
-        { code: "rendez_vous", label: "Rendez-vous" },
-        { code: "logement", label: "Logement" },
-        { code: "autre", label: "Autres" },
-      ];
+    const active = (subtypesQuery.data ?? []).map((row) => ({
+      code: row.code,
+      label: row.label_fr,
+    }));
+    if (subtype && !active.some((row) => row.code === subtype)) {
+      const inactive = (adminSubtypesQuery.data ?? []).find(
+        (row) => row.domain === domain && row.code === subtype,
+      );
+      if (inactive) {
+        return [...active, { code: inactive.code, label: `${inactive.label_fr} (désactivé)` }];
+      }
+      return [...active, { code: subtype, label: `${subtype} (historique)` }];
     }
-    return [
-      { code: "cours", label: "Cours" },
-      { code: "exercices", label: "Exercices" },
-      { code: "annonce", label: "Annonces" },
-    ];
-  }, [domain]);
+    return active;
+  }, [subtypesQuery.data, adminSubtypesQuery.data, subtype, domain]);
+  const adminSubtypeRows = useMemo(() => {
+    return (adminSubtypesQuery.data ?? []).slice().sort((a, b) => {
+      if (a.domain !== b.domain) return a.domain.localeCompare(b.domain);
+      return a.sort_order - b.sort_order;
+    });
+  }, [adminSubtypesQuery.data]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -741,6 +759,120 @@ export function MaterialsLibraryPage() {
         ))}
       </div>
 
+      {isDirectorRole(role) ? (
+        <Surface className="mb-5 space-y-3 p-5">
+          <h2 className="text-sm font-semibold">Sous-types (admin)</h2>
+          <p className="text-xs text-muted-foreground">
+            Créer, renommer, réordonner ou désactiver. Les ressources déjà associées restent
+            lisibles.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-4">
+            <select
+              className="flex h-10 rounded-md border border-input bg-background px-3 text-sm"
+              value={subtypeDraft.domain}
+              onChange={(e) =>
+                setSubtypeDraft((prev) => ({
+                  ...prev,
+                  domain: e.target.value as "academic" | "professional",
+                }))
+              }
+            >
+              <option value="academic">Académique</option>
+              <option value="professional">Professionnelle</option>
+            </select>
+            <Input
+              placeholder="Code (ex. visa)"
+              value={subtypeDraft.code}
+              onChange={(e) => setSubtypeDraft((prev) => ({ ...prev, code: e.target.value }))}
+            />
+            <Input
+              placeholder="Libellé FR"
+              value={subtypeDraft.labelFr}
+              onChange={(e) => setSubtypeDraft((prev) => ({ ...prev, labelFr: e.target.value }))}
+            />
+            <Input
+              type="number"
+              placeholder="Ordre"
+              value={subtypeDraft.sortOrder}
+              onChange={(e) => setSubtypeDraft((prev) => ({ ...prev, sortOrder: e.target.value }))}
+            />
+          </div>
+          <Button
+            size="sm"
+            disabled={upsertSubtype.isPending}
+            onClick={() => {
+              void upsertSubtype
+                .mutateAsync({
+                  domain: subtypeDraft.domain,
+                  code: subtypeDraft.code,
+                  labelFr: subtypeDraft.labelFr,
+                  sortOrder: Number(subtypeDraft.sortOrder) || 0,
+                  active: true,
+                })
+                .then(() => {
+                  toast.success("Sous-type enregistré");
+                  setSubtypeDraft((prev) => ({ ...prev, code: "", labelFr: "" }));
+                })
+                .catch((err) =>
+                  toast.error(err instanceof Error ? err.message : "Enregistrement impossible"),
+                );
+            }}
+          >
+            Ajouter / mettre à jour
+          </Button>
+          <div className="space-y-2">
+            {adminSubtypeRows.map((row) => (
+              <div
+                key={row.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/70 px-3 py-2 text-sm"
+              >
+                <div>
+                  <span className="font-medium">{row.label_fr}</span>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · {row.domain} · {row.code} · ordre {row.sort_order}
+                    {!row.active ? " · désactivé" : ""}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setSubtypeDraft({
+                        domain: row.domain,
+                        code: row.code,
+                        labelFr: row.label_fr,
+                        sortOrder: String(row.sort_order),
+                      })
+                    }
+                  >
+                    Éditer
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={setSubtypeActive.isPending}
+                    onClick={() => {
+                      void setSubtypeActive
+                        .mutateAsync({ id: row.id, active: !row.active })
+                        .then(() =>
+                          toast.success(row.active ? "Sous-type désactivé" : "Sous-type réactivé"),
+                        )
+                        .catch((err) =>
+                          toast.error(err instanceof Error ? err.message : "Action impossible"),
+                        );
+                    }}
+                  >
+                    {row.active ? "Désactiver" : "Réactiver"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Surface>
+      ) : null}
+
       {restricted && domainTab === "academic" ? (
         <Surface className="mb-5 p-6">
           <h2 className="font-semibold">Accès restreint</h2>
@@ -772,7 +904,10 @@ export function MaterialsLibraryPage() {
               <select
                 className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={domain}
-                onChange={(e) => setDomain(e.target.value as typeof domain)}
+                onChange={(e) => {
+                  setDomain(e.target.value as typeof domain);
+                  setSubtype("");
+                }}
               >
                 <option value="academic">Académique</option>
                 <option value="professional">Professionnelle</option>

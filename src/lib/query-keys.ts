@@ -29,6 +29,7 @@ export const queryKeys = {
   },
   library: {
     all: ["library"] as const,
+    subtypes: (domain?: string) => ["library", "subtypes", domain ?? "all"] as const,
   },
   conversations: {
     all: ["conversations"] as const,
