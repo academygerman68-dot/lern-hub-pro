@@ -577,6 +577,10 @@ export const LibraryService = {
     if (!isSupabaseConfigured) return [];
     return SupabaseLibraryService.listClassTargets(libraryItemId);
   },
+  async listAttachments(libraryItemId: string) {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseLibraryService.listAttachments(libraryItemId);
+  },
   async listSubtypes(
     domain?: Parameters<typeof SupabaseLibraryService.listSubtypes>[0],
     opts?: Parameters<typeof SupabaseLibraryService.listSubtypes>[1],
@@ -607,6 +611,12 @@ export const LibraryService = {
   async getSignedUrl(item: Parameters<typeof SupabaseLibraryService.getSignedUrl>[0]) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseLibraryService.getSignedUrl(item);
+  },
+  async getAttachmentSignedUrl(
+    item: Parameters<typeof SupabaseLibraryService.getAttachmentSignedUrl>[0],
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseLibraryService.getAttachmentSignedUrl(item);
   },
   async archive(id: string) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");

@@ -25,13 +25,25 @@ describe("teacher scope for groups", () => {
     expect(scopedClassOrLevelItemVisible({ class_id: "other", level_id: "l1" }, scope)).toBe(false);
   });
 
-  it("scopes library items by audience class", () => {
+  it("scopes library items by audience class and multi-group", () => {
     expect(
       scopedLibraryItemVisible({ audience: "class", class_id: "c1", level_code: "A1" }, scope),
     ).toBe(true);
     expect(
       scopedLibraryItemVisible({ audience: "everyone", class_id: null, level_code: null }, scope),
     ).toBe(true);
+    expect(
+      scopedLibraryItemVisible(
+        { audience: "classes", class_id: "c1", classIds: ["c1", "other"], level_code: null },
+        scope,
+      ),
+    ).toBe(true);
+    expect(
+      scopedLibraryItemVisible(
+        { audience: "classes", class_id: "other", classIds: ["other"], level_code: null },
+        scope,
+      ),
+    ).toBe(false);
   });
 });
 

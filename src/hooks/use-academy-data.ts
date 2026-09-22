@@ -424,7 +424,10 @@ export function useLibrary() {
   });
 }
 
-export function useLibrarySubtypes(domain?: "academic" | "professional", includeInactive = false) {
+export function useLibrarySubtypes(
+  domain?: "academic" | "professional" | "announcements",
+  includeInactive = false,
+) {
   return useQuery({
     queryKey: [...queryKeys.library.subtypes(domain), includeInactive ? "all" : "active"],
     queryFn: () => LibraryService.listSubtypes(domain, { includeInactive }),

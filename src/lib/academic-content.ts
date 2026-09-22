@@ -24,8 +24,13 @@ export const MEDIA_KIND_LABELS: Record<MediaKind, string> = {
 
 export const DOMAIN_LABELS = {
   academic: "Académique",
-  professional: "Professionnelle",
+  professional: "Administratif et professionnel",
+  announcements: "Annonces et informations",
 } as const;
+
+export type LibraryDomainKey = keyof typeof DOMAIN_LABELS;
+
+export const LIBRARY_DOMAINS = Object.keys(DOMAIN_LABELS) as LibraryDomainKey[];
 
 export const AUDIENCE_LABELS = {
   everyone: "Tous les étudiants autorisés",

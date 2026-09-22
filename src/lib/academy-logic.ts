@@ -137,15 +137,28 @@ export function scopedClassOrLevelItemVisible(
 }
 
 export function scopedLibraryItemVisible(
-  item: { audience: string; class_id?: string | null; level_code?: string | null },
+  item: {
+    audience: string;
+    class_id?: string | null;
+    level_code?: string | null;
+    /** Multi-group targets from library_item_classes (preferred for audience=classes). */
+    classIds?: string[] | null;
+  },
   scope: TeacherScope,
 ) {
   if (item.audience === "everyone") return true;
   if (item.audience === "level") {
     return Boolean(item.level_code && scope.levelCodes.has(item.level_code));
   }
-  if (item.audience === "class" || item.audience === "classes") {
+  if (item.audience === "class") {
     return Boolean(item.class_id && scope.classIds.has(item.class_id));
+  }
+  if (item.audience === "classes") {
+    const ids = (item.classIds?.length ? item.classIds : item.class_id ? [item.class_id] : []).filter(
+      Boolean,
+    ) as string[];
+    if (!ids.length) return false;
+    return ids.some((id) => scope.classIds.has(id));
   }
   return false;
 }

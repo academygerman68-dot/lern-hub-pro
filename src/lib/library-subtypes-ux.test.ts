@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { subtypeOptionsForDomain } from "./library-resources";
 
 /** Regression: subtypes are domain-scoped catalogue rows, not hardcoded form options. */
 describe("library subtypes catalogue", () => {
@@ -21,26 +22,14 @@ describe("library subtypes catalogue", () => {
         sort_order: 99,
       },
     ];
-    const academicActive = rows
-      .filter((row) => row.domain === "academic" && row.active)
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map((row) => ({ code: row.code, label: row.label_fr }));
+    const academicActive = subtypeOptionsForDomain(rows, "academic");
     expect(academicActive).toEqual([
       { code: "cours", label: "Cours" },
       { code: "exercices", label: "Exercices" },
     ]);
-
-    const selected = "legacy";
-    const withHistorical =
-      selected && !academicActive.some((row) => row.code === selected)
-        ? [
-            ...academicActive,
-            {
-              code: selected,
-              label: `${rows.find((r) => r.code === selected)?.label_fr ?? selected} (désactivé)`,
-            },
-          ]
-        : academicActive;
-    expect(withHistorical.at(-1)).toEqual({ code: "legacy", label: "Ancien (désactivé)" });
+    expect(subtypeOptionsForDomain(rows, "academic", "legacy").at(-1)).toEqual({
+      code: "legacy",
+      label: "Ancien (désactivé)",
+    });
   });
 });

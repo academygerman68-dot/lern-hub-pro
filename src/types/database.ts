@@ -2903,7 +2903,7 @@ export type Database = {
       exam_skill: "lesen" | "hoeren" | "schreiben" | "sprechen" | "grammatik" | "wortschatz";
       exam_status: "draft" | "published" | "archived";
       invoice_status: "draft" | "issued" | "paid" | "void" | "overdue";
-      library_audience: "everyone" | "level" | "class";
+      library_audience: "everyone" | "level" | "class" | "classes";
       library_category:
         | "course_material"
         | "book"
@@ -2916,7 +2916,7 @@ export type Database = {
         | "university"
         | "application"
         | "announcement";
-      library_domain: "academic" | "professional";
+      library_domain: "academic" | "professional" | "announcements";
       library_visibility: "private" | "staff" | "academy" | "published";
       live_session_status: "scheduled" | "live" | "completed" | "cancelled";
       media_content_kind: "pdf" | "document" | "link" | "image" | "audio" | "poster" | "text";
@@ -3078,7 +3078,7 @@ export const Constants = {
       exam_skill: ["lesen", "hoeren", "schreiben", "sprechen", "grammatik", "wortschatz"],
       exam_status: ["draft", "published", "archived"],
       invoice_status: ["draft", "issued", "paid", "void", "overdue"],
-      library_audience: ["everyone", "level", "class"],
+      library_audience: ["everyone", "level", "class", "classes"],
       library_category: [
         "course_material",
         "book",
@@ -3092,7 +3092,7 @@ export const Constants = {
         "application",
         "announcement",
       ],
-      library_domain: ["academic", "professional"],
+      library_domain: ["academic", "professional", "announcements"],
       library_visibility: ["private", "staff", "academy", "published"],
       live_session_status: ["scheduled", "live", "completed", "cancelled"],
       media_content_kind: ["pdf", "document", "link", "image", "audio", "poster", "text"],
