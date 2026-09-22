@@ -223,6 +223,7 @@ export function resolveActiveBillingFromSubscription(
 }
 
 export {
+  amountToMad,
   billingPeriodLabel,
   billingPlanLabel,
   formatMoneyAmount,

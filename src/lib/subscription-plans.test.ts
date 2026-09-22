@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  amountToMad,
   billingPeriodDueDate,
   billingPeriodLabel,
   billingPlanLabel,
@@ -9,11 +10,17 @@ import {
 } from "./subscription-plans";
 
 describe("subscription plans", () => {
-  it("returns settings-aligned MAD/EUR fallbacks (prod monthly MAD 1200)", () => {
-    expect(planAmount("monthly", "MAD")).toBe(1200);
+  it("returns catalogue MAD/EUR amounts (1000/100 monthly, 2400/240 quarterly)", () => {
+    expect(planAmount("monthly", "MAD")).toBe(1000);
     expect(planAmount("monthly", "EUR")).toBe(100);
     expect(planAmount("quarterly", "MAD")).toBe(2400);
     expect(planAmount("quarterly", "EUR")).toBe(240);
+  });
+
+  it("converts EUR to MAD at 1 EUR = 10 MAD for CA", () => {
+    expect(amountToMad(100, "EUR")).toBe(1000);
+    expect(amountToMad(240, "EUR")).toBe(2400);
+    expect(amountToMad(1000, "MAD")).toBe(1000);
   });
 
   it("quotes flexible monthly + 3 future months at quarterly pack", () => {
@@ -22,10 +29,10 @@ describe("subscription plans", () => {
       currentMonth: "2026-09",
       includeFuturePack: true,
     });
-    expect(quote.currentAmount).toBe(1200);
+    expect(quote.currentAmount).toBe(1000);
     expect(quote.futureMonths).toEqual(["2026-10", "2026-11", "2026-12"]);
     expect(quote.futurePackAmount).toBe(2400);
-    expect(quote.totalAmount).toBe(3600);
+    expect(quote.totalAmount).toBe(3400);
   });
 
   it("labels plans and periods in French", () => {

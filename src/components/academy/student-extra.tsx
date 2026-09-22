@@ -61,6 +61,7 @@ import {
   useUploadRecording,
 } from "@/hooks/use-academy-data";
 import type { ClassDetail } from "@/lib/academy-mappers";
+import { amountToMad } from "@/lib/subscription-plans";
 import type { Student } from "@/types/academy";
 import { Metric, PageHeader, ProgressLine, Status, Surface } from "./primitives";
 import { useAcademy } from "./academy-context";
@@ -947,18 +948,18 @@ export function DirectorReports() {
     });
   }, [attemptsQuery.data, filteredStudentIds, cutoff]);
 
-  const currency = useMemo(() => {
-    const sample = paymentsQuery.data?.[0];
-    return sample?.currency?.trim() || "MAD";
-  }, [paymentsQuery.data]);
+  const currency = "MAD";
 
   const paymentStats = useMemo(() => {
-    const expected = filteredPayments.reduce((acc, row) => acc + Number(row.amount ?? 0), 0);
+    const expected = filteredPayments.reduce(
+      (acc, row) => acc + amountToMad(Number(row.amount ?? 0), row.currency),
+      0,
+    );
     const collected = filteredPayments.reduce((acc, row) => {
       if (row.status === "paid") {
-        return acc + Number(row.amount_paid ?? row.amount ?? 0);
+        return acc + amountToMad(Number(row.amount_paid ?? row.amount ?? 0), row.currency);
       }
-      return acc + Number(row.amount_paid ?? 0);
+      return acc + amountToMad(Number(row.amount_paid ?? 0), row.currency);
     }, 0);
     const paidCount = filteredPayments.filter((row) => row.status === "paid").length;
     const overdueCount = filteredPayments.filter((row) => row.status === "overdue").length;
@@ -997,11 +998,14 @@ export function DirectorReports() {
         year: "2-digit",
       });
       const current = buckets.get(label) ?? { collected: 0, expected: 0 };
-      current.expected += Number(payment.amount ?? 0);
+      current.expected += amountToMad(Number(payment.amount ?? 0), payment.currency);
       if (payment.status === "paid") {
-        current.collected += Number(payment.amount_paid ?? payment.amount ?? 0);
+        current.collected += amountToMad(
+          Number(payment.amount_paid ?? payment.amount ?? 0),
+          payment.currency,
+        );
       } else {
-        current.collected += Number(payment.amount_paid ?? 0);
+        current.collected += amountToMad(Number(payment.amount_paid ?? 0), payment.currency);
       }
       buckets.set(label, current);
     }
@@ -1194,7 +1198,7 @@ export function DirectorReports() {
           <Metric
             label="Revenus encaissés"
             value={formatMoney(paymentStats.collected, currency)}
-            note={`Attendu : ${formatMoney(paymentStats.expected, currency)}`}
+            note={`Attendu : ${formatMoney(paymentStats.expected, currency)} · CA en MAD (1 € = 10 MAD)`}
           />
           <Metric
             label="Paiements réglés"
@@ -1413,7 +1417,7 @@ export function DirectorSettings() {
   const [defaultCapacity, setDefaultCapacity] = useState("20");
   const [courseDuration, setCourseDuration] = useState("90");
   const [meetingProvider, setMeetingProvider] = useState("jitsi");
-  const [defaultPrice, setDefaultPrice] = useState("1200");
+  const [defaultPrice, setDefaultPrice] = useState("1000");
   const [paymentDueDay, setPaymentDueDay] = useState("1");
   const [notifyEmail, setNotifyEmail] = useState(true);
   const [notifyWhatsapp, setNotifyWhatsapp] = useState(false);
@@ -1434,7 +1438,7 @@ export function DirectorSettings() {
     setDefaultCapacity(settingString(map, "default_class_capacity", "20"));
     setCourseDuration(settingString(map, "default_course_duration_minutes", "90"));
     setMeetingProvider(settingString(map, "default_meeting_provider", "jitsi"));
-    setDefaultPrice(settingString(map, "default_payment_amount", "1200"));
+    setDefaultPrice(settingString(map, "default_payment_amount", "1000"));
     setPaymentDueDay(settingString(map, "payment_due_day", "1"));
     setNotifyEmail(settingString(map, "notifications_email_enabled", "true") === "true");
     setNotifyWhatsapp(settingString(map, "notifications_whatsapp_enabled", "false") === "true");

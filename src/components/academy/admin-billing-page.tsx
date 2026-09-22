@@ -35,6 +35,7 @@ import {
   type InstallmentUxStatus,
   PAYMENT_REJECTION_REASONS,
   type PaymentRejectionReasonId,
+  amountToMad,
   billingPeriodLabel,
   billingPlanLabel,
   formatMoneyAmount,
@@ -379,38 +380,27 @@ export function FinancePages({ mode }: { mode: string }) {
     const now = new Date();
     const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     let toCollectMad = 0;
-    let toCollectEur = 0;
     let collectedMonthMad = 0;
-    let collectedMonthEur = 0;
     let overdue = 0;
     for (const row of payments) {
       const remaining = paymentRemaining(row);
-      const code = (row.currency || "MAD").toUpperCase();
       if (row.status === "pending" || row.status === "partial" || row.status === "overdue") {
-        if (code === "EUR") toCollectEur += remaining;
-        else toCollectMad += remaining;
+        toCollectMad += amountToMad(remaining, row.currency);
       }
       if (row.status === "overdue") overdue += 1;
       if (row.status === "paid") {
         const paidAt = (row.payment_date ?? row.updated_at ?? "").slice(0, 7);
         if (paidAt === monthKey) {
           const amount = Number(row.amount_paid ?? row.amount);
-          if (code === "EUR") collectedMonthEur += amount;
-          else collectedMonthMad += amount;
+          collectedMonthMad += amountToMad(amount, row.currency);
         }
       }
     }
-    const formatPair = (mad: number, eur: number) => {
-      const parts = [];
-      if (mad > 0) parts.push(formatMoneyAmount(mad, "MAD"));
-      if (eur > 0) parts.push(formatMoneyAmount(eur, "EUR"));
-      return parts.length ? parts.join(" · ") : formatMoneyAmount(0, "MAD");
-    };
     return {
-      toCollect: formatPair(toCollectMad, toCollectEur),
+      toCollect: formatMoneyAmount(toCollectMad, "MAD"),
       pendingProofs: pendingQuery.data?.length ?? 0,
       overdue,
-      collectedMonth: formatPair(collectedMonthMad, collectedMonthEur),
+      collectedMonth: formatMoneyAmount(collectedMonthMad, "MAD"),
     };
   }, [payments, pendingQuery.data]);
 

@@ -1,9 +1,12 @@
 export type BillingPlan = "monthly" | "quarterly";
 export type BillingCurrency = "MAD" | "EUR";
 
-/** Fallback only when settings are unavailable — matches production MAD monthly 1200. */
+/** Fixed reporting FX: 1 EUR = 10 MAD (chiffre d'affaires). */
+export const EUR_TO_MAD_RATE = 10;
+
+/** Fallback when settings are unavailable — validated catalogue. */
 export const BILLING_PLAN_AMOUNT_FALLBACKS: Record<BillingPlan, Record<BillingCurrency, number>> = {
-  monthly: { MAD: 1200, EUR: 100 },
+  monthly: { MAD: 1000, EUR: 100 },
   quarterly: { MAD: 2400, EUR: 240 },
 };
 
@@ -38,6 +41,22 @@ export function resolvePlanAmount(
   return planAmount(plan, currency);
 }
 
+/** Convert any payment amount to MAD for CA / turnover aggregation. */
+export function amountToMad(
+  amount: number,
+  currency: string | null | undefined,
+  eurToMadRate: number = EUR_TO_MAD_RATE,
+): number {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return 0;
+  const code = (currency ?? "MAD").trim().toUpperCase();
+  if (code === "EUR") {
+    const rate = Number.isFinite(eurToMadRate) && eurToMadRate > 0 ? eurToMadRate : EUR_TO_MAD_RATE;
+    return Math.round(n * rate * 100) / 100;
+  }
+  return n;
+}
+
 export function parseBillingTariffSettings(
   rows: Array<{ key: string; value: unknown }>,
 ): BillingTariffMap {
@@ -52,13 +71,25 @@ export function parseBillingTariffSettings(
     if (typeof raw === "number") amount = raw;
     else if (typeof raw === "string") amount = Number(raw);
     else if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-      // jsonb number may arrive already parsed
       amount = Number(raw as never);
     }
     if (amount == null || !Number.isFinite(amount) || amount <= 0) continue;
     out[plan] = { ...(out[plan] ?? {}), [currency]: amount };
   }
   return out;
+}
+
+export function parseEurToMadRate(rows: Array<{ key: string; value: unknown }>): number {
+  const row = rows.find((r) => r.key === "billing_fx_eur_to_mad");
+  if (!row) return EUR_TO_MAD_RATE;
+  const raw = row.value;
+  const n =
+    typeof raw === "number"
+      ? raw
+      : typeof raw === "string"
+        ? Number(raw)
+        : Number(raw as never);
+  return Number.isFinite(n) && n > 0 ? n : EUR_TO_MAD_RATE;
 }
 
 /** Current month + optional 3 consecutive future months at quarterly pack price. */
