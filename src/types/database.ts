@@ -702,6 +702,9 @@ export type Database = {
       exam_answers: {
         Row: {
           answer: Json;
+          answer_media_bucket: string | null;
+          answer_media_path: string | null;
+          answer_mime_type: string | null;
           attempt_id: string;
           created_at: string;
           flagged: boolean;
@@ -715,6 +718,9 @@ export type Database = {
         };
         Insert: {
           answer?: Json;
+          answer_media_bucket?: string | null;
+          answer_media_path?: string | null;
+          answer_mime_type?: string | null;
           attempt_id: string;
           created_at?: string;
           flagged?: boolean;
@@ -728,6 +734,9 @@ export type Database = {
         };
         Update: {
           answer?: Json;
+          answer_media_bucket?: string | null;
+          answer_media_path?: string | null;
+          answer_mime_type?: string | null;
           attempt_id?: string;
           created_at?: string;
           flagged?: boolean;
@@ -2688,6 +2697,32 @@ export type Database = {
           to: "payment_proofs";
           isOneToOne: true;
           isSetofReturn: false;
+        };
+      };
+      save_exam_oral_answer: {
+        Args: {
+          p_attempt_id: string;
+          p_question_id: string;
+          p_bucket: string;
+          p_path: string;
+          p_mime_type?: string | null;
+          p_flagged?: boolean;
+        };
+        Returns: {
+          answer: Json;
+          answer_media_bucket: string | null;
+          answer_media_path: string | null;
+          answer_mime_type: string | null;
+          attempt_id: string;
+          created_at: string;
+          flagged: boolean;
+          grading_detail: Json | null;
+          id: string;
+          is_correct: boolean | null;
+          points_awarded: number | null;
+          question_id: string;
+          teacher_comment: string | null;
+          updated_at: string;
         };
       };
       save_exam_answer: {

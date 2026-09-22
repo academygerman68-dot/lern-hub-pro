@@ -97,7 +97,7 @@ export function CorrectionsCenter() {
               id: `exam:${exam.id}`,
               kind: "exam" as const,
               title: exam.title,
-              subtitle: `${exam.level?.code ?? "—"} · ${pending.length} écrit${pending.length > 1 ? "s" : ""} à corriger`,
+              subtitle: `${exam.level?.code ?? "—"} · ${pending.length} copie${pending.length > 1 ? "s" : ""} à corriger`,
               count: pending.length,
               examId: exam.id,
               classId: exam.class_id,

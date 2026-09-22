@@ -744,6 +744,16 @@ export const ExamService = {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseExamService.saveAnswer(input);
   },
+  async uploadOralAnswer(input: Parameters<typeof SupabaseExamService.uploadOralAnswer>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.uploadOralAnswer(input);
+  },
+  async getAnswerAudioSignedUrl(
+    ...args: Parameters<typeof SupabaseExamService.getAnswerAudioSignedUrl>
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.getAnswerAudioSignedUrl(...args);
+  },
   async submitAttempt(attemptId: string) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseExamService.submitAttempt(attemptId);

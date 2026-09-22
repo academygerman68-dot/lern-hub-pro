@@ -24,11 +24,13 @@ import {
   useSaveExamAnswer,
   useStartExam,
   useSubmitExam,
+  useUploadOralExamAnswer,
 } from "@/hooks/use-academy-data";
 import { ExamService, GradeAssistService } from "@/services/academy-services";
 import type { GradeAssistSuggestion } from "@/services/supabase/grade-assist-service";
 import type { Json } from "@/types/database";
 import { ExamParticipantRosterPanel } from "./exam-participant-roster";
+import { ExamOralAnswerComposer } from "./exam-oral-recorder";
 import {
   formatFrDate,
   isFileContentKind,
@@ -53,6 +55,14 @@ import {
   isManualQuestionType,
   studentExamProgressLabel,
 } from "@/lib/exam-writing";
+import {
+  hasOralAudioAnswer,
+  isSpeakingQuestionType,
+  isWritingOnlyQuestionType,
+  ORAL_RUBRIC_LABELS,
+  oralRubricFromMeta,
+  parseOralAnswer,
+} from "@/lib/exam-oral";
 import { examCatalogAction } from "@/lib/exam-labels";
 import {
   applySuggestionToWritingRubric,
@@ -79,6 +89,7 @@ const SKILL_LABELS: Record<string, string> = {
 };
 
 const RUBRIC_LABELS: Record<string, string> = {
+  ...ORAL_RUBRIC_LABELS,
   task_completion: "Réalisation de la tâche",
   comprehensibility: "Compréhensibilité",
   vocabulary: "Vocabulaire",
@@ -257,7 +268,7 @@ function StudentExamCatalog() {
                     {catalog.action === "final" && latest.percentage != null
                       ? `Score : ${Number(latest.percentage).toFixed(0)} %`
                       : catalog.action === "provisional"
-                        ? "Score partiel disponible — écrit en attente de correction"
+                        ? "Score partiel disponible — correction manuelle en attente"
                         : null}
                   </p>
                 ) : null}
@@ -333,11 +344,13 @@ function StudentExamRunner() {
   const attemptQuery = useExamAttempt(session.attemptId);
   const answersQuery = useExamAnswers(session.attemptId);
   const saveAnswer = useSaveExamAnswer();
+  const uploadOral = useUploadOralExamAnswer();
   const submitExam = useSubmitExam();
   const [index, setIndex] = useState(0);
   const [now, setNow] = useState(Date.now());
   const [localAnswers, setLocalAnswers] = useState<Record<string, Json>>({});
   const [flagged, setFlagged] = useState<Record<string, boolean>>({});
+  const [oralPreviewUrls, setOralPreviewUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -353,6 +366,24 @@ function StudentExamRunner() {
     }
     setLocalAnswers(next);
     setFlagged(flags);
+
+    let cancelled = false;
+    void (async () => {
+      const urls: Record<string, string> = {};
+      for (const row of answersQuery.data ?? []) {
+        if (!hasOralAudioAnswer(row)) continue;
+        try {
+          const signed = await ExamService.getAnswerAudioSignedUrl(row);
+          if (signed) urls[row.question_id] = signed;
+        } catch {
+          /* ignore preview errors while typing */
+        }
+      }
+      if (!cancelled) setOralPreviewUrls(urls);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [answersQuery.data]);
 
   const questions = useMemo(
@@ -395,7 +426,8 @@ function StudentExamRunner() {
     });
   };
 
-  const isWritingType = current ? isManualQuestionType(current.type) : false;
+  const isSpeakingType = current ? isSpeakingQuestionType(current.type) : false;
+  const isWritingType = current ? isWritingOnlyQuestionType(current.type) : false;
   const isFormFill = current?.type === "form_fill";
   const writingText = isWritingType && current ? answerValue(localAnswers[current.id]) : "";
   const writingStats = countWritingStats(writingText);
@@ -594,6 +626,38 @@ function StudentExamRunner() {
                 </div>
               )}
 
+              {isSpeakingType && current && session.attemptId ? (
+                <ExamOralAnswerComposer
+                  disabled={expired || attemptQuery.data?.status !== "in_progress"}
+                  hasAudio={hasOralAudioAnswer({
+                    answer: localAnswers[current.id],
+                    answer_media_path:
+                      (answersQuery.data ?? []).find((row) => row.question_id === current.id)
+                        ?.answer_media_path ?? null,
+                  })}
+                  previewUrl={oralPreviewUrls[current.id] ?? null}
+                  uploading={uploadOral.isPending}
+                  onUpload={async (file) => {
+                    const saved = await uploadOral.mutateAsync({
+                      attemptId: session.attemptId!,
+                      questionId: current.id,
+                      file,
+                      flagged: flagged[current.id] ?? false,
+                    });
+                    setLocalAnswers((prev) => ({ ...prev, [current.id]: saved.answer }));
+                    try {
+                      const signed = await ExamService.getAnswerAudioSignedUrl(saved);
+                      if (signed) {
+                        setOralPreviewUrls((prev) => ({ ...prev, [current.id]: signed }));
+                      }
+                    } catch {
+                      /* preview optional */
+                    }
+                    toast.success("Audio oral enregistré");
+                  }}
+                />
+              ) : null}
+
               {isWritingType && current && (
                 <div>
                   {requirements.length > 0 ? (
@@ -689,11 +753,12 @@ function StudentExamRunner() {
                 const answered =
                   raw !== undefined &&
                   raw !== null &&
-                  (typeof raw === "object" && !Array.isArray(raw)
-                    ? Object.values(raw as Record<string, unknown>).some(
-                        (v) => String(v ?? "").trim() !== "",
-                      )
-                    : answerValue(raw) !== "");
+                  (Boolean(parseOralAnswer(raw)) ||
+                    (typeof raw === "object" && !Array.isArray(raw)
+                      ? Object.values(raw as Record<string, unknown>).some(
+                          (v) => String(v ?? "").trim() !== "",
+                        )
+                      : answerValue(raw) !== ""));
                 const isCurrent = i === index;
                 const isFlagged = flagged[q.id];
                 return (
@@ -1033,7 +1098,7 @@ function StudentExamResult() {
 
               {writingItems.length ? (
                 <div className="mt-6 space-y-3">
-                  <h3 className="text-base font-semibold">Écriture</h3>
+                  <h3 className="text-base font-semibold">Écriture et oral</h3>
                   {writingItems.map((item) => {
                     const detail =
                       item.grading_detail &&
@@ -1041,12 +1106,26 @@ function StudentExamResult() {
                       !Array.isArray(item.grading_detail)
                         ? (item.grading_detail as Record<string, unknown>)
                         : {};
+                    const oral = isSpeakingQuestionType(item.type);
                     return (
                       <Surface className="space-y-2 p-4" key={item.question_id}>
-                        <p className="text-sm font-medium">{item.prompt}</p>
-                        <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                          {answerValue(item.student_answer) || "—"}
+                        <p className="text-xs text-muted-foreground">
+                          {oral ? "Expression orale" : "Expression écrite"}
                         </p>
+                        <p className="text-sm font-medium">{item.prompt}</p>
+                        {oral ? (
+                          <OralAnswerAudioPlayer
+                            answer={{
+                              answer: item.student_answer,
+                              answer_media_bucket: item.answer_media_bucket ?? null,
+                              answer_media_path: item.answer_media_path ?? null,
+                            }}
+                          />
+                        ) : (
+                          <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                            {answerValue(item.student_answer) || "—"}
+                          </p>
+                        )}
                         <p className="text-sm">
                           Score : {Number(item.points_awarded ?? 0)}/{item.points}
                         </p>
@@ -1077,23 +1156,55 @@ function StudentExamResult() {
   );
 }
 
+function OralAnswerAudioPlayer({
+  answer,
+}: {
+  answer: {
+    answer: Json;
+    answer_media_bucket?: string | null;
+    answer_media_path?: string | null;
+  };
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setUrl(null);
+    setError(null);
+    if (!hasOralAudioAnswer(answer)) {
+      setError("Aucun audio oral");
+      return;
+    }
+    void ExamService.getAnswerAudioSignedUrl(answer)
+      .then((signed) => {
+        if (!cancelled) setUrl(signed);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Lecture audio impossible");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [answer.answer, answer.answer_media_bucket, answer.answer_media_path]);
+
+  if (error) return <p className="text-sm text-muted-foreground">{error}</p>;
+  if (!url) return <p className="text-sm text-muted-foreground">Chargement audio…</p>;
+  return (
+    <audio controls src={url} className="w-full">
+      Votre navigateur ne lit pas l’audio.
+    </audio>
+  );
+}
+
 export function ExamWritingGradingPanel({ examId }: { examId: string }) {
   const attemptsQuery = useExamAttemptsForExam(examId);
   const examQuery = useExam(examId);
   const gradeWriting = useGradeWritingAnswer();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<
-    Record<
-      string,
-      {
-        task_completion: string;
-        comprehensibility: string;
-        vocabulary: string;
-        grammar_and_spelling: string;
-        comment: string;
-      }
-    >
-  >({});
+  const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({});
   const [aiBusyKey, setAiBusyKey] = useState<string | null>(null);
   const [aiSuggestions, setAiSuggestions] = useState<Record<string, GradeAssistSuggestion | null>>(
     {},
@@ -1134,13 +1245,11 @@ export function ExamWritingGradingPanel({ examId }: { examId: string }) {
             ? (answer.grading_detail as Record<string, unknown>)
             : {};
         next[key] = {
-          task_completion:
-            detail["task_completion"] != null ? String(detail["task_completion"]) : "",
-          comprehensibility:
-            detail["comprehensibility"] != null ? String(detail["comprehensibility"]) : "",
-          vocabulary: detail["vocabulary"] != null ? String(detail["vocabulary"]) : "",
-          grammar_and_spelling:
-            detail["grammar_and_spelling"] != null ? String(detail["grammar_and_spelling"]) : "",
+          ...Object.fromEntries(
+            Object.entries(detail)
+              .filter(([k]) => k !== "comment")
+              .map(([k, v]) => [k, v != null ? String(v) : ""]),
+          ),
           comment: answer.teacher_comment ?? "",
         };
       }
@@ -1212,7 +1321,7 @@ export function ExamWritingGradingPanel({ examId }: { examId: string }) {
   return (
     <div className="mt-4 space-y-3 border-t pt-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">Corrections écrites</h3>
+        <h3 className="text-sm font-semibold">Corrections manuelles (écrit / oral)</h3>
         {groupAverage != null && (
           <p className="text-sm text-muted-foreground">
             Moyenne groupe (corrigés) : {groupAverage.toFixed(1)} %
@@ -1265,7 +1374,7 @@ export function ExamWritingGradingPanel({ examId }: { examId: string }) {
                     )}
                     {writingQuestions.length === 0 && !answersQuery.isLoading && (
                       <p className="text-sm text-muted-foreground">
-                        Aucune question d’écriture sur cet examen.
+                        Aucune question manuelle (écrit ou oral) sur cet examen.
                       </p>
                     )}
                     {writingQuestions.map((question) => {
@@ -1279,30 +1388,33 @@ export function ExamWritingGradingPanel({ examId }: { examId: string }) {
                             (item): item is string => typeof item === "string",
                           )
                         : [];
-                      const rubricRaw = meta["rubric"];
-                      const rubric =
-                        rubricRaw && typeof rubricRaw === "object" && !Array.isArray(rubricRaw)
-                          ? (rubricRaw as Record<string, number>)
-                          : {
-                              task_completion: 4,
-                              comprehensibility: 2,
-                              vocabulary: 2,
-                              grammar_and_spelling: 2,
-                            };
+                      const speaking = isSpeakingQuestionType(question.type);
+                      const rubric = speaking
+                        ? oralRubricFromMeta(meta, question.points)
+                        : (() => {
+                            const rubricRaw = meta["rubric"];
+                            return rubricRaw &&
+                              typeof rubricRaw === "object" &&
+                              !Array.isArray(rubricRaw)
+                              ? (rubricRaw as Record<string, number>)
+                              : {
+                                  task_completion: 4,
+                                  comprehensibility: 2,
+                                  vocabulary: 2,
+                                  grammar_and_spelling: 2,
+                                };
+                          })();
+                      const rubricKeys = Object.keys(rubric);
                       const draft = drafts[key] ?? {
-                        task_completion: "",
-                        comprehensibility: "",
-                        vocabulary: "",
-                        grammar_and_spelling: "",
+                        ...Object.fromEntries(rubricKeys.map((k) => [k, ""])),
                         comment: "",
                       };
-                      const rubricSum =
-                        Number(draft.task_completion || 0) +
-                        Number(draft.comprehensibility || 0) +
-                        Number(draft.vocabulary || 0) +
-                        Number(draft.grammar_and_spelling || 0);
+                      const rubricSum = rubricKeys.reduce(
+                        (sum, rubricKey) => sum + Number(draft[rubricKey] || 0),
+                        0,
+                      );
                       const text = answer ? answerValue(answer.answer) : "";
-                      const stats = countWritingStats(text);
+                      const stats = countWritingStats(speaking ? "" : text);
                       const instruction =
                         typeof meta["instruction"] === "string"
                           ? meta["instruction"]
@@ -1310,7 +1422,8 @@ export function ExamWritingGradingPanel({ examId }: { examId: string }) {
                       return (
                         <div key={question.id} className="space-y-3 rounded-md bg-muted/40 p-3">
                           <p className="text-xs font-medium text-muted-foreground">
-                            {question.sectionTitle}
+                            {question.sectionTitle} ·{" "}
+                            {speaking ? "Expression orale" : "Expression écrite"}
                           </p>
                           <p className="text-sm font-medium">{instruction}</p>
                           {requirements.length > 0 ? (
@@ -1320,30 +1433,33 @@ export function ExamWritingGradingPanel({ examId }: { examId: string }) {
                               ))}
                             </ul>
                           ) : null}
-                          <p className="whitespace-pre-wrap rounded-md border border-border bg-background p-3 text-sm">
-                            {text || "Pas de réponse"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {stats.words} mot{stats.words === 1 ? "" : "s"}
-                          </p>
+                          {speaking ? (
+                            answer ? (
+                              <OralAnswerAudioPlayer answer={answer} />
+                            ) : (
+                              <p className="text-sm text-muted-foreground">Pas d’audio oral</p>
+                            )
+                          ) : (
+                            <>
+                              <p className="whitespace-pre-wrap rounded-md border border-border bg-background p-3 text-sm">
+                                {text || "Pas de réponse"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {stats.words} mot{stats.words === 1 ? "" : "s"}
+                              </p>
+                            </>
+                          )}
                           <div className="grid gap-2 sm:grid-cols-2">
-                            {(
-                              [
-                                "task_completion",
-                                "comprehensibility",
-                                "vocabulary",
-                                "grammar_and_spelling",
-                              ] as const
-                            ).map((rubricKey) => (
+                            {rubricKeys.map((rubricKey) => (
                               <label key={rubricKey} className="block text-xs">
-                                {RUBRIC_LABELS[rubricKey]} (/{rubric[rubricKey] ?? 0})
+                                {RUBRIC_LABELS[rubricKey] ?? rubricKey} (/{rubric[rubricKey] ?? 0})
                                 <Input
                                   className="mt-1"
                                   type="number"
                                   min={0}
                                   max={rubric[rubricKey] ?? question.points}
                                   step="0.5"
-                                  value={draft[rubricKey]}
+                                  value={draft[rubricKey] ?? ""}
                                   onChange={(e) =>
                                     setDrafts((prev) => ({
                                       ...prev,
@@ -1361,7 +1477,7 @@ export function ExamWritingGradingPanel({ examId }: { examId: string }) {
                             Commentaire
                             <Input
                               className="mt-1"
-                              value={draft.comment}
+                              value={draft["comment"] ?? ""}
                               onChange={(e) =>
                                 setDrafts((prev) => ({
                                   ...prev,
@@ -1370,91 +1486,90 @@ export function ExamWritingGradingPanel({ examId }: { examId: string }) {
                               }
                             />
                           </label>
-                          <AiGradeAssistPanel
-                            busy={aiBusyKey === key}
-                            disabled={gradeWriting.isPending}
-                            suggestion={aiSuggestions[key] ?? null}
-                            statusMessage={aiMessages[key] ?? null}
-                            maxScore={question.points}
-                            onRequest={() =>
-                              void requestWritingAi({
-                                key,
-                                attemptId: attempt.id,
-                                questionId: question.id,
-                                studentId: attempt.student_id,
-                                prompt: instruction,
-                                text,
-                                rubric,
-                                points: question.points,
-                              })
-                            }
-                            onUse={() => {
-                              const suggestion = aiSuggestions[key];
-                              if (!suggestion) return;
-                              const mapped = applySuggestionToWritingRubric({
-                                suggestedScore: suggestion.suggested_score,
-                                criteriaScores: suggestion.criteria_scores,
-                                rubric,
-                                questionPoints: question.points,
-                              });
-                              setDrafts((prev) => ({
-                                ...prev,
-                                [key]: {
-                                  ...draft,
-                                  task_completion: mapped["task_completion"] ?? "",
-                                  comprehensibility: mapped["comprehensibility"] ?? "",
-                                  vocabulary: mapped["vocabulary"] ?? "",
-                                  grammar_and_spelling: mapped["grammar_and_spelling"] ?? "",
-                                  comment: suggestion.feedback || draft.comment,
-                                },
-                              }));
-                              toast.message(
-                                "Proposition appliquée — vérifiez puis enregistrez la correction.",
-                              );
-                            }}
-                            onRegenerate={() =>
-                              void requestWritingAi({
-                                key,
-                                attemptId: attempt.id,
-                                questionId: question.id,
-                                studentId: attempt.student_id,
-                                prompt: instruction,
-                                text,
-                                rubric,
-                                points: question.points,
-                              })
-                            }
-                            onIgnore={() => {
-                              setAiSuggestions((prev) => ({ ...prev, [key]: null }));
-                              setAiMessages((prev) => ({ ...prev, [key]: null }));
-                            }}
-                          />
+                          {!speaking ? (
+                            <AiGradeAssistPanel
+                              busy={aiBusyKey === key}
+                              disabled={gradeWriting.isPending}
+                              suggestion={aiSuggestions[key] ?? null}
+                              statusMessage={aiMessages[key] ?? null}
+                              maxScore={question.points}
+                              onRequest={() =>
+                                void requestWritingAi({
+                                  key,
+                                  attemptId: attempt.id,
+                                  questionId: question.id,
+                                  studentId: attempt.student_id,
+                                  prompt: instruction,
+                                  text,
+                                  rubric,
+                                  points: question.points,
+                                })
+                              }
+                              onUse={() => {
+                                const suggestion = aiSuggestions[key];
+                                if (!suggestion) return;
+                                const mapped = applySuggestionToWritingRubric({
+                                  suggestedScore: suggestion.suggested_score,
+                                  criteriaScores: suggestion.criteria_scores,
+                                  rubric,
+                                  questionPoints: question.points,
+                                });
+                                setDrafts((prev) => ({
+                                  ...prev,
+                                  [key]: {
+                                    ...draft,
+                                    ...mapped,
+                                    comment: suggestion.feedback || draft["comment"] || "",
+                                  },
+                                }));
+                                toast.message(
+                                  "Proposition appliquée — vérifiez puis enregistrez la correction.",
+                                );
+                              }}
+                              onRegenerate={() =>
+                                void requestWritingAi({
+                                  key,
+                                  attemptId: attempt.id,
+                                  questionId: question.id,
+                                  studentId: attempt.student_id,
+                                  prompt: instruction,
+                                  text,
+                                  rubric,
+                                  points: question.points,
+                                })
+                              }
+                              onIgnore={() => {
+                                setAiSuggestions((prev) => ({ ...prev, [key]: null }));
+                                setAiMessages((prev) => ({ ...prev, [key]: null }));
+                              }}
+                            />
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Correction orale manuelle : écoutez l’audio puis saisissez la grille.
+                            </p>
+                          )}
                           <Button
                             size="sm"
                             disabled={
                               gradeWriting.isPending ||
-                              draft.task_completion === "" ||
-                              draft.comprehensibility === "" ||
-                              draft.vocabulary === "" ||
-                              draft.grammar_and_spelling === ""
+                              rubricKeys.some((k) => draft[k] === "" || draft[k] == null) ||
+                              !Number.isFinite(rubricSum) ||
+                              rubricSum > question.points
                             }
                             onClick={() => {
                               if (!Number.isFinite(rubricSum) || rubricSum > question.points) {
-                                toast.error("Points invalides");
+                                toast.error("Total de barème invalide");
                                 return;
                               }
-                              const gradingDetail = {
-                                task_completion: Number(draft.task_completion),
-                                comprehensibility: Number(draft.comprehensibility),
-                                vocabulary: Number(draft.vocabulary),
-                                grammar_and_spelling: Number(draft.grammar_and_spelling),
-                              };
+                              const gradingDetail = Object.fromEntries(
+                                rubricKeys.map((k) => [k, Number(draft[k])]),
+                              );
                               gradeWriting.mutate(
                                 {
                                   attemptId: attempt.id,
                                   questionId: question.id,
                                   points: rubricSum,
-                                  comment: draft.comment.trim() || null,
+                                  comment: draft["comment"] || null,
                                   gradingDetail,
                                 },
                                 {
@@ -1464,7 +1579,7 @@ export function ExamWritingGradingPanel({ examId }: { examId: string }) {
                               );
                             }}
                           >
-                            Enregistrer la correction
+                            Enregistrer la note
                           </Button>
                         </div>
                       );
@@ -1575,6 +1690,7 @@ export function DirectorExamsPage() {
   const [classId, setClassId] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [duration, setDuration] = useState("60");
+  const [maxAttempts, setMaxAttempts] = useState("3");
   const [attachment, setAttachment] = useState<AttachmentDraft>({
     kind: "text",
     url: "",
@@ -1795,6 +1911,17 @@ export function DirectorExamsPage() {
                 onChange={(e) => setDuration(e.target.value)}
               />
             </label>
+            <label className="block text-sm">
+              Tentatives max (attribution d’essais supplémentaires)
+              <Input
+                className="mt-1"
+                type="number"
+                min={1}
+                max={20}
+                value={maxAttempts}
+                onChange={(e) => setMaxAttempts(e.target.value)}
+              />
+            </label>
             <ContentAttachmentUploader
               kinds={["text", "pdf", "document", "image", "link"]}
               value={attachment}
@@ -1867,6 +1994,7 @@ export function DirectorExamsPage() {
                         ...(description.trim() ? { description: description.trim() } : {}),
                         ...(resolvedInstructions ? { instructions: resolvedInstructions } : {}),
                         durationMinutes: Number(duration) || 60,
+                        maxAttempts: Math.max(1, Number(maxAttempts) || 3),
                         startsAt: startsAt ? new Date(startsAt).toISOString() : null,
                         endsAt: startsAt
                           ? new Date(

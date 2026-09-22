@@ -6,6 +6,7 @@ export type ExamQuestionTypeLabel =
   | "Choix multiple"
   | "Écoute"
   | "Expression écrite"
+  | "Expression orale"
   | "Formulaire"
   | "Texte"
   | "Question";
@@ -15,7 +16,8 @@ export function examQuestionTypeLabel(type: string | null | undefined): ExamQues
   if (type === "single_choice") return "Choix unique";
   if (type === "multiple_choice") return "Choix multiple";
   if (type === "listening" || type === "audio") return "Écoute";
-  if (type === "writing" || type === "text" || type === "open_text" || type === "speaking") {
+  if (type === "speaking") return "Expression orale";
+  if (type === "writing" || type === "text" || type === "open_text") {
     return "Expression écrite";
   }
   if (type === "form_fill") return "Formulaire";

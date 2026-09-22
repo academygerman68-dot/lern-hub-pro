@@ -11,6 +11,11 @@ import {
   resolveExamParticipantStatus,
   type ExamParticipantRow,
 } from "@/lib/exam-participant-status";
+import {
+  buildOralStoragePath,
+  parseOralAnswer,
+  validateOralAnswerAudioFile,
+} from "@/lib/exam-oral";
 import { isManualQuestionType } from "@/lib/exam-writing";
 import type { Database, Json } from "@/types/database";
 
@@ -100,6 +105,9 @@ export type ExamAttemptReviewItem = {
   passage: string | null;
   points: number;
   student_answer: Json;
+  answer_media_bucket?: string | null;
+  answer_media_path?: string | null;
+  answer_mime_type?: string | null;
   is_correct: boolean | null;
   points_awarded: number | null;
   correct_values: string[] | null;
@@ -338,6 +346,7 @@ export const SupabaseExamService = {
     levelId: string;
     classId?: string | null;
     durationMinutes?: number;
+    maxAttempts?: number;
     passPercentage?: number;
     isMock?: boolean;
     startsAt?: string | null;
@@ -359,6 +368,7 @@ export const SupabaseExamService = {
         level_id: input.levelId,
         class_id: input.classId ?? null,
         duration_minutes: input.durationMinutes ?? 30,
+        max_attempts: Math.max(1, input.maxAttempts ?? 3),
         pass_percentage: input.passPercentage ?? 60,
         is_mock: input.isMock ?? true,
         starts_at: input.startsAt ?? null,
@@ -500,6 +510,7 @@ export const SupabaseExamService = {
     prompt: string;
     points?: number;
     sortOrder?: number;
+    metadata?: Json;
   }): Promise<ExamQuestion> {
     const { data, error } = await requireClient()
       .from("exam_questions")
@@ -509,11 +520,104 @@ export const SupabaseExamService = {
         prompt: input.prompt,
         points: input.points ?? 1,
         sort_order: input.sortOrder ?? 0,
+        ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
       })
       .select("*")
       .single();
     if (error) throw error;
     return data;
+  },
+
+  async uploadOralAnswer(input: {
+    attemptId: string;
+    questionId: string;
+    file: File;
+    flagged?: boolean;
+  }): Promise<ExamAnswer> {
+    const fileError = validateOralAnswerAudioFile(input.file);
+    if (fileError) throw new Error(fileError);
+    const supabase = requireClient();
+
+    const { data: attempt, error: attemptError } = await supabase
+      .from("exam_attempts")
+      .select("id, student_id, status")
+      .eq("id", input.attemptId)
+      .maybeSingle();
+    if (attemptError) throw attemptError;
+    if (!attempt) throw new Error("Tentative introuvable.");
+    if (attempt.status !== "in_progress") {
+      throw new Error("La tentative n’est plus modifiable.");
+    }
+
+    const { data: existingAnswer } = await supabase
+      .from("exam_answers")
+      .select("answer_media_bucket, answer_media_path, answer")
+      .eq("attempt_id", input.attemptId)
+      .eq("question_id", input.questionId)
+      .maybeSingle();
+
+    const path = buildOralStoragePath({
+      attemptId: input.attemptId,
+      studentId: attempt.student_id,
+      questionId: input.questionId,
+      fileName: input.file.name || "oral.webm",
+    });
+    const contentType = input.file.type || "audio/webm";
+    const { error: uploadError } = await supabase.storage.from("course-materials").upload(path, input.file, {
+      upsert: false,
+      contentType,
+    });
+    if (uploadError) throw uploadError;
+
+    const { data, error } = await supabase.rpc("save_exam_oral_answer", {
+      p_attempt_id: input.attemptId,
+      p_question_id: input.questionId,
+      p_bucket: "course-materials",
+      p_path: path,
+      p_mime_type: contentType,
+      p_flagged: input.flagged ?? false,
+    });
+    if (error) {
+      void supabase.storage.from("course-materials").remove([path]);
+      throw error;
+    }
+
+    const prevBucket = existingAnswer?.answer_media_bucket;
+    const prevPath = existingAnswer?.answer_media_path;
+    if (prevBucket && prevPath && prevPath !== path) {
+      void supabase.storage.from(prevBucket).remove([prevPath]);
+    } else {
+      const parsed = parseOralAnswer(existingAnswer?.answer);
+      if (parsed && parsed.path !== path) {
+        void supabase.storage.from(parsed.bucket).remove([parsed.path]);
+      }
+    }
+
+    return data as ExamAnswer;
+  },
+
+  async getAnswerAudioSignedUrl(
+    answer: {
+      answer?: Json | null;
+      answer_media_bucket?: string | null;
+      answer_media_path?: string | null;
+    },
+    expiresIn = 3600,
+  ): Promise<string | null> {
+    const bucket = answer.answer_media_bucket;
+    const path = answer.answer_media_path;
+    if (bucket && path) {
+      const { data, error } = await requireClient().storage.from(bucket).createSignedUrl(path, expiresIn);
+      if (error) throw error;
+      return data.signedUrl;
+    }
+    const parsed = parseOralAnswer(answer.answer);
+    if (!parsed) return null;
+    const { data, error } = await requireClient()
+      .storage.from(parsed.bucket)
+      .createSignedUrl(parsed.path, expiresIn);
+    if (error) throw error;
+    return data.signedUrl;
   },
 
   async createOptions(

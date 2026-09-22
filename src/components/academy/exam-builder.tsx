@@ -424,10 +424,15 @@ export function ExamBuilder({ examId }: { examId: string }) {
             <option value="multiple_choice">{examQuestionTypeLabel("multiple_choice")}</option>
             <option value="listening">{examQuestionTypeLabel("listening")}</option>
             <option value="writing">{examQuestionTypeLabel("writing")}</option>
+            <option value="speaking">{examQuestionTypeLabel("speaking")}</option>
           </select>
         </label>
         <label className="block text-sm">
-          {qType === "writing" ? "Consigne d’expression écrite" : "Énoncé"}
+          {qType === "writing"
+            ? "Consigne d’expression écrite"
+            : qType === "speaking"
+              ? "Consigne d’expression orale (Sprechen)"
+              : "Énoncé"}
           <Textarea
             className="mt-1"
             value={prompt}
@@ -435,7 +440,9 @@ export function ExamBuilder({ examId }: { examId: string }) {
             placeholder={
               qType === "writing"
                 ? "Tapez uniquement le sujet / la consigne — aucun fichier requis"
-                : "Question ou consigne"
+                : qType === "speaking"
+                  ? "Ex. Présentez-vous en 1–2 minutes. Parlez de votre famille et de votre ville."
+                  : "Question ou consigne"
             }
           />
         </label>
@@ -443,6 +450,12 @@ export function ExamBuilder({ examId }: { examId: string }) {
           <p className="text-xs text-muted-foreground">
             Type rédaction : saisissez le texte, ajoutez les points, puis publiez l’examen quand
             il est complet.
+          </p>
+        ) : null}
+        {qType === "speaking" ? (
+          <p className="text-xs text-muted-foreground">
+            Section orale facultative : l’étudiant enregistre ou dépose un audio privé. Sans
+            question « speaking », les examens existants restent inchangés.
           </p>
         ) : null}
         <label className="block text-sm">
@@ -517,6 +530,19 @@ export function ExamBuilder({ examId }: { examId: string }) {
                   prompt: prompt.trim(),
                   points: Number(points) || 1,
                   sortOrder: (section?.questions?.length ?? 0) + 1,
+                  ...(qType === "speaking"
+                    ? {
+                        metadata: {
+                          instruction: prompt.trim(),
+                          rubric: {
+                            task_completion: 4,
+                            fluency: 2,
+                            pronunciation: 2,
+                            vocabulary: 2,
+                          },
+                        },
+                      }
+                    : {}),
                 });
                 if (isQcm) {
                   const filled = choices.filter((c) => c.label.trim());
