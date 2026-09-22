@@ -55,6 +55,28 @@ describe("jitsi-config", () => {
     ).toBe(true);
   });
 
+  it("blocks staff from starting scheduled sessions more than 30 minutes early", () => {
+    const startsAt = "2026-09-16T12:00:00.000Z";
+    expect(
+      getLiveSessionJoinState({
+        startsAt,
+        endsAt: "2026-09-16T14:00:00.000Z",
+        status: "scheduled",
+        isStaff: true,
+        now: new Date("2026-09-16T11:00:00.000Z").getTime(),
+      }).reason,
+    ).toBe("too_early");
+    expect(
+      getLiveSessionJoinState({
+        startsAt,
+        endsAt: "2026-09-16T14:00:00.000Z",
+        status: "scheduled",
+        isStaff: true,
+        now: new Date("2026-09-16T11:35:00.000Z").getTime(),
+      }).allowed,
+    ).toBe(true);
+  });
+
   it("keeps completed sessions closed even for staff", () => {
     expect(
       getLiveSessionJoinState({

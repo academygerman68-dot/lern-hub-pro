@@ -33,6 +33,10 @@ import {
   zoomHrefForViewer,
   zoomMeetingDurationMinutes,
 } from "@/lib/live-meeting";
+import {
+  readUpcomingSessionsCollapsed,
+  toggleUpcomingSessionsCollapsed,
+} from "@/lib/live-upcoming-collapse";
 import { LiveSessionService, RecordingService } from "@/services/academy-services";
 import type { LiveSessionListItem } from "@/services/supabase/live-session-service";
 import type { MeetingRecording } from "@/types/phase3";
@@ -43,16 +47,6 @@ import { LiveCalendar, LiveCalendarErrorBoundary } from "./live-calendar";
 import { canEditLiveSession, EditLiveSessionModal } from "./live/edit-session-modal";
 import { PageHeader, Status, Surface, LevelBadge, GroupBadge } from "./primitives";
 import { ReplayEditorModal, ReplayRowActions } from "./replay-editor";
-
-const UPCOMING_COLLAPSE_KEY = "ga.live.upcomingSessionsCollapsed";
-
-function readUpcomingCollapsed(): boolean {
-  try {
-    return sessionStorage.getItem(UPCOMING_COLLAPSE_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
 
 export function LiveClassesPage({ meeting }: { meeting: boolean }) {
   const accessQuery = useAcademicAccess();
@@ -272,9 +266,14 @@ function LiveSessionLobby() {
   const [monthClassId, setMonthClassId] = useState("");
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [liveTab, setLiveTab] = useState<"upcoming" | "replays">("upcoming");
-  const [upcomingCollapsed, setUpcomingCollapsed] = useState(readUpcomingCollapsed);
+  // Always start collapsed to avoid flashing the full card list before sessionStorage is read.
+  const [upcomingCollapsed, setUpcomingCollapsed] = useState(true);
   const [replayEditorOpen, setReplayEditorOpen] = useState(false);
   const [editingReplay, setEditingReplay] = useState<MeetingRecording | null>(null);
+
+  useEffect(() => {
+    setUpcomingCollapsed(readUpcomingSessionsCollapsed());
+  }, []);
 
   const myTeacherId = useMemo(
     () =>
@@ -634,10 +633,10 @@ function LiveSessionLobby() {
               </Surface>
             )}
 
-            {/* B. Upcoming — collapsible */}
+            {/* B. Upcoming — collapsed by default; sessionStorage keeps expand choice for this tab session only */}
             <section className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-base font-semibold tracking-tight">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5">
+                <h2 className="text-sm font-semibold tracking-tight sm:text-base">
                   Séances à venir
                   <span className="ml-2 text-sm font-normal text-muted-foreground">
                     ({upcomingList.length})
@@ -646,16 +645,10 @@ function LiveSessionLobby() {
                 <Button
                   size="sm"
                   variant="outline"
+                  className="min-h-10"
+                  aria-expanded={!upcomingCollapsed}
                   onClick={() => {
-                    setUpcomingCollapsed((prev) => {
-                      const next = !prev;
-                      try {
-                        sessionStorage.setItem(UPCOMING_COLLAPSE_KEY, next ? "1" : "0");
-                      } catch {
-                        /* ignore */
-                      }
-                      return next;
-                    });
+                    setUpcomingCollapsed((prev) => toggleUpcomingSessionsCollapsed(prev));
                   }}
                 >
                   {upcomingCollapsed ? (
@@ -722,21 +715,15 @@ function LiveSessionLobby() {
                               Modifier
                             </Button>
                           ) : null}
-                          <Button
-                            size="sm"
-                            className="min-h-11"
-                            disabled={!joinState.allowed}
-                            title={
-                              !joinState.allowed
-                                ? joinState.reason === "too_early"
-                                  ? "Accès disponible à partir de l’heure du créneau."
-                                  : "Rejoindre indisponible"
-                                : undefined
-                            }
-                            onClick={() => void startSession(item)}
-                          >
-                            {isStaff ? "Démarrer" : "Rejoindre"}
-                          </Button>
+                          {joinState.allowed ? (
+                            <Button
+                              size="sm"
+                              className="min-h-11"
+                              onClick={() => void startSession(item)}
+                            >
+                              {isStaff ? "Démarrer" : "Rejoindre"}
+                            </Button>
+                          ) : null}
                         </div>
                       </Surface>
                     );
