@@ -563,12 +563,13 @@ export function validateB1ExamBank(raw: unknown): B1ValidationResult {
 }
 
 /**
- * Map Drive folder names like "audi 1", "audi1", "Audi 01" → B1-MT01.
+ * Map Drive folder names like "audi 1", "Audio 1", "AudioN", "audi N" → B1-MT01.
  */
 export function mapDriveAudiFolderName(name: string): B1ExamId | null {
   if (!name || typeof name !== "string") return null;
   const normalized = name.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
-  const match = normalized.match(/^audi\s*0*([1-9]|1[0-5])$/);
+  // audi | audio | audios + optional spaces + 1..15
+  const match = normalized.match(/^audi(?:o)?s?\s*0*([1-9]|1[0-5])$/);
   if (!match) return null;
   const n = Number(match[1]);
   if (n < 1 || n > 15) return null;

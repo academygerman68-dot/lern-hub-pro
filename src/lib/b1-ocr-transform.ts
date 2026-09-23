@@ -24,6 +24,19 @@ export type LesenBundleClassification = {
 // OCR often glues markers: "Aufgabe2Arbeitszeit", "Aufgabe3Arbeitszit" — no word boundary after digit.
 const AUFGABE_SPLIT_RE = /(?:^|\n)\s*Aufgabe\s*([123])(?=[A-Za-zÄÖÜäöüß\s:]|$)/gi;
 
+/**
+ * High-confidence OCR spacing only — never rephrases content.
+ * e.g. Aufgabe2Arbeitszeit → Aufgabe 2 Arbeitszeit; Teil1LESEN → Teil 1 LESEN
+ */
+export function cleanupGluedOcrMarkers(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(/\bAufgabe\s*([123])(?=[A-Za-zÄÖÜäöüß])/gi, "Aufgabe $1 ")
+    .replace(/\bTeil\s*([1-5])(?=[A-Za-zÄÖÜäöüß])/gi, "Teil $1 ")
+    .replace(/\b(Arbeitszeit)\s*:/gi, "$1:")
+    .replace(/ {2,}/g, " ");
+}
+
 function extractBulletRequirements(text: string): string[] {
   const reqs: string[] = [];
   for (const line of text.split(/\n/)) {
@@ -51,13 +64,19 @@ export function splitSchreibenPageBundle(
 ): SchreibenSplitTask[] {
   if (!prompt || typeof prompt !== "string") return [];
 
+  const normalized = cleanupGluedOcrMarkers(prompt);
+
   const markers: Array<{ num: number; index: number; matchLen: number }> = [];
   const re = new RegExp(AUFGABE_SPLIT_RE.source, AUFGABE_SPLIT_RE.flags);
   let match: RegExpExecArray | null;
-  while ((match = re.exec(prompt)) !== null) {
+  while ((match = re.exec(normalized)) !== null) {
     const num = Number(match[1]);
     if (num >= 1 && num <= 3) {
-      markers.push({ num, index: match.index + (match[0].startsWith("\n") ? 1 : 0), matchLen: match[0].length });
+      markers.push({
+        num,
+        index: match.index + (match[0].startsWith("\n") ? 1 : 0),
+        matchLen: match[0].length,
+      });
     }
   }
 
@@ -79,8 +98,8 @@ export function splitSchreibenPageBundle(
   for (let i = 0; i < ordered.length; i++) {
     const current = ordered[i]!;
     const start = current.index;
-    const end = i + 1 < ordered.length ? ordered[i + 1]!.index : prompt.length;
-    const chunk = prompt.slice(start, end).trim();
+    const end = i + 1 < ordered.length ? ordered[i + 1]!.index : normalized.length;
+    const chunk = cleanupGluedOcrMarkers(normalized.slice(start, end).trim());
     if (!chunk) continue;
 
     tasks.push({
@@ -123,9 +142,9 @@ export function detectSprechenRole(prompt: string): "A" | "B" | null {
   }
 
   // Truncated patterns observed in the bank:
-  // - A sheets often OCR as "andidat" (lost leading K), anywhere in header
+  // - A sheets often OCR as "andidat" / "andid" (lost leading K), anywhere in header
   // - B sheets often keep "Kandid" / "Kandida" (and sometimes a following "B")
-  if (headerLines.some((l) => /^andidat$/i.test(l) || /^andidat\b/i.test(l))) {
+  if (headerLines.some((l) => /^andidat$/i.test(l) || /^andidat\b/i.test(l) || /^andid$/i.test(l))) {
     return "A";
   }
   if (headerLines.some((l) => /^kandida$/i.test(l) || /^kandid$/i.test(l) || /^kandidat$/i.test(l))) {
@@ -136,6 +155,8 @@ export function detectSprechenRole(prompt: string): "A" | "B" | null {
 
   if (/kandidat\s*a\b/i.test(prompt)) return "A";
   if (/kandidat\s*b\b/i.test(prompt)) return "B";
+  // Ultra-truncated "andid" / "Kandid" anywhere in first lines
+  if (/\bandid\b/i.test(header) && !/\bkandid/i.test(header)) return "A";
 
   return null;
 }
