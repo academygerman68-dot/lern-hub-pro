@@ -71,6 +71,10 @@ describe("B1 exam bank core", () => {
     expect(mapDriveAudiFolderName("audi1")).toBe("B1-MT01");
     expect(mapDriveAudiFolderName("Audi 01")).toBe("B1-MT01");
     expect(mapDriveAudiFolderName("AUDI 15")).toBe("B1-MT15");
+    expect(mapDriveAudiFolderName("Audio 1")).toBe("B1-MT01");
+    expect(mapDriveAudiFolderName("Audio N".replace("N", "7"))).toBe("B1-MT07");
+    expect(mapDriveAudiFolderName("Audio7")).toBe("B1-MT07");
+    expect(mapDriveAudiFolderName("audio 10")).toBe("B1-MT10");
     expect(mapDriveAudiFolderName("audi 16")).toBeNull();
     expect(mapDriveAudiFolderName("music 1")).toBeNull();
   });
@@ -142,6 +146,7 @@ describe("B1 exam bank core", () => {
 
   it("detects truncated Kandidat A/B roles", () => {
     expect(detectSprechenRole("SPRECHEN\nandidat\nTeil2")).toBe("A");
+    expect(detectSprechenRole("SPRECHEN\nandid\nTeil2")).toBe("A");
     expect(detectSprechenRole("Kandida\nSPRECHEN\nB\nTeil2")).toBe("B");
     expect(detectSprechenRole("Teil 1\nSPRECHEN\nGemeinsam")).toBeNull();
   });

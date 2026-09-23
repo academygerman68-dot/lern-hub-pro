@@ -20,10 +20,20 @@ Schreiben Sie eine E-Mail (circa 40 Wörter).
     const tasks = splitSchreibenPageBundle(glued);
     expect(tasks).toHaveLength(3);
     expect(tasks.map((t) => t.idSuffix)).toEqual(["A1", "A2", "A3"]);
+    expect(tasks[0]!.prompt).toMatch(/Aufgabe 1/);
+    expect(tasks[1]!.prompt).toMatch(/Aufgabe 2/);
     expect(tasks.every((t) => t.transform_status === "structured")).toBe(true);
     expect(tasks.every((t) => t.needs_review === true)).toBe(true);
     expect(tasks[0]!.recommended_words).toMatch(/80/);
     expect(tasks[2]!.recommended_words).toMatch(/40/);
+  });
+
+  it("cleanupGluedOcrMarkers only inserts high-confidence spaces", async () => {
+    const { cleanupGluedOcrMarkers } = await import("./b1-ocr-transform");
+    expect(cleanupGluedOcrMarkers("Aufgabe2Arbeitszeit")).toMatch(/Aufgabe 2/);
+    expect(cleanupGluedOcrMarkers("Teil1LESEN")).toMatch(/Teil 1/);
+    // Does not rephrase free text
+    expect(cleanupGluedOcrMarkers("IchgeheindenPark.")).toBe("IchgeheindenPark.");
   });
 
   it("marks partial Aufgabe splits as needs_review transform_status", () => {
