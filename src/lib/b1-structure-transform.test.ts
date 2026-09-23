@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { loadB1ExamBank } from "./b1-exam-bank";
 import {
+  extractMatchingItems,
+  extractSingleChoiceItems,
   extractTrueFalseStatements,
   transformB1Exam,
   transformB1ExamBank,
@@ -11,6 +13,62 @@ import {
 } from "./b1-structure-transform";
 
 describe("B1 structure transform", () => {
+  it("recovers unnumbered Lesen Teil2 stems 8–9 after numbered 7", () => {
+    const ocr = `Beispiel
+Hotelmanagerwurdengefragt,
+wohin sie am liebstenreisen.
+welcheTouristensieamsympathischstenfinden.
+wosiegern arbeiten wurden.
+7In diesemText gehtes darum,...
+wasfurTouristen ausverschiedenenLandern
+typisch ist.
+warum dieJapanergernreisen.
+welcheSprache man alsTouristlernen sollte.
+DieDeutschen erkennt man...
+anihreramerikanischenKleidung.
+anihrenSommerschuhen.
+anderKombinationvonSocken undSommer-
+schuhen.
+Osterreicher...
+sindbei HotelmanagernbeliebteralsDeutscheund
+Amerikaner.
+machenkeinenbesonderenEindruck aufdieHotel-
+manager.
+haben dasReisenbessergelernt.`;
+    const items = extractSingleChoiceItems(ocr, 7, 9);
+    expect(items.get(7)?.prompt).toMatch(/diesemText|darum/i);
+    expect(items.get(7)?.options).toHaveLength(3);
+    expect(items.get(8)?.prompt).toMatch(/Deutschen erkennt/i);
+    expect(items.get(8)?.options).toHaveLength(3);
+    expect(items.get(9)?.prompt).toMatch(/Osterreicher/i);
+    expect(items.get(9)?.options).toHaveLength(3);
+  });
+
+  it("recovers matching situations when OCR drops tens digit", () => {
+    const ocr = `13AnnaliebtdasAbenteuerund hatvor,eineexotischeReisezuunternehmen.
+14TimhatgroBesInteresseanaltenBurgenundSchlossern.
+5MartinistHobbykoch,deshalbmochteerimUrlaubauchdieauslandischeKuche
+naherkennenlernen.
+6IlseundihredreiFreundinnensindromantischeTypen.SiewollengemeinsamimJuni
+Urlaub machen.
+Jutta hateinanstrengendesJahrhintersichundwurdegernetwasBesonderesfur
+ihre Gesundheit tun.
+8BenverbringtseinenUrlaubamliebstenineinemHotel,dochnicht imSuden,weiler
+keine Hitze mag.
+19LeonieundAndreasverreisennieohne ihrenHundMax.
+a
+UrlaubamMeer-Adria Italien Lido di Jesolo Wohnung
+b
+bewusst.er.leben MARE Vitality Hotel`;
+    const items = extractMatchingItems(ocr, 13, 19);
+    expect(items.get(13)?.prompt).toMatch(/Anna/i);
+    expect(items.get(15)?.prompt).toMatch(/Martin/i);
+    expect(items.get(16)?.prompt).toMatch(/Ilse/i);
+    expect(items.get(17)?.prompt).toMatch(/Jutta/i);
+    expect(items.get(18)?.prompt).toMatch(/Ben/i);
+    expect(items.get(19)?.prompt).toMatch(/Leonie/i);
+  });
+
   it("extracts 6 Lesen Teil1 RF statements from MT01 fixture pattern", () => {
     const prompt = `1
 Teil 1

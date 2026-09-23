@@ -220,9 +220,10 @@ export function B1ExamBankPanel({ exams, alwaysShow = true, onOpenBuilder }: Pro
                       <th className="py-2 pr-3 font-medium">Modelltest</th>
                       <th className="py-2 pr-3 font-medium">Statut</th>
                       <th className="py-2 pr-3 font-medium">Progression</th>
-                      <th className="py-2 pr-3 font-medium">Questions</th>
-                      <th className="py-2 pr-3 font-medium">OCR</th>
-                      <th className="py-2 pr-3 font-medium">Audios</th>
+                      <th className="py-2 pr-3 font-medium">Placeholders</th>
+                      <th className="py-2 pr-3 font-medium">Clés manquantes</th>
+                      <th className="py-2 pr-3 font-medium">Audio vérifié</th>
+                      <th className="py-2 pr-3 font-medium">Barème</th>
                       <th className="py-2 pr-3 font-medium">Blocages</th>
                       <th className="py-2 font-medium">Actions</th>
                     </tr>
@@ -253,16 +254,34 @@ export function B1ExamBankPanel({ exams, alwaysShow = true, onOpenBuilder }: Pro
                             {readiness.progress}%
                           </p>
                         </td>
-                        <td className="py-3 pr-3 tabular-nums">{readiness.questionCount}</td>
                         <td className="py-3 pr-3 tabular-nums">
-                          {readiness.pagesNeedingReview > 0 ? (
-                            <Status tone="amber">{readiness.pagesNeedingReview} restant(s)</Status>
+                          {readiness.placeholderCount > 0 ? (
+                            <Status tone="amber">{readiness.placeholderCount}</Status>
                           ) : (
-                            <Status tone="green">OK</Status>
+                            <Status tone="green">0</Status>
                           )}
                         </td>
                         <td className="py-3 pr-3 tabular-nums">
-                          {readiness.audioReady}/{readiness.audioTotal}
+                          {readiness.missingKeysCount > 0 ? (
+                            <Status tone="amber">{readiness.missingKeysCount}</Status>
+                          ) : (
+                            <Status tone="green">0</Status>
+                          )}
+                        </td>
+                        <td className="py-3 pr-3 tabular-nums">
+                          {readiness.audioVerified}/{readiness.audioSlotsTotal}
+                          <p className="text-[10px] text-muted-foreground">
+                            fichiers {readiness.audioReady}/{readiness.audioTotal}
+                          </p>
+                        </td>
+                        <td className="py-3 pr-3">
+                          {readiness.scoringStatus === "provisional_needs_review" ? (
+                            <Status tone="amber">Barème interne, à confirmer</Status>
+                          ) : readiness.scoringStatus === "official" ? (
+                            <Status tone="green">Officiel</Status>
+                          ) : (
+                            <Status tone="amber">Inconnu</Status>
+                          )}
                         </td>
                         <td className="py-3 pr-3">
                           {readiness.blockers.length === 0 ? (
@@ -290,6 +309,84 @@ export function B1ExamBankPanel({ exams, alwaysShow = true, onOpenBuilder }: Pro
                             </Button>
                             <Button
                               size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                toast.message("Anomalies", {
+                                  description: [
+                                    `Placeholders: ${readiness.placeholderCount}`,
+                                    `Clés manquantes: ${readiness.missingKeysCount}`,
+                                    `OCR à vérifier: ${readiness.pagesNeedingReview}`,
+                                    `Audios vérifiés: ${readiness.audioVerified}/${readiness.audioSlotsTotal}`,
+                                    `Barème: ${readiness.scoringStatus}`,
+                                    `Tests E2E: non exécutés`,
+                                    `Blocages: ${readiness.blockers.join(" · ") || "aucun"}`,
+                                  ].join(" · "),
+                                })
+                              }
+                            >
+                              Voir les anomalies
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedId(exam.id);
+                                toast.message("Comparer au PDF", {
+                                  description:
+                                    "Ouvrez l’aperçu OCR ci-dessous (page source dans les métadonnées). Ne remplacez jamais un placeholder par du texte inventé.",
+                                });
+                              }}
+                            >
+                              Comparer au PDF
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedId(exam.id);
+                                toast.message("Audios Hören", {
+                                  description: `Vérifiés contenu ${readiness.audioVerified}/${readiness.audioSlotsTotal} · Fichiers ${readiness.audioReady}/${readiness.audioTotal} · Statut: needs_review tant que l’annonce Teil n’est pas entendue`,
+                                });
+                              }}
+                            >
+                              <Play className="mr-1 size-3.5" />
+                              Écouter les audios
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                toast.message("Tester comme étudiant", {
+                                  description:
+                                    exam.status === "published"
+                                      ? "Examen publié — ouvrir le parcours étudiant."
+                                      : "Examen en brouillon — utilisez une prévisualisation sécurisée Admin/Teacher. Ne publiez pas pour tester.",
+                                })
+                              }
+                            >
+                              Tester comme étudiant
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                toast.message(`Rapport de complétude · ${exam.code}`, {
+                                  description: [
+                                    `Progression ${readiness.progress}% (ne compte pas audio non vérifié / placeholder / barème provisoire)`,
+                                    `Prêt publication: ${readiness.readyForPublish ? "oui" : "non"}`,
+                                    `Placeholders ${readiness.placeholderCount}`,
+                                    `Clés manquantes ${readiness.missingKeysCount}`,
+                                    `Audio contenu ${readiness.audioVerified}/${readiness.audioSlotsTotal}`,
+                                    `Barème: Barème pédagogique interne, à confirmer (${readiness.scoringStatus})`,
+                                    readiness.blockers.slice(0, 6).join(" · ") || "aucun blocage",
+                                  ].join(" · "),
+                                })
+                              }
+                            >
+                              Rapport de complétude
+                            </Button>
+                            <Button
+                              size="sm"
                               variant="secondary"
                               onClick={() => {
                                 setEditExamId((id) => (id === exam.id ? null : exam.id));
@@ -298,14 +395,6 @@ export function B1ExamBankPanel({ exams, alwaysShow = true, onOpenBuilder }: Pro
                             >
                               <Pencil className="mr-1 size-3.5" />
                               Modifier
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setSelectedId(exam.id)}
-                            >
-                              <Play className="mr-1 size-3.5" />
-                              Tester
                             </Button>
                             <Button
                               size="sm"

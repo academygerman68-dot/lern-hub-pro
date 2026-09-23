@@ -21,6 +21,9 @@ dist-ssr
 .env.*
 !.env.example
 
+# Local scratch (audios, OCR audits, key renders)
+tmp/
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

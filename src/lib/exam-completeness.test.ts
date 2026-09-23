@@ -121,7 +121,7 @@ describe("exam completeness — Hören audio", () => {
     expect(report.issues.some((i) => i.includes("OCR non validé"))).toBe(true);
   });
 
-  it("flags Audio Hören non confirmé when media present but unverified", () => {
+  it("flags Audio Hören non vérifié (contenu) when media present but not content_verified", () => {
     const report = validateExamCompleteness([
       {
         id: "h-1",
@@ -141,8 +141,31 @@ describe("exam completeness — Hören audio", () => {
       },
     ]);
     expect(report.ok).toBe(false);
-    expect(report.issues.some((i) => i.includes("Audio Hören non confirmé"))).toBe(true);
+    expect(report.issues.some((i) => i.includes("Audio Hören non vérifié (contenu)"))).toBe(
+      true,
+    );
     expect(report.issues.some((i) => i.includes("OCR non validé"))).toBe(true);
+  });
+
+  it("flags Barème provisoire and Placeholder OCR", () => {
+    const report = validateExamCompleteness([
+      {
+        id: "p1",
+        prompt: "Frage 3 — OCR unvollständig",
+        type: "true_false",
+        points: 1,
+        skill: "lesen",
+        sectionTitle: "Lesen",
+        metadata: {
+          transform_status: "placeholder",
+          points_rubric: "provisional_needs_review",
+        },
+        correct_values: ["richtig"],
+      },
+    ]);
+    expect(report.ok).toBe(false);
+    expect(report.issues.some((i) => i.includes("Barème provisoire"))).toBe(true);
+    expect(report.issues.some((i) => i.includes("Placeholder OCR"))).toBe(true);
   });
 
   it("does not flag A1 when OCR/audio verification metadata absent", () => {

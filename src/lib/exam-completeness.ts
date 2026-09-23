@@ -23,6 +23,7 @@ export type ExamCompletenessQuestion = {
   sectionTitle: string;
   correct_values?: string[] | null;
   teacher_payload?: Record<string, unknown> | Json | null;
+  options?: Array<{ label?: string | null; value?: string | null }> | null;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -97,11 +98,19 @@ export function validateExamCompleteness(
       const verification = meta?.["audio_verification_status"];
       const isOcrDraft =
         meta?.["needs_review"] === true || meta?.["transcription_status"] === "ocr_unverified";
-      if (verification != null && verification !== "confirmed") {
-        issues.push(`Audio Hören non confirmé · « ${label} »`);
+      if (verification != null && verification !== "content_verified") {
+        issues.push(`Audio Hören non vérifié (contenu) · « ${label} »`);
       } else if (verification == null && isOcrDraft) {
         issues.push(`Audio Hören non confirmé · « ${label} »`);
       }
+    }
+
+    if (meta?.["points_rubric"] === "provisional_needs_review") {
+      issues.push(`Barème provisoire · « ${label} »`);
+    }
+
+    if (meta?.["transform_status"] === "placeholder") {
+      issues.push(`Placeholder OCR · « ${label} »`);
     }
 
     if (q.type === "true_false" || q.type === "single_choice" || q.type === "multiple_choice") {

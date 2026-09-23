@@ -567,10 +567,87 @@ export function extractSingleChoiceItems(
     result.set(cur.n, parseChunk(work.slice(cur.index, end).trim()));
   }
 
+  /** Stem lines often end with … / ... (OCR may glue the number). */
+  const isStemLine = (l: string) =>
+    /\.\.\.\s*$|…\s*$/.test(l) ||
+    /geht\s*es\s*darum/i.test(l) ||
+    (/^[A-ZÄÖÜ]/.test(l.replace(/^\d+\s*/, "")) &&
+      /(erkennt man|geht es|stimmen Sie|meint|sagt|w[aä]hlt)/i.test(l));
+
+  /** Split a long chunk that ate following unnumbered a/b/c questions. */
+  const expandUnnumberedStems = (startN: number, chunkRaw: string) => {
+    const lines = chunkRaw
+      .replace(/^(?:[\[@])?\s*\d{1,2}\s*/, "")
+      .split(/\n/)
+      .map((l) => l.trim())
+      .filter(
+        (l) =>
+          l &&
+          !/^(LESEN|HOREN|HÖREN|Teil\s*\d+|WahlenSie.*|LesenSie.*|auseiner|\d{1,3}$)/i.test(l) &&
+          !/^Zertifikat/i.test(l),
+      );
+    if (lines.length < 4) return;
+
+    const stemIdx: number[] = [];
+    for (let li = 0; li < lines.length; li++) {
+      if (li === 0 || isStemLine(lines[li]!)) stemIdx.push(li);
+    }
+    // Dedupe adjacent
+    const starts = stemIdx.filter((v, i, a) => i === 0 || v - (a[i - 1] ?? -99) > 1);
+    if (starts.length < 2) return;
+
+    for (let si = 0; si < starts.length; si++) {
+      const n = startN + si;
+      if (n > to) break;
+      const fromL = starts[si]!;
+      const toL = si + 1 < starts.length ? starts[si + 1]! : lines.length;
+      const slice = lines.slice(fromL, toL);
+      if (slice.length < 2) continue;
+      const parsed = parseChunk(slice.join("\n"));
+      if (parsed.prompt.length > 5 && parsed.options.length === 3) {
+        result.set(n, {
+          ...parsed,
+          status: "needs_review", // OCR reparse — visual confirmation still required
+        });
+      }
+    }
+  };
+
+  // When a numbered item swallowed following unnumbered stems (Q8/Q9…), expand it
+  for (const [n, item] of [...result.entries()]) {
+    const optTexts = item.options.map((o) => o.text).join("\n");
+    const fat =
+      item.options.length === 3 &&
+      (/\.\.\.|…/.test(optTexts) || /erkennt man|Osterreicher|Deutschen/i.test(optTexts));
+    if (!fat && item.prompt.split(/\s+/).length < 40) continue;
+    const marker = markers.find((x) => x.n === n);
+    if (!marker) continue;
+    const end =
+      markers.find((x) => x.n > n)?.index ??
+      markers[markers.findIndex((x) => x.n === n) + 1]?.index ??
+      work.length;
+    expandUnnumberedStems(n, work.slice(marker.index, end));
+  }
+
+  // Also try expand from first marker across full remaining block when many missing
+  const missingEarly = [];
+  for (let n = from; n <= to; n++) if (!result.has(n) || !result.get(n)!.options.length) missingEarly.push(n);
+  if (missingEarly.length > 0 && markers.length > 0) {
+    const first = markers[0]!;
+    const end = markers.length > 1 ? markers[1]!.index : work.length;
+    // Prefer full span from first marker to last content before next numbered band
+    const lastMarker = markers[markers.length - 1]!;
+    const spanEnd =
+      markers.length === 1
+        ? work.length
+        : lastMarker.index + 800;
+    expandUnnumberedStems(first.n, work.slice(first.index, Math.min(work.length, spanEnd)));
+  }
+
   // Fill gaps: content between consecutive known numbers assigned to missing ids in order
   const expected = [];
   for (let n = from; n <= to; n++) expected.push(n);
-  const missing = expected.filter((n) => !result.has(n));
+  const missing = expected.filter((n) => !result.has(n) || result.get(n)!.options.length < 3);
   if (missing.length > 0) {
     // Q7-style: "In diesemText..." after Beispiel, before first numbered marker
     const inDiesem = work.match(
@@ -583,7 +660,7 @@ export function extractSingleChoiceItems(
 
     // "DieWebStamp..." style missing middle number between neighbors
     for (const miss of [...missing]) {
-      if (result.has(miss)) continue;
+      if (result.has(miss) && result.get(miss)!.options.length === 3) continue;
       const prevN = miss - 1;
       const nextN = miss + 1;
       if (!result.has(prevN) || !markers.some((x) => x.n === nextN)) continue;
@@ -632,12 +709,21 @@ export function extractMatchingItems(
   >();
 
   const markerRe = /(?:^|\n)\s*([1-9][0-9]?)\s*(?=[A-ZÄÖÜa-zäöü])/g;
-  const markers: Array<{ n: number; index: number }> = [];
+  const markers: Array<{ n: number; index: number; rawDigit: number }> = [];
   let m: RegExpExecArray | null;
   while ((m = markerRe.exec(text)) !== null) {
-    const n = Number(m[1]);
+    let n = Number(m[1]);
+    const rawDigit = n;
+    // OCR often drops the tens digit in Teil3 (13–19): "5Martin" → 15 when 15 is in range
+    if (n < from && n >= 5 && n <= 9 && from <= 10 + n && 10 + n <= to) {
+      n = 10 + n;
+    }
     if (n >= from && n <= to && !markers.some((x) => x.n === n)) {
-      markers.push({ n, index: m.index + (m[0].startsWith("\n") ? 1 : 0) });
+      markers.push({
+        n,
+        index: m.index + (m[0].startsWith("\n") ? 1 : 0),
+        rawDigit,
+      });
     }
   }
   markers.sort((a, b) => a.index - b.index);
@@ -673,6 +759,45 @@ export function extractMatchingItems(
       options: adOptions.length > 0 ? adOptions : [],
       status: chunk.length > 10 ? (adOptions.length >= 3 ? "structured" : "needs_review") : "needs_review",
     });
+  }
+
+  // Unnumbered situation lines (e.g. "Jutta hate...") between known markers → fill missing numbers in order
+  const missing = [];
+  for (let n = from; n <= to; n++) if (!result.has(n)) missing.push(n);
+  if (missing.length > 0 && markers.length >= 2) {
+    const lines = text.split(/\n/).map((l) => l.trim()).filter(Boolean);
+    const unnumbered: Array<{ index: number; text: string }> = [];
+    for (let li = 0; li < lines.length; li++) {
+      const line = lines[li]!;
+      if (/^\d{1,2}\s*[A-Za-zÄÖÜäöüß]/.test(line)) continue;
+      if (!/^[A-ZÄÖÜ][a-zäöüßA-ZÄÖÜ]{2,}/.test(line)) continue;
+      if (/^(LESEN|Teil|Anzeige|Beispiel|Urlaub|Romantisches|Chalet|MOSS|Lust|Kontakt)/i.test(line))
+        continue;
+      if (line.length < 20) continue;
+      // Must look like a person situation, not an ad headline
+      if (!/\b(und|ist|hat|möchte|mochte|will|suchen|verbringt|reisen|Urlaub)\b/i.test(line) && line.length < 40)
+        continue;
+      const absIndex = text.indexOf(line);
+      if (absIndex < 0) continue;
+      // Only between first and last situation marker
+      const first = markers[0]!.index;
+      const last = markers[markers.length - 1]!.index;
+      if (absIndex <= first || absIndex >= last) continue;
+      // Skip if already inside a captured chunk near a marker
+      const nearMarker = markers.some((mk) => Math.abs(mk.index - absIndex) < 3);
+      if (nearMarker) continue;
+      unnumbered.push({ index: absIndex, text: line });
+    }
+    unnumbered.sort((a, b) => a.index - b.index);
+    for (let ui = 0; ui < unnumbered.length && ui < missing.length; ui++) {
+      const n = missing[ui]!;
+      if (result.has(n)) continue;
+      result.set(n, {
+        prompt: unnumbered[ui]!.text,
+        options: adOptions.length > 0 ? adOptions : [],
+        status: "needs_review",
+      });
+    }
   }
 
   return result;
