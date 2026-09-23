@@ -17,6 +17,7 @@ export const STUDENT_PAGES = [
   "exams",
   "mock-exam",
   "exam-result",
+  "b1-preview",
   "progress",
   "payments",
   "messages",
@@ -35,6 +36,8 @@ export const TEACHER_PAGES = [
   "materials",
   "assignments",
   "exams",
+  "b1-exam",
+  "b1-preview",
   "corrections",
   "live",
   "meeting",
@@ -55,6 +58,8 @@ export const DIRECTOR_PAGES = [
   "materials",
   "assignments",
   "exams",
+  "b1-exam",
+  "b1-preview",
   "corrections",
   "payments",
   "payroll",
@@ -231,4 +236,7 @@ export interface NavigateOptions {
   lessonId?: string;
   assignmentId?: string;
   recipientId?: string;
+  examCode?: string;
+  examId?: string;
+  b1Tab?: string;
 }

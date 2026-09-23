@@ -1,5 +1,9 @@
 import type { ExamQuestionType, ExamSkill } from "@/services/supabase/exam-service";
 import type { Json } from "@/types/database";
+import {
+  countHorenAudioReady as countHorenAudioReadySlots,
+  countHorenAudioVerifiedSlots,
+} from "@/lib/horen-audio-slots";
 
 export type ExamCompletenessIssue = string;
 
@@ -54,24 +58,29 @@ export function countHorenAudioReady(questions: ExamCompletenessQuestion[]): {
   ready: number;
   total: number;
 } {
-  let ready = 0;
-  let total = 0;
-  for (const q of questions) {
-    if (!questionNeedsHorenAudio(q.skill, q.type)) continue;
-    total += 1;
-    if (questionHasAudio(q)) ready += 1;
-  }
-  return { ready, total };
+  const result = countHorenAudioReadySlots(questions);
+  return { ready: result.ready, total: result.total };
 }
 
 export function validateExamCompleteness(
   questions: ExamCompletenessQuestion[],
 ): ExamCompletenessReport {
   const issues: string[] = [];
-  const { ready: horenReady, total: horenTotal } = countHorenAudioReady(questions);
+  const slotCount = countHorenAudioReadySlots(questions);
+  const { ready: horenReady, total: horenTotal, mode } = slotCount;
 
   if (questions.length === 0) {
     issues.push("Aucune question dans l’examen");
+  }
+
+  if (mode === "slots") {
+    const verified = countHorenAudioVerifiedSlots(questions);
+    if (horenReady < 4) {
+      issues.push(`Pistes Hören incomplètes · ${horenReady}/4`);
+    }
+    if (verified < 4) {
+      issues.push(`Audio Hören non vérifié (contenu) · ${verified}/4`);
+    }
   }
 
   for (const q of questions) {
@@ -83,26 +92,24 @@ export function validateExamCompleteness(
     if (!(Number(q.points) > 0)) {
       issues.push(`Barème invalide · ${q.sectionTitle} · « ${label} »`);
     }
-    if (questionNeedsHorenAudio(q.skill, q.type) && !questionHasAudio(q)) {
-      issues.push(`Audio Hören manquant · « ${label} »`);
+
+    if (mode === "per_question" && questionNeedsHorenAudio(q.skill, q.type)) {
+      if (!questionHasAudio(q)) {
+        issues.push(`Audio Hören manquant · « ${label} »`);
+      } else {
+        const verification = meta?.["audio_verification_status"];
+        const isOcrDraft =
+          meta?.["needs_review"] === true || meta?.["transcription_status"] === "ocr_unverified";
+        if (verification != null && verification !== "content_verified") {
+          issues.push(`Audio Hören non vérifié (contenu) · « ${label} »`);
+        } else if (verification == null && isOcrDraft) {
+          issues.push(`Audio Hören non confirmé · « ${label} »`);
+        }
+      }
     }
 
-    // B1 OCR gates — A1 stays unaffected when these metadata flags are absent.
     if (meta?.["needs_review"] === true || meta?.["transcription_status"] === "ocr_unverified") {
       issues.push(`OCR non validé · « ${label} »`);
-    }
-
-    // Audio verification: only when Hören media is present. Skip classic A1
-    // uploads that never introduced audio_verification_status / OCR flags.
-    if (questionNeedsHorenAudio(q.skill, q.type) && questionHasAudio(q)) {
-      const verification = meta?.["audio_verification_status"];
-      const isOcrDraft =
-        meta?.["needs_review"] === true || meta?.["transcription_status"] === "ocr_unverified";
-      if (verification != null && verification !== "content_verified") {
-        issues.push(`Audio Hören non vérifié (contenu) · « ${label} »`);
-      } else if (verification == null && isOcrDraft) {
-        issues.push(`Audio Hören non confirmé · « ${label} »`);
-      }
     }
 
     if (meta?.["points_rubric"] === "provisional_needs_review") {

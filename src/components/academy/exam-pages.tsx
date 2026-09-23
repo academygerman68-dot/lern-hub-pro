@@ -71,6 +71,7 @@ import {
 } from "@/lib/grade-assist-ux";
 import { AiGradeAssistPanel } from "./ai-grade-assist-panel";
 import { B1ExamBankPanel } from "./b1-exam-bank-panel";
+import { B1StudentRunner } from "./b1-student-runner";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { ExamBuilder } from "./exam-builder";
 import { useAcademy } from "./academy-context";
@@ -518,6 +519,10 @@ function StudentExamRunner() {
           typeof (field as { key?: unknown }).key === "string",
       )
     : [];
+
+  if (examQuery.data && isB1ModelltestCode(examQuery.data.code)) {
+    return <B1StudentRunner mode="live" />;
+  }
 
   return (
     <QueryState
@@ -1789,11 +1794,7 @@ export function DirectorExamsPage() {
         action={<Button onClick={() => setOpen(true)}>+ Créer un examen blanc</Button>}
       />
 
-      <B1ExamBankPanel
-        exams={exams}
-        alwaysShow
-        onOpenBuilder={(examId) => setBuilderExamId(examId)}
-      />
+      <B1ExamBankPanel exams={exams} alwaysShow />
 
       <QueryState
         isLoading={examsQuery.isLoading}

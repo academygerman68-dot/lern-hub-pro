@@ -11,11 +11,13 @@
 
 import type { Json } from "@/types/database";
 import {
-  questionHasAudio,
-  questionNeedsHorenAudio,
   validateExamCompleteness,
   type ExamCompletenessQuestion,
 } from "@/lib/exam-completeness";
+import {
+  countHorenAudioReady,
+  countHorenAudioVerifiedSlots,
+} from "@/lib/horen-audio-slots";
 
 export type B1ReadinessQuestion = {
   id?: string;
@@ -42,9 +44,9 @@ export type B1ReadinessSection = {
 };
 
 export type B1ReadinessExamInput = {
-  code?: string | null;
-  status?: string | null;
-  sections?: B1ReadinessSection[] | null;
+  code?: string | null | undefined;
+  status?: string | null | undefined;
+  sections?: B1ReadinessSection[] | null | undefined;
 };
 
 export type B1ExamReadiness = {
@@ -54,18 +56,23 @@ export type B1ExamReadiness = {
   pagesNeedingReview: number;
   placeholderCount: number;
   missingKeysCount: number;
+  /** Hören tracks with media (out of 4 in slot mode). */
   audioReady: number;
   audioTotal: number;
   /** Distinct Hören audio slots with content_verified (out of 4). */
   audioVerified: number;
   audioSlotsTotal: number;
+  lesenReady: number;
+  lesenTotal: number;
   schreibenTasks: number;
   sprechenTasks: number;
   confirmedAnswerKeys: number;
   scoringStatus: "provisional_needs_review" | "official" | "mixed_or_unknown";
   blockers: string[];
+  reviewSummary: string[];
   readyForPublish: boolean;
   progress: number;
+  progressDetail: Array<{ label: string; earned: number; max: number }>;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -146,22 +153,6 @@ function countMissingKeys(questions: ExamCompletenessQuestion[]): number {
   return n;
 }
 
-function countAudioVerifiedSlots(questions: ExamCompletenessQuestion[]): number {
-  const bySlot = new Map<number, boolean>();
-  for (const q of questions) {
-    if (!questionNeedsHorenAudio(q.skill, q.type)) continue;
-    const meta = asRecord(q.metadata);
-    const slot = Number(meta?.["audio_slot"] ?? meta?.["teil"]);
-    if (!Number.isFinite(slot) || slot < 1 || slot > 4) continue;
-    if (meta?.["audio_verification_status"] === "content_verified") {
-      bySlot.set(slot, true);
-    } else if (!bySlot.has(slot)) {
-      bySlot.set(slot, false);
-    }
-  }
-  return [1, 2, 3, 4].filter((s) => bySlot.get(s) === true).length;
-}
-
 function resolveScoringStatus(
   questions: ExamCompletenessQuestion[],
 ): B1ExamReadiness["scoringStatus"] {
@@ -189,11 +180,11 @@ export function computeB1ExamReadiness(exam: B1ReadinessExamInput): B1ExamReadin
   const completeness = validateExamCompleteness(questions);
 
   let pagesNeedingReview = 0;
-  let audioReady = 0;
-  let audioTotal = 0;
   let schreibenTasks = 0;
   let sprechenTasks = 0;
   let placeholderCount = 0;
+  let lesenReady = 0;
+  let lesenTotal = 0;
 
   for (const q of questions) {
     const meta = asRecord(q.metadata);
@@ -201,9 +192,9 @@ export function computeB1ExamReadiness(exam: B1ReadinessExamInput): B1ExamReadin
       pagesNeedingReview += 1;
     }
     if (isPlaceholderQuestion(q)) placeholderCount += 1;
-    if (questionNeedsHorenAudio(q.skill, q.type)) {
-      audioTotal += 1;
-      if (questionHasAudio(q)) audioReady += 1;
+    if (q.skill === "lesen") {
+      lesenTotal += 1;
+      if (!isPlaceholderQuestion(q) && q.prompt.trim()) lesenReady += 1;
     }
     if (q.skill === "schreiben" || q.type === "writing") schreibenTasks += 1;
     if (q.skill === "sprechen" || q.type === "speaking") sprechenTasks += 1;
@@ -212,8 +203,11 @@ export function computeB1ExamReadiness(exam: B1ReadinessExamInput): B1ExamReadin
   const objectiveTotal = questions.filter((q) => q.skill === "lesen" || q.skill === "hoeren").length;
   const confirmedAnswerKeys = countAnswerKeys(questions);
   const missingKeysCount = countMissingKeys(questions);
+  const audioSlots = countHorenAudioReady(questions);
+  const audioReady = audioSlots.ready;
+  const audioTotal = audioSlots.total;
   const audioSlotsTotal = 4;
-  const audioVerified = countAudioVerifiedSlots(questions);
+  const audioVerified = countHorenAudioVerifiedSlots(questions);
   const scoringStatus = resolveScoringStatus(questions);
   const blockers = [...completeness.issues];
 
@@ -226,15 +220,14 @@ export function computeB1ExamReadiness(exam: B1ReadinessExamInput): B1ExamReadin
   if (missingKeysCount > 0 && !blockers.some((b) => /clé|réponse/i.test(b))) {
     blockers.push(`${missingKeysCount} clé(s) manquante(s) ou incompatible(s)`);
   }
-  if (audioTotal > 0 && audioReady < audioTotal) {
-    const missing = audioTotal - audioReady;
-    if (!blockers.some((b) => b.includes("Audio Hören manquant"))) {
-      blockers.push(`${missing} audio(s) Hören manquant(s)`);
+  if (audioReady < audioSlotsTotal) {
+    if (!blockers.some((b) => /Pistes Hören|Audio Hören manquant/i.test(b))) {
+      blockers.push(`Hören : ${audioReady}/4 pistes téléversées`);
     }
   }
   if (audioVerified < audioSlotsTotal) {
-    if (!blockers.some((b) => /non vérifié \(contenu\)|content_verified/i.test(b))) {
-      blockers.push(`Audio Hören vérifié ${audioVerified}/${audioSlotsTotal}`);
+    if (!blockers.some((b) => /non vérifié \(contenu\)|confirmée/i.test(b))) {
+      blockers.push(`Vérification audio : ${audioVerified}/4 confirmée`);
     }
   }
   if (scoringStatus === "provisional_needs_review") {
@@ -286,6 +279,48 @@ export function computeB1ExamReadiness(exam: B1ReadinessExamInput): B1ExamReadin
 
   progress = Math.max(0, Math.min(100, progress));
 
+  const reviewSummary: string[] = [];
+  if (placeholderCount > 0) reviewSummary.push(`${placeholderCount} éléments à vérifier`);
+  if (audioVerified < audioSlotsTotal) {
+    reviewSummary.push(`${audioSlotsTotal - audioVerified} audios non confirmés`);
+  }
+  if (scoringStatus === "provisional_needs_review") {
+    reviewSummary.push("Barème à confirmer");
+  }
+
+  const progressDetail = [
+    { label: "Structure", earned: questions.length > 0 ? weights.structure : 0, max: weights.structure },
+    {
+      label: "Transcription (hors placeholders)",
+      earned:
+        questions.length > 0
+          ? Math.round(
+              (Math.max(0, questions.length - placeholderCount) / questions.length) *
+                weights.nonPlaceholder,
+            )
+          : 0,
+      max: weights.nonPlaceholder,
+    },
+    {
+      label: "Audios vérifiés (contenu)",
+      earned: Math.round((audioVerified / audioSlotsTotal) * weights.audioVerified),
+      max: weights.audioVerified,
+    },
+    {
+      label: "Corrigés objectifs",
+      earned:
+        objectiveTotal > 0
+          ? Math.round((confirmedAnswerKeys / objectiveTotal) * weights.keys)
+          : 0,
+      max: weights.keys,
+    },
+    {
+      label: "Barème confirmé",
+      earned: scoringStatus === "official" ? weights.scoring : 0,
+      max: weights.scoring,
+    },
+  ];
+
   return {
     examCode,
     status,
@@ -297,13 +332,17 @@ export function computeB1ExamReadiness(exam: B1ReadinessExamInput): B1ExamReadin
     audioTotal,
     audioVerified,
     audioSlotsTotal,
+    lesenReady,
+    lesenTotal,
     schreibenTasks,
     sprechenTasks,
     confirmedAnswerKeys,
     scoringStatus,
     blockers: [...new Set(blockers)],
+    reviewSummary,
     readyForPublish: readyForPublish && completeness.ok,
     progress,
+    progressDetail,
   };
 }
 

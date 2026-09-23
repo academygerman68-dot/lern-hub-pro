@@ -56,7 +56,7 @@ describe("b1-exam-readiness", () => {
     expect(readiness.examCode).toBe("B1-MT01");
     expect(readiness.questionCount).toBe(2);
     expect(readiness.pagesNeedingReview).toBe(2);
-    expect(readiness.audioTotal).toBe(1);
+    expect(readiness.audioTotal).toBe(4);
     expect(readiness.audioReady).toBe(0);
     expect(readiness.audioVerified).toBe(0);
     expect(readiness.schreibenTasks).toBe(1);

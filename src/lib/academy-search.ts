@@ -9,6 +9,9 @@ export function parseAcademySearch(search: Record<string, unknown>): NavigateOpt
     "lessonId",
     "assignmentId",
     "recipientId",
+    "examCode",
+    "examId",
+    "b1Tab",
   ] as const) {
     const value = search[key];
     if (typeof value === "string" && value.trim() && value.length <= 200)

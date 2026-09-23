@@ -11,6 +11,7 @@ import {
 } from "./student-extra";
 import { MaterialsLibraryPage, StudentLearningPage } from "./academic-pages";
 import { StudentExamsPage } from "./exam-pages";
+import { B1StudentRunner } from "./b1-student-runner";
 import { LiveClassesPage } from "./live-pages";
 import { StudentPaymentsPage } from "./finance-pages";
 import { useAcademy } from "./academy-context";
@@ -74,6 +75,7 @@ export function StudentPages({ page: pageProp }: { page?: AcademyPage } = {}) {
     return <Assignments detail={page === "assignment-detail"} />;
   if (page === "exams" || page === "mock-exam" || page === "exam-result")
     return <StudentExamsPage mode={page} />;
+  if (page === "b1-preview") return <B1StudentRunner mode="preview" />;
   if (page === "progress") return <Progress />;
   if (page === "payments") return <StudentPaymentsPage />;
   if (page === "messages") return <Messages />;

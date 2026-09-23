@@ -57,6 +57,8 @@ import {
 } from "./academic-pages";
 import { GroupProgressPage } from "./group-progress-page";
 import { DirectorExamsPage } from "./exam-pages";
+import { B1ExamWorkspace } from "./b1-exam-workspace";
+import { B1StudentRunner } from "./b1-student-runner";
 import { LiveClassesPage } from "./live-pages";
 import { FinancePages } from "./finance-pages";
 import { useClassSelection } from "./class-selection";
@@ -81,6 +83,8 @@ export function TeacherPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "calendar") return <CalendarPage />;
   if (page === "materials") return <MaterialsLibraryPage />;
   if (page === "exams") return <DirectorExamsPage />;
+  if (page === "b1-exam") return <B1ExamWorkspace />;
+  if (page === "b1-preview") return <B1StudentRunner mode="preview" />;
   if (page === "live" || page === "meeting")
     return <LiveClassesPage meeting={page === "meeting"} />;
   if (page === "recordings") return <RecordingsPage />;
@@ -229,6 +233,8 @@ export function DirectorPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "teachers") return <Teachers />;
   if (page === "courses" || page === "levels") return <DirectorCoursesPage />;
   if (page === "exams") return <DirectorExamsPage />;
+  if (page === "b1-exam") return <B1ExamWorkspace />;
+  if (page === "b1-preview") return <B1StudentRunner mode="preview" />;
   if (page === "payments" || page === "subscriptions" || page === "invoices" || page === "payroll")
     return <FinancePages mode={page === "payroll" ? "payments" : page} />;
   if (page === "audit") return <AuditPage />;
