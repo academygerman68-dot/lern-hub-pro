@@ -120,7 +120,7 @@ export function validateExamCompleteness(
       issues.push(`Placeholder OCR · « ${label} »`);
     }
 
-    if (q.type === "true_false" || q.type === "single_choice" || q.type === "multiple_choice") {
+    if (q.type === "true_false" || q.type === "single_choice" || q.type === "multiple_choice" || q.type === "listening" || q.type === "matching") {
       if (!q.correct_values?.length) {
         issues.push(`Réponse correcte manquante · « ${label} »`);
       }

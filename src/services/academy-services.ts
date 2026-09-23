@@ -843,6 +843,12 @@ export const ExamService = {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseExamService.clearQuestionAudio(questionId);
   },
+  async confirmHorenSlotVerification(
+    input: Parameters<typeof SupabaseExamService.confirmHorenSlotVerification>[0],
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.confirmHorenSlotVerification(input);
+  },
   async getQuestionAudioSignedUrl(
     question: Parameters<typeof SupabaseExamService.getQuestionAudioSignedUrl>[0],
     expiresIn?: number,

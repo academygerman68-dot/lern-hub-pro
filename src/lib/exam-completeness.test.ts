@@ -168,6 +168,33 @@ describe("exam completeness — Hören audio", () => {
     expect(report.issues.some((i) => i.includes("Placeholder OCR"))).toBe(true);
   });
 
+  it("flags missing keys for listening and matching", () => {
+    const report = validateExamCompleteness([
+      {
+        id: "m1",
+        prompt: "Zuordnung",
+        type: "matching",
+        points: 1,
+        skill: "lesen",
+        sectionTitle: "Lesen",
+        correct_values: null,
+      },
+      {
+        id: "l1",
+        prompt: "Hören Frage",
+        type: "listening",
+        points: 1,
+        skill: "hoeren",
+        sectionTitle: "Hören",
+        media_bucket: "course-materials",
+        media_path: "exams/a1/h1.mp3",
+        correct_values: [],
+      },
+    ]);
+    expect(report.ok).toBe(false);
+    expect(report.issues.filter((i) => i.includes("Réponse correcte manquante"))).toHaveLength(2);
+  });
+
   it("does not flag A1 when OCR/audio verification metadata absent", () => {
     const report = validateExamCompleteness([
       {

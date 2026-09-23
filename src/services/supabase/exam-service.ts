@@ -266,6 +266,49 @@ export const SupabaseExamService = {
     return data;
   },
 
+  /**
+   * Staff confirmation after real listening of one Hören Teil.
+   * Updates all questions sharing the slot + optional exam_audio_tracks inventory row.
+   * Playback authority remains question media_path / getExam signed URLs.
+   */
+  async confirmHorenSlotVerification(input: {
+    examId: string;
+    partNumber: number;
+    verifiedBy: string;
+  }) {
+    if (input.partNumber < 1 || input.partNumber > 4) {
+      throw new Error("Teil Hören invalide (1–4).");
+    }
+    const supabase = requireClient();
+    const structure = await SupabaseExamService.listExamStructure(input.examId);
+    const hoerenQs = structure
+      .filter((s) => s.skill === "hoeren")
+      .flatMap((s) => s.questions ?? [])
+      .filter((q) => {
+        const meta = asMetaRecord(q.metadata);
+        const slot = Number(meta["audio_slot"] ?? meta["teil"]);
+        return slot === input.partNumber;
+      });
+    if (hoerenQs.length === 0) {
+      throw new Error(`Aucune question Hören pour le Teil ${input.partNumber}.`);
+    }
+    const verifiedAt = new Date().toISOString();
+    for (const q of hoerenQs) {
+      const meta = asMetaRecord(q.metadata);
+      meta["audio_verification_status"] = "content_verified";
+      meta["audio_verified_at"] = verifiedAt;
+      meta["audio_verified_by"] = input.verifiedBy;
+      const { error } = await supabase
+        .from("exam_questions")
+        .update({ metadata: meta as Json })
+        .eq("id", q.id);
+      if (error) throw error;
+    }
+    // exam_audio_tracks remains admin inventory only — keep in sync via ops scripts/migration.
+    // Playback authority: question media_path → getExam signed URL.
+    return { partNumber: input.partNumber, questionCount: hoerenQs.length, verifiedAt };
+  },
+
   async listAll(): Promise<ExamListItem[]> {
     const { data, error } = await requireClient()
       .from("exams")

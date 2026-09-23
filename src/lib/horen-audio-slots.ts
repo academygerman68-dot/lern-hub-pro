@@ -78,6 +78,31 @@ export function countHorenAudioVerifiedSlots(questions: AudioQuestion[]): number
   return [1, 2, 3, 4].filter((s) => bySlot.get(s) === true).length;
 }
 
+/**
+ * Authority for student playback remains question media_path / signed URL via getExam.
+ * exam_audio_tracks is an admin inventory mirror — detect divergence only.
+ */
+export function detectHorenTrackInventoryDivergence(input: {
+  questionPathsBySlot: Record<number, string | null | undefined>;
+  inventoryPathsBySlot: Record<number, string | null | undefined>;
+}): string[] {
+  const issues: string[] = [];
+  for (const slot of [1, 2, 3, 4]) {
+    const q = input.questionPathsBySlot[slot]?.trim() || null;
+    const inv = input.inventoryPathsBySlot[slot]?.trim() || null;
+    if (q && inv && q !== inv) {
+      issues.push(`Teil ${slot}: inventory path diverges from question media_path`);
+    }
+    if (q && !inv) {
+      issues.push(`Teil ${slot}: question media present but inventory row missing`);
+    }
+    if (!q && inv) {
+      issues.push(`Teil ${slot}: inventory row without question media_path`);
+    }
+  }
+  return issues;
+}
+
 export function listHorenAudioSlots(questions: AudioQuestion[]): Array<{
   part: number;
   hasAudio: boolean;

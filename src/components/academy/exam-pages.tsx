@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Clock3, Flag, Headphones } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,6 @@ import {
   useCreateExam,
   useExam,
   useExamAnswers,
-  useExamAttempt,
   useExamAttemptReview,
   useExamAttemptsForExam,
   useExamResult,
@@ -21,10 +20,7 @@ import {
   useMyExamAttempts,
   usePublishExam,
   usePublishedExams,
-  useSaveExamAnswer,
   useStartExam,
-  useSubmitExam,
-  useUploadOralExamAnswer,
 } from "@/hooks/use-academy-data";
 import { ExamService, GradeAssistService } from "@/services/academy-services";
 import type { GradeAssistSuggestion } from "@/services/supabase/grade-assist-service";
@@ -70,14 +66,22 @@ import {
   GRADE_ASSIST_NEEDS_TEXT_MESSAGE,
 } from "@/lib/grade-assist-ux";
 import { AiGradeAssistPanel } from "./ai-grade-assist-panel";
-import { B1ExamBankPanel } from "./b1-exam-bank-panel";
-import { B1StudentRunner } from "./b1-student-runner";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { ExamBuilder } from "./exam-builder";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
 import { PageHeader, Status, Surface, ProgressLine } from "./primitives";
-import { isB1ModelltestCode } from "@/lib/b1-exam-readiness";
+import { StudentExamRunner } from "./student-exam-runner";
+import { computeB1ExamReadiness, isB1ModelltestCode } from "@/lib/b1-exam-readiness";
+import { auditB1ExamContent } from "@/lib/b1-content-status";
+import {
+  draftBlockersSummary,
+  EXAM_LEVEL_FILTERS,
+  filterExamsByLevel,
+  sortExamsForCatalog,
+  type ExamLevelFilter,
+} from "@/lib/exam-runner-ux";
+import { countHorenAudioReady, countHorenAudioVerifiedSlots } from "@/lib/horen-audio-slots";
 
 const EXAM_ID_KEY = "ga_active_exam_id";
 const ATTEMPT_ID_KEY = "ga_active_attempt_id";
@@ -158,10 +162,12 @@ function progressTone(label: ReturnType<typeof studentExamProgressLabel>) {
 }
 
 export function StudentExamsPage({ mode }: { mode: string }) {
-  if (mode === "mock-exam") return <StudentExamRunner />;
+  if (mode === "mock-exam") return <StudentExamRunner mode="live" />;
   if (mode === "exam-result") return <StudentExamResult />;
   return <StudentExamCatalog />;
 }
+
+export { StudentExamRunner, StudentExamStaffPreview } from "./student-exam-runner";
 
 function StudentExamCatalog() {
   const { navigate } = useAcademy();
@@ -340,508 +346,6 @@ function StudentExamCatalog() {
   );
 }
 
-function StudentExamRunner() {
-  const { navigate } = useAcademy();
-  const session = readExamSession();
-  const examQuery = useExam(session.examId);
-  const attemptQuery = useExamAttempt(session.attemptId);
-  const answersQuery = useExamAnswers(session.attemptId);
-  const saveAnswer = useSaveExamAnswer();
-  const uploadOral = useUploadOralExamAnswer();
-  const submitExam = useSubmitExam();
-  const [index, setIndex] = useState(0);
-  const [now, setNow] = useState(Date.now());
-  const [localAnswers, setLocalAnswers] = useState<Record<string, Json>>({});
-  const [flagged, setFlagged] = useState<Record<string, boolean>>({});
-  const [oralPreviewUrls, setOralPreviewUrls] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const next: Record<string, Json> = {};
-    const flags: Record<string, boolean> = {};
-    for (const row of answersQuery.data ?? []) {
-      next[row.question_id] = row.answer;
-      flags[row.question_id] = row.flagged;
-    }
-    setLocalAnswers(next);
-    setFlagged(flags);
-
-    let cancelled = false;
-    void (async () => {
-      const urls: Record<string, string> = {};
-      for (const row of answersQuery.data ?? []) {
-        if (!hasOralAudioAnswer(row)) continue;
-        try {
-          const signed = await ExamService.getAnswerAudioSignedUrl(row);
-          if (signed) urls[row.question_id] = signed;
-        } catch {
-          /* ignore preview errors while typing */
-        }
-      }
-      if (!cancelled) setOralPreviewUrls(urls);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [answersQuery.data]);
-
-  const questions = useMemo(
-    () =>
-      (examQuery.data?.sections ?? []).flatMap((section) =>
-        (section.questions ?? []).map((q) => ({
-          ...q,
-          skill: section.skill,
-          sectionTitle: section.title,
-        })),
-      ),
-    [examQuery.data],
-  );
-
-  const current = questions[index];
-  const currentMeta = current ? questionMeta(current.metadata) : {};
-  const remaining = formatRemaining(attemptQuery.data?.expires_at);
-  const expired =
-    attemptQuery.data?.expires_at != null &&
-    new Date(attemptQuery.data.expires_at).getTime() <= now;
-
-  useEffect(() => {
-    if (!expired || !session.attemptId || submitExam.isPending) return;
-    if (attemptQuery.data?.status !== "in_progress") return;
-    submitExam.mutate(session.attemptId, {
-      onSuccess: () => {
-        toast.message("Temps écoulé — examen envoyé");
-        navigate("exam-result");
-      },
-    });
-  }, [expired, session.attemptId, attemptQuery.data?.status, submitExam, navigate]);
-
-  const persist = (questionId: string, answer: Json, isFlagged?: boolean) => {
-    if (!session.attemptId) return;
-    saveAnswer.mutate({
-      attemptId: session.attemptId,
-      questionId,
-      answer,
-      flagged: isFlagged ?? flagged[questionId] ?? false,
-    });
-  };
-
-  const isSpeakingType = current ? isSpeakingQuestionType(current.type) : false;
-  const isWritingType = current ? isWritingOnlyQuestionType(current.type) : false;
-  const isFormFill = current?.type === "form_fill";
-  const writingText = isWritingType && current ? answerValue(localAnswers[current.id]) : "";
-  const writingStats = countWritingStats(writingText);
-  const formFillDraft = isFormFill && current ? formFillAnswer(localAnswers[current.id]) : {};
-  const formFillSerialized = JSON.stringify(formFillDraft);
-
-  useEffect(() => {
-    if (!current || !session.attemptId) return;
-    if (!isManualQuestionType(current.type)) return;
-    const value = localAnswers[current.id];
-    if (value === undefined) return;
-    const timer = window.setTimeout(() => {
-      persist(current.id, value);
-    }, 800);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce local draft only
-  }, [current?.id, current?.type, writingText, session.attemptId]);
-
-  useEffect(() => {
-    if (!current || !session.attemptId || current.type !== "form_fill") return;
-    const value = localAnswers[current.id];
-    if (value === undefined) return;
-    const timer = window.setTimeout(() => {
-      persist(current.id, value);
-    }, 800);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce form_fill draft
-  }, [current?.id, current?.type, formFillSerialized, session.attemptId]);
-
-  useEffect(() => {
-    const inProgress = attemptQuery.data?.status === "in_progress";
-    if (!inProgress) return;
-
-    const hasWritingOrSpeakingDraft = Object.entries(localAnswers).some(([questionId, raw]) => {
-      const q = questions.find((item) => item.id === questionId);
-      if (!q) return false;
-      if (isWritingOnlyQuestionType(q.type)) {
-        return typeof raw === "string" ? raw.trim().length > 0 : Boolean(raw);
-      }
-      if (isSpeakingQuestionType(q.type)) {
-        return hasOralAudioAnswer({ answer: raw }) || Boolean(parseOralAnswer(raw));
-      }
-      return false;
-    });
-
-    if (!hasWritingOrSpeakingDraft) return;
-
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [attemptQuery.data?.status, localAnswers, questions]);
-
-  if (!session.examId || !session.attemptId) {
-    return (
-      <Surface className="p-8 text-center">
-        <p className="text-muted-foreground">Aucune session d’examen en cours.</p>
-        <Button className="mt-4" onClick={() => navigate("exams")}>
-          Retour aux examens
-        </Button>
-      </Surface>
-    );
-  }
-
-  const instruction =
-    typeof currentMeta["instruction"] === "string" ? currentMeta["instruction"] : null;
-  const passage = typeof currentMeta["passage"] === "string" ? currentMeta["passage"] : null;
-  const audioUrl = typeof currentMeta["audio_url"] === "string" ? currentMeta["audio_url"] : null;
-  const requirements = Array.isArray(currentMeta["requirements"])
-    ? currentMeta["requirements"].filter((item): item is string => typeof item === "string")
-    : [];
-  const recommendedWords =
-    typeof currentMeta["recommended_words"] === "string" ? currentMeta["recommended_words"] : null;
-  const sprechenRole =
-    typeof currentMeta["role"] === "string" && currentMeta["role"].trim()
-      ? currentMeta["role"].trim()
-      : null;
-  const isPageBundle = currentMeta["import_mode"] === "page_bundle";
-  const formFields = Array.isArray(currentMeta["fields"])
-    ? currentMeta["fields"].filter(
-        (field): field is { key: string; points: number } =>
-          Boolean(field) &&
-          typeof field === "object" &&
-          typeof (field as { key?: unknown }).key === "string",
-      )
-    : [];
-
-  if (examQuery.data && isB1ModelltestCode(examQuery.data.code)) {
-    return <B1StudentRunner mode="live" />;
-  }
-
-  return (
-    <QueryState
-      isLoading={examQuery.isLoading || attemptQuery.isLoading}
-      isError={examQuery.isError || attemptQuery.isError}
-      error={(examQuery.error ?? attemptQuery.error) as Error | null}
-      isEmpty={!current}
-      emptyTitle="Examen indisponible"
-      emptyMessage="Cet examen n’a pas encore de questions."
-    >
-      <div className="mx-auto max-w-5xl">
-        <header className="sticky top-0 z-20 mb-6 border-b border-border bg-background/95 py-4 backdrop-blur">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => navigate("exams")}
-              className="inline-flex items-center gap-2 text-sm text-muted-foreground"
-            >
-              <ArrowLeft className="size-4" />
-              Quitter
-            </button>
-            <div className="min-w-0 flex-1 text-center sm:text-left">
-              <p className="truncate text-sm font-medium">{examQuery.data?.title}</p>
-              <p className="text-xs text-muted-foreground">
-                {current ? (SKILL_LABELS[current.skill] ?? current.sectionTitle) : ""} · Question{" "}
-                {index + 1}/{questions.length}
-              </p>
-            </div>
-            <span className="inline-flex items-center gap-2 rounded-md border border-alert/20 bg-alert-soft px-3 py-1.5 text-sm font-medium text-alert">
-              <Clock3 className="size-4" />
-              {remaining}
-            </span>
-          </div>
-          <ProgressLine
-            className="mt-4"
-            value={((index + 1) / Math.max(questions.length, 1)) * 100}
-          />
-        </header>
-
-        <div className="grid gap-6 lg:grid-cols-[1fr_14rem]">
-          <Surface className="p-6 sm:p-8">
-            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              {current ? current.sectionTitle : ""}
-            </p>
-            {instruction ? (
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">{instruction}</p>
-            ) : null}
-            {passage ? (
-              <div className="mt-4 whitespace-pre-wrap rounded-md border border-border bg-muted/30 p-4 text-sm leading-6">
-                {passage}
-              </div>
-            ) : null}
-            <h2 className="mt-4 text-xl font-semibold leading-snug sm:text-2xl">
-              {current?.prompt}
-            </h2>
-
-            {isSpeakingType && sprechenRole ? (
-              <p className="mt-3 text-sm font-medium text-foreground">
-                Rôle : Kandidat {sprechenRole}
-              </p>
-            ) : null}
-
-            {isPageBundle ? (
-              <p className="mt-3 rounded-md border border-dashed border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
-                Page OCR complète (page_bundle) — le texte ci-dessus est la consigne issue du
-                scan ; les items individuels peuvent encore nécessiter une relecture.
-              </p>
-            ) : null}
-
-            {(current?.type === "listening" || current?.skill === "hoeren") && (
-              <div className="mt-5 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2 font-medium text-foreground">
-                  <Headphones className="size-4" />
-                  Audio
-                </div>
-                {audioUrl ? (
-                  <audio
-                    key={audioUrl}
-                    className="mt-3 w-full"
-                    controls
-                    src={audioUrl}
-                    preload="metadata"
-                  >
-                    Votre navigateur ne prend pas en charge l’audio.
-                  </audio>
-                ) : (
-                  <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                    <p className="font-medium">Audio Hören indisponible</p>
-                    <p className="mt-1 text-destructive/90">
-                      {typeof currentMeta["audio_error"] === "string"
-                        ? currentMeta["audio_error"]
-                        : "Aucun fichier audio n’est associé à cette question. Impossible de démarrer l’écoute — contactez votre professeur."}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="mt-6 space-y-3">
-              {(current?.type === "single_choice" ||
-                current?.type === "true_false" ||
-                current?.type === "listening") &&
-                current.options.map((option) => {
-                  const selected = answerValue(localAnswers[current.id]) === option.value;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={`flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left text-sm transition duration-150 ${
-                        selected
-                          ? "border-primary bg-primary/5 font-medium text-foreground shadow-soft"
-                          : "border-border hover:border-primary/40"
-                      }`}
-                      onClick={() => {
-                        setLocalAnswers((prev) => ({ ...prev, [current.id]: option.value }));
-                        persist(current.id, option.value);
-                      }}
-                    >
-                      <span
-                        className={`grid size-4 shrink-0 place-items-center rounded-full border ${
-                          selected ? "border-primary bg-primary" : "border-muted-foreground/40"
-                        }`}
-                        aria-hidden
-                      >
-                        {selected ? (
-                          <span className="size-1.5 rounded-full bg-primary-foreground" />
-                        ) : null}
-                      </span>
-                      <span>{option.label}</span>
-                    </button>
-                  );
-                })}
-
-              {current?.type === "form_fill" && (
-                <div className="space-y-3">
-                  {formFields.map((field) => (
-                    <label key={field.key} className="block text-sm">
-                      <span className="font-medium">{field.key}</span>
-                      <Input
-                        className="mt-1"
-                        value={formFillDraft[field.key] ?? ""}
-                        onChange={(e) => {
-                          const next = {
-                            ...formFillDraft,
-                            [field.key]: e.target.value,
-                          };
-                          setLocalAnswers((prev) => ({ ...prev, [current.id]: next }));
-                        }}
-                        onBlur={() => {
-                          persist(current.id, formFillAnswer(localAnswers[current.id]));
-                        }}
-                      />
-                    </label>
-                  ))}
-                </div>
-              )}
-
-              {isSpeakingType && current && session.attemptId ? (
-                <ExamOralAnswerComposer
-                  disabled={expired || attemptQuery.data?.status !== "in_progress"}
-                  hasAudio={hasOralAudioAnswer({
-                    answer: localAnswers[current.id],
-                    answer_media_path:
-                      (answersQuery.data ?? []).find((row) => row.question_id === current.id)
-                        ?.answer_media_path ?? null,
-                  })}
-                  previewUrl={oralPreviewUrls[current.id] ?? null}
-                  uploading={uploadOral.isPending}
-                  onUpload={async (file) => {
-                    const saved = await uploadOral.mutateAsync({
-                      attemptId: session.attemptId!,
-                      questionId: current.id,
-                      file,
-                      flagged: flagged[current.id] ?? false,
-                    });
-                    setLocalAnswers((prev) => ({ ...prev, [current.id]: saved.answer }));
-                    try {
-                      const signed = await ExamService.getAnswerAudioSignedUrl(saved);
-                      if (signed) {
-                        setOralPreviewUrls((prev) => ({ ...prev, [current.id]: signed }));
-                      }
-                    } catch {
-                      /* preview optional */
-                    }
-                    toast.success("Audio oral enregistré");
-                  }}
-                />
-              ) : null}
-
-              {isWritingType && current && (
-                <div>
-                  {requirements.length > 0 ? (
-                    <ul className="mb-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                      {requirements.map((req) => (
-                        <li key={req}>{req}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  {recommendedWords ? (
-                    <p className="mb-3 text-xs text-muted-foreground">
-                      Nombre de mots conseillé : {recommendedWords}
-                    </p>
-                  ) : null}
-                  <Textarea
-                    className="min-h-52 text-base leading-relaxed"
-                    value={answerValue(localAnswers[current.id])}
-                    placeholder="Saisissez votre réponse…"
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setLocalAnswers((prev) => ({ ...prev, [current.id]: value }));
-                    }}
-                    onBlur={() => {
-                      if (!current) return;
-                      persist(current.id, localAnswers[current.id] ?? "");
-                    }}
-                  />
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {writingStats.words} mot{writingStats.words === 1 ? "" : "s"} ·{" "}
-                    {writingStats.characters} caractère
-                    {writingStats.characters === 1 ? "" : "s"}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  disabled={index === 0}
-                  onClick={() => setIndex((v) => v - 1)}
-                >
-                  Précédent
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={index >= questions.length - 1}
-                  onClick={() => setIndex((v) => v + 1)}
-                >
-                  Suivant
-                </Button>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    if (!current) return;
-                    const next = !(flagged[current.id] ?? false);
-                    setFlagged((prev) => ({ ...prev, [current.id]: next }));
-                    persist(current.id, localAnswers[current.id] ?? null, next);
-                  }}
-                >
-                  <Flag className="size-4" />
-                  {flagged[current?.id ?? ""] ? "Marquée" : "Marquer"}
-                </Button>
-                <Button
-                  disabled={submitExam.isPending}
-                  onClick={() => {
-                    if (!session.attemptId) return;
-                    submitExam.mutate(session.attemptId, {
-                      onSuccess: () => {
-                        toast.success("Examen envoyé");
-                        navigate("exam-result");
-                      },
-                      onError: (err) => toast.error(err.message),
-                    });
-                  }}
-                >
-                  Envoyer
-                </Button>
-              </div>
-            </div>
-          </Surface>
-
-          <Surface className="h-fit p-4">
-            <p className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              Navigation
-            </p>
-            <div className="grid grid-cols-5 gap-2 sm:grid-cols-4 lg:grid-cols-3">
-              {questions.map((q, i) => {
-                const raw = localAnswers[q.id];
-                const answered =
-                  raw !== undefined &&
-                  raw !== null &&
-                  (Boolean(parseOralAnswer(raw)) ||
-                    (typeof raw === "object" && !Array.isArray(raw)
-                      ? Object.values(raw as Record<string, unknown>).some(
-                          (v) => String(v ?? "").trim() !== "",
-                        )
-                      : answerValue(raw) !== ""));
-                const isCurrent = i === index;
-                const isFlagged = flagged[q.id];
-                return (
-                  <button
-                    key={q.id}
-                    type="button"
-                    onClick={() => setIndex(i)}
-                    className={`grid size-9 place-items-center rounded-md text-xs font-medium ${
-                      isCurrent
-                        ? "bg-primary text-primary-foreground"
-                        : answered
-                          ? "bg-secondary text-primary"
-                          : "border border-border text-muted-foreground"
-                    } ${isFlagged ? "ring-2 ring-alert/40" : ""}`}
-                  >
-                    {i + 1}
-                  </button>
-                );
-              })}
-            </div>
-            {saveAnswer.isPending && (
-              <p className="mt-3 text-xs text-muted-foreground">Enregistrement…</p>
-            )}
-          </Surface>
-        </div>
-      </div>
-    </QueryState>
-  );
-}
 
 function StudentExamResult() {
   const { navigate } = useAcademy();
@@ -1722,7 +1226,7 @@ export function StaffExamsPage() {
 }
 
 export function DirectorExamsPage() {
-  const { role } = useAcademy();
+  const { role, navigate } = useAcademy();
   const examsQuery = useAllExams();
   const levelsQuery = useLevels();
   const classesQuery = useClasses();
@@ -1736,6 +1240,10 @@ export function DirectorExamsPage() {
   );
   const [builderExamId, setBuilderExamId] = useState<string | null>(null);
   const [gradingExamId, setGradingExamId] = useState<string | null>(null);
+  const [levelFilter, setLevelFilter] = useState<ExamLevelFilter>("all");
+  const [structureByExam, setStructureByExam] = useState<
+    Record<string, Awaited<ReturnType<typeof ExamService.listExamStructure>>>
+  >({});
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -1762,10 +1270,36 @@ export function DirectorExamsPage() {
       (exam) => isDirectorRole(role) || scopedClassOrLevelItemVisible(exam, teacherScope),
     );
   }, [examsQuery.data, role, teacherScope]);
-  const generalExams = useMemo(
-    () => exams.filter((exam) => !isB1ModelltestCode(exam.code)),
-    [exams],
+  const catalogExams = useMemo(
+    () => sortExamsForCatalog(filterExamsByLevel(exams, levelFilter)),
+    [exams, levelFilter],
   );
+
+  useEffect(() => {
+    const b1Ids = catalogExams
+      .filter((e) => isB1ModelltestCode(e.code) && e.status !== "published")
+      .map((e) => e.id)
+      .filter((id) => !structureByExam[id]);
+    if (b1Ids.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const next: typeof structureByExam = {};
+      await Promise.all(
+        b1Ids.slice(0, 15).map(async (id) => {
+          try {
+            next[id] = await ExamService.listExamStructure(id);
+          } catch {
+            next[id] = [];
+          }
+        }),
+      );
+      if (!cancelled) setStructureByExam((prev) => ({ ...prev, ...next }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load draft B1 readiness once
+  }, [catalogExams.map((e) => e.id).join(",")]);
 
   useEffect(() => {
     if (!isTeacher || classId || !levelId) return;
@@ -1794,13 +1328,24 @@ export function DirectorExamsPage() {
         action={<Button onClick={() => setOpen(true)}>+ Créer un examen blanc</Button>}
       />
 
-      <B1ExamBankPanel exams={exams} alwaysShow />
+      <div className="mb-4 flex flex-wrap gap-2">
+        {EXAM_LEVEL_FILTERS.map((filter) => (
+          <Button
+            key={filter}
+            size="sm"
+            variant={levelFilter === filter ? "default" : "outline"}
+            onClick={() => setLevelFilter(filter)}
+          >
+            {filter === "all" ? "Tous" : filter}
+          </Button>
+        ))}
+      </div>
 
       <QueryState
         isLoading={examsQuery.isLoading}
         isError={examsQuery.isError}
         error={examsQuery.error}
-        isEmpty={!generalExams.length && exams.length === 0}
+        isEmpty={!catalogExams.length}
         emptyTitle="Aucun examen"
         emptyMessage={
           isTeacher
@@ -1810,94 +1355,211 @@ export function DirectorExamsPage() {
         onRetry={() => void examsQuery.refetch()}
       >
         <div className="space-y-3">
-          {generalExams.map((exam) => (
-            <Surface className="p-5" key={exam.id}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="font-semibold">{exam.title}</h2>
-                  <p className="text-sm text-muted-foreground">
-                    {exam.level?.code}{" "}
-                    {exam.class?.name ? `· ${exam.class.name}` : "· Niveau entier"} ·{" "}
-                    {exam.duration_minutes} min
-                    {exam.starts_at ? ` · ${formatFrDate(exam.starts_at)}` : ""}
-                    {` · ${MEDIA_KIND_LABELS[exam.content_kind]}`}
-                  </p>
-                  {exam.instructions || exam.description ? (
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {exam.instructions || exam.description}
+          {catalogExams.map((exam) => {
+            const isB1 = isB1ModelltestCode(exam.code);
+            const sections = structureByExam[exam.id];
+            const readiness =
+              isB1 && sections
+                ? computeB1ExamReadiness({
+                    code: exam.code,
+                    status: exam.status,
+                    sections: sections.map((s) => ({
+                      skill: s.skill,
+                      title: s.title,
+                      questions: (s.questions ?? []).map((q) => ({
+                        id: q.id,
+                        prompt: q.prompt,
+                        type: q.type,
+                        points: q.points,
+                        media_path: q.media_path,
+                        media_bucket: q.media_bucket,
+                        metadata: q.metadata,
+                        options: q.options,
+                        correct_values: q.answer_key?.correct_values ?? null,
+                        teacher_payload: q.answer_key?.teacher_payload ?? null,
+                        answer_key: q.answer_key
+                          ? {
+                              correct_values: q.answer_key.correct_values ?? null,
+                              teacher_payload: q.answer_key.teacher_payload ?? null,
+                            }
+                          : null,
+                      })),
+                    })),
+                  })
+                : null;
+            const contentAudit =
+              isB1 && sections
+                ? auditB1ExamContent({
+                    code: exam.code,
+                    status: exam.status,
+                    sections: sections.map((s) => ({
+                      skill: s.skill,
+                      questions: (s.questions ?? []).map((q) => ({
+                        id: q.id,
+                        prompt: q.prompt,
+                        type: q.type,
+                        sort_order: q.sort_order,
+                        media_path: q.media_path,
+                        media_bucket: q.media_bucket,
+                        metadata: q.metadata,
+                        options: q.options,
+                        correct_values: q.answer_key?.correct_values ?? null,
+                        answer_key: q.answer_key,
+                      })),
+                    })),
+                  })
+                : null;
+            const flatQs =
+              sections?.flatMap((s) =>
+                (s.questions ?? []).map((q) => ({
+                  ...q,
+                  skill: s.skill,
+                })),
+              ) ?? [];
+            const audioSlots = isB1 ? countHorenAudioReady(flatQs) : null;
+            const audioVerified = isB1 ? countHorenAudioVerifiedSlots(flatQs) : null;
+            const draftHint =
+              exam.status !== "published" && readiness
+                ? draftBlockersSummary(readiness.blockers)
+                : null;
+
+            return (
+              <Surface className="p-5" key={exam.id}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="font-semibold">{exam.title}</h2>
+                    <p className="text-sm text-muted-foreground">
+                      {exam.code ? `${exam.code} · ` : ""}
+                      {exam.level?.code}{" "}
+                      {exam.class?.name ? `· ${exam.class.name}` : "· Niveau entier"} ·{" "}
+                      {exam.duration_minutes} min
+                      {exam.starts_at ? ` · ${formatFrDate(exam.starts_at)}` : ""}
+                      {` · ${MEDIA_KIND_LABELS[exam.content_kind]}`}
                     </p>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Status tone={exam.status === "published" ? "green" : "amber"}>
-                    {exam.status === "published" ? "Publié" : "Brouillon"}
-                  </Status>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setBuilderExamId((id) => (id === exam.id ? null : exam.id))}
-                  >
-                    {builderExamId === exam.id ? "Masquer QCM" : "Éditer QCM"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setGradingExamId((id) => (id === exam.id ? null : exam.id))}
-                  >
-                    {gradingExamId === exam.id ? "Masquer corrections" : "Corrections"}
-                  </Button>
-                  {(exam.content_url || exam.storage_path) &&
-                    !isTextContentKind(exam.content_kind) && (
+                    {exam.instructions || exam.description ? (
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {exam.instructions || exam.description}
+                      </p>
+                    ) : null}
+                    {isB1 && audioSlots ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Hören : {audioSlots.ready}/4 pistes disponibles
+                        {audioVerified != null
+                          ? ` · ${audioVerified}/4 pistes vérifiées par écoute`
+                          : ""}
+                      </p>
+                    ) : null}
+                    {contentAudit ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Contenu : {contentAudit.totals.ready} ready ·{" "}
+                        {contentAudit.totals.needs_review} needs_review ·{" "}
+                        {contentAudit.totals.blocked} blocked
+                        {" · "}Barème pédagogique interne, à confirmer
+                      </p>
+                    ) : null}
+                    {draftHint ? (
+                      <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+                        À compléter : {draftHint}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Status tone={exam.status === "published" ? "green" : "amber"}>
+                      {exam.status === "published" ? "Publié" : "Brouillon"}
+                    </Status>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setBuilderExamId((id) => (id === exam.id ? null : exam.id))}
+                    >
+                      {builderExamId === exam.id ? "Masquer" : "Modifier"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setGradingExamId((id) => (id === exam.id ? null : exam.id))}
+                    >
+                      {gradingExamId === exam.id ? "Masquer corrections" : "Corriger"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        navigate("b1-preview", {
+                          examId: exam.id,
+                          ...(exam.code ? { examCode: exam.code } : {}),
+                        })
+                      }
+                    >
+                      Tester
+                    </Button>
+                    {isB1 ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          navigate("b1-exam", {
+                            examCode: exam.code ?? "",
+                            b1Tab: "transcription",
+                          })
+                        }
+                      >
+                        Transcription
+                      </Button>
+                    ) : null}
+                    {(exam.content_url || exam.storage_path) &&
+                      !isTextContentKind(exam.content_kind) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            void ExamService.getExamMaterialUrl(exam)
+                              .then((url) => window.open(url, "_blank", "noopener,noreferrer"))
+                              .catch((err: Error) => toast.error(err.message));
+                          }}
+                        >
+                          Ouvrir
+                        </Button>
+                      )}
+                    {exam.status !== "published" && (
+                      <Button
+                        size="sm"
+                        disabled={publishExam.isPending}
+                        onClick={() =>
+                          publishExam.mutate(exam.id, {
+                            onSuccess: () => toast.success("Examen publié"),
+                            onError: (err) => toast.error(err.message),
+                          })
+                        }
+                      >
+                        Publier
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                        void ExamService.getExamMaterialUrl(exam)
-                          .then((url) => window.open(url, "_blank", "noopener,noreferrer"))
-                          .catch((err: Error) => toast.error(err.message));
+                        if (!window.confirm(`Supprimer l’examen « ${exam.title} » ?`)) return;
+                        archiveExam.mutate(exam.id, {
+                          onSuccess: () => toast.success("Examen archivé"),
+                          onError: (err) => toast.error(err.message),
+                        });
                       }}
                     >
-                      Ouvrir
+                      Supprimer
                     </Button>
-                  )}
-                  {exam.status !== "published" && (
-                    <Button
-                      size="sm"
-                      disabled={publishExam.isPending}
-                      onClick={() =>
-                        publishExam.mutate(exam.id, {
-                          onSuccess: () => toast.success("Examen publié"),
-                          onError: (err) => toast.error(err.message),
-                        })
-                      }
-                    >
-                      Publier
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (!window.confirm(`Supprimer l’examen « ${exam.title} » ?`)) return;
-                      archiveExam.mutate(exam.id, {
-                        onSuccess: () => toast.success("Examen archivé"),
-                        onError: (err) => toast.error(err.message),
-                      });
-                    }}
-                  >
-                    Supprimer
-                  </Button>
+                  </div>
                 </div>
-              </div>
-              {builderExamId === exam.id ? <ExamBuilder examId={exam.id} /> : null}
-              {gradingExamId === exam.id ? (
-                <>
-                  <ExamParticipantRosterPanel examId={exam.id} />
-                  <ExamWritingGradingPanel examId={exam.id} />
-                </>
-              ) : null}
-            </Surface>
-          ))}
+                {builderExamId === exam.id ? <ExamBuilder examId={exam.id} /> : null}
+                {gradingExamId === exam.id ? (
+                  <>
+                    <ExamParticipantRosterPanel examId={exam.id} />
+                    <ExamWritingGradingPanel examId={exam.id} />
+                  </>
+                ) : null}
+              </Surface>
+            );
+          })}
         </div>
       </QueryState>
 

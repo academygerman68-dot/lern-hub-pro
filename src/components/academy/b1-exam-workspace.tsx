@@ -215,7 +215,15 @@ export function B1ExamWorkspace() {
         <Status tone={exam?.status === "published" ? "green" : "amber"}>
           {exam?.status === "published" ? "Publié" : "Brouillon"}
         </Status>
-        <Button size="sm" onClick={() => navigate("b1-preview", { examCode })}>
+        <Button
+          size="sm"
+          onClick={() =>
+            navigate("b1-preview", {
+              examCode,
+              ...(exam?.id ? { examId: exam.id } : {}),
+            })
+          }
+        >
           Tester comme étudiant
         </Button>
       </div>
@@ -356,13 +364,12 @@ export function B1ExamWorkspace() {
 
           <TabsContent value="keys" className="space-y-2">
             <Surface className="p-4 text-sm text-muted-foreground">
-              Les 900 clés objectives sont conservées. Statuts distincts dans le payload Teacher :
+              Les clés objectives sont conservées. Statuts distincts dans le payload Teacher :
               structurally_valid / visually_confirmed / needs_review. Aucune clé n’est marquée
               visually_confirmed sans comparaison PDF.
             </Surface>
             {(bySkill("lesen")?.questions ?? [])
               .concat(bySkill("hoeren")?.questions ?? [])
-              .slice(0, 40)
               .map((q) => (
                 <div key={q.id} className="rounded-md border border-border px-3 py-2 text-sm">
                   #{q.sort_order} · {q.answer_key?.correct_values?.join(", ") || "—"} ·{" "}
@@ -401,20 +408,19 @@ export function B1ExamWorkspace() {
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={() => toast.message("Corriger", { description: "Ouvrez l’onglet Modifier." })}
+                      onClick={() => {
+                        setTab("edit");
+                        toast.success("Ouvrez le constructeur ci-dessous pour corriger la question.");
+                      }}
                     >
-                      Corriger
+                      Ouvrir le constructeur
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() =>
-                        toast.message("Laisser à vérifier", {
-                          description: "Statut needs_review conservé.",
-                        })
-                      }
+                      onClick={() => navigate("exams")}
                     >
-                      Laisser à vérifier
+                      Retour catalogue (Modifier)
                     </Button>
                   </div>
                 </Surface>
@@ -431,8 +437,15 @@ export function B1ExamWorkspace() {
               <p className="text-sm text-muted-foreground">
                 Ouvre l’aperçu Student isolé pour {examCode} (brouillon autorisé en preview).
               </p>
-              <Button className="mt-3" onClick={() => navigate("b1-preview", { examCode })}>
-                Lancer le test étudiant
+              <Button
+                className="mt-3"
+                onClick={() =>
+                  navigate("b1-preview", {
+                    examCode,
+                    ...(exam?.id ? { examId: exam.id } : {}),
+                  })
+                }
+              >                Lancer le test étudiant
               </Button>
             </Surface>
           </TabsContent>

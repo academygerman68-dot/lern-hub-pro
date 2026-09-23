@@ -47,7 +47,13 @@ export function sanitizeQuestionMetadataForStudent(
     teacher_payload: _teacher,
     media_path: _mediaPath,
     media_bucket: _mediaBucket,
+    ocr_raw_prompt: _ocrRaw,
+    ocr_raw: _ocrRaw2,
+    ocr_original: _ocrOrig,
     ...safe
   } = metadata;
+  // Keep pedagogical fields; drop staff review payloads that leak OCR jargon.
+  delete safe["review_notes"];
+  delete safe["import_debug"];
   return safe;
 }

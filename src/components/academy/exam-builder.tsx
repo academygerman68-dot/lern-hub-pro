@@ -11,7 +11,13 @@ import {
   validateExamAudioFile,
   validateExamCompleteness,
 } from "@/lib/exam-completeness";
+import {
+  countHorenAudioReady as countHorenAudioReadySlots,
+  countHorenAudioVerifiedSlots,
+  listHorenAudioSlots,
+} from "@/lib/horen-audio-slots";
 import { examQuestionTypeLabel, examSkillLabel } from "@/lib/exam-labels";
+import { useAcademy } from "./academy-context";
 import { ExamService } from "@/services/academy-services";
 import type {
   ExamQuestionType,
@@ -163,6 +169,137 @@ function HorenQuestionAudioRow({
   );
 }
 
+function HorenSlotVerificationPanel({
+  examId,
+  questions,
+  onChanged,
+}: {
+  examId: string;
+  questions: Array<{
+    skill: string;
+    type: string;
+    media_path?: string | null;
+    media_bucket?: string | null;
+    metadata?: Record<string, unknown> | null;
+  }>;
+  onChanged: () => Promise<void>;
+}) {
+  const { user } = useAcademy();
+  const slots = listHorenAudioSlots(questions);
+  const [busySlot, setBusySlot] = useState<number | null>(null);
+  const [previewBySlot, setPreviewBySlot] = useState<Record<number, string>>({});
+
+  const listen = async (part: number) => {
+    const sample = questions.find((q) => {
+      if (q.skill !== "hoeren" && q.type !== "listening") return false;
+      const meta = q.metadata ?? {};
+      const slot = Number(meta["audio_slot"] ?? meta["teil"]);
+      return slot === part && questionHasAudio(q);
+    });
+    if (!sample) {
+      toast.error(`Aucune piste pour le Teil ${part}`);
+      return;
+    }
+    setBusySlot(part);
+    try {
+      const url = await ExamService.getQuestionAudioSignedUrl({
+        media_bucket: sample.media_bucket ?? null,
+        media_path: sample.media_path ?? null,
+        metadata: sample.metadata as never,
+      });
+      if (!url) throw new Error("URL signée indisponible");
+      setPreviewBySlot((prev) => ({ ...prev, [part]: url }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lecture impossible");
+    } finally {
+      setBusySlot(null);
+    }
+  };
+
+  const confirm = async (part: number) => {
+    if (
+      !window.confirm(
+        `Confirmer que vous avez réellement écouté la piste Hören Teil ${part} et qu’elle correspond à cet examen ?`,
+      )
+    ) {
+      return;
+    }
+    const verifiedBy = user?.email || user?.id || "staff";
+    setBusySlot(part);
+    try {
+      await ExamService.confirmHorenSlotVerification({
+        examId,
+        partNumber: part,
+        verifiedBy,
+      });
+      toast.success(`Teil ${part} marqué vérifié par écoute`);
+      await onChanged();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Confirmation impossible");
+    } finally {
+      setBusySlot(null);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-border p-3">
+      <p className="text-sm font-semibold">Hören — 4 pistes (autorité = media_path questions)</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Inventaire `exam_audio_tracks` éventuel = miroir admin uniquement. Ne confirmez une piste
+        qu’après écoute réelle. La confirmation enregistre qui / quand.
+      </p>
+      <ul className="mt-3 space-y-3">
+        {slots.map((slot) => (
+          <li key={slot.part} className="rounded-md border border-border/70 p-3 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="font-medium">Teil {slot.part}</p>
+                <p className="text-xs text-muted-foreground">
+                  {slot.hasAudio ? slot.mediaPath || "fichier présent" : "piste absente"}
+                  {slot.verificationStatus
+                    ? ` · ${slot.verificationStatus}`
+                    : " · needs_review"}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busySlot === slot.part || !slot.hasAudio}
+                  onClick={() => void listen(slot.part)}
+                >
+                  Écouter
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={
+                    busySlot === slot.part ||
+                    !slot.hasAudio ||
+                    slot.verificationStatus === "content_verified"
+                  }
+                  onClick={() => void confirm(slot.part)}
+                >
+                  Confirmer l’écoute
+                </Button>
+              </div>
+            </div>
+            {previewBySlot[slot.part] ? (
+              <audio
+                className="mt-2 w-full"
+                controls
+                src={previewBySlot[slot.part]}
+                preload="metadata"
+              >
+                Votre navigateur ne prend pas en charge l’audio.
+              </audio>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function ExamBuilder({ examId }: { examId: string }) {
   const [sections, setSections] = useState<ExamStructureSection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -228,6 +365,14 @@ export function ExamBuilder({ examId }: { examId: string }) {
 
   const completeness = useMemo(() => validateExamCompleteness(flatQuestions), [flatQuestions]);
   const horenStats = useMemo(() => countHorenAudioReady(flatQuestions), [flatQuestions]);
+  const horenSlotMode = useMemo(
+    () => countHorenAudioReadySlots(flatQuestions).mode === "slots",
+    [flatQuestions],
+  );
+  const horenVerified = useMemo(
+    () => (horenSlotMode ? countHorenAudioVerifiedSlots(flatQuestions) : null),
+    [flatQuestions, horenSlotMode],
+  );
 
   const skillGroups = useMemo(() => {
     const groups = new Map<
@@ -281,7 +426,13 @@ export function ExamBuilder({ examId }: { examId: string }) {
             {completeness.ok ? "Examen complet — prêt à publier" : "Examen incomplet"}
           </p>
           <p className="mt-1 text-muted-foreground">
-            Écoute : {horenStats.ready} / {horenStats.total} audios prêts
+            {horenSlotMode
+              ? `Hören : ${horenStats.ready}/4 pistes disponibles${
+                  horenVerified != null
+                    ? ` · ${horenVerified}/4 pistes vérifiées par écoute`
+                    : ""
+                }`
+              : `Écoute : ${horenStats.ready} / ${horenStats.total} audios prêts`}
           </p>
           {!completeness.ok ? (
             <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
@@ -296,6 +447,20 @@ export function ExamBuilder({ examId }: { examId: string }) {
         </div>
       ) : null}
 
+      {!loading && horenSlotMode ? (
+        <HorenSlotVerificationPanel
+          examId={examId}
+          questions={flatQuestions.map((q) => ({
+            skill: String(q.skill),
+            type: String(q.type),
+            media_path: q.media_path,
+            media_bucket: q.media_bucket,
+            metadata: q.metadata,
+          }))}
+          onChanged={reload}
+        />
+      ) : null}
+
       {loading ? <p className="text-sm text-muted-foreground">Chargement…</p> : null}
 
       <div className="space-y-4">
@@ -307,7 +472,9 @@ export function ExamBuilder({ examId }: { examId: string }) {
                 · {group.count} question{group.count > 1 ? "s" : ""} · {group.points} pt
                 {group.points > 1 ? "s" : ""}
                 {group.skill === "hoeren"
-                  ? ` · ${horenStats.ready}/${horenStats.total} audios prêts`
+                  ? horenSlotMode
+                    ? ` · ${horenStats.ready}/4 pistes`
+                    : ` · ${horenStats.ready}/${horenStats.total} audios prêts`
                   : ""}
               </span>
             </p>
