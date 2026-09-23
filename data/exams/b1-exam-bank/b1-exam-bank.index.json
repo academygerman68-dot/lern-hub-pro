@@ -1,0 +1,138 @@
+{
+  "schema_version": "b1-scanned-draft-1.0",
+  "bank": {
+    "name": "Zertifikat B1 neu - 15 Modelltests (scan OCR)",
+    "level": "B1",
+    "language": "de",
+    "exams_count": 15,
+    "source_pdf": "B1 badr.pdf",
+    "source_pdf_sha256": "20ad171d76b658c786134d0eb206dda3483d137e032090318681584ea0a39c49",
+    "source_pdf_page_count": 249
+  },
+  "exams": [
+    {
+      "id": "B1-MT01",
+      "title": "Examen blanc B1 - Modelltest 1",
+      "file": "exams/B1-MT01.json",
+      "manifest": "manifests/B1-MT01.manifest.json",
+      "status": "draft",
+      "publishable": false
+    },
+    {
+      "id": "B1-MT02",
+      "title": "Examen blanc B1 - Modelltest 2",
+      "file": "exams/B1-MT02.json",
+      "manifest": "manifests/B1-MT02.manifest.json",
+      "status": "draft",
+      "publishable": false
+    },
+    {
+      "id": "B1-MT03",
+      "title": "Examen blanc B1 - Modelltest 3",
+      "file": "exams/B1-MT03.json",
+      "manifest": "manifests/B1-MT03.manifest.json",
+      "status": "draft",
+      "publishable": false
+    },
+    {
+      "id": "B1-MT04",
+      "title": "Examen blanc B1 - Modelltest 4",
+      "file": "exams/B1-MT04.json",
+      "manifest": "manifests/B1-MT04.manifest.json",
+      "status": "draft",
+      "publishable": false
+    },
+    {
+      "id": "B1-MT05",
+      "title": "Examen blanc B1 - Modelltest 5",
+      "file": "exams/B1-MT05.json",
+      "manifest": "manifests/B1-MT05.manifest.json",
+      "status": "draft",
+      "publishable": false
+    },
+    {
+      "id": "B1-MT06",
+      "title": "Examen blanc B1 - Modelltest 6",
+      "file": "exams/B1-MT06.json",
+      "manifest": "manifests/B1-MT06.manifest.json",
+      "status": "draft",
+      "publishable": false
+    },
+    {
+      "id": "B1-MT07",
+      "title": "Examen blanc B1 - Modelltest 7",
+      "file": "exams/B1-MT07.json",
+      "manifest": "manifests/B1-MT07.manifest.json",
+      "status": "draft",
+      "publishable": false
+    },
+    {
+      "id": "B1-MT08",
+      "title": "Examen blanc B1 - Modelltest 8",
+      "file": "exams/B1-MT08.json",
+      "manifest": "manifests/B1-MT08.manifest.json",
+      "status": "draft",
+      "publishable": false
+    },
+    {
+      "id": "B1-MT09",
+      "title": "Examen blanc B1 - Modelltest 9",
+      "file": "exams/B1-MT09.json",
+      "manifest": "manifests/B1-MT09.manifest.json",
+      "status": "draft",
+      "publishable": false
+    },
+    {
+      "id": "B1-MT10",
+      "title": "Examen blanc B1 - Modelltest 10",
+      "file": "exams/B1-MT10.json",
+      "manifest": "manifests/B1-MT10.manifest.json",
+      "status": "draft",
+      "publishable": false
+    },
+    {
+      "id": "B1-MT11",
+      "title": "Examen blanc B1 - Modelltest 11",
+      "file": "exams/B1-MT11.json",
+      "manifest": "manifests/B1-MT11.manifest.json",
+      "status": "draft",
+      "publishable": false
+    },
+    {
+      "id": "B1-MT12",
+      "title": "Examen blanc B1 - Modelltest 12",
+      "file": "exams/B1-MT12.json",
+      "manifest": "manifests/B1-MT12.manifest.json",
+      "status": "draft",
+      "publishable": false
+    },
+    {
+      "id": "B1-MT13",
+      "title": "Examen blanc B1 - Modelltest 13",
+      "file": "exams/B1-MT13.json",
+      "manifest": "manifests/B1-MT13.manifest.json",
+      "status": "draft",
+      "publishable": false
+    },
+    {
+      "id": "B1-MT14",
+      "title": "Examen blanc B1 - Modelltest 14",
+      "file": "exams/B1-MT14.json",
+      "manifest": "manifests/B1-MT14.manifest.json",
+      "status": "draft",
+      "publishable": false
+    },
+    {
+      "id": "B1-MT15",
+      "title": "Examen blanc B1 - Modelltest 15",
+      "file": "exams/B1-MT15.json",
+      "manifest": "manifests/B1-MT15.manifest.json",
+      "status": "draft",
+      "publishable": false
+    }
+  ],
+  "appendices": {
+    "source_credits": "appendices/source-credits.ocr.json",
+    "official_answer_keys": "appendices/official-answer-keys.ocr.json"
+  }
+}

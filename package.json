@@ -13,7 +13,9 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "seed:a1-exams": "node scripts/import-a1-exam-bank.mjs",
-    "generate:a1-exam-seed": "node scripts/generate-a1-exam-seed.mjs"
+    "generate:a1-exam-seed": "node scripts/generate-a1-exam-seed.mjs",
+    "seed:b1-exams": "node scripts/import-b1-exam-bank.mjs",
+    "dry-run:b1-exams": "node scripts/import-b1-exam-bank.mjs --dry-run"
   },
   "overrides": {
     "rolldown": "1.2.1"

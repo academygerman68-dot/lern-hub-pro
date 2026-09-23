@@ -75,6 +75,7 @@ export function validateExamCompleteness(
 
   for (const q of questions) {
     const label = q.prompt.trim().slice(0, 60) || "(sans titre)";
+    const meta = asRecord(q.metadata);
     if (!q.prompt.trim()) {
       issues.push(`Consigne manquante · ${q.sectionTitle}`);
     }
@@ -85,12 +86,29 @@ export function validateExamCompleteness(
       issues.push(`Audio Hören manquant · « ${label} »`);
     }
 
+    // B1 OCR gates — A1 stays unaffected when these metadata flags are absent.
+    if (meta?.["needs_review"] === true || meta?.["transcription_status"] === "ocr_unverified") {
+      issues.push(`OCR non validé · « ${label} »`);
+    }
+
+    // Audio verification: only when Hören media is present. Skip classic A1
+    // uploads that never introduced audio_verification_status / OCR flags.
+    if (questionNeedsHorenAudio(q.skill, q.type) && questionHasAudio(q)) {
+      const verification = meta?.["audio_verification_status"];
+      const isOcrDraft =
+        meta?.["needs_review"] === true || meta?.["transcription_status"] === "ocr_unverified";
+      if (verification != null && verification !== "confirmed") {
+        issues.push(`Audio Hören non confirmé · « ${label} »`);
+      } else if (verification == null && isOcrDraft) {
+        issues.push(`Audio Hören non confirmé · « ${label} »`);
+      }
+    }
+
     if (q.type === "true_false" || q.type === "single_choice" || q.type === "multiple_choice") {
       if (!q.correct_values?.length) {
         issues.push(`Réponse correcte manquante · « ${label} »`);
       }
     } else if (q.type === "form_fill") {
-      const meta = asRecord(q.metadata);
       const payload = asRecord(q.teacher_payload);
       const fields = meta?.["fields"] ?? payload?.["fields"];
       const source = payload?.["source_data"];

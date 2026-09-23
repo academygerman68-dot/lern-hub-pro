@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.german-academy.invalid/schemas/b1-scanned-draft-1.0.json",
+  "title": "lern-hub-pro B1 scanned draft",
+  "type": "object",
+  "required": ["schema_version", "id", "level", "status", "publishable", "source", "integrity", "sections"],
+  "properties": {
+    "schema_version": { "const": "b1-scanned-draft-1.0" },
+    "id": { "type": "string", "pattern": "^B1-MT(0[1-9]|1[0-5])$" },
+    "level": { "const": "B1" },
+    "status": { "const": "draft" },
+    "publishable": { "const": false },
+    "source": { "type": "object" },
+    "integrity": {
+      "type": "object",
+      "required": ["answer_keys_included", "answer_keys_invented", "audio_included", "manual_review_required"],
+      "properties": {
+        "answer_keys_included": { "const": false },
+        "answer_keys_invented": { "const": false },
+        "audio_included": { "const": false },
+        "manual_review_required": { "const": true }
+      }
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "title", "questions"],
+        "properties": {
+          "type": { "enum": ["lesen", "hoeren", "schreiben", "sprechen"] },
+          "questions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["id", "order", "type", "prompt", "points", "answer_key", "source"],
+              "properties": {
+                "points": { "const": 0 },
+                "answer_key": { "type": "null" },
+                "source": {
+                  "type": "object",
+                  "required": ["source_pdf_page", "ocr_text", "ocr_lines", "transcription_status"],
+                  "properties": {
+                    "transcription_status": { "const": "ocr_unverified" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

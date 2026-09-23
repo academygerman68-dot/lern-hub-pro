@@ -70,11 +70,13 @@ import {
   GRADE_ASSIST_NEEDS_TEXT_MESSAGE,
 } from "@/lib/grade-assist-ux";
 import { AiGradeAssistPanel } from "./ai-grade-assist-panel";
+import { B1ExamBankPanel } from "./b1-exam-bank-panel";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
 import { ExamBuilder } from "./exam-builder";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
 import { PageHeader, Status, Surface, ProgressLine } from "./primitives";
+import { isB1ModelltestCode } from "@/lib/b1-exam-readiness";
 
 const EXAM_ID_KEY = "ga_active_exam_id";
 const ATTEMPT_ID_KEY = "ga_active_attempt_id";
@@ -457,6 +459,32 @@ function StudentExamRunner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce form_fill draft
   }, [current?.id, current?.type, formFillSerialized, session.attemptId]);
 
+  useEffect(() => {
+    const inProgress = attemptQuery.data?.status === "in_progress";
+    if (!inProgress) return;
+
+    const hasWritingOrSpeakingDraft = Object.entries(localAnswers).some(([questionId, raw]) => {
+      const q = questions.find((item) => item.id === questionId);
+      if (!q) return false;
+      if (isWritingOnlyQuestionType(q.type)) {
+        return typeof raw === "string" ? raw.trim().length > 0 : Boolean(raw);
+      }
+      if (isSpeakingQuestionType(q.type)) {
+        return hasOralAudioAnswer({ answer: raw }) || Boolean(parseOralAnswer(raw));
+      }
+      return false;
+    });
+
+    if (!hasWritingOrSpeakingDraft) return;
+
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [attemptQuery.data?.status, localAnswers, questions]);
+
   if (!session.examId || !session.attemptId) {
     return (
       <Surface className="p-8 text-center">
@@ -477,6 +505,11 @@ function StudentExamRunner() {
     : [];
   const recommendedWords =
     typeof currentMeta["recommended_words"] === "string" ? currentMeta["recommended_words"] : null;
+  const sprechenRole =
+    typeof currentMeta["role"] === "string" && currentMeta["role"].trim()
+      ? currentMeta["role"].trim()
+      : null;
+  const isPageBundle = currentMeta["import_mode"] === "page_bundle";
   const formFields = Array.isArray(currentMeta["fields"])
     ? currentMeta["fields"].filter(
         (field): field is { key: string; points: number } =>
@@ -541,6 +574,19 @@ function StudentExamRunner() {
               {current?.prompt}
             </h2>
 
+            {isSpeakingType && sprechenRole ? (
+              <p className="mt-3 text-sm font-medium text-foreground">
+                Rôle : Kandidat {sprechenRole}
+              </p>
+            ) : null}
+
+            {isPageBundle ? (
+              <p className="mt-3 rounded-md border border-dashed border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
+                Page OCR complète (page_bundle) — le texte ci-dessus est la consigne issue du
+                scan ; les items individuels peuvent encore nécessiter une relecture.
+              </p>
+            ) : null}
+
             {(current?.type === "listening" || current?.skill === "hoeren") && (
               <div className="mt-5 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2 font-medium text-foreground">
@@ -558,11 +604,14 @@ function StudentExamRunner() {
                     Votre navigateur ne prend pas en charge l’audio.
                   </audio>
                 ) : (
-                  <p className="mt-2 text-destructive">
-                    {typeof currentMeta["audio_error"] === "string"
-                      ? currentMeta["audio_error"]
-                      : "Audio indisponible pour cette question. Contactez votre professeur."}
-                  </p>
+                  <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                    <p className="font-medium">Audio Hören indisponible</p>
+                    <p className="mt-1 text-destructive/90">
+                      {typeof currentMeta["audio_error"] === "string"
+                        ? currentMeta["audio_error"]
+                        : "Aucun fichier audio n’est associé à cette question. Impossible de démarrer l’écoute — contactez votre professeur."}
+                    </p>
+                  </div>
                 )}
               </div>
             )}
@@ -1708,6 +1757,10 @@ export function DirectorExamsPage() {
       (exam) => isDirectorRole(role) || scopedClassOrLevelItemVisible(exam, teacherScope),
     );
   }, [examsQuery.data, role, teacherScope]);
+  const generalExams = useMemo(
+    () => exams.filter((exam) => !isB1ModelltestCode(exam.code)),
+    [exams],
+  );
 
   useEffect(() => {
     if (!isTeacher || classId || !levelId) return;
@@ -1735,11 +1788,18 @@ export function DirectorExamsPage() {
         }
         action={<Button onClick={() => setOpen(true)}>+ Créer un examen blanc</Button>}
       />
+
+      <B1ExamBankPanel
+        exams={exams}
+        alwaysShow
+        onOpenBuilder={(examId) => setBuilderExamId(examId)}
+      />
+
       <QueryState
         isLoading={examsQuery.isLoading}
         isError={examsQuery.isError}
         error={examsQuery.error}
-        isEmpty={!exams.length}
+        isEmpty={!generalExams.length && exams.length === 0}
         emptyTitle="Aucun examen"
         emptyMessage={
           isTeacher
@@ -1749,7 +1809,7 @@ export function DirectorExamsPage() {
         onRetry={() => void examsQuery.refetch()}
       >
         <div className="space-y-3">
-          {exams.map((exam) => (
+          {generalExams.map((exam) => (
             <Surface className="p-5" key={exam.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>

@@ -1,0 +1,111 @@
+{
+  "manifest_version": "1.0",
+  "exam_id": "B1-MT05",
+  "exam_json": "../exams/B1-MT05.json",
+  "source_pdf_pages": [
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84
+  ],
+  "section_page_map": {
+    "lesen": [
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76
+    ],
+    "hoeren": [
+      77,
+      78,
+      79,
+      80
+    ],
+    "schreiben": [
+      81
+    ],
+    "sprechen": [
+      82,
+      83,
+      84
+    ]
+  },
+  "expected_audio": [
+    {
+      "section": "hoeren",
+      "part": 1,
+      "target_question_id": "B1-MT05-HOEREN-P01",
+      "preferred_filename": "B1-MT05-HOEREN-TEIL-1.mp3",
+      "storage_bucket": "course-materials",
+      "storage_path": "exams/b1/b1-mt05/hoeren/teil-1.mp3",
+      "status": "missing",
+      "sha256": null,
+      "duration_seconds": null
+    },
+    {
+      "section": "hoeren",
+      "part": 2,
+      "target_question_id": "B1-MT05-HOEREN-P02",
+      "preferred_filename": "B1-MT05-HOEREN-TEIL-2.mp3",
+      "storage_bucket": "course-materials",
+      "storage_path": "exams/b1/b1-mt05/hoeren/teil-2.mp3",
+      "status": "missing",
+      "sha256": null,
+      "duration_seconds": null
+    },
+    {
+      "section": "hoeren",
+      "part": 3,
+      "target_question_id": "B1-MT05-HOEREN-P03",
+      "preferred_filename": "B1-MT05-HOEREN-TEIL-3.mp3",
+      "storage_bucket": "course-materials",
+      "storage_path": "exams/b1/b1-mt05/hoeren/teil-3.mp3",
+      "status": "missing",
+      "sha256": null,
+      "duration_seconds": null
+    },
+    {
+      "section": "hoeren",
+      "part": 4,
+      "target_question_id": "B1-MT05-HOEREN-P04",
+      "preferred_filename": "B1-MT05-HOEREN-TEIL-4.mp3",
+      "storage_bucket": "course-materials",
+      "storage_path": "exams/b1/b1-mt05/hoeren/teil-4.mp3",
+      "status": "missing",
+      "sha256": null,
+      "duration_seconds": null
+    }
+  ],
+  "official_answer_key_source": {
+    "present_in_pdf": true,
+    "pdf_pages": [
+      247,
+      248
+    ],
+    "appendix_file": "../appendices/official-answer-keys.ocr.json",
+    "structured_keys_imported": false,
+    "status": "ocr_unverified_manual_transcription_required"
+  },
+  "quality": {
+    "ocr_status": "unverified",
+    "answer_key_status": "absent",
+    "audio_status": "absent",
+    "publishable": false
+  }
+}

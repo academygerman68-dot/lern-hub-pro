@@ -104,4 +104,71 @@ describe("exam completeness — Hören audio", () => {
     expect(parsed.horenTotal).toBe(15);
     expect(parsed.issues).toHaveLength(1);
   });
+
+  it("flags OCR non validé for needs_review / ocr_unverified", () => {
+    const report = validateExamCompleteness([
+      {
+        id: "ocr-1",
+        prompt: "Lesen Sie den Text",
+        type: "text",
+        points: 1,
+        skill: "lesen",
+        sectionTitle: "Lesen",
+        metadata: { needs_review: true, transcription_status: "ocr_unverified" },
+      },
+    ]);
+    expect(report.ok).toBe(false);
+    expect(report.issues.some((i) => i.includes("OCR non validé"))).toBe(true);
+  });
+
+  it("flags Audio Hören non confirmé when media present but unverified", () => {
+    const report = validateExamCompleteness([
+      {
+        id: "h-1",
+        prompt: "Hören Teil 1",
+        type: "listening",
+        points: 1,
+        skill: "hoeren",
+        sectionTitle: "Hören",
+        media_bucket: "course-materials",
+        media_path: "exams/b1/b1-mt01/hoeren/teil-1.mp3",
+        metadata: {
+          needs_review: true,
+          transcription_status: "ocr_unverified",
+          audio_verification_status: "unverified",
+        },
+        correct_values: null,
+      },
+    ]);
+    expect(report.ok).toBe(false);
+    expect(report.issues.some((i) => i.includes("Audio Hören non confirmé"))).toBe(true);
+    expect(report.issues.some((i) => i.includes("OCR non validé"))).toBe(true);
+  });
+
+  it("does not flag A1 when OCR/audio verification metadata absent", () => {
+    const report = validateExamCompleteness([
+      {
+        id: "a1-h",
+        prompt: "Wie spät ist es?",
+        type: "true_false",
+        points: 1,
+        skill: "hoeren",
+        sectionTitle: "Hören",
+        media_bucket: "course-materials",
+        media_path: "exam-audio/a1.mp3",
+        correct_values: ["true"],
+      },
+      {
+        id: "a1-w",
+        prompt: "Schreiben Sie",
+        type: "writing",
+        points: 10,
+        skill: "schreiben",
+        sectionTitle: "Schreiben",
+      },
+    ]);
+    expect(report.ok).toBe(true);
+    expect(report.issues.some((i) => i.includes("OCR non validé"))).toBe(false);
+    expect(report.issues.some((i) => i.includes("Audio Hören non confirmé"))).toBe(false);
+  });
 });

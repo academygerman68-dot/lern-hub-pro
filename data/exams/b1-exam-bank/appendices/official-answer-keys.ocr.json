@@ -1,0 +1,2352 @@
+{
+  "description": "Lösungen imprimées dans le PDF - OCR non vérifié, non importé comme corrigé",
+  "source_pdf_pages": [
+    247,
+    248,
+    249
+  ],
+  "pages": [
+    {
+      "source_pdf_page": 247,
+      "printed_page_number": 248,
+      "ocr_text": "ZertifikatB1neu\n15 Ubungsprufungen\nLosungen\n2014HueberVerlag,Munchen\nModelltest1\nLesen:1ichtig,2Falsch,Richtig,4Falsch,5ichtig,6Falsch,7,b,9a10c,11a,12b,13g\n29 b, 30 c\nHoren:1ichtig,2a,3Falsch,4c,5ichtig,6c,7ichtg,8b,9Falsch,10b,11c,12a,13b,14a,\n15 b,16Richtig,17Richtig,18Falsch,19Richtig,20Richtig,21Richtig,22Falsch,23 a,24b,25 c,\n26 a, 27 b, 28 c, 29 c, 30 b\nModelltest2\nLesen:1ichtig,2ichtig,Falsch,4ichtig,5Falsch,6ichtig,7ac,9b10,c,1a,12b,3,\n14 0, 15j, 16 g, 17 b, 18i, 19 f, 20 Nein, 21Ja, 22Ja, 13 Nein, 24Ja, 25 Nein, 26Ja, 17 a, 28 c, 29 b,\nHoren：1ichtig,2c,3Richtig,4b,5Falsch,6a,7ichtig,8b,9Falsch,10b,11a,12c,13b,14,\n27b,28 c,29 c, 30 b\nModelltest3\nLesen:1Falsch,2Richtig,ichtig,4ichtig,5Falsch,6ichtig,7c,a,9b,10a,11b,12c,3,\n14 a,15f,16i, 17h,18 g,19 d,20 Ja,21Ja,22Nein,23Ja,24Nein, 25Nein, 26Ja,27a,28 c,29 a,\n30b\nHoren：1Falsch,2c,3Falsch,4b,5ichtig,6b,7ichtig,8a,9Falsch,10a,11b,12a,13b,14a,\n15 c,16Richtig,17Falsch,18Falsch,19Falsch, 20 Richtig,21Falsch,22 Richtig,23 c,24 a, 25 b, 26 c,\n27 b, 28 c, 29 c, 30 a\nModelltest4\nLesen:1ichtig,2Falsh,ichtig,4Falsch,5Falsch,6ichtig,7ab,9b,10b,11a,12c,1j\n14 f, 15 h, 16 0, 17 e, 18 g, 19 b, 20 Ja, 21Ja, 22 Nein, 23 Nein, 24 Ja, 25 Nein, 26 Ja, 27 a, 28 b, 29 a,\n30c\nHoren:1Falsch,2c,Falsch,4c,5Falsch,6b,7Richtig,8 c,9Falsch,10 b,11b,12c,13c,14a,15a,\n16Falsch,17Falsch,18Richtig,19Falsch,20Richtig,21Falsch,22Richtig,23b,24c,25a,26b,27b,\n28b,29a,30b\nModelltest5\nLesen:1ichtig,2Falsch,3Falsch,4Falsch,5ichtig,6ichtig,7b,8a,9c,10a,11a,12b,1,\n14i, 15 d,16h,17j, 18 f, 19 0, 20 Nein, 21Ja, 22 Ja, 23Nein, 24Nein, 25Nein, 26Ja, 27 c, 28 b, 29 a,\n30c\nZertifikat B1 neu,15 Obungsprifungen, Losungen,2014HueberVerlagMunchen\nSeite 1 von3",
+      "ocr_lines": [
+        {
+          "box": [
+            [
+              91.0,
+              60.0
+            ],
+            [
+              236.0,
+              63.0
+            ],
+            [
+              236.0,
+              84.0
+            ],
+            [
+              91.0,
+              80.0
+            ]
+          ],
+          "text": "ZertifikatB1neu",
+          "confidence": 0.9951
+        },
+        {
+          "box": [
+            [
+              90.0,
+              88.0
+            ],
+            [
+              272.0,
+              91.0
+            ],
+            [
+              271.0,
+              114.0
+            ],
+            [
+              90.0,
+              112.0
+            ]
+          ],
+          "text": "15 Ubungsprufungen",
+          "confidence": 0.9772
+        },
+        {
+          "box": [
+            [
+              92.0,
+              116.0
+            ],
+            [
+              152.0,
+              120.0
+            ],
+            [
+              151.0,
+              138.0
+            ],
+            [
+              91.0,
+              134.0
+            ]
+          ],
+          "text": "Losungen",
+          "confidence": 0.9928
+        },
+        {
+          "box": [
+            [
+              93.0,
+              138.0
+            ],
+            [
+              285.0,
+              138.0
+            ],
+            [
+              285.0,
+              155.0
+            ],
+            [
+              93.0,
+              155.0
+            ]
+          ],
+          "text": "2014HueberVerlag,Munchen",
+          "confidence": 0.9779
+        },
+        {
+          "box": [
+            [
+              92.0,
+              171.0
+            ],
+            [
+              170.0,
+              171.0
+            ],
+            [
+              170.0,
+              188.0
+            ],
+            [
+              92.0,
+              188.0
+            ]
+          ],
+          "text": "Modelltest1",
+          "confidence": 0.9967
+        },
+        {
+          "box": [
+            [
+              91.0,
+              201.0
+            ],
+            [
+              652.0,
+              202.0
+            ],
+            [
+              652.0,
+              222.0
+            ],
+            [
+              91.0,
+              221.0
+            ]
+          ],
+          "text": "Lesen:1ichtig,2Falsch,Richtig,4Falsch,5ichtig,6Falsch,7,b,9a10c,11a,12b,13g",
+          "confidence": 0.7685
+        },
+        {
+          "box": [
+            [
+              92.0,
+              244.0
+            ],
+            [
+              150.0,
+              244.0
+            ],
+            [
+              150.0,
+              261.0
+            ],
+            [
+              92.0,
+              261.0
+            ]
+          ],
+          "text": "29 b, 30 c",
+          "confidence": 0.9418
+        },
+        {
+          "box": [
+            [
+              91.0,
+              274.0
+            ],
+            [
+              656.0,
+              274.0
+            ],
+            [
+              656.0,
+              293.0
+            ],
+            [
+              91.0,
+              293.0
+            ]
+          ],
+          "text": "Horen:1ichtig,2a,3Falsch,4c,5ichtig,6c,7ichtg,8b,9Falsch,10b,11c,12a,13b,14a,",
+          "confidence": 0.7886
+        },
+        {
+          "box": [
+            [
+              91.0,
+              294.0
+            ],
+            [
+              651.0,
+              294.0
+            ],
+            [
+              651.0,
+              313.0
+            ],
+            [
+              91.0,
+              313.0
+            ]
+          ],
+          "text": "15 b,16Richtig,17Richtig,18Falsch,19Richtig,20Richtig,21Richtig,22Falsch,23 a,24b,25 c,",
+          "confidence": 0.946
+        },
+        {
+          "box": [
+            [
+              92.0,
+              316.0
+            ],
+            [
+              243.0,
+              316.0
+            ],
+            [
+              243.0,
+              332.0
+            ],
+            [
+              92.0,
+              332.0
+            ]
+          ],
+          "text": "26 a, 27 b, 28 c, 29 c, 30 b",
+          "confidence": 0.9048
+        },
+        {
+          "box": [
+            [
+              92.0,
+              348.0
+            ],
+            [
+              170.0,
+              348.0
+            ],
+            [
+              170.0,
+              365.0
+            ],
+            [
+              92.0,
+              365.0
+            ]
+          ],
+          "text": "Modelltest2",
+          "confidence": 0.9967
+        },
+        {
+          "box": [
+            [
+              91.0,
+              380.0
+            ],
+            [
+              656.0,
+              380.0
+            ],
+            [
+              656.0,
+              399.0
+            ],
+            [
+              91.0,
+              399.0
+            ]
+          ],
+          "text": "Lesen:1ichtig,2ichtig,Falsch,4ichtig,5Falsch,6ichtig,7ac,9b10,c,1a,12b,3,",
+          "confidence": 0.7473
+        },
+        {
+          "box": [
+            [
+              92.0,
+              401.0
+            ],
+            [
+              656.0,
+              401.0
+            ],
+            [
+              656.0,
+              417.0
+            ],
+            [
+              92.0,
+              417.0
+            ]
+          ],
+          "text": "14 0, 15j, 16 g, 17 b, 18i, 19 f, 20 Nein, 21Ja, 22Ja, 13 Nein, 24Ja, 25 Nein, 26Ja, 17 a, 28 c, 29 b,",
+          "confidence": 0.9144
+        },
+        {
+          "box": [
+            [
+              91.0,
+              450.0
+            ],
+            [
+              656.0,
+              452.0
+            ],
+            [
+              656.0,
+              471.0
+            ],
+            [
+              91.0,
+              469.0
+            ]
+          ],
+          "text": "Horen：1ichtig,2c,3Richtig,4b,5Falsch,6a,7ichtig,8b,9Falsch,10b,11a,12c,13b,14,",
+          "confidence": 0.7877
+        },
+        {
+          "box": [
+            [
+              92.0,
+              493.0
+            ],
+            [
+              212.0,
+              493.0
+            ],
+            [
+              212.0,
+              509.0
+            ],
+            [
+              92.0,
+              509.0
+            ]
+          ],
+          "text": "27b,28 c,29 c, 30 b",
+          "confidence": 0.8893
+        },
+        {
+          "box": [
+            [
+              91.0,
+              525.0
+            ],
+            [
+              170.0,
+              525.0
+            ],
+            [
+              170.0,
+              542.0
+            ],
+            [
+              91.0,
+              542.0
+            ]
+          ],
+          "text": "Modelltest3",
+          "confidence": 0.9678
+        },
+        {
+          "box": [
+            [
+              91.0,
+              556.0
+            ],
+            [
+              655.0,
+              557.0
+            ],
+            [
+              655.0,
+              576.0
+            ],
+            [
+              91.0,
+              575.0
+            ]
+          ],
+          "text": "Lesen:1Falsch,2Richtig,ichtig,4ichtig,5Falsch,6ichtig,7c,a,9b,10a,11b,12c,3,",
+          "confidence": 0.8007
+        },
+        {
+          "box": [
+            [
+              91.0,
+              576.0
+            ],
+            [
+              658.0,
+              576.0
+            ],
+            [
+              658.0,
+              595.0
+            ],
+            [
+              91.0,
+              595.0
+            ]
+          ],
+          "text": "14 a,15f,16i, 17h,18 g,19 d,20 Ja,21Ja,22Nein,23Ja,24Nein, 25Nein, 26Ja,27a,28 c,29 a,",
+          "confidence": 0.9043
+        },
+        {
+          "box": [
+            [
+              91.0,
+              597.0
+            ],
+            [
+              121.0,
+              597.0
+            ],
+            [
+              121.0,
+              614.0
+            ],
+            [
+              91.0,
+              614.0
+            ]
+          ],
+          "text": "30b",
+          "confidence": 0.9974
+        },
+        {
+          "box": [
+            [
+              91.0,
+              628.0
+            ],
+            [
+              654.0,
+              628.0
+            ],
+            [
+              654.0,
+              647.0
+            ],
+            [
+              91.0,
+              647.0
+            ]
+          ],
+          "text": "Horen：1Falsch,2c,3Falsch,4b,5ichtig,6b,7ichtig,8a,9Falsch,10a,11b,12a,13b,14a,",
+          "confidence": 0.7967
+        },
+        {
+          "box": [
+            [
+              91.0,
+              648.0
+            ],
+            [
+              671.0,
+              649.0
+            ],
+            [
+              671.0,
+              668.0
+            ],
+            [
+              91.0,
+              667.0
+            ]
+          ],
+          "text": "15 c,16Richtig,17Falsch,18Falsch,19Falsch, 20 Richtig,21Falsch,22 Richtig,23 c,24 a, 25 b, 26 c,",
+          "confidence": 0.9245
+        },
+        {
+          "box": [
+            [
+              92.0,
+              670.0
+            ],
+            [
+              212.0,
+              670.0
+            ],
+            [
+              212.0,
+              686.0
+            ],
+            [
+              92.0,
+              686.0
+            ]
+          ],
+          "text": "27 b, 28 c, 29 c, 30 a",
+          "confidence": 0.9164
+        },
+        {
+          "box": [
+            [
+              92.0,
+              702.0
+            ],
+            [
+              170.0,
+              702.0
+            ],
+            [
+              170.0,
+              719.0
+            ],
+            [
+              92.0,
+              719.0
+            ]
+          ],
+          "text": "Modelltest4",
+          "confidence": 0.9955
+        },
+        {
+          "box": [
+            [
+              91.0,
+              734.0
+            ],
+            [
+              650.0,
+              734.0
+            ],
+            [
+              650.0,
+              753.0
+            ],
+            [
+              91.0,
+              753.0
+            ]
+          ],
+          "text": "Lesen:1ichtig,2Falsh,ichtig,4Falsch,5Falsch,6ichtig,7ab,9b,10b,11a,12c,1j",
+          "confidence": 0.7418
+        },
+        {
+          "box": [
+            [
+              91.0,
+              754.0
+            ],
+            [
+              666.0,
+              754.0
+            ],
+            [
+              666.0,
+              773.0
+            ],
+            [
+              91.0,
+              773.0
+            ]
+          ],
+          "text": "14 f, 15 h, 16 0, 17 e, 18 g, 19 b, 20 Ja, 21Ja, 22 Nein, 23 Nein, 24 Ja, 25 Nein, 26 Ja, 27 a, 28 b, 29 a,",
+          "confidence": 0.9535
+        },
+        {
+          "box": [
+            [
+              92.0,
+              776.0
+            ],
+            [
+              119.0,
+              776.0
+            ],
+            [
+              119.0,
+              790.0
+            ],
+            [
+              92.0,
+              790.0
+            ]
+          ],
+          "text": "30c",
+          "confidence": 0.9671
+        },
+        {
+          "box": [
+            [
+              91.0,
+              806.0
+            ],
+            [
+              669.0,
+              806.0
+            ],
+            [
+              669.0,
+              825.0
+            ],
+            [
+              91.0,
+              825.0
+            ]
+          ],
+          "text": "Horen:1Falsch,2c,Falsch,4c,5Falsch,6b,7Richtig,8 c,9Falsch,10 b,11b,12c,13c,14a,15a,",
+          "confidence": 0.888
+        },
+        {
+          "box": [
+            [
+              91.0,
+              826.0
+            ],
+            [
+              675.0,
+              826.0
+            ],
+            [
+              675.0,
+              845.0
+            ],
+            [
+              91.0,
+              845.0
+            ]
+          ],
+          "text": "16Falsch,17Falsch,18Richtig,19Falsch,20Richtig,21Falsch,22Richtig,23b,24c,25a,26b,27b,",
+          "confidence": 0.9274
+        },
+        {
+          "box": [
+            [
+              93.0,
+              848.0
+            ],
+            [
+              182.0,
+              848.0
+            ],
+            [
+              182.0,
+              862.0
+            ],
+            [
+              93.0,
+              862.0
+            ]
+          ],
+          "text": "28b,29a,30b",
+          "confidence": 0.9613
+        },
+        {
+          "box": [
+            [
+              92.0,
+              879.0
+            ],
+            [
+              170.0,
+              879.0
+            ],
+            [
+              170.0,
+              896.0
+            ],
+            [
+              92.0,
+              896.0
+            ]
+          ],
+          "text": "Modelltest5",
+          "confidence": 0.9965
+        },
+        {
+          "box": [
+            [
+              91.0,
+              911.0
+            ],
+            [
+              653.0,
+              911.0
+            ],
+            [
+              653.0,
+              930.0
+            ],
+            [
+              91.0,
+              930.0
+            ]
+          ],
+          "text": "Lesen:1ichtig,2Falsch,3Falsch,4Falsch,5ichtig,6ichtig,7b,8a,9c,10a,11a,12b,1,",
+          "confidence": 0.809
+        },
+        {
+          "box": [
+            [
+              91.0,
+              931.0
+            ],
+            [
+              673.0,
+              932.0
+            ],
+            [
+              673.0,
+              949.0
+            ],
+            [
+              91.0,
+              948.0
+            ]
+          ],
+          "text": "14i, 15 d,16h,17j, 18 f, 19 0, 20 Nein, 21Ja, 22 Ja, 23Nein, 24Nein, 25Nein, 26Ja, 27 c, 28 b, 29 a,",
+          "confidence": 0.8925
+        },
+        {
+          "box": [
+            [
+              91.0,
+              952.0
+            ],
+            [
+              120.0,
+              952.0
+            ],
+            [
+              120.0,
+              969.0
+            ],
+            [
+              91.0,
+              969.0
+            ]
+          ],
+          "text": "30c",
+          "confidence": 0.9129
+        },
+        {
+          "box": [
+            [
+              92.0,
+              993.0
+            ],
+            [
+              450.0,
+              993.0
+            ],
+            [
+              450.0,
+              1010.0
+            ],
+            [
+              92.0,
+              1010.0
+            ]
+          ],
+          "text": "Zertifikat B1 neu,15 Obungsprifungen, Losungen,2014HueberVerlagMunchen",
+          "confidence": 0.9114
+        },
+        {
+          "box": [
+            [
+              591.0,
+              992.0
+            ],
+            [
+              649.0,
+              992.0
+            ],
+            [
+              649.0,
+              1009.0
+            ],
+            [
+              591.0,
+              1009.0
+            ]
+          ],
+          "text": "Seite 1 von3",
+          "confidence": 0.9383
+        }
+      ],
+      "ocr_line_count": 35,
+      "ocr_mean_confidence": 0.9094,
+      "transcription_status": "ocr_unverified"
+    },
+    {
+      "source_pdf_page": 248,
+      "printed_page_number": 249,
+      "ocr_text": "Horen:1Falsch,2a,3ichtig,4b,5Falsh,6a,7ichtig,8b,9Falsch,10c,11a,12a,13c,4,\n15 b,16 Richtig,17 Falsch, 18 Falsch, 19 Falsch, 20 Richtig,21Falsch, 22 Richtig,23 b, 24 c, 25 c, 26 b,\n27 a, 28 a, 29 c, 30 b\nModelltest6\nLesen:1Richtig,2Falsch,3Richtig,4Richtig,5Falsch,6Falsch,7b,8a,9c,10b,11c,12a,130,\n14j, 15 h, 16 e, 17f, 18 i, 19 a, 20 Ja, 21 Nein, 22 Nein, 23 Ja, 24 Nein, 25Ja, 26 Nein, 27 b, 28 c, 29 b,\n30c\nHoren:1Richtig,2b,3ichtig,4b,5Richtig,6c,7Falsch,8a,9Richtig,10c,11c,12c,13b,14a,\n27b,28a,29c,30b\nModelltest7\nLesen:1 Richtig,2Richtig,3Falsch, 4Falsch, 5Falsch,6 Richtig,7a,8c, 9 b,10 b,11 c,12 a,13 c,\n14 d,15j,16f,170,18 a,19h,20Nein,21Ja,22Nein,23Ja,24Nein,25Nein,26Ja,27b,28a,29\na,30b\nHoren:1Richtig,2c,3alsch,4a,5Falsch,6b,7Richtig,8b,9Falsch,10b,11c,12b,13c,14c,\n27a,28b,29a,30b\nModelltest8\n14 a,150,16 d,17i,18g,19j,20Nein,21Ja,22Ja,23Nein,24Nein,25Ja,26Nein,27a,28c,29b,\n30b\nHren:1ichtig,2a,3Falsch,4b,5Falsh,6b,7Falsch,8c,9Falsch,10,11b,12a,13c,14a\n15 a,16Richtig,17Falsch,18Richtig,19Falsch,20Falsch,21Falsch,22Falsch,23b,24c,25 b,26 c,\n27a,28b,29a,30a\nModelltest9\nLesen:1ichtig,2Falsch,Falsch,4Richtig,5ichig,6Falsch,7a,8c,9c,10b,11a,12c,13f,\n14 a,15 d,160,17j,18e,19i, 20 Nein, 21Ja,22Nein,23Nein,24Ja,25Ja,26Ja,27b,28 a,29a,\n30a\nHren：1Falsch,2c,3Falsch,4c,5Richtig,6c,7Falsch,8c,9Falsch,10b,11b,12a,13c,4b\n15 a,16Falsch,17Richtig,18Richtig,19Falsch,20Falsch,21Falsch,22Richtig,23b,24b,25c,26b,\n27c,28a,29b,30c\nModelltest10\nLesen:1ichtig,2Falsch,3ichtig,4ichtig,5Falsch,6ichtig,7b,8a,9c,10a,11b,12c,130,\n30a\nZertifikatB1neu,15 0bungsprifungen,Losungen, 2014 Hueber Verlag,Munchen\nSeite 2 von3",
+      "ocr_lines": [
+        {
+          "box": [
+            [
+              91.0,
+              59.0
+            ],
+            [
+              654.0,
+              59.0
+            ],
+            [
+              654.0,
+              78.0
+            ],
+            [
+              91.0,
+              78.0
+            ]
+          ],
+          "text": "Horen:1Falsch,2a,3ichtig,4b,5Falsh,6a,7ichtig,8b,9Falsch,10c,11a,12a,13c,4,",
+          "confidence": 0.7697
+        },
+        {
+          "box": [
+            [
+              91.0,
+              79.0
+            ],
+            [
+              675.0,
+              79.0
+            ],
+            [
+              675.0,
+              97.0
+            ],
+            [
+              91.0,
+              97.0
+            ]
+          ],
+          "text": "15 b,16 Richtig,17 Falsch, 18 Falsch, 19 Falsch, 20 Richtig,21Falsch, 22 Richtig,23 b, 24 c, 25 c, 26 b,",
+          "confidence": 0.9132
+        },
+        {
+          "box": [
+            [
+              92.0,
+              99.0
+            ],
+            [
+              213.0,
+              99.0
+            ],
+            [
+              213.0,
+              116.0
+            ],
+            [
+              92.0,
+              116.0
+            ]
+          ],
+          "text": "27 a, 28 a, 29 c, 30 b",
+          "confidence": 0.9675
+        },
+        {
+          "box": [
+            [
+              93.0,
+              133.0
+            ],
+            [
+              170.0,
+              133.0
+            ],
+            [
+              170.0,
+              147.0
+            ],
+            [
+              93.0,
+              147.0
+            ]
+          ],
+          "text": "Modelltest6",
+          "confidence": 0.9966
+        },
+        {
+          "box": [
+            [
+              93.0,
+              165.0
+            ],
+            [
+              653.0,
+              165.0
+            ],
+            [
+              653.0,
+              181.0
+            ],
+            [
+              93.0,
+              181.0
+            ]
+          ],
+          "text": "Lesen:1Richtig,2Falsch,3Richtig,4Richtig,5Falsch,6Falsch,7b,8a,9c,10b,11c,12a,130,",
+          "confidence": 0.9321
+        },
+        {
+          "box": [
+            [
+              92.0,
+              185.0
+            ],
+            [
+              673.0,
+              185.0
+            ],
+            [
+              673.0,
+              201.0
+            ],
+            [
+              92.0,
+              201.0
+            ]
+          ],
+          "text": "14j, 15 h, 16 e, 17f, 18 i, 19 a, 20 Ja, 21 Nein, 22 Nein, 23 Ja, 24 Nein, 25Ja, 26 Nein, 27 b, 28 c, 29 b,",
+          "confidence": 0.9394
+        },
+        {
+          "box": [
+            [
+              91.0,
+              205.0
+            ],
+            [
+              120.0,
+              205.0
+            ],
+            [
+              120.0,
+              223.0
+            ],
+            [
+              91.0,
+              223.0
+            ]
+          ],
+          "text": "30c",
+          "confidence": 0.9368
+        },
+        {
+          "box": [
+            [
+              91.0,
+              237.0
+            ],
+            [
+              662.0,
+              237.0
+            ],
+            [
+              662.0,
+              256.0
+            ],
+            [
+              91.0,
+              256.0
+            ]
+          ],
+          "text": "Horen:1Richtig,2b,3ichtig,4b,5Richtig,6c,7Falsch,8a,9Richtig,10c,11c,12c,13b,14a,",
+          "confidence": 0.8556
+        },
+        {
+          "box": [
+            [
+              92.0,
+              277.0
+            ],
+            [
+              214.0,
+              277.0
+            ],
+            [
+              214.0,
+              294.0
+            ],
+            [
+              92.0,
+              294.0
+            ]
+          ],
+          "text": "27b,28a,29c,30b",
+          "confidence": 0.9623
+        },
+        {
+          "box": [
+            [
+              93.0,
+              311.0
+            ],
+            [
+              170.0,
+              311.0
+            ],
+            [
+              170.0,
+              325.0
+            ],
+            [
+              93.0,
+              325.0
+            ]
+          ],
+          "text": "Modelltest7",
+          "confidence": 0.9977
+        },
+        {
+          "box": [
+            [
+              92.0,
+              343.0
+            ],
+            [
+              652.0,
+              343.0
+            ],
+            [
+              652.0,
+              359.0
+            ],
+            [
+              92.0,
+              359.0
+            ]
+          ],
+          "text": "Lesen:1 Richtig,2Richtig,3Falsch, 4Falsch, 5Falsch,6 Richtig,7a,8c, 9 b,10 b,11 c,12 a,13 c,",
+          "confidence": 0.9263
+        },
+        {
+          "box": [
+            [
+              91.0,
+              360.0
+            ],
+            [
+              665.0,
+              361.0
+            ],
+            [
+              665.0,
+              380.0
+            ],
+            [
+              91.0,
+              379.0
+            ]
+          ],
+          "text": "14 d,15j,16f,170,18 a,19h,20Nein,21Ja,22Nein,23Ja,24Nein,25Nein,26Ja,27b,28a,29",
+          "confidence": 0.9004
+        },
+        {
+          "box": [
+            [
+              90.0,
+              382.0
+            ],
+            [
+              135.0,
+              380.0
+            ],
+            [
+              136.0,
+              398.0
+            ],
+            [
+              91.0,
+              400.0
+            ]
+          ],
+          "text": "a,30b",
+          "confidence": 0.936
+        },
+        {
+          "box": [
+            [
+              92.0,
+              416.0
+            ],
+            [
+              654.0,
+              416.0
+            ],
+            [
+              654.0,
+              432.0
+            ],
+            [
+              92.0,
+              432.0
+            ]
+          ],
+          "text": "Horen:1Richtig,2c,3alsch,4a,5Falsch,6b,7Richtig,8b,9Falsch,10b,11c,12b,13c,14c,",
+          "confidence": 0.8938
+        },
+        {
+          "box": [
+            [
+              92.0,
+              455.0
+            ],
+            [
+              215.0,
+              455.0
+            ],
+            [
+              215.0,
+              471.0
+            ],
+            [
+              92.0,
+              471.0
+            ]
+          ],
+          "text": "27a,28b,29a,30b",
+          "confidence": 0.968
+        },
+        {
+          "box": [
+            [
+              92.0,
+              487.0
+            ],
+            [
+              171.0,
+              487.0
+            ],
+            [
+              171.0,
+              504.0
+            ],
+            [
+              92.0,
+              504.0
+            ]
+          ],
+          "text": "Modelltest8",
+          "confidence": 0.9926
+        },
+        {
+          "box": [
+            [
+              91.0,
+              539.0
+            ],
+            [
+              677.0,
+              539.0
+            ],
+            [
+              677.0,
+              558.0
+            ],
+            [
+              91.0,
+              558.0
+            ]
+          ],
+          "text": "14 a,150,16 d,17i,18g,19j,20Nein,21Ja,22Ja,23Nein,24Nein,25Ja,26Nein,27a,28c,29b,",
+          "confidence": 0.9028
+        },
+        {
+          "box": [
+            [
+              91.0,
+              559.0
+            ],
+            [
+              122.0,
+              559.0
+            ],
+            [
+              122.0,
+              577.0
+            ],
+            [
+              91.0,
+              577.0
+            ]
+          ],
+          "text": "30b",
+          "confidence": 0.9981
+        },
+        {
+          "box": [
+            [
+              91.0,
+              591.0
+            ],
+            [
+              651.0,
+              592.0
+            ],
+            [
+              651.0,
+              611.0
+            ],
+            [
+              91.0,
+              610.0
+            ]
+          ],
+          "text": "Hren:1ichtig,2a,3Falsch,4b,5Falsh,6b,7Falsch,8c,9Falsch,10,11b,12a,13c,14a",
+          "confidence": 0.8255
+        },
+        {
+          "box": [
+            [
+              91.0,
+              611.0
+            ],
+            [
+              672.0,
+              612.0
+            ],
+            [
+              672.0,
+              630.0
+            ],
+            [
+              91.0,
+              629.0
+            ]
+          ],
+          "text": "15 a,16Richtig,17Falsch,18Richtig,19Falsch,20Falsch,21Falsch,22Falsch,23b,24c,25 b,26 c,",
+          "confidence": 0.9438
+        },
+        {
+          "box": [
+            [
+              91.0,
+              631.0
+            ],
+            [
+              213.0,
+              632.0
+            ],
+            [
+              213.0,
+              649.0
+            ],
+            [
+              91.0,
+              648.0
+            ]
+          ],
+          "text": "27a,28b,29a,30a",
+          "confidence": 0.9599
+        },
+        {
+          "box": [
+            [
+              92.0,
+              665.0
+            ],
+            [
+              170.0,
+              665.0
+            ],
+            [
+              170.0,
+              682.0
+            ],
+            [
+              92.0,
+              682.0
+            ]
+          ],
+          "text": "Modelltest9",
+          "confidence": 0.9953
+        },
+        {
+          "box": [
+            [
+              92.0,
+              697.0
+            ],
+            [
+              651.0,
+              697.0
+            ],
+            [
+              651.0,
+              716.0
+            ],
+            [
+              92.0,
+              716.0
+            ]
+          ],
+          "text": "Lesen:1ichtig,2Falsch,Falsch,4Richtig,5ichig,6Falsch,7a,8c,9c,10b,11a,12c,13f,",
+          "confidence": 0.7321
+        },
+        {
+          "box": [
+            [
+              91.0,
+              716.0
+            ],
+            [
+              661.0,
+              717.0
+            ],
+            [
+              661.0,
+              736.0
+            ],
+            [
+              91.0,
+              735.0
+            ]
+          ],
+          "text": "14 a,15 d,160,17j,18e,19i, 20 Nein, 21Ja,22Nein,23Nein,24Ja,25Ja,26Ja,27b,28 a,29a,",
+          "confidence": 0.8953
+        },
+        {
+          "box": [
+            [
+              91.0,
+              738.0
+            ],
+            [
+              121.0,
+              738.0
+            ],
+            [
+              121.0,
+              756.0
+            ],
+            [
+              91.0,
+              756.0
+            ]
+          ],
+          "text": "30a",
+          "confidence": 0.993
+        },
+        {
+          "box": [
+            [
+              92.0,
+              768.0
+            ],
+            [
+              648.0,
+              769.0
+            ],
+            [
+              648.0,
+              788.0
+            ],
+            [
+              92.0,
+              786.0
+            ]
+          ],
+          "text": "Hren：1Falsch,2c,3Falsch,4c,5Richtig,6c,7Falsch,8c,9Falsch,10b,11b,12a,13c,4b",
+          "confidence": 0.8069
+        },
+        {
+          "box": [
+            [
+              91.0,
+              788.0
+            ],
+            [
+              677.0,
+              788.0
+            ],
+            [
+              677.0,
+              807.0
+            ],
+            [
+              91.0,
+              807.0
+            ]
+          ],
+          "text": "15 a,16Falsch,17Richtig,18Richtig,19Falsch,20Falsch,21Falsch,22Richtig,23b,24b,25c,26b,",
+          "confidence": 0.9138
+        },
+        {
+          "box": [
+            [
+              92.0,
+              810.0
+            ],
+            [
+              212.0,
+              810.0
+            ],
+            [
+              212.0,
+              826.0
+            ],
+            [
+              92.0,
+              826.0
+            ]
+          ],
+          "text": "27c,28a,29b,30c",
+          "confidence": 0.9532
+        },
+        {
+          "box": [
+            [
+              92.0,
+              842.0
+            ],
+            [
+              178.0,
+              842.0
+            ],
+            [
+              178.0,
+              859.0
+            ],
+            [
+              92.0,
+              859.0
+            ]
+          ],
+          "text": "Modelltest10",
+          "confidence": 0.9952
+        },
+        {
+          "box": [
+            [
+              91.0,
+              874.0
+            ],
+            [
+              658.0,
+              874.0
+            ],
+            [
+              658.0,
+              893.0
+            ],
+            [
+              91.0,
+              893.0
+            ]
+          ],
+          "text": "Lesen:1ichtig,2Falsch,3ichtig,4ichtig,5Falsch,6ichtig,7b,8a,9c,10a,11b,12c,130,",
+          "confidence": 0.8294
+        },
+        {
+          "box": [
+            [
+              92.0,
+              912.0
+            ],
+            [
+              121.0,
+              915.0
+            ],
+            [
+              119.0,
+              933.0
+            ],
+            [
+              90.0,
+              930.0
+            ]
+          ],
+          "text": "30a",
+          "confidence": 0.9949
+        },
+        {
+          "box": [
+            [
+              92.0,
+              994.0
+            ],
+            [
+              451.0,
+              994.0
+            ],
+            [
+              451.0,
+              1011.0
+            ],
+            [
+              92.0,
+              1011.0
+            ]
+          ],
+          "text": "ZertifikatB1neu,15 0bungsprifungen,Losungen, 2014 Hueber Verlag,Munchen",
+          "confidence": 0.8964
+        },
+        {
+          "box": [
+            [
+              592.0,
+              995.0
+            ],
+            [
+              649.0,
+              995.0
+            ],
+            [
+              649.0,
+              1009.0
+            ],
+            [
+              592.0,
+              1009.0
+            ]
+          ],
+          "text": "Seite 2 von3",
+          "confidence": 0.9755
+        }
+      ],
+      "ocr_line_count": 33,
+      "ocr_mean_confidence": 0.9242,
+      "transcription_status": "ocr_unverified"
+    },
+    {
+      "source_pdf_page": 249,
+      "printed_page_number": 250,
+      "ocr_text": "Horen:1Falsch,2c,3ichtig,4c,5ichtig,6b,7Falsch,8b,9Falsh,10b,11c,12a,13c,14b,\n27 b,28 c, 29 c, 30 c\nModelltest 11\nLesen:1ichtig,2ichtig,3Falsch,4ichtig,5Falsch,6ichtig,a,a,9c,10b,11a,12c,3,\n14 h, 15 0, 16 a, 17f, 18 i, 19 j, 20 Nein, 21Ja, 22 Nein, 23 Nein, 24 Ja, 25Ja, 26 Ja, 27 c, 28 c, 29 b,\n30a\nHren:1Falsch,2c,3Falsch,4b,5Falsch,6b,7Richtig,8a,9Falsch,10a,11c,12b,13a,14,\n15 b,16Richtig,17Falsch,18Falsch,19Falsch,20Falsch,21Richtig,22Richtig,23c,24a,25a,26a,\n27b,28c,29a,30c\nModelltest 12\nLesen: 1 Richtig, 2 Richtig,3 Richtig,4 Falsch, 5 Falsch, 6 Falsch, 7 b, 8 a, 9 c, 10 b, 11 a, 12 c, 13 0,\n14 g,15 d,16j,17 c,18 a,19h, 20 Nein, 21 Nein, 22Nein,23Ja,24Nein,25Ja,26Ja, 27b,28 a,\n29 b, 30 c\nHren：1ichtig,2b,Falsch,4c,5ichtig,6c,7Falsch,8a,9Falsch,10c,11c,12c,13b,,\n15 c,16Richtig,17Falsch,18Richtig,19Falsch,20Richtig,21 Richtig,22Falsch,23c,24b,25 a,26 c,\n27b,28c,29b,30c\nModelltest13\nLesen:1ichtig,2Falsch,3Falsch,4Fasch,5Richtig,6ichtig,7c,8b,9c,10b,11a,12c,13,\n14 0,15j,16g,17a,18d,19f,20Nein,21Ja,22Ja,23Nein,24Ja,25Ja,26Nein,27b,28c,29a,\n30c\nHren:1Falsch,2b,3Falsch,4a,5Falsch,6a,7Richtig,8c,9Falsch,10b,11a,12c,13c,14b,\n15 c,16Richtig,17Falsch,18Falsch,19Falsch,20Falsch,21Richtig,22Richtig,23c,24c,25b,26a,\n27b,28a,29b,30c\nModelltest14\nLesen:1Falsch,2ichtig,3Falsch,4Falsch,5Falsch,6Richtig,7b,8a,9b,10c,11b,12a,13i,14,\n15 f, 16 e, 170, 18 a,19h, 20 Nein, 21Ja,22Nein, 23Ja, 24Nein, 25Ja, 26Ja,27 c, 28 b, 29 a, 30 b\nHren：1Falsch,aFalh,b,ichtig,6b,ihtig,a,9Falsh,10a,11c,12b,13c,,\n15 a,16Falsch,17Richtig,18Falsch,19Richtig,20Falsch,21ichtig,22Falsch,23b,24c,5a,6a,\n27c,28c,29b,30b\nModelltest15\nLesen:1Falsch,2Falsch,ichtig,4Richtig,5ichtig,6Falsch,7a,8b,9a,10b,11c,12a,13,\n14 a,15 d,16 e,17 c,18j19 g,20Nein, 21Nein, 22Ja,23Nein, 24Ja,25Ja,26Nein, 27c,28b,29\na,30c\nHren:1ichtig,2a,3Falsch,4a,5ichtig,6c,7ichtig,8c,9ichti,10b,11a,12c,13b,14b,\n15 c,16Falsch,17Falsch,18Richtig,19Falsch,20 Richtig,21Richtig,22Falsch,23 b,24b,25a,26b,\n27c,28 b,29 c, 30 c\nZertifikatB1neu15 bungsprifungen,Losungen, 2014 Hueber Verlag,Munchen",
+      "ocr_lines": [
+        {
+          "box": [
+            [
+              91.0,
+              59.0
+            ],
+            [
+              655.0,
+              59.0
+            ],
+            [
+              655.0,
+              78.0
+            ],
+            [
+              91.0,
+              78.0
+            ]
+          ],
+          "text": "Horen:1Falsch,2c,3ichtig,4c,5ichtig,6b,7Falsch,8b,9Falsh,10b,11c,12a,13c,14b,",
+          "confidence": 0.8136
+        },
+        {
+          "box": [
+            [
+              92.0,
+              99.0
+            ],
+            [
+              212.0,
+              99.0
+            ],
+            [
+              212.0,
+              116.0
+            ],
+            [
+              92.0,
+              116.0
+            ]
+          ],
+          "text": "27 b,28 c, 29 c, 30 c",
+          "confidence": 0.8942
+        },
+        {
+          "box": [
+            [
+              92.0,
+              132.0
+            ],
+            [
+              177.0,
+              132.0
+            ],
+            [
+              177.0,
+              149.0
+            ],
+            [
+              92.0,
+              149.0
+            ]
+          ],
+          "text": "Modelltest 11",
+          "confidence": 0.9841
+        },
+        {
+          "box": [
+            [
+              92.0,
+              164.0
+            ],
+            [
+              657.0,
+              164.0
+            ],
+            [
+              657.0,
+              183.0
+            ],
+            [
+              92.0,
+              183.0
+            ]
+          ],
+          "text": "Lesen:1ichtig,2ichtig,3Falsch,4ichtig,5Falsch,6ichtig,a,a,9c,10b,11a,12c,3,",
+          "confidence": 0.7677
+        },
+        {
+          "box": [
+            [
+              92.0,
+              185.0
+            ],
+            [
+              657.0,
+              185.0
+            ],
+            [
+              657.0,
+              201.0
+            ],
+            [
+              92.0,
+              201.0
+            ]
+          ],
+          "text": "14 h, 15 0, 16 a, 17f, 18 i, 19 j, 20 Nein, 21Ja, 22 Nein, 23 Nein, 24 Ja, 25Ja, 26 Ja, 27 c, 28 c, 29 b,",
+          "confidence": 0.9203
+        },
+        {
+          "box": [
+            [
+              91.0,
+              205.0
+            ],
+            [
+              121.0,
+              205.0
+            ],
+            [
+              121.0,
+              223.0
+            ],
+            [
+              91.0,
+              223.0
+            ]
+          ],
+          "text": "30a",
+          "confidence": 0.9978
+        },
+        {
+          "box": [
+            [
+              91.0,
+              237.0
+            ],
+            [
+              652.0,
+              237.0
+            ],
+            [
+              652.0,
+              256.0
+            ],
+            [
+              91.0,
+              256.0
+            ]
+          ],
+          "text": "Hren:1Falsch,2c,3Falsch,4b,5Falsch,6b,7Richtig,8a,9Falsch,10a,11c,12b,13a,14,",
+          "confidence": 0.8052
+        },
+        {
+          "box": [
+            [
+              91.0,
+              257.0
+            ],
+            [
+              674.0,
+              257.0
+            ],
+            [
+              674.0,
+              275.0
+            ],
+            [
+              91.0,
+              275.0
+            ]
+          ],
+          "text": "15 b,16Richtig,17Falsch,18Falsch,19Falsch,20Falsch,21Richtig,22Richtig,23c,24a,25a,26a,",
+          "confidence": 0.9409
+        },
+        {
+          "box": [
+            [
+              92.0,
+              277.0
+            ],
+            [
+              213.0,
+              277.0
+            ],
+            [
+              213.0,
+              294.0
+            ],
+            [
+              92.0,
+              294.0
+            ]
+          ],
+          "text": "27b,28c,29a,30c",
+          "confidence": 0.9548
+        },
+        {
+          "box": [
+            [
+              92.0,
+              310.0
+            ],
+            [
+              178.0,
+              310.0
+            ],
+            [
+              178.0,
+              327.0
+            ],
+            [
+              92.0,
+              327.0
+            ]
+          ],
+          "text": "Modelltest 12",
+          "confidence": 0.9577
+        },
+        {
+          "box": [
+            [
+              92.0,
+              343.0
+            ],
+            [
+              653.0,
+              343.0
+            ],
+            [
+              653.0,
+              359.0
+            ],
+            [
+              92.0,
+              359.0
+            ]
+          ],
+          "text": "Lesen: 1 Richtig, 2 Richtig,3 Richtig,4 Falsch, 5 Falsch, 6 Falsch, 7 b, 8 a, 9 c, 10 b, 11 a, 12 c, 13 0,",
+          "confidence": 0.9065
+        },
+        {
+          "box": [
+            [
+              91.0,
+              361.0
+            ],
+            [
+              649.0,
+              362.0
+            ],
+            [
+              649.0,
+              381.0
+            ],
+            [
+              91.0,
+              380.0
+            ]
+          ],
+          "text": "14 g,15 d,16j,17 c,18 a,19h, 20 Nein, 21 Nein, 22Nein,23Ja,24Nein,25Ja,26Ja, 27b,28 a,",
+          "confidence": 0.9061
+        },
+        {
+          "box": [
+            [
+              91.0,
+              381.0
+            ],
+            [
+              152.0,
+              383.0
+            ],
+            [
+              151.0,
+              400.0
+            ],
+            [
+              91.0,
+              398.0
+            ]
+          ],
+          "text": "29 b, 30 c",
+          "confidence": 0.8903
+        },
+        {
+          "box": [
+            [
+              91.0,
+              414.0
+            ],
+            [
+              652.0,
+              415.0
+            ],
+            [
+              652.0,
+              434.0
+            ],
+            [
+              91.0,
+              433.0
+            ]
+          ],
+          "text": "Hren：1ichtig,2b,Falsch,4c,5ichtig,6c,7Falsch,8a,9Falsch,10c,11c,12c,13b,,",
+          "confidence": 0.7396
+        },
+        {
+          "box": [
+            [
+              92.0,
+              436.0
+            ],
+            [
+              675.0,
+              436.0
+            ],
+            [
+              675.0,
+              451.0
+            ],
+            [
+              92.0,
+              451.0
+            ]
+          ],
+          "text": "15 c,16Richtig,17Falsch,18Richtig,19Falsch,20Richtig,21 Richtig,22Falsch,23c,24b,25 a,26 c,",
+          "confidence": 0.9524
+        },
+        {
+          "box": [
+            [
+              91.0,
+              455.0
+            ],
+            [
+              213.0,
+              455.0
+            ],
+            [
+              213.0,
+              471.0
+            ],
+            [
+              91.0,
+              471.0
+            ]
+          ],
+          "text": "27b,28c,29b,30c",
+          "confidence": 0.9588
+        },
+        {
+          "box": [
+            [
+              92.0,
+              487.0
+            ],
+            [
+              178.0,
+              487.0
+            ],
+            [
+              178.0,
+              504.0
+            ],
+            [
+              92.0,
+              504.0
+            ]
+          ],
+          "text": "Modelltest13",
+          "confidence": 0.9952
+        },
+        {
+          "box": [
+            [
+              91.0,
+              519.0
+            ],
+            [
+              654.0,
+              519.0
+            ],
+            [
+              654.0,
+              538.0
+            ],
+            [
+              91.0,
+              538.0
+            ]
+          ],
+          "text": "Lesen:1ichtig,2Falsch,3Falsch,4Fasch,5Richtig,6ichtig,7c,8b,9c,10b,11a,12c,13,",
+          "confidence": 0.8024
+        },
+        {
+          "box": [
+            [
+              91.0,
+              539.0
+            ],
+            [
+              662.0,
+              539.0
+            ],
+            [
+              662.0,
+              558.0
+            ],
+            [
+              91.0,
+              558.0
+            ]
+          ],
+          "text": "14 0,15j,16g,17a,18d,19f,20Nein,21Ja,22Ja,23Nein,24Ja,25Ja,26Nein,27b,28c,29a,",
+          "confidence": 0.8341
+        },
+        {
+          "box": [
+            [
+              91.0,
+              560.0
+            ],
+            [
+              120.0,
+              560.0
+            ],
+            [
+              120.0,
+              578.0
+            ],
+            [
+              91.0,
+              578.0
+            ]
+          ],
+          "text": "30c",
+          "confidence": 0.9219
+        },
+        {
+          "box": [
+            [
+              91.0,
+              592.0
+            ],
+            [
+              651.0,
+              592.0
+            ],
+            [
+              651.0,
+              611.0
+            ],
+            [
+              91.0,
+              611.0
+            ]
+          ],
+          "text": "Hren:1Falsch,2b,3Falsch,4a,5Falsch,6a,7Richtig,8c,9Falsch,10b,11a,12c,13c,14b,",
+          "confidence": 0.891
+        },
+        {
+          "box": [
+            [
+              91.0,
+              612.0
+            ],
+            [
+              673.0,
+              612.0
+            ],
+            [
+              673.0,
+              630.0
+            ],
+            [
+              91.0,
+              630.0
+            ]
+          ],
+          "text": "15 c,16Richtig,17Falsch,18Falsch,19Falsch,20Falsch,21Richtig,22Richtig,23c,24c,25b,26a,",
+          "confidence": 0.9305
+        },
+        {
+          "box": [
+            [
+              92.0,
+              632.0
+            ],
+            [
+              214.0,
+              632.0
+            ],
+            [
+              214.0,
+              649.0
+            ],
+            [
+              92.0,
+              649.0
+            ]
+          ],
+          "text": "27b,28a,29b,30c",
+          "confidence": 0.9517
+        },
+        {
+          "box": [
+            [
+              92.0,
+              665.0
+            ],
+            [
+              178.0,
+              665.0
+            ],
+            [
+              178.0,
+              682.0
+            ],
+            [
+              92.0,
+              682.0
+            ]
+          ],
+          "text": "Modelltest14",
+          "confidence": 0.996
+        },
+        {
+          "box": [
+            [
+              92.0,
+              697.0
+            ],
+            [
+              678.0,
+              697.0
+            ],
+            [
+              678.0,
+              716.0
+            ],
+            [
+              92.0,
+              716.0
+            ]
+          ],
+          "text": "Lesen:1Falsch,2ichtig,3Falsch,4Falsch,5Falsch,6Richtig,7b,8a,9b,10c,11b,12a,13i,14,",
+          "confidence": 0.8421
+        },
+        {
+          "box": [
+            [
+              92.0,
+              717.0
+            ],
+            [
+              664.0,
+              717.0
+            ],
+            [
+              664.0,
+              736.0
+            ],
+            [
+              92.0,
+              736.0
+            ]
+          ],
+          "text": "15 f, 16 e, 170, 18 a,19h, 20 Nein, 21Ja,22Nein, 23Ja, 24Nein, 25Ja, 26Ja,27 c, 28 b, 29 a, 30 b",
+          "confidence": 0.8792
+        },
+        {
+          "box": [
+            [
+              91.0,
+              748.0
+            ],
+            [
+              656.0,
+              749.0
+            ],
+            [
+              656.0,
+              769.0
+            ],
+            [
+              91.0,
+              768.0
+            ]
+          ],
+          "text": "Hren：1Falsch,aFalh,b,ichtig,6b,ihtig,a,9Falsh,10a,11c,12b,13c,,",
+          "confidence": 0.7101
+        },
+        {
+          "box": [
+            [
+              91.0,
+              768.0
+            ],
+            [
+              675.0,
+              769.0
+            ],
+            [
+              675.0,
+              789.0
+            ],
+            [
+              91.0,
+              787.0
+            ]
+          ],
+          "text": "15 a,16Falsch,17Richtig,18Falsch,19Richtig,20Falsch,21ichtig,22Falsch,23b,24c,5a,6a,",
+          "confidence": 0.8764
+        },
+        {
+          "box": [
+            [
+              92.0,
+              790.0
+            ],
+            [
+              213.0,
+              790.0
+            ],
+            [
+              213.0,
+              806.0
+            ],
+            [
+              92.0,
+              806.0
+            ]
+          ],
+          "text": "27c,28c,29b,30b",
+          "confidence": 0.9608
+        },
+        {
+          "box": [
+            [
+              93.0,
+              824.0
+            ],
+            [
+              177.0,
+              824.0
+            ],
+            [
+              177.0,
+              838.0
+            ],
+            [
+              93.0,
+              838.0
+            ]
+          ],
+          "text": "Modelltest15",
+          "confidence": 0.9978
+        },
+        {
+          "box": [
+            [
+              92.0,
+              854.0
+            ],
+            [
+              654.0,
+              854.0
+            ],
+            [
+              654.0,
+              873.0
+            ],
+            [
+              92.0,
+              873.0
+            ]
+          ],
+          "text": "Lesen:1Falsch,2Falsch,ichtig,4Richtig,5ichtig,6Falsch,7a,8b,9a,10b,11c,12a,13,",
+          "confidence": 0.8193
+        },
+        {
+          "box": [
+            [
+              91.0,
+              874.0
+            ],
+            [
+              666.0,
+              874.0
+            ],
+            [
+              666.0,
+              893.0
+            ],
+            [
+              91.0,
+              893.0
+            ]
+          ],
+          "text": "14 a,15 d,16 e,17 c,18j19 g,20Nein, 21Nein, 22Ja,23Nein, 24Ja,25Ja,26Nein, 27c,28b,29",
+          "confidence": 0.9044
+        },
+        {
+          "box": [
+            [
+              91.0,
+              896.0
+            ],
+            [
+              134.0,
+              896.0
+            ],
+            [
+              134.0,
+              913.0
+            ],
+            [
+              91.0,
+              913.0
+            ]
+          ],
+          "text": "a,30c",
+          "confidence": 0.8841
+        },
+        {
+          "box": [
+            [
+              91.0,
+              927.0
+            ],
+            [
+              661.0,
+              927.0
+            ],
+            [
+              661.0,
+              946.0
+            ],
+            [
+              91.0,
+              946.0
+            ]
+          ],
+          "text": "Hren:1ichtig,2a,3Falsch,4a,5ichtig,6c,7ichtig,8c,9ichti,10b,11a,12c,13b,14b,",
+          "confidence": 0.8198
+        },
+        {
+          "box": [
+            [
+              92.0,
+              947.0
+            ],
+            [
+              676.0,
+              947.0
+            ],
+            [
+              676.0,
+              965.0
+            ],
+            [
+              92.0,
+              965.0
+            ]
+          ],
+          "text": "15 c,16Falsch,17Falsch,18Richtig,19Falsch,20 Richtig,21Richtig,22Falsch,23 b,24b,25a,26b,",
+          "confidence": 0.9416
+        },
+        {
+          "box": [
+            [
+              92.0,
+              967.0
+            ],
+            [
+              212.0,
+              967.0
+            ],
+            [
+              212.0,
+              984.0
+            ],
+            [
+              92.0,
+              984.0
+            ]
+          ],
+          "text": "27c,28 b,29 c, 30 c",
+          "confidence": 0.8709
+        },
+        {
+          "box": [
+            [
+              92.0,
+              994.0
+            ],
+            [
+              450.0,
+              994.0
+            ],
+            [
+              450.0,
+              1011.0
+            ],
+            [
+              92.0,
+              1011.0
+            ]
+          ],
+          "text": "ZertifikatB1neu15 bungsprifungen,Losungen, 2014 Hueber Verlag,Munchen",
+          "confidence": 0.9044
+        }
+      ],
+      "ocr_line_count": 37,
+      "ocr_mean_confidence": 0.8952,
+      "transcription_status": "ocr_unverified"
+    }
+  ],
+  "structured_answer_keys": null,
+  "manual_visual_verification_required": true
+}
