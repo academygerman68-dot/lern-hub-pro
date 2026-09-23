@@ -3,7 +3,9 @@ import {
   examLevelCode,
   filterExamsByLevel,
   isChoiceQuestionType,
+  loadPreviewDraft,
   questionTeil,
+  savePreviewDraft,
   sortExamsForCatalog,
   stableHorenAudioKey,
 } from "./exam-runner-ux";
@@ -73,5 +75,20 @@ describe("exam-runner-ux", () => {
     expect(questionTeil({ teil: 3 })).toBe(3);
     expect(questionTeil({ audio_slot: 4 })).toBe(4);
     expect(questionTeil({})).toBeNull();
+  });
+
+  it("loadPreviewDraft does not throw when sessionStorage is unavailable", () => {
+    const previous = Object.getOwnPropertyDescriptor(globalThis, "sessionStorage");
+    Object.defineProperty(globalThis, "sessionStorage", {
+      configurable: true,
+      value: undefined,
+    });
+    try {
+      expect(loadPreviewDraft("exam-ssr")).toEqual({ answers: {}, flagged: {}, index: 0 });
+      expect(() => savePreviewDraft("exam-ssr", { answers: {}, flagged: {}, index: 0 })).not.toThrow();
+    } finally {
+      if (previous) Object.defineProperty(globalThis, "sessionStorage", previous);
+      else Reflect.deleteProperty(globalThis, "sessionStorage");
+    }
   });
 });

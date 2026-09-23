@@ -55,6 +55,9 @@ const SKILL_LABELS: Record<string, string> = {
 const SKILL_ORDER = ["lesen", "hoeren", "schreiben", "sprechen"] as const;
 
 function readExamSession() {
+  if (typeof sessionStorage === "undefined") {
+    return { examId: null, attemptId: null };
+  }
   return {
     examId: sessionStorage.getItem(EXAM_ID_KEY),
     attemptId: sessionStorage.getItem(ATTEMPT_ID_KEY),
@@ -656,7 +659,7 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
 
             <div className="mt-6 space-y-3">
               {contentSafe && current && isChoiceQuestionType(current.type) &&
-                current.options.map((option) => {
+                (current.options ?? []).map((option) => {
                   const selected = answerValue(localAnswers[current.id]) === option.value;
                   return (
                     <button

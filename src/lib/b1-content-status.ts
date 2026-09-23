@@ -22,7 +22,7 @@ export type B1ContentStatusInput = {
   metadata?: Record<string, unknown> | Json | null;
   options?: Array<{ label?: string | null; value?: string | null }> | null;
   correct_values?: string[] | null;
-  answer_key?: { correct_values?: string[] | null } | null;
+  answer_key?: { correct_values?: string[] | null } | Array<{ correct_values?: string[] | null }> | null;
 };
 
 export type B1ContentStatusResult = {
@@ -47,9 +47,17 @@ export function questionTeilFromMeta(metadata: unknown): number | null {
 }
 
 function keyValues(input: B1ContentStatusInput): string[] {
-  if (input.correct_values?.length) return input.correct_values.map(String);
-  const fromKey = input.answer_key?.correct_values;
-  if (fromKey?.length) return fromKey.map(String);
+  if (Array.isArray(input.correct_values) && input.correct_values.length) {
+    return input.correct_values.map(String);
+  }
+  const rawKey = input.answer_key;
+  // PostgREST may return a one-to-many embed as an array — never throw on .correct_values.
+  const keyObj = Array.isArray(rawKey) ? rawKey[0] : rawKey;
+  const fromKey =
+    keyObj && typeof keyObj === "object" && !Array.isArray(keyObj)
+      ? (keyObj as { correct_values?: string[] | null }).correct_values
+      : null;
+  if (Array.isArray(fromKey) && fromKey.length) return fromKey.map(String);
   return [];
 }
 
@@ -87,7 +95,7 @@ export function classifyB1QuestionContent(input: B1ContentStatusInput): B1Conten
         ? Number(input.sort_order)
         : null;
   const reasons: string[] = [];
-  const opts = input.options ?? [];
+  const opts = Array.isArray(input.options) ? input.options : [];
   const keys = keyValues(input);
 
   if (isPlaceholderPrompt(prompt, meta) || meta["transform_status"] === "placeholder") {

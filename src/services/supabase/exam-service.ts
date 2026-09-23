@@ -372,7 +372,10 @@ export const SupabaseExamService = {
                   media_bucket: null,
                   media_path: null,
                   metadata: safeMeta as Json,
-                  options: (q.options ?? []).slice().sort((a, b) => a.sort_order - b.sort_order),
+                  options: (Array.isArray(q.options) ? q.options : [])
+                    .filter((o): o is NonNullable<typeof o> => Boolean(o))
+                    .slice()
+                    .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0)),
                 };
               }),
           ),
@@ -513,14 +516,26 @@ export const SupabaseExamService = {
     return sections
       .map((section) => ({
         ...section,
-        questions: (section.questions ?? [])
-          .map((question) => ({
-            ...question,
-            options: (question.options ?? []).slice().sort((a, b) => a.sort_order - b.sort_order),
-          }))
-          .sort((a, b) => a.sort_order - b.sort_order),
+        questions: (Array.isArray(section.questions) ? section.questions : [])
+          .map((question) => {
+            const rawKey = (question as { answer_key?: unknown }).answer_key;
+            const answerKey = Array.isArray(rawKey)
+              ? (rawKey[0] as ExamStructureQuestion["answer_key"])
+              : ((rawKey as ExamStructureQuestion["answer_key"]) ?? null);
+            const rawOptions = question.options;
+            const options = (Array.isArray(rawOptions) ? rawOptions : [])
+              .filter((o): o is NonNullable<typeof o> => Boolean(o))
+              .slice()
+              .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0));
+            return {
+              ...question,
+              answer_key: answerKey,
+              options,
+            };
+          })
+          .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0)),
       }))
-      .sort((a, b) => a.sort_order - b.sort_order);
+      .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0));
   },
 
   async createSection(input: {

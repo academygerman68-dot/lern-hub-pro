@@ -95,6 +95,9 @@ export type PreviewDraft = {
 
 export function loadPreviewDraft(examId: string): PreviewDraft {
   try {
+    if (typeof sessionStorage === "undefined") {
+      return { answers: {}, flagged: {}, index: 0 };
+    }
     const raw = sessionStorage.getItem(previewStorageKey(examId));
     if (!raw) return { answers: {}, flagged: {}, index: 0 };
     const parsed = JSON.parse(raw) as Partial<PreviewDraft>;
@@ -109,7 +112,12 @@ export function loadPreviewDraft(examId: string): PreviewDraft {
 }
 
 export function savePreviewDraft(examId: string, draft: PreviewDraft) {
-  sessionStorage.setItem(previewStorageKey(examId), JSON.stringify(draft));
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.setItem(previewStorageKey(examId), JSON.stringify(draft));
+  } catch {
+    /* ignore quota / private-mode write failures */
+  }
 }
 
 /** Discrete draft blockers for staff catalog cards (never shown to students). */

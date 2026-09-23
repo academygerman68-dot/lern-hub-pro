@@ -104,11 +104,15 @@ const RUBRIC_LABELS: Record<string, string> = {
 };
 
 function persistExamSession(examId: string, attemptId: string) {
+  if (typeof sessionStorage === "undefined") return;
   sessionStorage.setItem(EXAM_ID_KEY, examId);
   sessionStorage.setItem(ATTEMPT_ID_KEY, attemptId);
 }
 
 function readExamSession() {
+  if (typeof sessionStorage === "undefined") {
+    return { examId: null, attemptId: null };
+  }
   return {
     examId: sessionStorage.getItem(EXAM_ID_KEY),
     attemptId: sessionStorage.getItem(ATTEMPT_ID_KEY),
@@ -1366,24 +1370,29 @@ export function DirectorExamsPage() {
                     sections: sections.map((s) => ({
                       skill: s.skill,
                       title: s.title,
-                      questions: (s.questions ?? []).map((q) => ({
-                        id: q.id,
-                        prompt: q.prompt,
-                        type: q.type,
-                        points: q.points,
-                        media_path: q.media_path,
-                        media_bucket: q.media_bucket,
-                        metadata: q.metadata,
-                        options: q.options,
-                        correct_values: q.answer_key?.correct_values ?? null,
-                        teacher_payload: q.answer_key?.teacher_payload ?? null,
-                        answer_key: q.answer_key
-                          ? {
-                              correct_values: q.answer_key.correct_values ?? null,
-                              teacher_payload: q.answer_key.teacher_payload ?? null,
-                            }
-                          : null,
-                      })),
+                      questions: (Array.isArray(s.questions) ? s.questions : []).map((q) => {
+                        const key = Array.isArray(q.answer_key)
+                          ? q.answer_key[0]
+                          : q.answer_key;
+                        return {
+                          id: q.id,
+                          prompt: q.prompt,
+                          type: q.type,
+                          points: q.points,
+                          media_path: q.media_path,
+                          media_bucket: q.media_bucket,
+                          metadata: q.metadata,
+                          options: Array.isArray(q.options) ? q.options : [],
+                          correct_values: key?.correct_values ?? null,
+                          teacher_payload: key?.teacher_payload ?? null,
+                          answer_key: key
+                            ? {
+                                correct_values: key.correct_values ?? null,
+                                teacher_payload: key.teacher_payload ?? null,
+                              }
+                            : null,
+                        };
+                      }),
                     })),
                   })
                 : null;
@@ -1394,7 +1403,7 @@ export function DirectorExamsPage() {
                     status: exam.status,
                     sections: sections.map((s) => ({
                       skill: s.skill,
-                      questions: (s.questions ?? []).map((q) => ({
+                      questions: (Array.isArray(s.questions) ? s.questions : []).map((q) => ({
                         id: q.id,
                         prompt: q.prompt,
                         type: q.type,
@@ -1402,16 +1411,20 @@ export function DirectorExamsPage() {
                         media_path: q.media_path,
                         media_bucket: q.media_bucket,
                         metadata: q.metadata,
-                        options: q.options,
-                        correct_values: q.answer_key?.correct_values ?? null,
-                        answer_key: q.answer_key,
+                        options: Array.isArray(q.options) ? q.options : [],
+                        correct_values: Array.isArray(q.answer_key)
+                          ? (q.answer_key[0]?.correct_values ?? null)
+                          : (q.answer_key?.correct_values ?? null),
+                        answer_key: Array.isArray(q.answer_key)
+                          ? (q.answer_key[0] ?? null)
+                          : q.answer_key,
                       })),
                     })),
                   })
                 : null;
             const flatQs =
               sections?.flatMap((s) =>
-                (s.questions ?? []).map((q) => ({
+                (Array.isArray(s.questions) ? s.questions : []).map((q) => ({
                   ...q,
                   skill: s.skill,
                 })),
@@ -1434,7 +1447,9 @@ export function DirectorExamsPage() {
                       {exam.class?.name ? `· ${exam.class.name}` : "· Niveau entier"} ·{" "}
                       {exam.duration_minutes} min
                       {exam.starts_at ? ` · ${formatFrDate(exam.starts_at)}` : ""}
-                      {` · ${MEDIA_KIND_LABELS[exam.content_kind]}`}
+                      {exam.content_kind && MEDIA_KIND_LABELS[exam.content_kind]
+                        ? ` · ${MEDIA_KIND_LABELS[exam.content_kind]}`
+                        : ""}
                     </p>
                     {exam.instructions || exam.description ? (
                       <p className="mt-1 text-sm text-muted-foreground">
