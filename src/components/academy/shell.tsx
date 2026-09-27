@@ -32,6 +32,7 @@ import {
 } from "@/hooks/use-academy-data";
 import type { AcademyPage, Locale } from "@/types/academy";
 import { useAcademy } from "./academy-context";
+import { StudentMobileTabBar } from "./student-mobile-tabbar";
 
 type NavItem = readonly [AcademyPage, string, typeof Home];
 type NavSection = { label?: string; items: NavItem[] };
@@ -42,10 +43,10 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
       label: "nav.section.learning",
       items: [
         ["dashboard", "nav.home", Home],
-        ["courses", "nav.courses", BookOpen],
         ["materials", "nav.materials", Library],
         ["assignments", "nav.assignments", ClipboardCheck],
         ["exams", "nav.exams", FileText],
+        ["courses", "nav.courses", BookOpen],
         ["progress", "nav.progress", BarChart3],
         ["live", "nav.live", Video],
         ["calendar", "nav.calendar", CalendarDays],
@@ -211,9 +212,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 >
                   <Icon className="size-4 shrink-0 opacity-80" />
                   <span className="truncate">{t(label)}</span>
-                  {id === "messages" && (
-                    <span className="ml-auto size-1.5 rounded-full bg-alert" aria-hidden />
-                  )}
                 </button>
               ))}
             </div>
@@ -352,9 +350,16 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
         </header>
-        <main className="px-3 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))] sm:px-8 sm:py-8">
-          <div className="mx-auto w-full max-w-[72rem]">{children}</div>
+        <main
+          className={`px-3 py-5 sm:px-8 sm:py-8 ${
+            role === "student"
+              ? "pb-[max(5.5rem,calc(4.25rem+env(safe-area-inset-bottom,0px)))] lg:pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]"
+              : "pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]"
+          }`}
+        >
+          <div className="mx-auto w-full max-w-[72rem] animate-fade-in">{children}</div>
         </main>
+        {role === "student" ? <StudentMobileTabBar /> : null}
       </div>
     </div>
   );

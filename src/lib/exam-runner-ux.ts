@@ -26,11 +26,11 @@ export function questionTeil(metadata: unknown): number | null {
  * element does not remount when navigating questions inside that Teil.
  */
 export function stableHorenAudioKey(input: {
-  skill?: string | null;
-  type?: string | null;
+  skill?: string | null | undefined;
+  type?: string | null | undefined;
   metadata?: unknown;
-  audioUrl?: string | null;
-  questionId?: string;
+  audioUrl?: string | null | undefined;
+  questionId?: string | undefined;
 }): string {
   const needsAudio = input.skill === "hoeren" || input.type === "listening";
   if (!needsAudio) return input.questionId ?? "none";

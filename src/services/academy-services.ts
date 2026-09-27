@@ -640,9 +640,12 @@ export const GroupProgressService = {
 };
 
 export const AssignmentService = {
-  async list(classId?: string): Promise<AssignmentListItem[]> {
+  async list(classId?: string, levelCode?: string | null): Promise<AssignmentListItem[]> {
     if (isSupabaseConfigured) {
-      const rows = await SupabaseAssignmentService.list(classId);
+      const rows =
+        classId && levelCode
+          ? await SupabaseAssignmentService.listForStudent(classId, levelCode)
+          : await SupabaseAssignmentService.list(classId);
       return rows.map((row) => ({
         id: row.id,
         title: row.title,
@@ -855,6 +858,10 @@ export const ExamService = {
   ) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabaseExamService.getQuestionAudioSignedUrl(question, expiresIn);
+  },
+  async refreshQuestionAudioUrl(questionId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseExamService.refreshQuestionAudioUrl(questionId);
   },
   async archiveExam(id: string) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");

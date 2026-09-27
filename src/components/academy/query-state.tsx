@@ -24,10 +24,11 @@ export function QueryState({
 }) {
   if (isLoading) {
     return (
-      <div className="space-y-3" aria-busy="true" aria-live="polite">
-        <div className="skeleton h-12 w-full" />
-        <div className="skeleton h-28 w-full" />
-        <div className="skeleton h-28 w-4/5" />
+      <div className="space-y-3 animate-fade-in" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-10 w-2/5 max-w-xs" />
+        <div className="skeleton h-24 w-full rounded-xl" />
+        <div className="skeleton h-24 w-full rounded-xl" />
+        <div className="skeleton h-24 w-4/5 rounded-xl" />
       </div>
     );
   }

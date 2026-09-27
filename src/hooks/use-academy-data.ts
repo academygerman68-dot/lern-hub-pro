@@ -462,12 +462,17 @@ export function useAssignments(classId?: string) {
   });
 }
 
-export function useAssignmentRows(classId?: string) {
+export function useAssignmentRows(classId?: string, levelCode?: string | null) {
+  const studentScoped = levelCode != null && levelCode !== "";
   return useQuery({
     queryKey: classId
-      ? [...queryKeys.assignments.byClass(classId), "rows"]
+      ? [...queryKeys.assignments.byClass(classId), "rows", levelCode ?? ""]
       : [...queryKeys.assignments.all, "rows"],
-    queryFn: () => SupabaseAssignmentService.list(classId),
+    queryFn: () =>
+      classId && studentScoped
+        ? SupabaseAssignmentService.listForStudent(classId, levelCode)
+        : SupabaseAssignmentService.list(classId),
+    enabled: studentScoped ? Boolean(classId) : true,
   });
 }
 

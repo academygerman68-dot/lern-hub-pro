@@ -80,4 +80,10 @@ describe("Examens blancs navigation pages", () => {
     expect(shellNavPageIds("teacher")).toContain("corrections");
     expect(shellNavPageIds("director")).toContain("corrections");
   });
+
+  it("orders student learning nav: resources → assignments → exams → courses", () => {
+    const ids = shellNavPageIds("student");
+    const learning = ids.slice(0, 5);
+    expect(learning).toEqual(["dashboard", "materials", "assignments", "exams", "courses"]);
+  });
 });

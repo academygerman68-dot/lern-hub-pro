@@ -69,6 +69,40 @@ export const SupabaseAssignmentService = {
     return (data as AssignmentRow[] | null) ?? [];
   },
 
+  /** Class-scoped + level-wide (class_id null) for the student's level. */
+  async listForStudent(classId: string, levelCode?: string | null): Promise<AssignmentRow[]> {
+    const supabase = requireClient();
+    let levelId: string | null = null;
+    if (levelCode) {
+      const { data: level, error: levelError } = await supabase
+        .from("levels")
+        .select("id")
+        .eq("code", levelCode)
+        .maybeSingle();
+      if (levelError) throw levelError;
+      levelId = level?.id ?? null;
+    }
+
+    let query = supabase
+      .from("assignments")
+      .select(ASSIGNMENT_SELECT)
+      .is("archived_at", null)
+      .order("due_at", {
+        ascending: true,
+        nullsFirst: false,
+      });
+
+    if (levelId) {
+      query = query.or(`class_id.eq.${classId},and(class_id.is.null,level_id.eq.${levelId})`);
+    } else {
+      query = query.eq("class_id", classId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data as AssignmentRow[] | null) ?? [];
+  },
+
   async create(input: {
     levelId: string;
     classId?: string | null;

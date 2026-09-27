@@ -18,6 +18,7 @@ import {
   useArchiveLibraryItem,
   useAssignmentRows,
   useClasses,
+  useCourseModules,
   useCourses,
   useCreateAssignment,
   useCreateCourse,
@@ -72,7 +73,15 @@ import { DocumentViewer } from "./document-viewer";
 import { useAcademy } from "./academy-context";
 import { MultiClassPicker } from "./multi-class-picker";
 import { GroupProgressPage } from "./group-progress-page";
-import { PageHeader, Status, Surface, LevelBadge, GroupBadge, FormSection } from "./primitives";
+import {
+  PageHeader,
+  Status,
+  Surface,
+  LevelBadge,
+  GroupBadge,
+  FormSection,
+  ProgressLine,
+} from "./primitives";
 import { QueryState } from "./query-state";
 import { AssignmentGrading } from "./workflow-pages";
 
@@ -604,11 +613,13 @@ export { MaterialsLibraryPage } from "./materials-library-page";
 
 
 export function StudentLearningPage() {
-  const { user, profile } = useAcademy();
+  const { navigate, user, profile } = useAcademy();
   const coursesQuery = useCourses();
+  const modulesQuery = useCourseModules();
   const accessQuery = useAcademicAccess();
   const studentsQuery = useStudents();
   const { preview, setPreview, openLinkOrFile } = usePreview();
+  const [textPreview, setTextPreview] = useState<{ title: string; body: string } | null>(null);
   const myStudent = resolveOwnStudent(studentsQuery.data ?? [], {
     profileId: profile?.id ?? user?.id ?? null,
     email: user?.email ?? null,
@@ -621,9 +632,25 @@ export function StudentLearningPage() {
     [progressQuery.data],
   );
 
+  const modules = useMemo(() => {
+    const rows = modulesQuery.data ?? [];
+    if (!levelCode) return rows;
+    return rows.filter((m) => !m.level || m.level === levelCode);
+  }, [modulesQuery.data, levelCode]);
+
+  const courses = useMemo(
+    () =>
+      (coursesQuery.data ?? []).filter((course) => {
+        if (course.status !== "published") return false;
+        if (levelCode && course.level?.code && course.level.code !== levelCode) return false;
+        return true;
+      }),
+    [coursesQuery.data, levelCode],
+  );
+
   if (accessQuery.data === false) {
     return (
-      <>
+      <div className="animate-fade-in space-y-4">
         <PageHeader title="Cours" subtitle="Les cours de votre niveau." />
         <Surface className="space-y-3 p-6">
           <h2 className="font-semibold">Accès académique indisponible</h2>
@@ -631,93 +658,163 @@ export function StudentLearningPage() {
             Votre mois d’essai est terminé ou votre paiement n’est plus à jour. Régularisez dans
             Paiements pour rouvrir les cours.
           </p>
+          <Button onClick={() => navigate("payments")}>Mes paiements</Button>
         </Surface>
-      </>
+      </div>
     );
   }
 
-  const courses = (coursesQuery.data ?? []).filter((course) => {
-    if (course.status !== "published") return false;
-    if (levelCode && course.level?.code && course.level.code !== levelCode) return false;
-    return true;
-  });
-
   return (
-    <>
+    <div className="animate-fade-in space-y-6">
       <PageHeader
         title="Cours"
         subtitle={
           classId
             ? `Niveau ${levelCode || "—"} · progression groupe ${summary.completed}/${summary.total} (${summary.percent} %)`
-            : "Uniquement les cours de votre niveau."
+            : "Parcours et supports de votre niveau."
         }
       />
+
       {classId ? (
-        <Surface className="mb-5 space-y-2 p-4">
-          <p className="text-sm font-medium">Progression de votre groupe</p>
-          <p className="text-xs text-muted-foreground">
-            Distincte du niveau catalogue. Les chapitres verrouillés restent fermés jusqu’au
-            déblocage par l’équipe pédagogique.
-          </p>
-          <div className="flex flex-wrap gap-2 pt-1">
-            {(progressQuery.data ?? []).map((row) => (
-              <Status
-                key={row.unitId}
-                tone={
-                  row.status === "completed" ? "green" : row.status === "unlocked" ? "blue" : "gray"
-                }
-              >
-                {row.title}
-                {row.status === "locked" ? " (verrouillé)" : ""}
-              </Status>
-            ))}
-            {!progressQuery.isLoading && !(progressQuery.data ?? []).length ? (
-              <p className="text-sm text-muted-foreground">
-                Aucun chapitre de parcours pour ce niveau pour l’instant.
+        <Surface className="space-y-3 p-5">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Progression de votre groupe</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Chapitres débloqués par l’équipe pédagogique.
               </p>
-            ) : null}
+            </div>
+            <p className="text-sm font-semibold tabular-nums">{summary.percent} %</p>
           </div>
-        </Surface>
-      ) : null}
-      <QueryState
-        isLoading={coursesQuery.isLoading}
-        isError={coursesQuery.isError}
-        error={coursesQuery.error}
-        isEmpty={!courses.length}
-        emptyTitle="Aucun cours"
-        emptyMessage="Les cours de votre niveau apparaîtront ici une fois publiés."
-        onRetry={() => void coursesQuery.refetch()}
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          {courses.map((course) => (
-            <Surface key={course.id} className="p-5">
-              <p className="text-xs font-medium text-muted-foreground uppercase">
-                {course.level?.code ?? "—"} · {COURSE_KIND_LABELS[course.content_kind]}
-              </p>
-              <h2 className="mt-2 text-lg font-semibold">{course.title}</h2>
-              {course.description ? (
-                <p className="mt-1 text-sm text-muted-foreground">{course.description}</p>
-              ) : null}
-              <p className="mt-1 text-sm text-muted-foreground">
-                {formatFrDate(course.created_at)}
-              </p>
-              {course.content_kind === "text" ? null : (
-                <Button
-                  className="mt-4"
-                  variant="outline"
-                  onClick={() =>
-                    void openLinkOrFile(course.title, course.content_kind, course.mime_type, () =>
-                      CourseService.getCourseMaterialUrl(course),
-                    )
+          <ProgressLine value={summary.percent} />
+          <ul className="mt-2 space-y-2">
+            {(progressQuery.data ?? []).map((row) => (
+              <li
+                key={row.unitId}
+                className="flex items-center justify-between gap-3 border-b border-border/60 py-2 text-sm last:border-0"
+              >
+                <span className="min-w-0 truncate">{row.title}</span>
+                <Status
+                  tone={
+                    row.status === "completed"
+                      ? "green"
+                      : row.status === "unlocked"
+                        ? "blue"
+                        : "gray"
                   }
                 >
-                  {course.content_kind === "link" ? "Ouvrir le lien" : "Ouvrir"}
+                  {row.status === "completed"
+                    ? "Terminé"
+                    : row.status === "unlocked"
+                      ? "Ouvert"
+                      : "Verrouillé"}
+                </Status>
+              </li>
+            ))}
+          </ul>
+          {!progressQuery.isLoading && !(progressQuery.data ?? []).length ? (
+            <p className="text-sm text-muted-foreground">
+              Aucun chapitre de parcours pour ce niveau pour l’instant.
+            </p>
+          ) : null}
+        </Surface>
+      ) : null}
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold tracking-tight">Parcours & leçons</h2>
+        <QueryState
+          isLoading={modulesQuery.isLoading}
+          isError={modulesQuery.isError}
+          error={modulesQuery.error}
+          isEmpty={!modules.length}
+          emptyTitle="Aucun module publié"
+          emptyMessage="Les leçons de votre niveau apparaîtront ici une fois publiées."
+          onRetry={() => void modulesQuery.refetch()}
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            {modules.map((module) => (
+              <Surface key={module.id} className="p-5">
+                <p className="text-xs font-medium text-muted-foreground uppercase">
+                  {module.level || levelCode || "—"}
+                </p>
+                <h3 className="mt-2 text-lg font-semibold">{module.title}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {module.courseTitle} · {module.lessons} leçon
+                  {module.lessons !== 1 ? "s" : ""}
+                </p>
+                <Button
+                  className="mt-4"
+                  onClick={() => navigate("lesson", { moduleId: module.id })}
+                >
+                  Ouvrir les leçons
                 </Button>
-              )}
-            </Surface>
-          ))}
-        </div>
-      </QueryState>
+              </Surface>
+            ))}
+          </div>
+        </QueryState>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold tracking-tight">Supports de cours</h2>
+        <QueryState
+          isLoading={coursesQuery.isLoading}
+          isError={coursesQuery.isError}
+          error={coursesQuery.error}
+          isEmpty={!courses.length}
+          emptyTitle="Aucun support"
+          emptyMessage="Les fichiers et liens publiés pour votre niveau apparaîtront ici."
+          onRetry={() => void coursesQuery.refetch()}
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            {courses.map((course) => (
+              <Surface key={course.id} className="p-5">
+                <p className="text-xs font-medium text-muted-foreground uppercase">
+                  {course.level?.code ?? "—"} · {COURSE_KIND_LABELS[course.content_kind]}
+                </p>
+                <h3 className="mt-2 text-lg font-semibold">{course.title}</h3>
+                {course.description ? (
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                    {course.description}
+                  </p>
+                ) : null}
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {formatFrDate(course.created_at)}
+                </p>
+                {course.content_kind === "text" ? (
+                  <Button
+                    className="mt-4"
+                    variant="outline"
+                    onClick={() =>
+                      setTextPreview({
+                        title: course.title,
+                        body: course.description?.trim() || "Aucun texte disponible.",
+                      })
+                    }
+                  >
+                    Lire
+                  </Button>
+                ) : (
+                  <Button
+                    className="mt-4"
+                    variant="outline"
+                    onClick={() =>
+                      void openLinkOrFile(
+                        course.title,
+                        course.content_kind,
+                        course.mime_type,
+                        () => CourseService.getCourseMaterialUrl(course),
+                      )
+                    }
+                  >
+                    {course.content_kind === "link" ? "Ouvrir le lien" : "Ouvrir"}
+                  </Button>
+                )}
+              </Surface>
+            ))}
+          </div>
+        </QueryState>
+      </section>
+
       <DocumentViewer
         open={Boolean(preview)}
         onClose={() => setPreview(null)}
@@ -727,7 +824,18 @@ export function StudentLearningPage() {
         loading={preview?.loading}
         error={preview?.error}
       />
-    </>
+      {textPreview ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <Surface className="max-h-[80vh] w-full max-w-lg overflow-y-auto p-5">
+            <h2 className="font-semibold">{textPreview.title}</h2>
+            <p className="mt-3 whitespace-pre-wrap text-sm">{textPreview.body}</p>
+            <Button className="mt-4" onClick={() => setTextPreview(null)}>
+              Fermer
+            </Button>
+          </Surface>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

@@ -9,8 +9,9 @@ import {
   RecordingsPage,
   AccountSettings,
 } from "./student-extra";
-import { MaterialsLibraryPage, StudentLearningPage } from "./academic-pages";
+import { StudentLearningPage } from "./academic-pages";
 import { StudentExamsPage } from "./exam-pages";
+import { StudentMaterialsPage } from "./student-materials-page";
 import { LiveClassesPage } from "./live-pages";
 import { StudentPaymentsPage } from "./finance-pages";
 import { useAcademy } from "./academy-context";
@@ -65,7 +66,7 @@ export function StudentPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   }
   if (page === "courses") return <StudentLearningPage />;
   if (page === "lesson") return <StudentLessonPage />;
-  if (page === "materials") return <MaterialsLibraryPage />;
+  if (page === "materials") return <StudentMaterialsPage />;
   if (page === "live" || page === "meeting")
     return <LiveClassesPage meeting={page === "meeting"} />;
   if (page === "calendar") return <CalendarPage />;

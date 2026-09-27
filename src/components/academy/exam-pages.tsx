@@ -82,6 +82,19 @@ import {
   type ExamLevelFilter,
 } from "@/lib/exam-runner-ux";
 import { countHorenAudioReady, countHorenAudioVerifiedSlots } from "@/lib/horen-audio-slots";
+import {
+  allowedScoresFromMeta,
+  isGoetheA1AdultProfile,
+  summarizeA1Result,
+} from "@/lib/a1-goethe-scoring";
+import { ExamAudioPreflight } from "./exam-audio-preflight";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const EXAM_ID_KEY = "ga_active_exam_id";
 const ATTEMPT_ID_KEY = "ga_active_attempt_id";
@@ -101,6 +114,13 @@ const RUBRIC_LABELS: Record<string, string> = {
   comprehensibility: "Compréhensibilité",
   vocabulary: "Vocabulaire",
   grammar_and_spelling: "Grammaire et orthographe",
+  content_point_1: "Contenu 1",
+  content_point_2: "Contenu 2",
+  content_point_3: "Contenu 3",
+  communicative_design: "Forme communicative",
+  introduction: "Présentation",
+  spelling: "Épellation",
+  number: "Numéro",
 };
 
 function persistExamSession(examId: string, attemptId: string) {
@@ -179,6 +199,13 @@ function StudentExamCatalog() {
   const attemptsQuery = useMyExamAttempts();
   const startExam = useStartExam();
   const accessQuery = useAcademicAccess();
+  const [preflightExam, setPreflightExam] = useState<{
+    id: string;
+    title: string;
+    testAudioUrl: string;
+    writtenMinutes: number;
+    speakingMinutes: number | null;
+  } | null>(null);
 
   const latestByExam = useMemo(() => {
     const map = new Map<string, NonNullable<typeof attemptsQuery.data>[number]>();
@@ -204,25 +231,45 @@ function StudentExamCatalog() {
   }
 
   return (
-    <>
+    <div className="animate-fade-in space-y-5">
       <PageHeader
         title="Examens blancs"
-        subtitle="Uniquement les examens de votre niveau, avec consignes et documents."
+        subtitle="Entraînez-vous dans les conditions de l’examen officiel de votre niveau."
       />
       <QueryState
         isLoading={examsQuery.isLoading || attemptsQuery.isLoading || accessQuery.isLoading}
         isError={examsQuery.isError || attemptsQuery.isError || accessQuery.isError}
         error={(examsQuery.error ?? attemptsQuery.error ?? accessQuery.error) as Error | null}
         isEmpty={!examsQuery.data?.length}
-        emptyTitle="Aucun examen disponible"
-        emptyMessage="Les examens blancs de votre niveau apparaîtront ici."
+        emptyTitle="Aucun examen disponible pour le moment"
+        emptyMessage="Les examens blancs de votre niveau seront publiés ici. Revenez bientôt pour vous entraîner."
         onRetry={() => {
           void examsQuery.refetch();
           void attemptsQuery.refetch();
           void accessQuery.refetch();
         }}
       >
-        <div className="grid gap-4 md:grid-cols-2">
+        {preflightExam ? (
+          <ExamAudioPreflight
+            examTitle={preflightExam.title}
+            testAudioUrl={preflightExam.testAudioUrl}
+            writtenMinutes={preflightExam.writtenMinutes}
+            speakingMinutes={preflightExam.speakingMinutes}
+            busy={startExam.isPending}
+            onCancel={() => setPreflightExam(null)}
+            onConfirm={() => {
+              startExam.mutate(preflightExam.id, {
+                onSuccess: (attempt) => {
+                  persistExamSession(preflightExam.id, attempt.id);
+                  setPreflightExam(null);
+                  navigate("mock-exam");
+                },
+                onError: (err) => toast.error(err.message),
+              });
+            }}
+          />
+        ) : null}
+        <div className={`grid gap-4 md:grid-cols-2 ${preflightExam ? "hidden" : ""}`}>
           {examsQuery.data?.map((exam) => {
             const latest = latestByExam.get(exam.id);
             const hasUngradedWriting =
@@ -240,7 +287,29 @@ function StudentExamCatalog() {
               completedAttempts,
               maxAttempts,
             });
+            const examExt = exam as typeof exam & {
+              format_profile?: string | null;
+              written_duration_minutes?: number | null;
+              speaking_duration_minutes?: number | null;
+            };
+            const goetheA1 = isGoetheA1AdultProfile({
+              format_profile: examExt.format_profile,
+              code: exam.code,
+            });
+            const writtenMins =
+              examExt.written_duration_minutes ?? exam.duration_minutes;
+            const speakingMins = examExt.speaking_duration_minutes ?? (goetheA1 ? 15 : null);
             const launchExam = () => {
+              if (goetheA1) {
+                setPreflightExam({
+                  id: exam.id,
+                  title: exam.title,
+                  testAudioUrl: "/exam-media/a1-sim-01/hoeren-teil-1.mp3",
+                  writtenMinutes: writtenMins,
+                  speakingMinutes: speakingMins,
+                });
+                return;
+              }
               startExam.mutate(exam.id, {
                 onSuccess: (attempt) => {
                   persistExamSession(exam.id, attempt.id);
@@ -256,14 +325,16 @@ function StudentExamCatalog() {
                     <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                       {exam.level?.code ?? "—"}
                       {exam.class?.name ? ` · ${exam.class.name}` : " · Niveau entier"} ·{" "}
-                      {exam.duration_minutes} min
+                      {goetheA1 ? `écrit ${writtenMins} min` : `${exam.duration_minutes} min`}
                     </p>
                     <h2 className="mt-2 text-xl font-semibold">{exam.title}</h2>
                     {exam.description ? (
                       <p className="mt-2 text-sm text-muted-foreground">{exam.description}</p>
                     ) : null}
                     <p className="mt-2 text-sm text-muted-foreground">
-                      Durée : {exam.duration_minutes} min
+                      {goetheA1
+                        ? `Écrit ${writtenMins} min · Oral enregistré ${speakingMins ?? 15} min · simulation indépendante`
+                        : `Durée : ${exam.duration_minutes} min`}
                       {exam.starts_at ? ` · Début ${formatFrDate(exam.starts_at)}` : ""}
                       {exam.ends_at ? ` · Fin ${formatFrDate(exam.ends_at)}` : ""}
                     </p>
@@ -346,7 +417,7 @@ function StudentExamCatalog() {
           })}
         </div>
       </QueryState>
-    </>
+    </div>
   );
 }
 
@@ -362,13 +433,37 @@ function StudentExamResult() {
 
   const skills = resultQuery.data?.skills ?? {};
   const awaiting = resultQuery.data?.awaitingManual ?? false;
+  const examCode = resultQuery.data?.exam?.code ?? null;
+  const examProfile = (
+    resultQuery.data?.exam as { format_profile?: string | null } | null | undefined
+  )?.format_profile;
+  const goetheA1 = isGoetheA1AdultProfile({ format_profile: examProfile, code: examCode });
+  const a1Summary = goetheA1
+    ? summarizeA1Result({
+        rawBySkill: {
+          hoeren: Number(skills["hoeren"]?.score ?? 0),
+          lesen: Number(skills["lesen"]?.score ?? 0),
+          schreiben: Number(skills["schreiben"]?.score ?? 0),
+          sprechen: Number(skills["sprechen"]?.score ?? 0),
+        },
+        awaitingManual: awaiting,
+      })
+    : null;
   const displayScore = awaiting
     ? (resultQuery.data?.automaticScore ?? 0)
-    : (resultQuery.data?.score ?? 0);
+    : goetheA1
+      ? (a1Summary?.rawTotal ?? resultQuery.data?.score ?? 0)
+      : (resultQuery.data?.score ?? 0);
   const displayMax = awaiting
-    ? (resultQuery.data?.automaticMax ?? 40)
-    : (resultQuery.data?.maxScore ?? 50);
-  const displayPct = displayMax > 0 ? Math.round((displayScore / displayMax) * 10000) / 100 : 0;
+    ? (resultQuery.data?.automaticMax ?? (goetheA1 ? 35 : 40))
+    : goetheA1
+      ? 60
+      : (resultQuery.data?.maxScore ?? 50);
+  const displayPct = goetheA1
+    ? (a1Summary?.score100 ?? Number(resultQuery.data?.percentage ?? 0))
+    : displayMax > 0
+      ? Math.round((displayScore / displayMax) * 10000) / 100
+      : 0;
 
   const objectiveItems = useMemo(
     () => (reviewQuery.data?.items ?? []).filter((item) => !isManualQuestionType(item.type)),
@@ -463,13 +558,19 @@ function StudentExamResult() {
             <h1 className="mt-2 font-display text-3xl md:text-4xl">
               {awaiting
                 ? `Score auto ${displayScore}/${displayMax}`
-                : `${displayScore}/${displayMax}`}
+                : goetheA1
+                  ? `${displayPct}/100`
+                  : `${displayScore}/${displayMax}`}
             </h1>
             <p className="mt-3 max-w-lg text-sm leading-6 text-primary-foreground/75">
               {resultQuery.data?.exam?.title}
               {awaiting
-                ? " · Les parties objectives sont corrigées ; l’écrit est en attente."
-                : ` · ${displayPct.toFixed(0)} %`}
+                ? " · Résultat provisoire — Schreiben/Sprechen en attente de correction."
+                : goetheA1
+                  ? ` · Brut ${displayScore}/60 · ${a1Summary?.mention ?? ""} · ${
+                      a1Summary?.passed ? "bestanden" : "nicht bestanden"
+                    }`
+                  : ` · ${displayPct.toFixed(0)} %`}
             </p>
           </div>
         </section>
@@ -480,15 +581,24 @@ function StudentExamResult() {
               Résultats par compétence
             </h2>
             <div className="mt-5 space-y-4">
-              {(["lesen", "hoeren", "schreiben"] as const).map((skill) => {
+              {(["lesen", "hoeren", "schreiben", "sprechen"] as const).map((skill) => {
                 const value = skills[skill];
-                if (!value && skill !== "schreiben") return null;
-                if (skill === "schreiben") {
+                if (!value && skill !== "schreiben" && skill !== "sprechen") return null;
+                if (skill === "schreiben" || skill === "sprechen") {
+                  const items = (resultQuery.data?.schreibenItems ?? []).filter((item) =>
+                    skill === "sprechen"
+                      ? isSpeakingQuestionType(item.type)
+                      : !isSpeakingQuestionType(item.type),
+                  );
+                  if (skill === "sprechen" && !items.length && !value) return null;
                   return (
                     <div key={skill} className="space-y-2">
                       <p className="text-sm font-medium">{SKILL_LABELS[skill]}</p>
-                      {(resultQuery.data?.schreibenItems ?? []).map((item, idx) => {
-                        const label = shortBankId(item.bankQuestionId, `S0${idx + 1}`);
+                      {items.map((item, idx) => {
+                        const label = shortBankId(
+                          item.bankQuestionId,
+                          skill === "sprechen" ? `SP0${idx + 1}` : `S0${idx + 1}`,
+                        );
                         return (
                           <div
                             key={item.questionId}
@@ -497,6 +607,7 @@ function StudentExamResult() {
                             <span>
                               {label}
                               {item.type === "form_fill" ? " (formulaire)" : ""}
+                              {isSpeakingQuestionType(item.type) ? " (oral)" : ""}
                             </span>
                             <span>
                               {item.pending
@@ -967,6 +1078,7 @@ export function ExamWritingGradingPanel({ examId }: { examId: string }) {
                                 };
                           })();
                       const rubricKeys = Object.keys(rubric);
+                      const allowedByCriterion = allowedScoresFromMeta(meta, rubric);
                       const draft = drafts[key] ?? {
                         ...Object.fromEntries(rubricKeys.map((k) => [k, ""])),
                         comment: "",
@@ -1012,25 +1124,52 @@ export function ExamWritingGradingPanel({ examId }: { examId: string }) {
                             </>
                           )}
                           <div className="grid gap-2 sm:grid-cols-2">
-                            {rubricKeys.map((rubricKey) => (
-                              <label key={rubricKey} className="block text-xs">
-                                {RUBRIC_LABELS[rubricKey] ?? rubricKey} (/{rubric[rubricKey] ?? 0})
-                                <Input
-                                  className="mt-1"
-                                  type="number"
-                                  min={0}
-                                  max={rubric[rubricKey] ?? question.points}
-                                  step="0.5"
-                                  value={draft[rubricKey] ?? ""}
-                                  onChange={(e) =>
-                                    setDrafts((prev) => ({
-                                      ...prev,
-                                      [key]: { ...draft, [rubricKey]: e.target.value },
-                                    }))
-                                  }
-                                />
-                              </label>
-                            ))}
+                            {rubricKeys.map((rubricKey) => {
+                              const allowed = allowedByCriterion[rubricKey] ?? [];
+                              const useDiscrete = allowed.length > 0;
+                              return (
+                                <label key={rubricKey} className="block text-xs">
+                                  {RUBRIC_LABELS[rubricKey] ?? rubricKey} (/{rubric[rubricKey] ?? 0})
+                                  {useDiscrete ? (
+                                    <Select
+                                      value={draft[rubricKey] ?? ""}
+                                      onValueChange={(value) =>
+                                        setDrafts((prev) => ({
+                                          ...prev,
+                                          [key]: { ...draft, [rubricKey]: value },
+                                        }))
+                                      }
+                                    >
+                                      <SelectTrigger className="mt-1">
+                                        <SelectValue placeholder="Choisir…" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {allowed.map((score) => (
+                                          <SelectItem key={String(score)} value={String(score)}>
+                                            {score}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    <Input
+                                      className="mt-1"
+                                      type="number"
+                                      min={0}
+                                      max={rubric[rubricKey] ?? question.points}
+                                      step="0.5"
+                                      value={draft[rubricKey] ?? ""}
+                                      onChange={(e) =>
+                                        setDrafts((prev) => ({
+                                          ...prev,
+                                          [key]: { ...draft, [rubricKey]: e.target.value },
+                                        }))
+                                      }
+                                    />
+                                  )}
+                                </label>
+                              );
+                            })}
                           </div>
                           <p className="text-sm text-muted-foreground">
                             Total : {rubricSum} / {question.points}

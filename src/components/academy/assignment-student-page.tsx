@@ -10,7 +10,9 @@ import {
   assignmentUxLabel,
   assignmentUxTone,
   formatAssignmentActivity,
+  matchesAssignmentFilter,
   resolveAssignmentUxStatus,
+  type AssignmentUxFilter,
   type AssignmentUxStatus,
 } from "@/lib/assignment-ux";
 import { queryKeys } from "@/lib/query-keys";
@@ -23,6 +25,14 @@ import { PageHeader, Status, Surface } from "./primitives";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
 
+const FILTERS: { id: AssignmentUxFilter; label: string }[] = [
+  { id: "all", label: "Tous" },
+  { id: "todo", label: "À faire" },
+  { id: "late", label: "En retard" },
+  { id: "submitted", label: "Remis" },
+  { id: "graded", label: "Notés" },
+];
+
 export function Assignments({ detail }: { detail: boolean }) {
   const { navigate, user, profile } = useAcademy();
   const search = useSearch({ from: "/app/$role/$page" });
@@ -31,14 +41,16 @@ export function Assignments({ detail }: { detail: boolean }) {
     profileId: profile?.id ?? user?.id ?? null,
     email: user?.email ?? null,
   });
-  const listQuery = useAssignmentRows(myStudent?.classId);
+  const listQuery = useAssignmentRows(myStudent?.classId, myStudent?.level);
   const submit = useSubmitAssignment();
+  const [filter, setFilter] = useState<AssignmentUxFilter>("all");
   const published = useMemo(
     () => (listQuery.data ?? []).filter((row) => row.status === "published"),
     [listQuery.data],
   );
-  const selected =
-    published.find((a) => a.id === search.assignmentId) ?? (detail ? published[0] : undefined);
+  const selected = search.assignmentId
+    ? published.find((a) => a.id === search.assignmentId)
+    : undefined;
 
   const [text, setText] = useState("");
   const [editing, setEditing] = useState(false);
@@ -90,6 +102,12 @@ export function Assignments({ detail }: { detail: boolean }) {
       dueAt: dueAt ?? null,
     });
 
+  const filtered = useMemo(
+    () =>
+      published.filter((row) => matchesAssignmentFilter(uxFor(row.id, row.due_at), filter)),
+    [published, filter, submissionByAssignment],
+  );
+
   if (detail) {
     const submission = selectedSubmission;
     const ux = resolveAssignmentUxStatus({
@@ -107,11 +125,11 @@ export function Assignments({ detail }: { detail: boolean }) {
     const showModifyCta = hasBeenSubmitted && !editing;
 
     return (
-      <>
+      <div className="animate-fade-in">
         <button
           type="button"
           onClick={() => navigate("assignments")}
-          className="mb-5 flex items-center gap-2 text-sm text-muted-foreground"
+          className="mb-5 flex min-h-11 items-center gap-2 text-sm text-muted-foreground"
         >
           <ArrowLeft className="size-4" />
           Devoirs
@@ -130,7 +148,12 @@ export function Assignments({ detail }: { detail: boolean }) {
           error={listQuery.error ?? studentsQuery.error ?? submissionsQuery.error}
           isEmpty={!selected}
           emptyTitle="Devoir introuvable"
-          emptyMessage="Sélectionnez un devoir depuis la liste."
+          emptyMessage="Ce devoir n’existe pas ou n’est plus disponible. Retournez à la liste."
+          emptyAction={
+            <Button variant="outline" onClick={() => navigate("assignments")}>
+              Voir mes devoirs
+            </Button>
+          }
           onRetry={() => {
             void listQuery.refetch();
             void submissionsQuery.refetch();
@@ -454,30 +477,46 @@ export function Assignments({ detail }: { detail: boolean }) {
           loading={preview?.loading}
           error={preview?.error}
         />
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="animate-fade-in space-y-4">
       <PageHeader
         title="Devoirs"
         subtitle="Consultez les consignes, remettez et suivez vos notes."
       />
+      <div className="flex flex-wrap gap-2">
+        {FILTERS.map((item) => (
+          <Button
+            key={item.id}
+            size="sm"
+            variant={filter === item.id ? "default" : "outline"}
+            onClick={() => setFilter(item.id)}
+          >
+            {item.label}
+          </Button>
+        ))}
+      </div>
       <QueryState
         isLoading={listQuery.isLoading || submissionsQuery.isLoading}
         isError={listQuery.isError || submissionsQuery.isError}
         error={listQuery.error ?? submissionsQuery.error}
-        isEmpty={!published.length}
-        emptyTitle="Aucun devoir"
-        emptyMessage="Les devoirs publiés apparaîtront ici."
+        isEmpty={!filtered.length}
+        emptyTitle={published.length ? "Aucun devoir dans ce filtre" : "Aucun devoir"}
+        emptyMessage={
+          published.length
+            ? "Changez de filtre pour voir d’autres devoirs."
+            : "Les devoirs publiés pour votre groupe ou votre niveau apparaîtront ici."
+        }
         onRetry={() => {
           void listQuery.refetch();
           void submissionsQuery.refetch();
         }}
       >
         <div className="space-y-3 md:hidden">
-          {published.map((row) => {
+          {filtered.map((row) => {
             const submission = submissionByAssignment.get(row.id);
             const ux = uxFor(row.id, row.due_at);
             return (
@@ -524,7 +563,7 @@ export function Assignments({ detail }: { detail: boolean }) {
               </tr>
             </thead>
             <tbody>
-              {published.map((row) => {
+              {filtered.map((row) => {
                 const submission = submissionByAssignment.get(row.id);
                 const ux = uxFor(row.id, row.due_at);
                 return (
@@ -558,6 +597,6 @@ export function Assignments({ detail }: { detail: boolean }) {
           </table>
         </div>
       </QueryState>
-    </>
+    </div>
   );
 }

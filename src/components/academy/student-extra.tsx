@@ -1,13 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  CheckCircle2,
-  Download,
-  FileText,
-  Headphones,
-  Send,
-  Upload,
-  Video,
-} from "lucide-react";
+import { CheckCircle2, Send, Upload } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -28,7 +20,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { queryKeys } from "@/lib/query-keys";
 import {
   AssignmentService,
-  CourseService,
   MessagingService,
   RecordingService,
 } from "@/services/academy-services";
@@ -121,73 +112,6 @@ function classMatchesFilters(
   if (filters.classId && klass.id !== filters.classId) return false;
   if (filters.teacherId && klass.teacherId !== filters.teacherId) return false;
   return true;
-}
-
-export function Materials() {
-  const [type, setType] = useState("All");
-  const { data = [] } = useQuery({
-    queryKey: ["resources"],
-    queryFn: CourseService.listResources,
-  });
-  return (
-    <>
-      <PageHeader title="Materials" subtitle="Learning resources for every part of your course." />
-      <div className="mb-5 flex flex-wrap gap-2">
-        {["All", "PDF", "Audio", "Video", "Exercise"].map((item) => (
-          <Button
-            key={item}
-            variant={type === item ? "default" : "outline"}
-            size="sm"
-            onClick={() => setType(item)}
-          >
-            {item}
-          </Button>
-        ))}
-      </div>
-      <div className="space-y-3">
-        {data
-          .filter((resource) => type === "All" || resource.type === type)
-          .map((resource) => (
-            <Surface
-              key={resource.title}
-              className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center"
-            >
-              <span className="grid size-11 place-items-center rounded-md bg-secondary text-primary">
-                {resource.type === "Audio" ? (
-                  <Headphones />
-                ) : resource.type === "Video" ? (
-                  <Video />
-                ) : (
-                  <FileText />
-                )}
-              </span>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold">{resource.title}</h3>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {resource.level} · {resource.type} · {resource.date} · {resource.size}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => toast.info(`${resource.title} opened`)}
-                >
-                  Open
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => toast.success("Download prepared")}
-                >
-                  <Download />
-                </Button>
-              </div>
-            </Surface>
-          ))}
-      </div>
-    </>
-  );
 }
 
 /** Route wrapper — calendar UI lives in live-calendar.tsx to avoid circular imports with live-pages. */

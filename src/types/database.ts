@@ -971,6 +971,7 @@ export type Database = {
           description: string | null;
           duration_minutes: number;
           ends_at: string | null;
+          format_profile: string | null;
           id: string;
           instructions: string | null;
           is_mock: boolean;
@@ -979,12 +980,14 @@ export type Database = {
           mime_type: string | null;
           pass_percentage: number;
           published_at: string | null;
+          speaking_duration_minutes: number | null;
           starts_at: string | null;
           status: Database["public"]["Enums"]["exam_status"];
           storage_bucket: string | null;
           storage_path: string | null;
           title: string;
           updated_at: string;
+          written_duration_minutes: number | null;
         };
         Insert: {
           class_id?: string | null;
@@ -996,6 +999,7 @@ export type Database = {
           description?: string | null;
           duration_minutes?: number;
           ends_at?: string | null;
+          format_profile?: string | null;
           id?: string;
           instructions?: string | null;
           is_mock?: boolean;
@@ -1004,12 +1008,14 @@ export type Database = {
           mime_type?: string | null;
           pass_percentage?: number;
           published_at?: string | null;
+          speaking_duration_minutes?: number | null;
           starts_at?: string | null;
           status?: Database["public"]["Enums"]["exam_status"];
           storage_bucket?: string | null;
           storage_path?: string | null;
           title: string;
           updated_at?: string;
+          written_duration_minutes?: number | null;
         };
         Update: {
           class_id?: string | null;
@@ -1021,6 +1027,7 @@ export type Database = {
           description?: string | null;
           duration_minutes?: number;
           ends_at?: string | null;
+          format_profile?: string | null;
           id?: string;
           instructions?: string | null;
           is_mock?: boolean;
@@ -1029,12 +1036,14 @@ export type Database = {
           mime_type?: string | null;
           pass_percentage?: number;
           published_at?: string | null;
+          speaking_duration_minutes?: number | null;
           starts_at?: string | null;
           status?: Database["public"]["Enums"]["exam_status"];
           storage_bucket?: string | null;
           storage_path?: string | null;
           title?: string;
           updated_at?: string;
+          written_duration_minutes?: number | null;
         };
         Relationships: [
           {

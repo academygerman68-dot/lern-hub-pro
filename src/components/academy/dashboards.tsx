@@ -49,9 +49,9 @@ export function PremiumStudentDashboard() {
   const attemptsQuery = useMyExamAttempts();
   const assignmentsQuery = useQuery({
     queryKey: myStudent?.classId
-      ? queryKeys.assignments.byClass(myStudent.classId)
+      ? [...queryKeys.assignments.byClass(myStudent.classId), myStudent.level ?? ""]
       : (["assignments", "student-dashboard", "none"] as const),
-    queryFn: () => AssignmentService.list(myStudent!.classId!),
+    queryFn: () => AssignmentService.list(myStudent!.classId!, myStudent!.level),
     enabled: Boolean(myStudent?.classId),
   });
 
@@ -102,10 +102,16 @@ export function PremiumStudentDashboard() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => navigate("courses")}>
-            {l("Mes cours", "دروسي")}
+          <Button variant="outline" onClick={() => navigate("assignments")}>
+            {l("Devoirs", "الواجبات")}
           </Button>
-          <Button onClick={() => navigate("exams")}>{l("Examens", "الامتحانات")}</Button>
+          <Button variant="outline" onClick={() => navigate("exams")}>
+            {l("Examens", "الامتحانات")}
+          </Button>
+          <Button variant="outline" onClick={() => navigate("materials")}>
+            {l("Ressources", "الموارد")}
+          </Button>
+          <Button onClick={() => navigate("courses")}>{l("Cours", "الدورات")}</Button>
         </div>
       </div>
 

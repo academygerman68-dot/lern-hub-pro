@@ -173,7 +173,7 @@ export const SupabaseExamService = {
 
   async getQuestionAudioSignedUrl(
     question: Pick<ExamQuestion, "media_bucket" | "media_path" | "metadata">,
-    expiresIn = 3600,
+    expiresIn = 14_400,
   ): Promise<string | null> {
     const meta = asMetaRecord(question.metadata);
     if (question.media_bucket && question.media_path) {
@@ -186,6 +186,18 @@ export const SupabaseExamService = {
     const external = meta["audio_url"];
     if (typeof external === "string" && external.trim()) return external.trim();
     return null;
+  },
+
+  /** Re-sign Hören audio mid-attempt (URLs expire; client payload has no storage paths). */
+  async refreshQuestionAudioUrl(questionId: string): Promise<string | null> {
+    const { data, error } = await requireClient()
+      .from("exam_questions")
+      .select("media_bucket, media_path, metadata")
+      .eq("id", questionId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return this.getQuestionAudioSignedUrl(data, 14_400);
   },
 
   async uploadQuestionAudio(questionId: string, file: File) {
@@ -1099,6 +1111,7 @@ export const SupabaseExamService = {
           }
         : null,
       percentage,
+      // For goethe_a1_adult_v1, percentage is already /100 via ×1.66.
       passed: percentage >= pass,
       skills,
       correct: objectiveCorrect,

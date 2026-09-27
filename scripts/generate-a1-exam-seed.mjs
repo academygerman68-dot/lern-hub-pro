@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 
-const bank = JSON.parse(readFileSync("data/exams/german-academy-a1-exams.json", "utf8"));
+const bankPath = process.argv[2] || "data/exams/german-academy-a1-exams.json";
+const outputPath = process.argv[3] || "supabase/migrations/20260919021000_seed_a1_exam_bank.sql";
+const bank = JSON.parse(readFileSync(bankPath, "utf8"));
 
 function stableUuid(label) {
   const h = createHash("md5").update(`ga-exam:${label}`).digest("hex");
@@ -15,12 +17,13 @@ function esc(s) {
 function mapType(sectionType, questionType) {
   if (questionType === "form_fill") return "form_fill";
   if (questionType === "writing") return "writing";
+  if (questionType === "speaking") return "speaking";
   if (sectionType === "hoeren") return "listening";
   return questionType;
 }
 
 const lines = [];
-lines.push(`-- Idempotent seed of A1-01 / A1-02 / A1-03 mock exams`);
+lines.push(`-- Idempotent seed generated from ${bankPath}`);
 lines.push(`DO $$`);
 lines.push(`DECLARE`);
 lines.push(`  v_level_id uuid;`);
@@ -92,6 +95,8 @@ for (const exam of bank.exams) {
         fields:
           q.type === "form_fill" ? q.fields.map((f) => ({ key: f.key, points: f.points })) : null,
         rubric: q.rubric ?? null,
+        allowed_scores: q.allowed_scores ?? null,
+        playback_count: q.playback_count ?? null,
       };
       const prompt =
         q.prompt || q.instruction || (q.type === "form_fill" ? "Formular ausfüllen" : "Schreiben");
@@ -127,6 +132,7 @@ for (const exam of bank.exams) {
       if (q.audio_script) teacherPayload.audio_script = q.audio_script;
       if (q.sample_answer) teacherPayload.sample_answer = q.sample_answer;
       if (q.rubric) teacherPayload.rubric = q.rubric;
+      if (q.allowed_scores) teacherPayload.allowed_scores = q.allowed_scores;
       if (q.source_data) teacherPayload.source_data = q.source_data;
       if (q.fields) teacherPayload.fields = q.fields;
 
@@ -155,9 +161,9 @@ for (const exam of bank.exams) {
 }
 
 lines.push(`END $$;`);
-writeFileSync("supabase/migrations/20260919021000_seed_a1_exam_bank.sql", lines.join("\n"));
+writeFileSync(outputPath, lines.join("\n"));
 console.log(
-  "Wrote seed SQL",
+  `Wrote ${outputPath}`,
   lines.length,
   "lines",
   (lines.join("\n").length / 1024).toFixed(1),

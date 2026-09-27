@@ -6,11 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useAssignments,
-  useAcademicAccess,
   useArchiveCourse,
   useArchiveLibraryItem,
   useClasses,
-  useCourseModules,
   useCourses,
   useCreateAssignment,
   useCreateCourse,
@@ -524,62 +522,7 @@ export function TeacherLessonManagerPage() {
 }
 
 export { MaterialsLibraryPage } from "./materials-library-page";
-
-
-export function StudentLearningPage() {
-  const { navigate } = useAcademy();
-  const modulesQuery = useCourseModules();
-  const accessQuery = useAcademicAccess();
-
-  if (accessQuery.data === false) {
-    return (
-      <>
-        <PageHeader title="Mes cours" subtitle="Parcours publiés de votre académie." />
-        <Surface className="space-y-3 p-6">
-          <h2 className="font-semibold">Accès restreint</h2>
-          <p className="text-sm text-muted-foreground">
-            Votre mois d’essai est terminé ou votre paiement n’est plus à jour. Consultez Paiements
-            pour régulariser et retrouver l’accès aux cours.
-          </p>
-          <Button onClick={() => navigate("payments")}>Mes paiements</Button>
-        </Surface>
-      </>
-    );
-  }
-  return (
-    <>
-      <PageHeader title="Mes cours" subtitle="Parcours publiés de votre académie." />
-      <QueryState
-        isLoading={modulesQuery.isLoading}
-        isError={modulesQuery.isError}
-        error={modulesQuery.error}
-        isEmpty={!modulesQuery.data?.length}
-        emptyTitle="Aucun module publié"
-        emptyMessage="Les cours apparaîtront ici une fois publiés par l’équipe pédagogique."
-        onRetry={() => void modulesQuery.refetch()}
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          {modulesQuery.data?.map((module) => (
-            <Surface key={module.id} className="p-5">
-              <p className="text-xs font-medium text-muted-foreground uppercase">{module.level}</p>
-              <h2 className="mt-2 text-lg font-semibold">{module.title}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {module.courseTitle} · {module.lessons} leçon{module.lessons !== 1 ? "s" : ""}
-              </p>
-              <Button
-                className="mt-4"
-                variant="outline"
-                onClick={() => navigate("lesson", { moduleId: module.id })}
-              >
-                Ouvrir les leçons
-              </Button>
-            </Surface>
-          ))}
-        </div>
-      </QueryState>
-    </>
-  );
-}
+export { StudentLearningPage } from "./academic-pages";
 
 export function TeacherAssignmentsPage() {
   const [instructions, setInstructions] = useState("");

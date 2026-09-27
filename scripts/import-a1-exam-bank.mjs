@@ -10,7 +10,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const bankPath = resolve(__dirname, "../data/exams/german-academy-a1-exams.json");
+const requestedBankPath = process.argv[2] || process.env.A1_EXAM_BANK_PATH;
+const bankPath = requestedBankPath
+  ? resolve(process.cwd(), requestedBankPath)
+  : resolve(__dirname, "../data/exams/german-academy-a1-exams.json");
 
 function stableUuid(label) {
   const h = createHash("md5").update(`ga-exam:${label}`).digest("hex");
@@ -29,6 +32,7 @@ function choiceOptions(choices) {
 function mapDbQuestionType(sectionType, questionType) {
   if (questionType === "form_fill") return "form_fill";
   if (questionType === "writing") return "writing";
+  if (questionType === "speaking") return "speaking";
   if (sectionType === "hoeren") return "listening";
   return questionType;
 }
@@ -46,8 +50,8 @@ async function main() {
 
   const bank = JSON.parse(readFileSync(bankPath, "utf8"));
   // Lightweight validation without bundling zod in the script
-  if (!Array.isArray(bank.exams) || bank.exams.length !== 3) {
-    throw new Error("Bank must contain exactly 3 exams");
+  if (!Array.isArray(bank.exams) || bank.exams.length < 1) {
+    throw new Error("Bank must contain at least one exam");
   }
 
   const supabase = createClient(url, key, { auth: { persistSession: false } });
@@ -62,24 +66,38 @@ async function main() {
 
   for (const exam of bank.exams) {
     const examId = stableUuid(`exam:${exam.id}`);
-    const { error: examUpsertError } = await supabase.from("exams").upsert(
-      {
-        id: examId,
-        code: exam.id,
-        title: exam.title,
-        description: exam.subtitle,
-        instructions: `${exam.subtitle} · ${exam.duration_minutes} min · ${exam.total_points} points`,
-        level_id: level.id,
-        class_id: null,
-        duration_minutes: exam.duration_minutes,
-        pass_percentage: 60,
-        status: "published",
-        published_at: new Date().toISOString(),
-        max_attempts: 3,
-        is_mock: true,
-      },
-      { onConflict: "id" },
-    );
+    const writtenMins = exam.written_duration_minutes ?? exam.duration_minutes;
+    const speakingMins = exam.speaking_duration_minutes ?? null;
+    const formatProfile = exam.format_profile ?? null;
+    const instructions =
+      formatProfile === "goethe_a1_adult_v1"
+        ? `${exam.subtitle} · Écrit ${writtenMins} min · Oral enregistré ${speakingMins ?? 15} min · ${exam.total_points} points bruts (/100 via ×1,66)`
+        : `${exam.subtitle} · ${exam.duration_minutes} min · ${exam.total_points} points`;
+
+    const examRow = {
+      id: examId,
+      code: exam.id,
+      title: exam.title,
+      description: exam.subtitle,
+      instructions,
+      level_id: level.id,
+      class_id: null,
+      duration_minutes: writtenMins,
+      pass_percentage: exam.pass_score_100 ?? 60,
+      status: "published",
+      published_at: new Date().toISOString(),
+      max_attempts: 3,
+      is_mock: true,
+    };
+    if (formatProfile) examRow.format_profile = formatProfile;
+    if (exam.written_duration_minutes != null) {
+      examRow.written_duration_minutes = exam.written_duration_minutes;
+    }
+    if (speakingMins != null) examRow.speaking_duration_minutes = speakingMins;
+
+    const { error: examUpsertError } = await supabase
+      .from("exams")
+      .upsert(examRow, { onConflict: "id" });
     if (examUpsertError) throw examUpsertError;
 
     // Remove previous structure for this exam (idempotent rebuild)
@@ -134,6 +152,8 @@ async function main() {
               ? question.fields.map((f) => ({ key: f.key, points: f.points }))
               : null,
           rubric: question.rubric ?? null,
+          allowed_scores: question.allowed_scores ?? null,
+          playback_count: question.playback_count ?? null,
         };
         const prompt =
           question.prompt ||
@@ -170,6 +190,7 @@ async function main() {
         if (question.audio_script) teacherPayload.audio_script = question.audio_script;
         if (question.sample_answer) teacherPayload.sample_answer = question.sample_answer;
         if (question.rubric) teacherPayload.rubric = question.rubric;
+        if (question.allowed_scores) teacherPayload.allowed_scores = question.allowed_scores;
         if (question.source_data) teacherPayload.source_data = question.source_data;
         if (question.fields) teacherPayload.fields = question.fields;
 
@@ -195,7 +216,7 @@ async function main() {
     console.log(`Imported ${exam.id} (${exam.title})`);
   }
 
-  console.log("Done: 3 A1 exams imported idempotently.");
+  console.log(`Done: ${bank.exams.length} A1 exam(s) imported idempotently.`);
 }
 
 main().catch((err) => {

@@ -16,7 +16,12 @@
     "generate:a1-exam-seed": "node scripts/generate-a1-exam-seed.mjs",
     "seed:b1-exams": "node scripts/import-b1-exam-bank.mjs",
     "dry-run:b1-exams": "node scripts/import-b1-exam-bank.mjs --dry-run",
-    "build:b1-structured": "node scripts/build-b1-structured-bank.mjs"
+    "build:b1-structured": "node scripts/build-b1-structured-bank.mjs",
+    "build:a1-complete": "node scripts/build-a1-complete-exam.mjs",
+    "audio:a1-complete": "py scripts/generate-a1-audio.py",
+    "validate:a1-complete": "node scripts/validate-a1-complete-exam.mjs",
+    "seed:a1-complete": "node scripts/import-a1-exam-bank.mjs data/exams/a1-complete/a1-sim-01.json",
+    "generate:a1-complete-seed": "node scripts/generate-a1-exam-seed.mjs data/exams/a1-complete/a1-sim-01.json supabase/migrations/20260927120000_seed_a1_complete_exam.sql"
   },
   "overrides": {
     "rolldown": "1.2.1"

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Clock3, Flag, Headphones } from "lucide-react";
+import { ArrowLeft, Clock3, Flag } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import {
   useExam,
   useExamAnswers,
   useExamAttempt,
+  useMyExamAttempts,
   useSaveExamAnswer,
   useSubmitExam,
   useUploadOralExamAnswer,
@@ -37,8 +38,10 @@ import { ExamService } from "@/services/academy-services";
 import type { Json } from "@/types/database";
 import { useAcademy } from "./academy-context";
 import { ExamOralAnswerComposer } from "./exam-oral-recorder";
+import { HorenTeilAudioPlayer } from "./horen-teil-audio-player";
 import { QueryState } from "./query-state";
 import { ProgressLine, Surface } from "./primitives";
+import { isGoetheA1AdultProfile } from "@/lib/a1-goethe-scoring";
 
 const EXAM_ID_KEY = "ga_active_exam_id";
 const ATTEMPT_ID_KEY = "ga_active_attempt_id";
@@ -56,12 +59,18 @@ const SKILL_ORDER = ["lesen", "hoeren", "schreiben", "sprechen"] as const;
 
 function readExamSession() {
   if (typeof sessionStorage === "undefined") {
-    return { examId: null, attemptId: null };
+    return { examId: null as string | null, attemptId: null as string | null };
   }
   return {
     examId: sessionStorage.getItem(EXAM_ID_KEY),
     attemptId: sessionStorage.getItem(ATTEMPT_ID_KEY),
   };
+}
+
+function persistExamSession(examId: string, attemptId: string) {
+  if (typeof sessionStorage === "undefined") return;
+  sessionStorage.setItem(EXAM_ID_KEY, examId);
+  sessionStorage.setItem(ATTEMPT_ID_KEY, attemptId);
 }
 
 function formatRemaining(expiresAt: string | null | undefined) {
@@ -113,7 +122,8 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
   const isPreview = mode === "preview";
   const isStaff = role === "director" || role === "teacher";
 
-  const liveSession = readExamSession();
+  const [liveSession, setLiveSession] = useState(readExamSession);
+  const myAttemptsQuery = useMyExamAttempts();
   const examsQuery = useAllExams();
   const examIdFromSearch = readSearchParam("examId");
   const examCodeFromSearch = readSearchParam("examCode");
@@ -127,6 +137,15 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
     );
     return hit?.id ?? "";
   }, [isPreview, examIdFromSearch, examCodeFromSearch, examsQuery.data]);
+
+  useEffect(() => {
+    if (isPreview) return;
+    if (liveSession.examId && liveSession.attemptId) return;
+    const inProgress = (myAttemptsQuery.data ?? []).find((row) => row.status === "in_progress");
+    if (!inProgress?.exam_id) return;
+    persistExamSession(inProgress.exam_id, inProgress.id);
+    setLiveSession({ examId: inProgress.exam_id, attemptId: inProgress.id });
+  }, [isPreview, liveSession.examId, liveSession.attemptId, myAttemptsQuery.data]);
 
   const examId = isPreview ? previewExamId : liveSession.examId;
   const attemptId = isPreview ? null : liveSession.attemptId;
@@ -144,8 +163,11 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
   const [flagged, setFlagged] = useState<Record<string, boolean>>({});
   const [oralPreviewUrls, setOralPreviewUrls] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [liveAudioUrl, setLiveAudioUrl] = useState<string | null>(null);
+  const [audioRefreshing, setAudioRefreshing] = useState(false);
   const dirtyRef = useRef<Set<string>>(new Set());
   const hydratedAttemptRef = useRef<string | null>(null);
+  const autoSubmitStartedRef = useRef(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -269,13 +291,32 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
   useEffect(() => {
     if (isPreview || !expired || !attemptId || submitExam.isPending || submitting) return;
     if (attemptQuery.data?.status !== "in_progress") return;
-    submitExam.mutate(attemptId, {
-      onSuccess: () => {
+    if (autoSubmitStartedRef.current) return;
+    autoSubmitStartedRef.current = true;
+    let cancelled = false;
+    void (async () => {
+      try {
+        await flushPendingWrites();
+        if (cancelled) return;
+        await new Promise<void>((resolve, reject) => {
+          submitExam.mutate(attemptId, {
+            onSuccess: () => resolve(),
+            onError: (err) => reject(err),
+          });
+        });
+        if (cancelled) return;
         toast.message("Temps écoulé — examen envoyé");
         navigate("exam-result");
-      },
-      onError: (err) => toast.error(err.message),
-    });
+      } catch (err) {
+        autoSubmitStartedRef.current = false;
+        toast.error(err instanceof Error ? err.message : "Envoi automatique impossible");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // flushPendingWrites is stable enough for this one-shot expiry path
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once when expired
   }, [
     expired,
     attemptId,
@@ -312,7 +353,8 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
     if (
       isWritingOnlyQuestionType(current.type) ||
       current.type === "form_fill" ||
-      isManualQuestionType(current.type)
+      isManualQuestionType(current.type) ||
+      isChoiceQuestionType(current.type)
     ) {
       const value = localAnswers[current.id];
       if (value !== undefined) {
@@ -333,6 +375,40 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
     while (saveAnswer.isPending && waits < 40) {
       await sleep(100);
       waits += 1;
+    }
+  };
+
+  const currentTeil = current ? questionTeil(current.metadata) : null;
+  const horenAudioKey = current
+    ? stableHorenAudioKey({
+        skill: current.skill,
+        type: current.type,
+        metadata: current.metadata,
+        audioUrl:
+          liveAudioUrl ??
+          (typeof questionMeta(current.metadata)["audio_url"] === "string"
+            ? String(questionMeta(current.metadata)["audio_url"])
+            : null),
+        questionId: current.id,
+      })
+    : "none";
+
+  useEffect(() => {
+    // Only reset signed URL when leaving the logical Hören Teil track.
+    setLiveAudioUrl(null);
+  }, [horenAudioKey]);
+
+  const refreshAudio = async () => {
+    if (!current?.id) return;
+    setAudioRefreshing(true);
+    try {
+      const url = await ExamService.refreshQuestionAudioUrl(current.id);
+      if (url) setLiveAudioUrl(url);
+      else toast.error("Audio indisponible");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Actualisation audio impossible");
+    } finally {
+      setAudioRefreshing(false);
     }
   };
 
@@ -430,7 +506,9 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
   const instruction =
     typeof currentMeta["instruction"] === "string" ? currentMeta["instruction"] : null;
   const passage = typeof currentMeta["passage"] === "string" ? currentMeta["passage"] : null;
-  const audioUrl = typeof currentMeta["audio_url"] === "string" ? currentMeta["audio_url"] : null;
+  const embeddedAudioUrl =
+    typeof currentMeta["audio_url"] === "string" ? currentMeta["audio_url"] : null;
+  const audioUrl = liveAudioUrl ?? embeddedAudioUrl;
   const requirements = Array.isArray(currentMeta["requirements"])
     ? currentMeta["requirements"].filter((item): item is string => typeof item === "string")
     : [];
@@ -449,18 +527,20 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
       )
     : [];
 
-  const currentTeil = current ? questionTeil(current.metadata) : null;
-  const audioPlayerKey = current
-    ? stableHorenAudioKey({
-        skill: current.skill,
-        type: current.type,
-        metadata: current.metadata,
-        audioUrl,
-        questionId: current.id,
-      })
-    : "none";
+  const audioPlayerKey = horenAudioKey;
   const showModuleNav = skillNav.length > 1 || teilNav.length > 1;
   const isB1 = isB1ModelltestCode(examQuery.data?.code);
+  const isGoetheA1 = isGoetheA1AdultProfile({
+    format_profile: examQuery.data?.format_profile,
+    code: examQuery.data?.code,
+  });
+  const playbackCount =
+    typeof currentMeta["playback_count"] === "number"
+      ? currentMeta["playback_count"]
+      : typeof currentMeta["playback_count"] === "string"
+        ? Number(currentMeta["playback_count"])
+        : null;
+  const strictHoren = !isPreview && Boolean(examQuery.data?.is_mock);
   const indexInSkill = current
     ? questions.filter((q) => q.skill === current.skill).findIndex((q) => q.id === current.id)
     : 0;
@@ -555,7 +635,11 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                 <button
                   key={item.skill}
                   type="button"
-                  onClick={() => setIndex(item.index)}
+                  onClick={() => {
+                    void flushPendingWrites()
+                      .then(() => setIndex(item.index))
+                      .catch((err: Error) => toast.error(err.message));
+                  }}
                   className={`rounded-md border px-2.5 py-1 text-xs ${
                     current?.skill === item.skill
                       ? "border-primary bg-primary/10 font-medium text-foreground"
@@ -569,7 +653,11 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                 <button
                   key={`teil-${item.teil}`}
                   type="button"
-                  onClick={() => setIndex(item.index)}
+                  onClick={() => {
+                    void flushPendingWrites()
+                      .then(() => setIndex(item.index))
+                      .catch((err: Error) => toast.error(err.message));
+                  }}
                   className={`rounded-md border px-2.5 py-1 text-xs ${
                     currentTeil === item.teil
                       ? "border-primary bg-primary/10 font-medium text-foreground"
@@ -629,33 +717,29 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
             ) : null}
 
             {(current?.type === "listening" || current?.skill === "hoeren") && (
-              <div className="mt-5 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2 font-medium text-foreground">
-                  <Headphones className="size-4" />
-                  Audio{currentTeil != null ? ` · Teil ${currentTeil}` : ""}
-                </div>
-                {audioUrl ? (
-                  <audio
-                    key={audioPlayerKey}
-                    className="mt-3 w-full"
-                    controls
-                    src={audioUrl}
-                    preload="metadata"
-                  >
-                    Votre navigateur ne prend pas en charge l’audio.
-                  </audio>
-                ) : (
-                  <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                    <p className="font-medium">Audio Hören indisponible</p>
-                    <p className="mt-1 text-destructive/90">
-                      {typeof currentMeta["audio_error"] === "string"
-                        ? currentMeta["audio_error"]
-                        : "Aucun fichier audio n’est associé à cette question. Impossible de démarrer l’écoute — contactez votre professeur."}
-                    </p>
-                  </div>
-                )}
+              <div className="mt-5">
+                <HorenTeilAudioPlayer
+                  playerKey={audioPlayerKey}
+                  audioUrl={audioUrl}
+                  teil={currentTeil}
+                  playbackCount={Number.isFinite(playbackCount) ? Number(playbackCount) : null}
+                  strictExamMode={strictHoren}
+                  disabled={expired}
+                  reloading={audioRefreshing}
+                  onReload={() => void refreshAudio()}
+                />
               </div>
             )}
+
+            {isSpeakingType && isGoetheA1 ? (
+              <p className="mt-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                Entraînement oral enregistré — hors chronomètre écrit (
+                {examQuery.data?.written_duration_minutes ??
+                  examQuery.data?.duration_minutes ??
+                  65}{" "}
+                min). Enregistrez ou déposez votre audio pour chaque Teil.
+              </p>
+            ) : null}
 
             <div className="mt-6 space-y-3">
               {contentSafe && current && isChoiceQuestionType(current.type) &&
@@ -665,12 +749,14 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                     <button
                       key={option.id}
                       type="button"
-                      className={`flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left text-sm transition duration-150 ${
+                      disabled={expired || attemptQuery.data?.status !== "in_progress"}
+                      className={`flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left text-sm transition duration-150 disabled:opacity-60 ${
                         selected
                           ? "border-primary bg-primary/5 font-medium text-foreground shadow-soft"
                           : "border-border hover:border-primary/40"
                       }`}
                       onClick={() => {
+                        if (expired) return;
                         setLocalAnswers((prev) => ({ ...prev, [current.id]: option.value }));
                         persist(current.id, option.value);
                       }}
@@ -698,6 +784,7 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                       <Input
                         className="mt-1"
                         value={formFillDraft[field.key] ?? ""}
+                        disabled={expired || attemptQuery.data?.status !== "in_progress"}
                         onChange={(e) => {
                           const next = {
                             ...formFillDraft,
@@ -784,13 +871,14 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                     className="min-h-52 text-base leading-relaxed"
                     value={answerValue(localAnswers[current.id])}
                     placeholder="Saisissez votre réponse…"
+                    disabled={expired || attemptQuery.data?.status !== "in_progress"}
                     onChange={(e) => {
                       const value = e.target.value;
                       setLocalAnswers((prev) => ({ ...prev, [current.id]: value }));
                       dirtyRef.current.add(current.id);
                     }}
                     onBlur={() => {
-                      if (!current) return;
+                      if (!current || expired) return;
                       persist(current.id, localAnswers[current.id] ?? "");
                     }}
                   />
@@ -847,9 +935,22 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                   </Button>
                 ) : (
                   <Button
-                    disabled={submitExam.isPending || submitting || saveAnswer.isPending}
+                    disabled={
+                      submitExam.isPending ||
+                      submitting ||
+                      saveAnswer.isPending ||
+                      expired ||
+                      attemptQuery.data?.status !== "in_progress"
+                    }
                     onClick={() => {
                       if (!attemptId) return;
+                      if (
+                        !window.confirm(
+                          "Envoyer définitivement cet examen ? Vous ne pourrez plus modifier vos réponses.",
+                        )
+                      ) {
+                        return;
+                      }
                       setSubmitting(true);
                       void flushPendingWrites()
                         .then(

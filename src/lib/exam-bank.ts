@@ -21,6 +21,7 @@ const objectiveQuestionSchema = z.object({
   explanation: z.string().min(1),
   audio_script: z.string().optional(),
   audio_url: z.string().nullable().optional(),
+  playback_count: z.number().int().positive().optional(),
 });
 
 const formFillQuestionSchema = z.object({
@@ -53,23 +54,33 @@ const writingQuestionSchema = z.object({
   requirements: z.array(z.string().min(1)).min(1),
   recommended_words: z.string().min(1),
   sample_answer: z.string().min(1),
-  rubric: z.object({
-    task_completion: z.number().positive(),
-    comprehensibility: z.number().positive(),
-    vocabulary: z.number().positive(),
-    grammar_and_spelling: z.number().positive(),
-  }),
+  rubric: z.record(z.string(), z.number().positive()),
+  allowed_scores: z.record(z.string(), z.array(z.number().nonnegative())).optional(),
+});
+
+const speakingQuestionSchema = z.object({
+  id: z.string().min(1),
+  part: z.number().int().min(1).max(3),
+  order: z.number().int().positive(),
+  type: z.literal("speaking"),
+  automatic_grading: z.literal(false),
+  points: z.number().positive(),
+  instruction: z.string().min(1),
+  requirements: z.array(z.string().min(1)).min(1),
+  rubric: z.record(z.string(), z.number().positive()),
+  allowed_scores: z.record(z.string(), z.array(z.number().nonnegative())).optional(),
 });
 
 const questionSchema = z.discriminatedUnion("type", [
   objectiveQuestionSchema,
   formFillQuestionSchema,
   writingQuestionSchema,
+  speakingQuestionSchema,
 ]);
 
 const sectionSchema = z.object({
   id: z.string().min(1),
-  type: z.enum(["lesen", "hoeren", "schreiben"]),
+  type: z.enum(["lesen", "hoeren", "schreiben", "sprechen"]),
   title: z.string().min(1),
   max_points: z.number().positive(),
   questions: z.array(questionSchema).min(1),
@@ -81,10 +92,15 @@ const examSchema = z.object({
   title: z.string().min(1),
   subtitle: z.string().min(1),
   duration_minutes: z.number().int().positive(),
+  written_duration_minutes: z.number().int().positive().optional(),
+  speaking_duration_minutes: z.number().int().positive().optional(),
+  format_profile: z.string().min(1).optional(),
+  conversion_factor: z.number().positive().optional(),
+  pass_score_100: z.number().int().positive().optional(),
   total_points: z.number().positive(),
   automatic_points: z.number().positive(),
   manual_points: z.number().positive(),
-  sections: z.array(sectionSchema).length(3),
+  sections: z.array(sectionSchema).min(3).max(4),
 });
 
 export const examBankSchema = z.object({
@@ -152,10 +168,18 @@ export function validateExamBank(raw: unknown): {
         message: "total_points must equal automatic_points + manual_points",
       });
     }
-    if (exam.total_points !== 50 || exam.automatic_points !== 40 || exam.manual_points !== 10) {
+    const isCompleteA1 = exam.sections.some((section) => section.type === "sprechen");
+    const expected = isCompleteA1
+      ? { total: 60, automatic: 35, manual: 25 }
+      : { total: 50, automatic: 40, manual: 10 };
+    if (
+      exam.total_points !== expected.total ||
+      exam.automatic_points !== expected.automatic ||
+      exam.manual_points !== expected.manual
+    ) {
       issues.push({
         path: `${exam.id}.points`,
-        message: "Expected total=50, automatic=40, manual=10",
+        message: `Expected total=${expected.total}, automatic=${expected.automatic}, manual=${expected.manual}`,
       });
     }
 
@@ -163,10 +187,13 @@ export function validateExamBank(raw: unknown): {
       .map((s) => s.type)
       .sort()
       .join(",");
-    if (sectionTypes !== "hoeren,lesen,schreiben") {
+    const expectedSections = isCompleteA1
+      ? "hoeren,lesen,schreiben,sprechen"
+      : "hoeren,lesen,schreiben";
+    if (sectionTypes !== expectedSections) {
       issues.push({
         path: `${exam.id}.sections`,
-        message: "Expected sections lesen, hoeren, schreiben",
+        message: `Expected sections ${expectedSections}`,
       });
     }
 
@@ -189,6 +216,12 @@ export function validateExamBank(raw: unknown): {
         issues.push({
           path: `${section.id}`,
           message: `Schreiben must have 2 questions, found ${section.questions.length}`,
+        });
+      }
+      if (section.type === "sprechen" && section.questions.length !== 3) {
+        issues.push({
+          path: `${section.id}`,
+          message: `Sprechen must have 3 questions, found ${section.questions.length}`,
         });
       }
 
@@ -257,12 +290,8 @@ export function validateExamBank(raw: unknown): {
           }
         }
 
-        if (question.type === "writing") {
-          const rubricTotal =
-            question.rubric.task_completion +
-            question.rubric.comprehensibility +
-            question.rubric.vocabulary +
-            question.rubric.grammar_and_spelling;
+        if (question.type === "writing" || question.type === "speaking") {
+          const rubricTotal = Object.values(question.rubric).reduce((sum, value) => sum + value, 0);
           if (rubricTotal !== question.points) {
             issues.push({
               path: `${question.id}.rubric`,

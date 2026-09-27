@@ -6,6 +6,7 @@ import { validateExamBank } from "./exam-bank";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const bankPath = resolve(__dirname, "../../data/exams/german-academy-a1-exams.json");
+const completeBankPath = resolve(__dirname, "../../data/exams/a1-complete/a1-sim-01.json");
 
 describe("A1 exam bank", () => {
   it("validates bank JSON with expected counts and totals", () => {
@@ -47,5 +48,34 @@ describe("A1 exam bank", () => {
         }
       }
     }
+  });
+});
+
+describe("complete A1 adult simulation", () => {
+  it("validates four skills and official raw-point structure", () => {
+    const raw = JSON.parse(readFileSync(completeBankPath, "utf8"));
+    const result = validateExamBank(raw);
+    expect(result.ok, JSON.stringify(result.issues, null, 2)).toBe(true);
+
+    const exam = result.data!.exams[0]!;
+    expect(exam.total_points).toBe(60);
+    expect(exam.automatic_points).toBe(35);
+    expect(exam.manual_points).toBe(25);
+    expect(exam.sections.map((section) => section.type).sort()).toEqual([
+      "hoeren",
+      "lesen",
+      "schreiben",
+      "sprechen",
+    ]);
+    expect(exam.sections.every((section) => section.max_points === 15)).toBe(true);
+
+    const horen = exam.sections.find((section) => section.type === "hoeren")!;
+    const lesen = exam.sections.find((section) => section.type === "lesen")!;
+    expect([1, 2, 3].map((part) => horen.questions.filter((q) => q.part === part).length)).toEqual([
+      6, 4, 5,
+    ]);
+    expect([1, 2, 3].map((part) => lesen.questions.filter((q) => q.part === part).length)).toEqual([
+      5, 5, 5,
+    ]);
   });
 });

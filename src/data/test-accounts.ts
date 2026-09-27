@@ -23,6 +23,14 @@ export const TEST_QUICK_ACCOUNTS: TestQuickAccount[] = [
     descriptionAr: "مجموعة A1 · يوسف عمراني",
   },
   {
+    role: "student",
+    email: "etudiant11@gla.academy",
+    labelFr: "Étudiant B1",
+    labelAr: "طالب B1",
+    descriptionFr: "Groupe B1 · Rania Ouazzani",
+    descriptionAr: "مجموعة B1 · رانيا وازاني",
+  },
+  {
     role: "teacher",
     email: "walid@gla.academy",
     labelFr: "Prof. Walid",
@@ -51,7 +59,7 @@ export function getTestAccountPassword(): string {
 }
 
 /**
- * Show the 3 role sections on the login page during the test phase.
+ * Show quick-login profiles on the login page during the test phase.
  * Hidden only when VITE_ENABLE_TEST_LOGIN=false.
  */
 export function isTestLoginAllowed(): boolean {
