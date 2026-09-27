@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   A1_PASS_SCORE_100,
   A1_RAW_MAX,
+  a1ConversionTable,
   a1MentionFromHundred,
   a1PassedFromHundred,
   convertA1RawToHundred,
@@ -25,6 +26,22 @@ describe("a1 goethe scoring", () => {
     expect(a1PassedFromHundred(60)).toBe(true);
     expect(a1PassedFromHundred(59)).toBe(false);
     expect(A1_PASS_SCORE_100).toBe(60);
+  });
+
+  it("rounds every integer raw score 0..60 with half-up ×1.66 (60→100 exactly)", () => {
+    const table = a1ConversionTable();
+    expect(table).toHaveLength(61);
+    expect(table[0]).toEqual({ raw: 0, score100: 0 });
+    expect(table[36]).toEqual({ raw: 36, score100: 60 });
+    expect(table[60]).toEqual({ raw: 60, score100: 100 });
+    for (const { raw, score100 } of table) {
+      expect(score100).toBe(Math.round(raw * 1.66));
+      expect(score100).toBeGreaterThanOrEqual(0);
+      expect(score100).toBeLessThanOrEqual(100);
+    }
+    // Guard against the buggy round(..., 2) SQL path that yielded 99.60.
+    expect(Number((60 * 1.66).toFixed(2))).toBe(99.6);
+    expect(convertA1RawToHundred(60)).not.toBe(99.6);
   });
 
   it("assigns mentions from /100 score", () => {

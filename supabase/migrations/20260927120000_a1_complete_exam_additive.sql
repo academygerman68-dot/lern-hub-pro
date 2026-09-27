@@ -1,4 +1,19 @@
--- Idempotent seed generated from data/exams/a1-complete/a1-sim-01.json
+-- A1 additive seed only (no global RPC / RLS changes).
+-- Generated from data/exams/a1-complete/a1-sim-01.json
+-- Requires companion migration for Goethe scoring + teacher-scope RLS.
+
+ALTER TABLE public.exams
+  ADD COLUMN IF NOT EXISTS format_profile text,
+  ADD COLUMN IF NOT EXISTS written_duration_minutes integer,
+  ADD COLUMN IF NOT EXISTS speaking_duration_minutes integer;
+
+COMMENT ON COLUMN public.exams.format_profile IS
+  'Scoring/UX profile, e.g. goethe_a1_adult_v1 for A1-SIM complete exams.';
+COMMENT ON COLUMN public.exams.written_duration_minutes IS
+  'Written clock (Hören+Lesen+Schreiben). Oral is separate/async.';
+COMMENT ON COLUMN public.exams.speaking_duration_minutes IS
+  'Indicative oral duration for solo recorded Sprechen.';
+
 DO $$
 DECLARE
   v_level_id uuid;
@@ -9,21 +24,23 @@ BEGIN
   END IF;
   -- A1-SIM-01
   INSERT INTO public.exams (
-    id, code, title, description, instructions, level_id, duration_minutes,
-    pass_percentage, status, published_at, max_attempts, is_mock
+    id, code, title, description, instructions, level_id, duration_minutes, pass_percentage, status, published_at, max_attempts, is_mock, format_profile, written_duration_minutes, speaking_duration_minutes
   ) VALUES (
     '811f4e04-864d-46b4-8c61-c2d319003efc'::uuid,
     'A1-SIM-01',
     'Examen blanc A1 complet — Alltag',
     'Simulation indépendante A1 adultes — non affiliée au Goethe-Institut',
-    'Simulation indépendante A1 adultes — non affiliée au Goethe-Institut · 80 min · 60 points',
+    'Simulation indépendante A1 adultes — non affiliée au Goethe-Institut · Écrit 65 min · Oral enregistré 15 min · 60 points bruts (/100 via ×1,66)',
     v_level_id,
-    80,
+    65,
     60,
     'published',
     now(),
     3,
-    true
+    true,
+    'goethe_a1_adult_v1',
+    65,
+    15
   )
   ON CONFLICT (id) DO UPDATE SET
     code = EXCLUDED.code,
@@ -32,6 +49,9 @@ BEGIN
     instructions = EXCLUDED.instructions,
     level_id = EXCLUDED.level_id,
     duration_minutes = EXCLUDED.duration_minutes,
+    format_profile = EXCLUDED.format_profile,
+    written_duration_minutes = EXCLUDED.written_duration_minutes,
+    speaking_duration_minutes = EXCLUDED.speaking_duration_minutes,
     status = 'published',
     published_at = coalesce(public.exams.published_at, now()),
     is_mock = true,

@@ -22,8 +22,32 @@ function mapType(sectionType, questionType) {
   return questionType;
 }
 
+const hasProfileColumns = bank.exams.some(
+  (e) => e.format_profile || e.written_duration_minutes != null || e.speaking_duration_minutes != null,
+);
+
 const lines = [];
-lines.push(`-- Idempotent seed generated from ${bankPath}`);
+if (hasProfileColumns) {
+  lines.push(`-- A1 additive seed only (no global RPC / RLS changes).`);
+  lines.push(`-- Generated from ${bankPath}`);
+  lines.push(`-- Requires companion migration for Goethe scoring + teacher-scope RLS.`);
+  lines.push(``);
+  lines.push(`ALTER TABLE public.exams`);
+  lines.push(`  ADD COLUMN IF NOT EXISTS format_profile text,`);
+  lines.push(`  ADD COLUMN IF NOT EXISTS written_duration_minutes integer,`);
+  lines.push(`  ADD COLUMN IF NOT EXISTS speaking_duration_minutes integer;`);
+  lines.push(``);
+  lines.push(`COMMENT ON COLUMN public.exams.format_profile IS`);
+  lines.push(`  'Scoring/UX profile, e.g. goethe_a1_adult_v1 for A1-SIM complete exams.';`);
+  lines.push(`COMMENT ON COLUMN public.exams.written_duration_minutes IS`);
+  lines.push(`  'Written clock (Hören+Lesen+Schreiben). Oral is separate/async.';`);
+  lines.push(`COMMENT ON COLUMN public.exams.speaking_duration_minutes IS`);
+  lines.push(`  'Indicative oral duration for solo recorded Sprechen.';`);
+  lines.push(``);
+} else {
+  lines.push(`-- Idempotent seed generated from ${bankPath}`);
+}
+
 lines.push(`DO $$`);
 lines.push(`DECLARE`);
 lines.push(`  v_level_id uuid;`);
@@ -35,25 +59,68 @@ lines.push(`  END IF;`);
 
 for (const exam of bank.exams) {
   const examId = stableUuid(`exam:${exam.id}`);
+  const writtenMins = exam.written_duration_minutes ?? exam.duration_minutes;
+  const speakingMins = exam.speaking_duration_minutes ?? null;
+  const formatProfile = exam.format_profile ?? null;
+  const instructions =
+    formatProfile === "goethe_a1_adult_v1"
+      ? `${exam.subtitle} · Écrit ${writtenMins} min · Oral enregistré ${speakingMins ?? 15} min · ${exam.total_points} points bruts (/100 via ×1,66)`
+      : `${exam.subtitle} · ${exam.duration_minutes} min · ${exam.total_points} points`;
+
+  const extraCols = [];
+  const extraVals = [];
+  const extraUpdates = [];
+  if (formatProfile) {
+    extraCols.push("format_profile");
+    extraVals.push(`'${esc(formatProfile)}'`);
+    extraUpdates.push("format_profile = EXCLUDED.format_profile");
+  }
+  if (exam.written_duration_minutes != null) {
+    extraCols.push("written_duration_minutes");
+    extraVals.push(String(exam.written_duration_minutes));
+    extraUpdates.push("written_duration_minutes = EXCLUDED.written_duration_minutes");
+  }
+  if (speakingMins != null) {
+    extraCols.push("speaking_duration_minutes");
+    extraVals.push(String(speakingMins));
+    extraUpdates.push("speaking_duration_minutes = EXCLUDED.speaking_duration_minutes");
+  }
+
+  const colList = [
+    "id",
+    "code",
+    "title",
+    "description",
+    "instructions",
+    "level_id",
+    "duration_minutes",
+    "pass_percentage",
+    "status",
+    "published_at",
+    "max_attempts",
+    "is_mock",
+    ...extraCols,
+  ];
+
   lines.push(`  -- ${exam.id}`);
   lines.push(`  INSERT INTO public.exams (`);
-  lines.push(`    id, code, title, description, instructions, level_id, duration_minutes,`);
-  lines.push(`    pass_percentage, status, published_at, max_attempts, is_mock`);
+  lines.push(`    ${colList.join(", ")}`);
   lines.push(`  ) VALUES (`);
   lines.push(`    '${examId}'::uuid,`);
   lines.push(`    '${esc(exam.id)}',`);
   lines.push(`    '${esc(exam.title)}',`);
   lines.push(`    '${esc(exam.subtitle)}',`);
-  lines.push(
-    `    '${esc(`${exam.subtitle} · ${exam.duration_minutes} min · ${exam.total_points} points`)}',`,
-  );
+  lines.push(`    '${esc(instructions)}',`);
   lines.push(`    v_level_id,`);
-  lines.push(`    ${exam.duration_minutes},`);
-  lines.push(`    60,`);
+  lines.push(`    ${writtenMins},`);
+  lines.push(`    ${exam.pass_score_100 ?? 60},`);
   lines.push(`    'published',`);
   lines.push(`    now(),`);
   lines.push(`    3,`);
-  lines.push(`    true`);
+  lines.push(`    true${extraVals.length ? "," : ""}`);
+  for (let i = 0; i < extraVals.length; i++) {
+    lines.push(`    ${extraVals[i]}${i < extraVals.length - 1 ? "," : ""}`);
+  }
   lines.push(`  )`);
   lines.push(`  ON CONFLICT (id) DO UPDATE SET`);
   lines.push(`    code = EXCLUDED.code,`);
@@ -62,6 +129,9 @@ for (const exam of bank.exams) {
   lines.push(`    instructions = EXCLUDED.instructions,`);
   lines.push(`    level_id = EXCLUDED.level_id,`);
   lines.push(`    duration_minutes = EXCLUDED.duration_minutes,`);
+  if (extraUpdates.length) {
+    for (const u of extraUpdates) lines.push(`    ${u},`);
+  }
   lines.push(`    status = 'published',`);
   lines.push(`    published_at = coalesce(public.exams.published_at, now()),`);
   lines.push(`    is_mock = true,`);
@@ -161,7 +231,7 @@ for (const exam of bank.exams) {
 }
 
 lines.push(`END $$;`);
-writeFileSync(outputPath, lines.join("\n"));
+writeFileSync(outputPath, lines.join("\n") + "\n");
 console.log(
   `Wrote ${outputPath}`,
   lines.length,

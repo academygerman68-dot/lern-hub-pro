@@ -1,27 +1,48 @@
--- A1 complete simulation: profile columns, Goethe /100 scoring, written timer,
--- publish gates for goethe_a1_adult_v1, teacher scope for level-wide exams + attempts.
-
-ALTER TABLE public.exams
-  ADD COLUMN IF NOT EXISTS format_profile text,
-  ADD COLUMN IF NOT EXISTS written_duration_minutes integer,
-  ADD COLUMN IF NOT EXISTS speaking_duration_minutes integer;
-
-COMMENT ON COLUMN public.exams.format_profile IS
-  'Scoring/UX profile, e.g. goethe_a1_adult_v1 for A1-SIM complete exams.';
-COMMENT ON COLUMN public.exams.written_duration_minutes IS
-  'Written clock (Hören+Lesen+Schreiben). Oral is separate/async.';
-COMMENT ON COLUMN public.exams.speaking_duration_minutes IS
-  'Indicative oral duration for solo recorded Sprechen.';
-
-UPDATE public.exams
-SET
-  format_profile = 'goethe_a1_adult_v1',
-  written_duration_minutes = 65,
-  speaking_duration_minutes = 15,
-  duration_minutes = 65,
-  instructions = 'Simulation indépendante A1 adultes — non affiliée au Goethe-Institut · Écrit 65 min · Oral enregistré 15 min · 60 points bruts (/100 via ×1,66)',
-  updated_at = now()
-WHERE code = 'A1-SIM-01';
+-- GLOBAL exam-engine security + Goethe A1 scoring (no A1 seed content).
+-- Companion: 20260927120000_a1_complete_exam_additive.sql (columns + A1-SIM-01 seed only).
+--
+-- RPC BEHAVIOR DIFF (old → new)
+-- 1) teacher_can_manage_exam(class_id, level_id)
+--    OLD: admin OR (class_id NOT NULL AND teacher_of_class). Level-wide mocks (class_id NULL) not manageable by teachers.
+--    NEW: also allows teachers who teach that level to manage class_id-null exams.
+--    IMPACT: teachers of A1 classes can author/manage level-wide A1 mocks. Other exams unchanged if class-scoped.
+--
+-- 2) exam_score_percentage(exam_id, raw, max) [NEW]
+--    OLD: inline (score/max)*100 in submit/grade.
+--    NEW: if format_profile=goethe_a1_adult_v1 → round(raw*1.66) integer (60→100); else classic %.
+--    IMPACT: only exams with that profile; B1/others keep ratio scoring.
+--
+-- 3) start_exam_attempt(exam_id)
+--    OLD: expires_at = now() + duration_minutes.
+--    NEW: expires_at = now() + coalesce(written_duration_minutes, duration_minutes, 65).
+--    IMPACT: Goethe A1 uses written clock; others unchanged when written_duration is null.
+--
+-- 4) submit_exam_attempt(attempt_id)
+--    OLD: percentage = (score/max)*100.
+--    NEW: percentage = exam_score_percentage(...). Manual/objective loop unchanged otherwise.
+--    IMPACT: Goethe A1 conversion only when profile set; other exams identical ratio.
+--
+-- 5) grade_exam_writing_answer(...)
+--    OLD: admin OR teacher_can_manage_exam(exam); no check that student is in teacher's class.
+--    NEW: same manage check + teacher must be teacher_of_class(student.class_id); uses exam_score_percentage.
+--    IMPACT: teachers cannot grade students outside their classes (security tighten).
+--
+-- 6) exam_completeness_report(exam_id)
+--    OLD: B1/audio-track gates; listening keys not always required; no Goethe structure gates.
+--    NEW: preserves B1/track gates + Goethe A1 structure (4×15, Hören 6/4/5, Lesen 5/5/5, rubrics).
+--    IMPACT: only exams with profile goethe_a1_adult_v1 or code A1-SIM-01 get extra gates.
+--
+-- RLS DIFF
+-- exam_attempts_select / exam_answers_select:
+--   OLD: any teacher can SELECT all attempts/answers.
+--   NEW: teacher only if manages exam AND is_teacher_of_class(student.class_id); students own rows; admin all.
+-- course_materials_exam_oral_select:
+--   OLD: any teacher can read exam-oral storage.
+--   NEW: teacher only for attempts of their class students.
+-- exam_answer_keys:
+--   ENSURE staff-only ALL policy (admin/teacher). Students must never SELECT teacher_payload/correct_values.
+--
+-- NON-GOETHE COMPAT: format_profile NULL → scoring/timer/completeness behave as before (plus tighter teacher RLS).
 
 -- Teachers may manage level-wide mock exams (class_id null) for levels they teach.
 CREATE OR REPLACE FUNCTION public.teacher_can_manage_exam(p_class_id uuid, p_level_id uuid)
@@ -68,7 +89,8 @@ DECLARE
 BEGIN
   SELECT format_profile INTO v_profile FROM public.exams WHERE id = p_exam_id;
   IF v_profile = 'goethe_a1_adult_v1' THEN
-    RETURN round(coalesce(p_raw_score, 0) * 1.66, 2);
+    -- Integer half-up: 60*1.66=99.6 → 100 (matches convertA1RawToHundred)
+    RETURN round(coalesce(p_raw_score, 0) * 1.66);
   END IF;
   IF coalesce(p_raw_max, 0) <= 0 THEN
     RETURN 0;
@@ -885,6 +907,14 @@ USING (
     )
   )
 );
+
+
+-- Staff-only answer keys: students must never read correct_values / teacher_payload via PostgREST.
+DROP POLICY IF EXISTS exam_answer_keys_staff ON public.exam_answer_keys;
+CREATE POLICY exam_answer_keys_staff
+  ON public.exam_answer_keys FOR ALL TO authenticated
+  USING (public.is_admin() OR public.is_teacher())
+  WITH CHECK (public.is_admin() OR public.is_teacher());
 
 REVOKE ALL ON FUNCTION public.exam_score_percentage(uuid, numeric, numeric) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.exam_score_percentage(uuid, numeric, numeric) TO authenticated;

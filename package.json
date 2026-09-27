@@ -21,7 +21,8 @@
     "audio:a1-complete": "py scripts/generate-a1-audio.py",
     "validate:a1-complete": "node scripts/validate-a1-complete-exam.mjs",
     "seed:a1-complete": "node scripts/import-a1-exam-bank.mjs data/exams/a1-complete/a1-sim-01.json",
-    "generate:a1-complete-seed": "node scripts/generate-a1-exam-seed.mjs data/exams/a1-complete/a1-sim-01.json supabase/migrations/20260927120000_seed_a1_complete_exam.sql"
+    "generate:a1-complete-seed": "node scripts/generate-a1-exam-seed.mjs data/exams/a1-complete/a1-sim-01.json supabase/migrations/20260927120000_a1_complete_exam_additive.sql",
+    "build:a1-security-rollback": "node scripts/build-rollback-exam-engine-security.mjs"
   },
   "overrides": {
     "rolldown": "1.2.1"

@@ -24,6 +24,10 @@ dist-ssr
 # Local scratch (audios, OCR audits, key renders)
 tmp/
 
+# Working copies of the A1 complete package (not source of truth)
+a1-complete-package/
+a1-complete-package-tmp/
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

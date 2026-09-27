@@ -14,8 +14,10 @@ const expected = {
 if (!exam) errors.push("Missing exam");
 if (exam?.format_profile !== "goethe_a1_adult_v1") errors.push("Wrong format profile");
 if (exam?.total_points !== 60) errors.push("Total must be 60 raw points");
+if (exam?.duration_minutes !== 65) errors.push("duration_minutes must be 65 (written clock)");
 if (exam?.written_duration_minutes !== 65) errors.push("Written duration must be 65 minutes");
 if (exam?.speaking_duration_minutes !== 15) errors.push("Speaking duration must be 15 minutes");
+if (Math.round(60 * 1.66) !== 100) errors.push("Conversion 60×1.66 must round to 100");
 
 const ids = new Set();
 for (const [skill, rules] of Object.entries(expected)) {

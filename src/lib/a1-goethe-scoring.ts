@@ -22,10 +22,33 @@ export function isGoetheA1AdultProfile(input: {
   return code === "A1-SIM-01" || code.startsWith("A1-SIM-");
 }
 
-/** Convert raw /60 points to /100 (round half up). */
-export function convertA1RawToHundred(rawTotal: number): number {
+/**
+ * PostgreSQL-compatible Goethe conversion used in exam_score_percentage:
+ *   RETURN round(coalesce(p_raw_score, 0) * 1.66);
+ * For non-negative scores this matches Math.round (half away from zero / half up).
+ */
+export function sqlRoundGoetheRawToHundred(rawTotal: number): number {
   if (!Number.isFinite(rawTotal) || rawTotal <= 0) return 0;
+  // Mirror PG numeric round-to-integer: nearest; halves away from 0 for positives.
   return Math.round(rawTotal * A1_CONVERSION_FACTOR);
+}
+
+/**
+ * Convert raw /60 points to /100.
+ * Rule: round half up on (raw × 1.66) to nearest integer.
+ * Guarantees 60 → 100 (not 99.6).
+ */
+export function convertA1RawToHundred(rawTotal: number): number {
+  return sqlRoundGoetheRawToHundred(rawTotal);
+}
+
+/** Full rounding table for raw scores 0..60 (integer steps). */
+export function a1ConversionTable(): Array<{ raw: number; score100: number }> {
+  const rows: Array<{ raw: number; score100: number }> = [];
+  for (let raw = 0; raw <= A1_RAW_MAX; raw += 1) {
+    rows.push({ raw, score100: convertA1RawToHundred(raw) });
+  }
+  return rows;
 }
 
 export function a1MentionFromHundred(score100: number): A1Mention {
