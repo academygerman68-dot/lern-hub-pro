@@ -33,6 +33,7 @@ describe("exam role non-regression (student / teacher / admin)", () => {
     expect(additiveSql).toContain("A1-SIM-01");
     expect(additiveSql).toContain("goethe_a1_adult_v1");
     expect(additiveSql).toMatch(/written_duration_minutes/);
+    expect(additiveSql).toMatch(/'draft'/);
     expect(additiveSql).not.toMatch(/CREATE OR REPLACE FUNCTION public\.start_exam_attempt/);
     expect(additiveSql).not.toMatch(/CREATE OR REPLACE FUNCTION public\.submit_exam_attempt/);
     expect(additiveSql).not.toMatch(/DROP POLICY IF EXISTS exam_attempts_select/);

@@ -39,6 +39,22 @@ describe("A1 migration invariants", () => {
     expect(additive).not.toMatch(/\bDELETE FROM\b/i);
   });
 
+  it("seeds A1-SIM-01 as draft and never force-publishes on re-seed", () => {
+    expect(additive).toMatch(/'A1-SIM-01'/);
+    expect(additive).toMatch(/'draft'/);
+    expect(additive).toMatch(
+      /status = CASE WHEN public\.exams\.status = 'published' THEN public\.exams\.status ELSE EXCLUDED\.status END/,
+    );
+    expect(additive).toMatch(/published_at = public\.exams\.published_at/);
+    // Must not insert as published for the Goethe complete sim.
+    const insertBlock = additive.slice(
+      additive.indexOf("-- A1-SIM-01"),
+      additive.indexOf("ON CONFLICT (id) DO UPDATE"),
+    );
+    expect(insertBlock).toContain("'draft'");
+    expect(insertBlock).not.toMatch(/'published'/);
+  });
+
   it("global security migration keeps classic path when format_profile is NULL", () => {
     expect(security).toMatch(/IF v_profile = 'goethe_a1_adult_v1' THEN/);
     expect(security).toMatch(

@@ -1,6 +1,7 @@
 -- A1 additive seed only (no global RPC / RLS changes).
 -- Generated from data/exams/a1-complete/a1-sim-01.json
 -- Requires companion migration for Goethe scoring + teacher-scope RLS.
+-- A1-SIM-01 is seeded as draft; general publish is scripts/publish-a1-sim-01.sql only.
 
 ALTER TABLE public.exams
   ADD COLUMN IF NOT EXISTS format_profile text,
@@ -34,8 +35,8 @@ BEGIN
     v_level_id,
     65,
     60,
-    'published',
-    now(),
+    'draft',
+    NULL,
     3,
     true,
     'goethe_a1_adult_v1',
@@ -52,8 +53,8 @@ BEGIN
     format_profile = EXCLUDED.format_profile,
     written_duration_minutes = EXCLUDED.written_duration_minutes,
     speaking_duration_minutes = EXCLUDED.speaking_duration_minutes,
-    status = 'published',
-    published_at = coalesce(public.exams.published_at, now()),
+    status = CASE WHEN public.exams.status = 'published' THEN public.exams.status ELSE EXCLUDED.status END,
+    published_at = public.exams.published_at,
     is_mock = true,
     updated_at = now();
   INSERT INTO public.exam_sections (id, exam_id, skill, title, sort_order, max_score)

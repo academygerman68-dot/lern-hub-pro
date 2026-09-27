@@ -111,11 +111,15 @@ for (const exam of bank.exams) {
   lines.push(`    '${esc(exam.title)}',`);
   lines.push(`    '${esc(exam.subtitle)}',`);
   lines.push(`    '${esc(instructions)}',`);
+  // Goethe complete sims seed as draft; publish is a separate controlled step.
+  const seedStatus = formatProfile === "goethe_a1_adult_v1" ? "draft" : "published";
+  const seedPublishedAt = seedStatus === "published" ? "now()" : "NULL";
+
   lines.push(`    v_level_id,`);
   lines.push(`    ${writtenMins},`);
   lines.push(`    ${exam.pass_score_100 ?? 60},`);
-  lines.push(`    'published',`);
-  lines.push(`    now(),`);
+  lines.push(`    '${seedStatus}',`);
+  lines.push(`    ${seedPublishedAt},`);
   lines.push(`    3,`);
   lines.push(`    true${extraVals.length ? "," : ""}`);
   for (let i = 0; i < extraVals.length; i++) {
@@ -132,8 +136,11 @@ for (const exam of bank.exams) {
   if (extraUpdates.length) {
     for (const u of extraUpdates) lines.push(`    ${u},`);
   }
-  lines.push(`    status = 'published',`);
-  lines.push(`    published_at = coalesce(public.exams.published_at, now()),`);
+  // Never force-republish on re-seed; keep published if already released.
+  lines.push(
+    `    status = CASE WHEN public.exams.status = 'published' THEN public.exams.status ELSE EXCLUDED.status END,`,
+  );
+  lines.push(`    published_at = public.exams.published_at,`);
   lines.push(`    is_mock = true,`);
   lines.push(`    updated_at = now();`);
 

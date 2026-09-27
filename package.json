@@ -22,7 +22,8 @@
     "validate:a1-complete": "node scripts/validate-a1-complete-exam.mjs",
     "seed:a1-complete": "node scripts/import-a1-exam-bank.mjs data/exams/a1-complete/a1-sim-01.json",
     "generate:a1-complete-seed": "node scripts/generate-a1-exam-seed.mjs data/exams/a1-complete/a1-sim-01.json supabase/migrations/20260927120000_a1_complete_exam_additive.sql",
-    "build:a1-security-rollback": "node scripts/build-rollback-exam-engine-security.mjs"
+    "build:a1-security-rollback": "node scripts/build-rollback-exam-engine-security.mjs",
+    "publish:a1-sim-01:sql": "node -e \"console.log('Manual only: run scripts/publish-a1-sim-01.sql after explicit confirmation. Not a migration.')\""
   },
   "overrides": {
     "rolldown": "1.2.1"

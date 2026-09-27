@@ -84,8 +84,8 @@ async function main() {
       class_id: null,
       duration_minutes: writtenMins,
       pass_percentage: exam.pass_score_100 ?? 60,
-      status: "published",
-      published_at: new Date().toISOString(),
+      status: formatProfile === "goethe_a1_adult_v1" ? "draft" : "published",
+      published_at: formatProfile === "goethe_a1_adult_v1" ? null : new Date().toISOString(),
       max_attempts: 3,
       is_mock: true,
     };
