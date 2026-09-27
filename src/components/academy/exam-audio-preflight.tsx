@@ -43,29 +43,25 @@ export function ExamAudioPreflight({
 
   useEffect(() => {
     let cancelled = false;
-    const loaders: HTMLAudioElement[] = [];
-    for (const track of TRACKS) {
-      const el = new Audio();
-      loaders.push(el);
-      el.preload = "metadata";
-      el.onloadedmetadata = () => {
-        if (cancelled) return;
-        setTrackStatus((prev) => ({ ...prev, [track.part]: "ok" }));
-      };
-      el.onerror = () => {
-        if (cancelled) return;
-        setTrackStatus((prev) => ({ ...prev, [track.part]: "error" }));
-      };
-      el.src = track.url;
-    }
+    // Prefer fetch over parallel Audio() loaders: sharing the same URL as the
+    // headset <audio> can abort one request and false-fail Teil 1 readiness.
+    void (async () => {
+      for (const track of TRACKS) {
+        try {
+          const res = await fetch(track.url, { method: "HEAD", cache: "no-cache" });
+          if (cancelled) return;
+          setTrackStatus((prev) => ({
+            ...prev,
+            [track.part]: res.ok ? "ok" : "error",
+          }));
+        } catch {
+          if (cancelled) return;
+          setTrackStatus((prev) => ({ ...prev, [track.part]: "error" }));
+        }
+      }
+    })();
     return () => {
       cancelled = true;
-      for (const el of loaders) {
-        el.onloadedmetadata = null;
-        el.onerror = null;
-        el.removeAttribute("src");
-        el.load();
-      }
     };
   }, []);
 

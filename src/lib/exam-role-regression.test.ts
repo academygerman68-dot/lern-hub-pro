@@ -50,13 +50,13 @@ describe("exam role non-regression (student / teacher / admin)", () => {
   });
 
   it("tightens teacher attempt/answer SELECT to own-class students", () => {
-    expect(securitySql).toMatch(/is_teacher_of_class\(s\.class_id\)/);
+    expect(securitySql).toMatch(/teacher_has_student\(/);
     expect(securitySql).toMatch(/teacher_can_manage_exam\(e\.class_id, e\.level_id\)/);
     const attemptsPolicy = securitySql.slice(
       securitySql.indexOf("CREATE POLICY exam_attempts_select"),
       securitySql.indexOf("CREATE POLICY exam_answers_select"),
     );
-    expect(attemptsPolicy).toMatch(/is_teacher_of_class/);
+    expect(attemptsPolicy).toMatch(/teacher_has_student\(exam_attempts\.student_id\)/);
     expect(attemptsPolicy).not.toMatch(/OR public\.is_teacher\(\)\s*\n\s*OR \(/);
   });
 

@@ -24,7 +24,7 @@
 --
 -- 5) grade_exam_writing_answer(...)
 --    OLD: admin OR teacher_can_manage_exam(exam); no check that student is in teacher's class.
---    NEW: same manage check + teacher must be teacher_of_class(student.class_id); uses exam_score_percentage.
+--    NEW: same manage check + teacher_has_student(attempt.student_id); uses exam_score_percentage.
 --    IMPACT: teachers cannot grade students outside their classes (security tighten).
 --
 -- 6) exam_completeness_report(exam_id)
@@ -35,7 +35,7 @@
 -- RLS DIFF
 -- exam_attempts_select / exam_answers_select:
 --   OLD: any teacher can SELECT all attempts/answers.
---   NEW: teacher only if manages exam AND is_teacher_of_class(student.class_id); students own rows; admin all.
+--   NEW: teacher only if manages exam AND teacher_has_student(attempt.student_id); students own rows; admin all.
 -- course_materials_exam_oral_select:
 --   OLD: any teacher can read exam-oral storage.
 --   NEW: teacher only for attempts of their class students.
@@ -415,15 +415,9 @@ BEGIN
     RAISE EXCEPTION 'FORBIDDEN';
   END IF;
 
-  -- Teachers may only grade students in their own classes.
+  -- Teachers may only grade students in their own classes (via enrollments).
   IF NOT public.is_admin() THEN
-    IF NOT EXISTS (
-      SELECT 1
-      FROM public.students s
-      WHERE s.id = attempt_row.student_id
-        AND s.class_id IS NOT NULL
-        AND public.is_teacher_of_class(s.class_id)
-    ) THEN
+    IF NOT public.teacher_has_student(attempt_row.student_id) THEN
       RAISE EXCEPTION 'FORBIDDEN';
     END IF;
   END IF;
@@ -527,6 +521,38 @@ BEGIN
   RETURN attempt_row;
 END;
 $$;
+
+-- Helpers required by completeness (may be missing if older local-only migrations never hit remote).
+CREATE OR REPLACE FUNCTION public.exam_question_needs_horen_audio(
+  p_skill public.exam_skill,
+  p_type public.exam_question_type
+)
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT p_skill = 'hoeren' OR p_type = 'listening';
+$$;
+
+CREATE OR REPLACE FUNCTION public.exam_question_has_audio(
+  p_media_path text,
+  p_media_bucket text,
+  p_metadata jsonb
+)
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT
+    (nullif(btrim(coalesce(p_media_path, '')), '') IS NOT NULL
+      AND nullif(btrim(coalesce(p_media_bucket, '')), '') IS NOT NULL)
+    OR nullif(btrim(coalesce(p_metadata ->> 'audio_url', '')), '') IS NOT NULL;
+$$;
+
+REVOKE ALL ON FUNCTION public.exam_question_needs_horen_audio(public.exam_skill, public.exam_question_type) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.exam_question_needs_horen_audio(public.exam_skill, public.exam_question_type) TO authenticated;
+REVOKE ALL ON FUNCTION public.exam_question_has_audio(text, text, jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.exam_question_has_audio(text, text, jsonb) TO authenticated;
 
 -- Completeness: preserve B1/audio-track gates + Goethe A1 adult structure checks.
 CREATE OR REPLACE FUNCTION public.exam_completeness_report(p_exam_id uuid)
@@ -714,14 +740,14 @@ BEGIN
       );
     END IF;
 
-    IF r.type IN ('true_false', 'single_choice', 'multiple_choice', 'listening') THEN
+    IF r.type::text IN ('true_false', 'single_choice', 'multiple_choice', 'listening') THEN
       IF r.correct_values IS NULL OR cardinality(r.correct_values) = 0 THEN
         v_issues := array_append(
           v_issues,
           format('Réponse correcte manquante · « %s »', left(r.prompt, 60))
         );
       END IF;
-    ELSIF r.type = 'form_fill' THEN
+    ELSIF r.type::text = 'form_fill' THEN
       IF coalesce(r.metadata -> 'fields', '[]'::jsonb) = '[]'::jsonb
          AND coalesce(r.teacher_payload -> 'fields', '[]'::jsonb) = '[]'::jsonb THEN
         v_issues := array_append(
@@ -735,7 +761,7 @@ BEGIN
           format('Clé formulaire manquante · « %s »', left(r.prompt, 60))
         );
       END IF;
-    ELSIF r.type IN ('writing', 'text', 'open_text', 'speaking') THEN
+    ELSIF r.type::text IN ('writing', 'text', 'open_text', 'speaking') THEN
       IF nullif(btrim(r.prompt), '') IS NULL THEN
         v_issues := array_append(
           v_issues,
@@ -846,11 +872,9 @@ CREATE POLICY exam_attempts_select
       AND EXISTS (
         SELECT 1
         FROM public.exams e
-        JOIN public.students s ON s.id = exam_attempts.student_id
         WHERE e.id = exam_attempts.exam_id
           AND public.teacher_can_manage_exam(e.class_id, e.level_id)
-          AND s.class_id IS NOT NULL
-          AND public.is_teacher_of_class(s.class_id)
+          AND public.teacher_has_student(exam_attempts.student_id)
       )
     )
   );
@@ -872,11 +896,9 @@ CREATE POLICY exam_answers_select
         SELECT 1
         FROM public.exam_attempts a
         JOIN public.exams e ON e.id = a.exam_id
-        JOIN public.students s ON s.id = a.student_id
         WHERE a.id = attempt_id
           AND public.teacher_can_manage_exam(e.class_id, e.level_id)
-          AND s.class_id IS NOT NULL
-          AND public.is_teacher_of_class(s.class_id)
+          AND public.teacher_has_student(a.student_id)
       )
     )
   );
@@ -899,10 +921,8 @@ USING (
       AND EXISTS (
         SELECT 1
         FROM public.exam_attempts a
-        JOIN public.students s ON s.id = a.student_id
         WHERE a.id = ((storage.foldername(name))[2])::uuid
-          AND s.class_id IS NOT NULL
-          AND public.is_teacher_of_class(s.class_id)
+          AND public.teacher_has_student(a.student_id)
       )
     )
   )
