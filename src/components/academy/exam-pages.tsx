@@ -338,6 +338,12 @@ function StudentExamCatalog() {
                       {exam.starts_at ? ` · Début ${formatFrDate(exam.starts_at)}` : ""}
                       {exam.ends_at ? ` · Fin ${formatFrDate(exam.ends_at)}` : ""}
                     </p>
+                    {goetheA1 ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Compétences : Hören · Lesen · Schreiben · Sprechen (15 pts chacune · 60
+                        bruts → /100)
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-xs text-muted-foreground">
                       Tentatives : {completedAttempts}/{maxAttempts}
                       {attemptsLeft > 0
