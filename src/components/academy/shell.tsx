@@ -19,6 +19,7 @@ import {
   Users,
   Video,
   X,
+  Dumbbell,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
         ["materials", "nav.materials", Library],
         ["assignments", "nav.assignments", ClipboardCheck],
         ["exams", "nav.exams", FileText],
+        ["training", "nav.training", Dumbbell],
         ["courses", "nav.courses", BookOpen],
         ["progress", "nav.progress", BarChart3],
         ["live", "nav.live", Video],
@@ -73,6 +75,8 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
         ["materials", "nav.materials", Library],
         ["assignments", "nav.assignments", ClipboardCheck],
         ["exams", "nav.exams", FileText],
+        ["training-preview", "nav.trainingPreview", Dumbbell],
+        ["training-corrections", "nav.trainingCorrections", ClipboardCheck],
         ["corrections", "nav.corrections", ClipboardCheck],
         ["live", "nav.live", Video],
       ],
@@ -104,6 +108,8 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
       items: [
         ["assignments", "nav.assignments", ClipboardCheck],
         ["exams", "nav.exams", FileText],
+        ["training-preview", "nav.trainingPreview", Dumbbell],
+        ["training-corrections", "nav.trainingCorrections", ClipboardCheck],
         ["corrections", "nav.corrections", ClipboardCheck],
         ["live", "nav.live", Video],
       ],

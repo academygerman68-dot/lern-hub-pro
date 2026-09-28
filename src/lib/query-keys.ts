@@ -98,4 +98,13 @@ export const queryKeys = {
   branding: {
     settings: ["branding", "settings"] as const,
   },
+  training: {
+    catalog: ["training", "catalog"] as const,
+    module: (code: string, preview: boolean) =>
+      ["training", "module", code, preview ? "preview" : "live"] as const,
+    attempt: (code: string, preview: boolean) =>
+      ["training", "attempt", code, preview ? "preview" : "live"] as const,
+    answers: (attemptId: string) => ["training", "answers", attemptId] as const,
+    teacherAttempts: ["training", "teacher-attempts"] as const,
+  },
 };

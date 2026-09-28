@@ -18,6 +18,7 @@ import { AuthError, SupabaseAuthService } from "@/services/supabase/auth-service
 import { SupabaseProfileService } from "@/services/supabase/profile-service";
 import { SupabaseGradeAssistService } from "@/services/supabase/grade-assist-service";
 import { SupabaseGroupProgressService } from "@/services/supabase/group-progress-service";
+import { TrainingService as SupabaseTrainingService } from "@/services/supabase/training-service";
 import { isDemoAuthAllowed } from "@/lib/auth-config";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { authenticate } from "@/lib/academy-logic";
@@ -1104,3 +1105,5 @@ export const LiveSessionService = {
     return SupabaseLiveSessionService.removeParticipant(sessionId, profileId);
   },
 };
+
+export const TrainingService = SupabaseTrainingService;

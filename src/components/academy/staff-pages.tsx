@@ -27,6 +27,7 @@ import { WEEKDAY_OPTIONS } from "@/services/supabase/class-schedule-service";
 import type { AccountStatus, AcademyPage, Level, Student } from "@/types/academy";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
+import { TrainingPages } from "./training-pages";
 import {
   PageHeader,
   Metric,
@@ -84,6 +85,10 @@ export function TeacherPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "exams") return <DirectorExamsPage />;
   if (page === "b1-exam") return <B1ExamWorkspace />;
   if (page === "b1-preview") return <StudentExamStaffPreview />;
+  if (page === "training") return <TrainingPages mode="catalog" />;
+  if (page === "training-module") return <TrainingPages mode="module" />;
+  if (page === "training-preview") return <TrainingPages mode="preview" />;
+  if (page === "training-corrections") return <TrainingPages mode="corrections" />;
   if (page === "live" || page === "meeting")
     return <LiveClassesPage meeting={page === "meeting"} />;
   if (page === "recordings") return <RecordingsPage />;
@@ -234,6 +239,10 @@ export function DirectorPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "exams") return <DirectorExamsPage />;
   if (page === "b1-exam") return <B1ExamWorkspace />;
   if (page === "b1-preview") return <StudentExamStaffPreview />;
+  if (page === "training") return <TrainingPages mode="catalog" />;
+  if (page === "training-module") return <TrainingPages mode="module" />;
+  if (page === "training-preview") return <TrainingPages mode="preview" />;
+  if (page === "training-corrections") return <TrainingPages mode="corrections" />;
   if (page === "payments" || page === "subscriptions" || page === "invoices" || page === "payroll")
     return <FinancePages mode={page === "payroll" ? "payments" : page} />;
   if (page === "audit") return <AuditPage />;

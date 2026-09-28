@@ -6,14 +6,10 @@ const require = createRequire(import.meta.url);
 
 // Resolve TS via vite-node/tsx if available; fallback: dynamic import of compiled path.
 async function loadValidator() {
-  try {
-    const { register } = await import("tsx/esm/api");
-    register();
-    return await import("../src/lib/training-module-schema.ts");
-  } catch {
-    // vitest/tsx may not be linked the same way; use a minimal inline check via node --import
-    throw new Error("Run via: npx tsx scripts/validate-training-module.mjs <file>");
-  }
+  const { validateTrainingModule, toStudentTrainingPayload } = await import(
+    "../src/lib/training-module-schema.ts"
+  );
+  return { validateTrainingModule, toStudentTrainingPayload };
 }
 
 const file = process.argv[2] || "data/exams/a1-b1-series/modules/GA-A1-M01.json";
