@@ -15,10 +15,11 @@ function readPublicAppUrl(): string {
 }
 
 export function getAppOrigin(): string {
-  const configured = readPublicAppUrl();
-  if (configured) return configured;
-  if (typeof window === "undefined") return "";
-  return window.location.origin;
+  // Prefer the live host so Vercel production and previews never redirect to a stale baked URL.
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+  return readPublicAppUrl();
 }
 
 export function getAuthRedirects() {

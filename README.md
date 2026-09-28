@@ -1452,12 +1452,14 @@ This project was built with [Lovable](https://lovable.dev).
 
 Continue developing this project in the [Lovable editor](https://lovable.dev/projects/lovp_7s5j0hjg9j9938xara49716tad).
 
-Canonical student URL: `https://lern-hub-pro.lovable.app/` — publishing is a **Lovable snapshot** (Publish / Publish changes). A push to `main` syncs the editor but does **not** update the live site until you republish in Lovable.
+**Canonical student production URL:** `https://lern-hub-pro.vercel.app` (Vercel, branch `main`).  
+`https://lern-hub-pro.lovable.app/` is no longer the validation host for the training runner.
+
+After each deploy, check `/build-info.json` (git SHA + build time, no secrets).
 
 - **Ship faster**: describe what you want to build and Lovable handles the code.
 - **Stay in sync**: every change made in Lovable is committed straight to this repository.
 - **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-- **Build fingerprint**: after deploy, check `/build-info.json` (git SHA + build time, no secrets).
 
 ## Development
 

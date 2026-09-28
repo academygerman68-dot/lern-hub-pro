@@ -9,6 +9,23 @@ major_version = 17
 
 [auth]
 enabled = true
+# Canonical student front (Vercel production alias).
+site_url = "https://lern-hub-pro.vercel.app"
+additional_redirect_urls = [
+  "https://lern-hub-pro.vercel.app",
+  "https://lern-hub-pro.vercel.app/**",
+  "https://lern-hub-pro.vercel.app/auth/callback",
+  "https://lern-hub-pro.vercel.app/auth/reset-password",
+  "https://lern-hub-pro-academygerman68-dot.vercel.app",
+  "https://lern-hub-pro-academygerman68-dot.vercel.app/**",
+  "https://lern-*-hub-pro-academygerman68-dot.vercel.app",
+  "https://lern-*-hub-pro-academygerman68-dot.vercel.app/**",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5173/**",
+  "http://localhost:5173",
+  "http://localhost:5173/**"
+]
 
 [storage]
 enabled = true
