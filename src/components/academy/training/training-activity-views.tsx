@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { AlertTriangle, Headphones, Mic, Pause, Play, Square, Upload } from "lucide-react";
+import { AlertTriangle, Mic, Square, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import {
   validateActivityProps,
   type StudentTrainingActivity,
 } from "@/lib/training-runner-ux";
+import { TrainingAudioPlayer } from "@/components/academy/training/training-audio-player";
 
 export type ActivityAnswerValue =
   | { value: string }
@@ -189,78 +190,6 @@ function WritingView({ activity, disabled, value, onChange }: BaseProps) {
           </ul>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function TrainingAudioPlayer({
-  url,
-  playerKey,
-  expectedDuration,
-}: {
-  url: string;
-  playerKey: string;
-  expectedDuration?: number;
-}) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [duration, setDuration] = useState<number | null>(null);
-
-  useEffect(() => {
-    setPlaying(false);
-    setError(null);
-    setDuration(null);
-  }, [playerKey, url]);
-
-  return (
-    <div className="rounded-xl border border-dashed border-border p-4">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <Headphones className="size-4" aria-hidden />
-        Audio Hören
-        {duration != null ? (
-          <span className="text-xs font-normal text-muted-foreground">
-            · {Math.round(duration)} s
-          </span>
-        ) : expectedDuration ? (
-          <span className="text-xs font-normal text-muted-foreground">
-            · ≈ {expectedDuration} s
-          </span>
-        ) : null}
-      </div>
-      <audio
-        key={playerKey}
-        ref={audioRef}
-        className="sr-only"
-        src={url}
-        preload="metadata"
-        onLoadedMetadata={() => {
-          const d = audioRef.current?.duration;
-          if (d && Number.isFinite(d)) setDuration(d);
-        }}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onEnded={() => setPlaying(false)}
-        onError={() => setError("Impossible de lire l’audio. Vérifiez votre connexion.")}
-      />
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          size="sm"
-          className="min-h-11 min-w-11"
-          aria-label={playing ? "Pause" : "Lecture"}
-          onClick={() => {
-            const el = audioRef.current;
-            if (!el) return;
-            if (playing) void el.pause();
-            else void el.play().catch(() => setError("Lecture impossible sur cet appareil."));
-          }}
-        >
-          {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
-        </Button>
-        <audio className="w-full max-w-md" controls src={url} controlsList="nodownload" />
-      </div>
-      {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
     </div>
   );
 }
