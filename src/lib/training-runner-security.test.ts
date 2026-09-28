@@ -95,8 +95,8 @@ describe("GA-A1-M01 runner integration guards", () => {
     expect(buf.byteLength).toBeGreaterThan(1000);
   });
 
-  it("does not create M02/M03 content files", () => {
-    expect(existsSync(join(ROOT, "data/exams/a1-b1-series/modules/GA-A1-M02.json"))).toBe(false);
-    expect(existsSync(join(ROOT, "data/exams/a1-b1-series/modules/GA-A1-M03.json"))).toBe(false);
+  it("allows M02/M03 content files as drafts after runner validation", () => {
+    expect(existsSync(join(ROOT, "data/exams/a1-b1-series/modules/GA-A1-M02.json"))).toBe(true);
+    expect(existsSync(join(ROOT, "data/exams/a1-b1-series/modules/GA-A1-M03.json"))).toBe(true);
   });
 });
