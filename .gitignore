@@ -42,3 +42,7 @@ a1-complete-package-tmp/
 *.njsproj
 *.sln
 *.sw?
+
+# Local MEGA/PDF sources (copyrighted, not for git)
+data/exams/a1-b1-series/source/
+data/exams/a1-b1-series/previews/

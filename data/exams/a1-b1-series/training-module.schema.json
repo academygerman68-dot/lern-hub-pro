@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://germanacademy.local/schemas/training-module-v1.json",
+  "title": "German Academy training module",
+  "description": "Reusable A1→B1 practice module schema (not timed exam sims).",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "module_id",
+    "kind",
+    "format_profile",
+    "level",
+    "sequence",
+    "title",
+    "theme",
+    "estimated_minutes",
+    "prerequisites",
+    "learning_objectives",
+    "vocabulary_targets",
+    "grammar_targets",
+    "skills",
+    "publication_status",
+    "provenance",
+    "media",
+    "activities",
+    "correction"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "module_id": { "type": "string", "pattern": "^GA-[A-C][0-9]-M[0-9]{2}$" },
+    "kind": { "const": "training_module" },
+    "format_profile": { "const": "ga_training_module_v1" },
+    "level": { "enum": ["A1", "A2", "B1", "B2"] },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "title": { "type": "string", "minLength": 3 },
+    "theme": { "type": "string", "minLength": 3 },
+    "estimated_minutes": { "type": "integer", "minimum": 1, "maximum": 90 },
+    "publication_status": { "enum": ["draft", "published", "archived"] },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "content_origin",
+        "publisher_content_embedded",
+        "commercial_media_used",
+        "author",
+        "created_at",
+        "updated_at",
+        "version"
+      ],
+      "properties": {
+        "content_origin": { "const": "original" },
+        "publisher_content_embedded": { "const": false },
+        "commercial_media_used": { "const": false },
+        "author": { "const": "German Academy" }
+      }
+    },
+    "correction": {
+      "type": "object",
+      "required": [
+        "show_keys_before_submit",
+        "practice_scoring",
+        "goethe_scoring",
+        "pass_fail_certificate",
+        "timed_exam"
+      ],
+      "properties": {
+        "show_keys_before_submit": { "const": false },
+        "practice_scoring": { "const": true },
+        "goethe_scoring": { "const": false },
+        "pass_fail_certificate": { "const": false },
+        "timed_exam": { "const": false }
+      }
+    }
+  }
+}

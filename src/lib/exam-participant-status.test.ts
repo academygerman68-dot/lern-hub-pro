@@ -3,6 +3,8 @@ import {
   countExamParticipantStatuses,
   examParticipantStatusLabel,
   pickLatestAttempt,
+  pickLatestGradedAttempt,
+  pickStudentCatalogAttempt,
   resolveExamParticipantStatus,
   type ExamParticipantRow,
 } from "./exam-participant-status";
@@ -36,6 +38,33 @@ describe("exam-participant-status", () => {
       { started_at: "2026-01-02T10:00:00Z", submitted_at: "2026-01-02T11:00:00Z" },
     ]);
     expect(latest?.submitted_at).toBe("2026-01-02T11:00:00Z");
+
+    const graded = pickLatestGradedAttempt([
+      {
+        status: "graded",
+        started_at: "2026-01-01T10:00:00Z",
+        submitted_at: "2026-01-01T11:00:00Z",
+      },
+      {
+        status: "submitted",
+        started_at: "2026-01-02T10:00:00Z",
+        submitted_at: "2026-01-02T12:00:00Z",
+      },
+    ]);
+    expect(graded?.submitted_at).toBe("2026-01-01T11:00:00Z");
+
+    const catalog = pickStudentCatalogAttempt([
+      {
+        status: "graded",
+        started_at: "2026-01-01T10:00:00Z",
+        submitted_at: "2026-01-01T11:00:00Z",
+      },
+      {
+        status: "in_progress",
+        started_at: "2026-01-03T10:00:00Z",
+      },
+    ]);
+    expect(catalog?.status).toBe("in_progress");
 
     const rows: ExamParticipantRow[] = [
       {

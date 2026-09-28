@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ClipboardList,
+  FileText,
+  Play,
+  RotateCcw,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -43,6 +52,10 @@ import {
   isDirectorRole,
   scopedClassOrLevelItemVisible,
 } from "@/lib/academy-logic";
+import {
+  pickLatestGradedAttempt,
+  pickStudentCatalogAttempt,
+} from "@/lib/exam-participant-status";
 import {
   canRetakeExam,
   countCompletedExamAttempts,
@@ -98,6 +111,7 @@ import {
 
 const EXAM_ID_KEY = "ga_active_exam_id";
 const ATTEMPT_ID_KEY = "ga_active_attempt_id";
+const OPEN_REVIEW_KEY = "ga_open_exam_review";
 
 const SKILL_LABELS: Record<string, string> = {
   lesen: "Lesen",
@@ -123,20 +137,32 @@ const RUBRIC_LABELS: Record<string, string> = {
   number: "Numéro",
 };
 
-function persistExamSession(examId: string, attemptId: string) {
+function persistExamSession(
+  examId: string,
+  attemptId: string,
+  options?: { openReview?: boolean },
+) {
   if (typeof sessionStorage === "undefined") return;
   sessionStorage.setItem(EXAM_ID_KEY, examId);
   sessionStorage.setItem(ATTEMPT_ID_KEY, attemptId);
+  if (options?.openReview) sessionStorage.setItem(OPEN_REVIEW_KEY, "1");
+  else sessionStorage.removeItem(OPEN_REVIEW_KEY);
 }
 
 function readExamSession() {
   if (typeof sessionStorage === "undefined") {
-    return { examId: null, attemptId: null };
+    return { examId: null, attemptId: null, openReview: false };
   }
   return {
     examId: sessionStorage.getItem(EXAM_ID_KEY),
     attemptId: sessionStorage.getItem(ATTEMPT_ID_KEY),
+    openReview: sessionStorage.getItem(OPEN_REVIEW_KEY) === "1",
   };
+}
+
+function clearOpenReviewFlag() {
+  if (typeof sessionStorage === "undefined") return;
+  sessionStorage.removeItem(OPEN_REVIEW_KEY);
 }
 
 function formatRemaining(expiresAt: string | null | undefined) {
@@ -207,10 +233,12 @@ function StudentExamCatalog() {
     speakingMinutes: number | null;
   } | null>(null);
 
-  const latestByExam = useMemo(() => {
-    const map = new Map<string, NonNullable<typeof attemptsQuery.data>[number]>();
+  const attemptsByExam = useMemo(() => {
+    const map = new Map<string, NonNullable<typeof attemptsQuery.data>>();
     for (const attempt of attemptsQuery.data ?? []) {
-      if (!map.has(attempt.exam_id)) map.set(attempt.exam_id, attempt);
+      const list = map.get(attempt.exam_id) ?? [];
+      list.push(attempt);
+      map.set(attempt.exam_id, list);
     }
     return map;
   }, [attemptsQuery]);
@@ -271,7 +299,9 @@ function StudentExamCatalog() {
         ) : null}
         <div className={`grid gap-4 md:grid-cols-2 ${preflightExam ? "hidden" : ""}`}>
           {examsQuery.data?.map((exam) => {
-            const latest = latestByExam.get(exam.id);
+            const examAttempts = attemptsByExam.get(exam.id) ?? [];
+            const latest = pickStudentCatalogAttempt(examAttempts);
+            const gradedAttempt = pickLatestGradedAttempt(examAttempts);
             const hasUngradedWriting =
               latest?.status === "submitted" || latest?.status === "expired";
             const catalog = examCatalogAction({
@@ -287,6 +317,10 @@ function StudentExamCatalog() {
               completedAttempts,
               maxAttempts,
             });
+            const showGradedCorrection =
+              Boolean(gradedAttempt) &&
+              gradedAttempt?.id !== latest?.id &&
+              (catalog.action === "provisional" || catalog.action === "final");
             const examExt = exam as typeof exam & {
               format_profile?: string | null;
               written_duration_minutes?: number | null;
@@ -319,53 +353,69 @@ function StudentExamCatalog() {
               });
             };
             return (
-              <Surface className="p-6" key={exam.id}>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                      {exam.level?.code ?? "—"}
-                      {exam.class?.name ? ` · ${exam.class.name}` : " · Niveau entier"} ·{" "}
-                      {goetheA1 ? `écrit ${writtenMins} min` : `${exam.duration_minutes} min`}
-                    </p>
-                    <h2 className="mt-2 text-xl font-semibold">{exam.title}</h2>
-                    {exam.description ? (
-                      <p className="mt-2 text-sm text-muted-foreground">{exam.description}</p>
-                    ) : null}
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {goetheA1
-                        ? `Écrit ${writtenMins} min · Oral enregistré ${speakingMins ?? 15} min · simulation indépendante`
-                        : `Durée : ${exam.duration_minutes} min`}
-                      {exam.starts_at ? ` · Début ${formatFrDate(exam.starts_at)}` : ""}
-                      {exam.ends_at ? ` · Fin ${formatFrDate(exam.ends_at)}` : ""}
-                    </p>
-                    {goetheA1 ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Compétences : Hören · Lesen · Schreiben · Sprechen (15 pts chacune · 60
-                        bruts → /100)
+              <Surface className="overflow-hidden p-0" key={exam.id}>
+                <div className="space-y-4 p-6">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                        {exam.level?.code ?? "—"}
+                        {exam.class?.name ? ` · ${exam.class.name}` : " · Niveau entier"} ·{" "}
+                        {goetheA1 ? `écrit ${writtenMins} min` : `${exam.duration_minutes} min`}
                       </p>
-                    ) : null}
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Tentatives : {completedAttempts}/{maxAttempts}
+                      <h2 className="mt-2 text-xl font-semibold tracking-tight">{exam.title}</h2>
+                      {exam.description ? (
+                        <p className="mt-2 text-sm text-muted-foreground">{exam.description}</p>
+                      ) : null}
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {goetheA1
+                          ? `Écrit ${writtenMins} min · Oral enregistré ${speakingMins ?? 15} min · simulation indépendante`
+                          : `Durée : ${exam.duration_minutes} min`}
+                        {exam.starts_at ? ` · Début ${formatFrDate(exam.starts_at)}` : ""}
+                        {exam.ends_at ? ` · Fin ${formatFrDate(exam.ends_at)}` : ""}
+                      </p>
+                      {goetheA1 ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Compétences : Hören · Lesen · Schreiben · Sprechen (15 pts chacune · 60
+                          bruts → /100)
+                        </p>
+                      ) : null}
+                    </div>
+                    <Status tone={progressTone(progressLabel)}>{progressLabel}</Status>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-muted/70 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                      Tentatives {completedAttempts}/{maxAttempts}
                       {attemptsLeft > 0
                         ? ` · ${attemptsLeft} restante${attemptsLeft > 1 ? "s" : ""}`
                         : ""}
-                    </p>
+                    </span>
+                    {catalog.action === "final" && latest?.percentage != null ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-xs font-semibold text-success">
+                        <CheckCircle2 className="size-3.5" aria-hidden />
+                        {Number(latest.percentage).toFixed(0)} %
+                      </span>
+                    ) : null}
+                    {catalog.action === "provisional" ? (
+                      <span className="inline-flex items-center rounded-full bg-warning-soft px-2.5 py-1 text-xs font-semibold text-[oklch(0.48_0.1_65)]">
+                        Score partiel — écrit/oral en attente
+                      </span>
+                    ) : null}
+                    {showGradedCorrection && gradedAttempt?.percentage != null ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-xs font-semibold text-success">
+                        <CheckCircle2 className="size-3.5" aria-hidden />
+                        Dernière correction : {Number(gradedAttempt.percentage).toFixed(0)} %
+                      </span>
+                    ) : null}
                   </div>
-                  <Status tone={progressTone(progressLabel)}>{progressLabel}</Status>
                 </div>
-                {latest && (catalog.action === "final" || catalog.action === "provisional") ? (
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    {catalog.action === "final" && latest.percentage != null
-                      ? `Score : ${Number(latest.percentage).toFixed(0)} %`
-                      : catalog.action === "provisional"
-                        ? "Score partiel disponible — correction manuelle en attente"
-                        : null}
-                  </p>
-                ) : null}
-                <div className="mt-5 flex flex-wrap gap-2">
+
+                <div className="flex flex-col gap-2 border-t border-border/70 bg-muted/25 px-6 py-4 sm:flex-row sm:flex-wrap sm:items-center">
                   {(exam.content_url || exam.storage_path) && (
                     <Button
-                      variant="outline"
+                      variant="ghost"
+                      size="sm"
+                      className="justify-start text-muted-foreground sm:justify-center"
                       onClick={() => {
                         void ExamService.getExamMaterialUrl(exam)
                           .then((url) => {
@@ -374,11 +424,13 @@ function StudentExamCatalog() {
                           .catch((err: Error) => toast.error(err.message));
                       }}
                     >
-                      Ouvrir le document
+                      <FileText aria-hidden />
+                      Document
                     </Button>
                   )}
                   {catalog.action === "start" ? (
                     <Button disabled={startExam.isPending} onClick={launchExam}>
+                      <Play aria-hidden />
                       {catalog.cta}
                     </Button>
                   ) : null}
@@ -390,16 +442,45 @@ function StudentExamCatalog() {
                         navigate("mock-exam");
                       }}
                     >
+                      <Play aria-hidden />
                       {catalog.cta}
                     </Button>
                   ) : null}
                   {catalog.action === "provisional" || catalog.action === "final" ? (
                     <>
-                      {latest ? (
+                      {showGradedCorrection && gradedAttempt ? (
                         <Button
-                          variant="outline"
                           onClick={() => {
-                            persistExamSession(exam.id, latest.id);
+                            persistExamSession(exam.id, gradedAttempt.id, {
+                              openReview: true,
+                            });
+                            navigate("exam-result");
+                          }}
+                        >
+                          <ClipboardList aria-hidden />
+                          Voir la correction
+                        </Button>
+                      ) : null}
+                      {latest && catalog.action === "final" && !showGradedCorrection ? (
+                        <Button
+                          onClick={() => {
+                            persistExamSession(exam.id, latest.id, {
+                              openReview: true,
+                            });
+                            navigate("exam-result");
+                          }}
+                        >
+                          <ClipboardList aria-hidden />
+                          {catalog.cta}
+                        </Button>
+                      ) : null}
+                      {latest && catalog.action === "provisional" ? (
+                        <Button
+                          variant={showGradedCorrection ? "outline" : "default"}
+                          onClick={() => {
+                            persistExamSession(exam.id, latest.id, {
+                              openReview: false,
+                            });
                             navigate("exam-result");
                           }}
                         >
@@ -407,11 +488,17 @@ function StudentExamCatalog() {
                         </Button>
                       ) : null}
                       {allowRetake ? (
-                        <Button disabled={startExam.isPending} onClick={launchExam}>
-                          Repasser le test
+                        <Button
+                          variant="outline"
+                          disabled={startExam.isPending}
+                          onClick={launchExam}
+                          className="border-border/80 bg-background"
+                        >
+                          <RotateCcw aria-hidden />
+                          Repasser
                         </Button>
                       ) : (
-                        <Button variant="secondary" disabled>
+                        <Button variant="ghost" disabled className="text-muted-foreground">
                           Tentatives épuisées
                         </Button>
                       )}
@@ -432,10 +519,15 @@ function StudentExamResult() {
   const { navigate } = useAcademy();
   const session = readExamSession();
   const resultQuery = useExamResult(session.attemptId);
-  const [showReview, setShowReview] = useState(false);
+  const [showReview, setShowReview] = useState(() => session.openReview);
   const [reviewFilter, setReviewFilter] = useState<"all" | "correct" | "incorrect">("all");
   const [reviewIndex, setReviewIndex] = useState(0);
   const reviewQuery = useExamAttemptReview(showReview ? session.attemptId : null);
+
+  useEffect(() => {
+    if (!session.openReview) return;
+    clearOpenReviewFlag();
+  }, [session.openReview]);
 
   const skills = resultQuery.data?.skills ?? {};
   const awaiting = resultQuery.data?.awaitingManual ?? false;
@@ -526,6 +618,11 @@ function StudentExamResult() {
       .join(", ");
   };
 
+  const passed = goetheA1
+    ? Boolean(a1Summary?.passed)
+    : Boolean(resultQuery.data?.passed);
+  const heroTone = awaiting ? "provisional" : passed ? "passed" : "failed";
+
   return (
     <QueryState
       isLoading={resultQuery.isLoading}
@@ -540,26 +637,39 @@ function StudentExamResult() {
         <button
           type="button"
           onClick={() => navigate("exams")}
-          className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground"
+          className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="size-4" />
           Examens blancs
         </button>
-        <section className="grid items-center gap-8 rounded-2xl bg-primary p-8 text-primary-foreground md:grid-cols-[auto_1fr] md:p-12">
-          {awaiting ? (
-            <div className="grid size-36 place-items-center rounded-full border-4 border-primary-foreground/20">
-              <span className="font-display text-3xl">
-                {displayScore}/{displayMax}
-              </span>
-            </div>
-          ) : (
-            <div className="grid size-36 place-items-center rounded-full border-4 border-primary-foreground/20">
-              <span className="font-display text-4xl">{displayPct.toFixed(0)}%</span>
-            </div>
+        <section
+          className={cn(
+            "grid items-center gap-8 rounded-2xl p-8 md:grid-cols-[auto_1fr] md:p-12",
+            heroTone === "provisional" && "bg-warning-soft text-foreground",
+            heroTone === "passed" && "bg-success-soft text-foreground",
+            heroTone === "failed" && "bg-primary text-primary-foreground",
           )}
+        >
+          <div
+            className={cn(
+              "grid size-36 place-items-center rounded-full border-4",
+              heroTone === "provisional" && "border-[oklch(0.48_0.1_65)]/25",
+              heroTone === "passed" && "border-success/30",
+              heroTone === "failed" && "border-primary-foreground/20",
+            )}
+          >
+            <span className="font-display text-4xl tabular-nums">
+              {awaiting ? `${displayScore}/${displayMax}` : `${displayPct.toFixed(0)}%`}
+            </span>
+          </div>
           <div>
-            <p className="text-xs tracking-wide uppercase text-primary-foreground/70">
-              {awaiting ? "Résultat provisoire" : "Résultat final"}
+            <p
+              className={cn(
+                "text-xs tracking-wide uppercase",
+                heroTone === "failed" ? "text-primary-foreground/70" : "text-muted-foreground",
+              )}
+            >
+              {awaiting ? "Résultat provisoire" : passed ? "Résultat final · bestanden" : "Résultat final"}
             </p>
             <h1 className="mt-2 font-display text-3xl md:text-4xl">
               {awaiting
@@ -568,10 +678,15 @@ function StudentExamResult() {
                   ? `${displayPct}/100`
                   : `${displayScore}/${displayMax}`}
             </h1>
-            <p className="mt-3 max-w-lg text-sm leading-6 text-primary-foreground/75">
+            <p
+              className={cn(
+                "mt-3 max-w-lg text-sm leading-6",
+                heroTone === "failed" ? "text-primary-foreground/75" : "text-muted-foreground",
+              )}
+            >
               {resultQuery.data?.exam?.title}
               {awaiting
-                ? " · Résultat provisoire — Schreiben/Sprechen en attente de correction."
+                ? " · Schreiben / Sprechen encore en correction — le score final arrivera bientôt."
                 : goetheA1
                   ? ` · Brut ${displayScore}/60 · ${a1Summary?.mention ?? ""} · ${
                       a1Summary?.passed ? "bestanden" : "nicht bestanden"
@@ -626,7 +741,10 @@ function StudentExamResult() {
                       {value ? (
                         <div className="h-2 rounded-full bg-secondary">
                           <div
-                            className="h-full rounded-full bg-primary"
+                            className={cn(
+                              "h-full rounded-full",
+                              awaiting ? "bg-[oklch(0.48_0.1_65)]" : "bg-success",
+                            )}
                             style={{
                               width: `${value.max > 0 ? Math.round((value.score / value.max) * 100) : 0}%`,
                             }}
@@ -648,7 +766,10 @@ function StudentExamResult() {
                     </div>
                     <div className="h-2 rounded-full bg-secondary">
                       <div
-                        className="h-full rounded-full bg-primary"
+                        className={cn(
+                          "h-full rounded-full",
+                          pct >= 60 ? "bg-success" : "bg-primary",
+                        )}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -657,29 +778,34 @@ function StudentExamResult() {
               })}
             </div>
           </div>
-          <div className="space-y-5">
+          <div className="space-y-4 rounded-xl border border-border/80 bg-card p-5 shadow-soft">
             <div>
               <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
                 Correction
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Consultez le détail question par question après l’envoi.
+                Relisez chaque question, comparez vos réponses et gardez les points forts.
               </p>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => setShowReview(true)}
-              disabled={!session.attemptId}
-            >
-              Voir la correction détaillée
-            </Button>
-            <Button onClick={() => navigate("courses")}>Continuer les cours</Button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Button
+                onClick={() => setShowReview(true)}
+                disabled={!session.attemptId}
+                className={cn(showReview && "pointer-events-none opacity-70")}
+              >
+                <ClipboardList aria-hidden />
+                {showReview ? "Correction ouverte" : "Voir la correction détaillée"}
+              </Button>
+              <Button variant="outline" onClick={() => navigate("courses")}>
+                Continuer les cours
+              </Button>
+            </div>
           </div>
         </div>
 
         {showReview ? (
           <div className="mt-10 space-y-4">
-            <h2 className="text-lg font-semibold">Correction détaillée</h2>
+            <h2 className="text-lg font-semibold tracking-tight">Correction détaillée</h2>
             <QueryState
               isLoading={reviewQuery.isLoading}
               isError={reviewQuery.isError}
@@ -694,13 +820,22 @@ function StudentExamResult() {
                   [
                     ["all", "Toutes"],
                     ["correct", "Correctes"],
-                    ["incorrect", "Incorrectes"],
+                    ["incorrect", "À revoir"],
                   ] as const
                 ).map(([value, label]) => (
                   <Button
                     key={value}
                     size="sm"
                     variant={reviewFilter === value ? "default" : "outline"}
+                    className={cn(
+                      reviewFilter !== value && "bg-background",
+                      value === "correct" &&
+                        reviewFilter === value &&
+                        "bg-success text-primary-foreground hover:bg-success/90",
+                      value === "incorrect" &&
+                        reviewFilter === value &&
+                        "bg-[oklch(0.48_0.1_65)] text-primary-foreground hover:bg-[oklch(0.48_0.1_65)]/90",
+                    )}
                     onClick={() => setReviewFilter(value)}
                   >
                     {label}
@@ -714,17 +849,19 @@ function StudentExamResult() {
                     <Button
                       size="sm"
                       variant="outline"
+                      className="bg-background"
                       disabled={reviewIndex <= 0}
                       onClick={() => setReviewIndex((i) => Math.max(0, i - 1))}
                     >
                       Précédent
                     </Button>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm tabular-nums text-muted-foreground">
                       {reviewIndex + 1} / {filteredObjective.length}
                     </p>
                     <Button
                       size="sm"
                       variant="outline"
+                      className="bg-background"
                       disabled={reviewIndex >= filteredObjective.length - 1}
                       onClick={() =>
                         setReviewIndex((i) => Math.min(filteredObjective.length - 1, i + 1))
@@ -734,7 +871,15 @@ function StudentExamResult() {
                     </Button>
                   </div>
                   {currentReview ? (
-                    <Surface className="space-y-2 p-4" key={currentReview.question_id}>
+                    <Surface
+                      className={cn(
+                        "space-y-3 border p-5",
+                        currentReview.is_correct
+                          ? "border-success/25 bg-success-soft/40"
+                          : "border-[oklch(0.48_0.1_65)]/25 bg-warning-soft/60",
+                      )}
+                      key={currentReview.question_id}
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                           {SKILL_LABELS[currentReview.skill] ?? currentReview.section_title}
@@ -743,29 +888,42 @@ function StudentExamResult() {
                             : ""}
                         </p>
                         <Status tone={currentReview.is_correct ? "green" : "amber"}>
-                          {currentReview.is_correct ? "Correct" : "Incorrect"}
+                          <span className="inline-flex items-center gap-1">
+                            {currentReview.is_correct ? (
+                              <CheckCircle2 className="size-3" aria-hidden />
+                            ) : (
+                              <XCircle className="size-3" aria-hidden />
+                            )}
+                            {currentReview.is_correct ? "Correct" : "À revoir"}
+                          </span>
                         </Status>
                       </div>
                       {currentReview.instruction ? (
                         <p className="text-sm text-muted-foreground">{currentReview.instruction}</p>
                       ) : null}
-                      <p className="text-sm font-medium">{currentReview.prompt}</p>
-                      <p className="text-sm">
-                        Votre réponse :{" "}
-                        <span className="text-muted-foreground">
-                          {formatStudentAnswer(currentReview)}
-                        </span>
-                      </p>
-                      <p className="text-sm">
-                        Bonne réponse :{" "}
-                        <span className="text-muted-foreground">
-                          {formatCorrectAnswer(currentReview)}
-                        </span>
-                      </p>
+                      <p className="text-sm font-medium leading-6">{currentReview.prompt}</p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="rounded-lg bg-background/80 px-3 py-2.5">
+                          <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                            Votre réponse
+                          </p>
+                          <p className="mt-1 text-sm">{formatStudentAnswer(currentReview)}</p>
+                        </div>
+                        <div className="rounded-lg bg-success-soft/80 px-3 py-2.5">
+                          <p className="text-[11px] font-semibold tracking-wide text-success uppercase">
+                            Bonne réponse
+                          </p>
+                          <p className="mt-1 text-sm text-foreground">
+                            {formatCorrectAnswer(currentReview)}
+                          </p>
+                        </div>
+                      </div>
                       {currentReview.explanation ? (
-                        <p className="text-sm text-muted-foreground">{currentReview.explanation}</p>
+                        <p className="rounded-lg bg-soft-blue/50 px-3 py-2.5 text-sm leading-6 text-foreground">
+                          {currentReview.explanation}
+                        </p>
                       ) : null}
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs font-medium text-muted-foreground">
                         {Number(currentReview.points_awarded ?? 0)}/{currentReview.points} pts
                       </p>
                     </Surface>
@@ -787,11 +945,11 @@ function StudentExamResult() {
                         : {};
                     const oral = isSpeakingQuestionType(item.type);
                     return (
-                      <Surface className="space-y-2 p-4" key={item.question_id}>
-                        <p className="text-xs text-muted-foreground">
+                      <Surface className="space-y-3 border border-soft-blue/80 bg-soft-blue/20 p-5" key={item.question_id}>
+                        <p className="text-xs font-semibold tracking-wide text-primary uppercase">
                           {oral ? "Expression orale" : "Expression écrite"}
                         </p>
-                        <p className="text-sm font-medium">{item.prompt}</p>
+                        <p className="text-sm font-medium leading-6">{item.prompt}</p>
                         {oral ? (
                           <OralAnswerAudioPlayer
                             answer={{
@@ -801,11 +959,11 @@ function StudentExamResult() {
                             }}
                           />
                         ) : (
-                          <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                          <p className="whitespace-pre-wrap rounded-lg bg-background/80 px-3 py-2.5 text-sm text-muted-foreground">
                             {answerValue(item.student_answer) || "—"}
                           </p>
                         )}
-                        <p className="text-sm">
+                        <p className="text-sm font-medium">
                           Score : {Number(item.points_awarded ?? 0)}/{item.points}
                         </p>
                         {Object.keys(detail).length ? (
@@ -820,7 +978,10 @@ function StudentExamResult() {
                           </div>
                         ) : null}
                         {item.teacher_comment ? (
-                          <p className="text-sm">Commentaire : {item.teacher_comment}</p>
+                          <p className="rounded-lg bg-background/80 px-3 py-2.5 text-sm leading-6">
+                            <span className="font-medium text-foreground">Commentaire : </span>
+                            {item.teacher_comment}
+                          </p>
                         ) : null}
                       </Surface>
                     );

@@ -51,12 +51,12 @@ export function examCatalogAction(input: {
     return { label: "En cours", cta: "Reprendre", action: "resume" };
   }
   if (status === "graded" && !input.hasUngradedWriting) {
-    return { label: "Terminé", cta: "Voir mes résultats", action: "final" };
+    return { label: "Terminé", cta: "Voir la correction", action: "final" };
   }
   if (status === "submitted" || status === "expired" || input.hasUngradedWriting) {
     return {
       label: "En attente de correction",
-      cta: "Voir le résultat provisoire",
+      cta: "Score provisoire",
       action: "provisional",
     };
   }

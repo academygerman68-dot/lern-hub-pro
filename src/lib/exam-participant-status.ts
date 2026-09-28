@@ -41,6 +41,42 @@ export function pickLatestAttempt<T extends { started_at?: string | null; submit
   })[0]!;
 }
 
+/** Latest graded attempt — used so students can open the correction even after a newer provisional retake. */
+export function pickLatestGradedAttempt<
+  T extends {
+    status: string;
+    started_at?: string | null;
+    submitted_at?: string | null;
+    created_at?: string | null;
+  },
+>(attempts: T[]): T | null {
+  return pickLatestAttempt(attempts.filter((attempt) => attempt.status === "graded"));
+}
+
+/**
+ * Catalog primary attempt: resume in-progress first, otherwise most recent completed
+ * (submitted / graded / expired).
+ */
+export function pickStudentCatalogAttempt<
+  T extends {
+    status: string;
+    started_at?: string | null;
+    submitted_at?: string | null;
+    created_at?: string | null;
+  },
+>(attempts: T[]): T | null {
+  const inProgress = attempts.filter((attempt) => attempt.status === "in_progress");
+  if (inProgress.length) return pickLatestAttempt(inProgress);
+  return pickLatestAttempt(
+    attempts.filter(
+      (attempt) =>
+        attempt.status === "submitted" ||
+        attempt.status === "graded" ||
+        attempt.status === "expired",
+    ),
+  );
+}
+
 export function resolveExamParticipantStatus(input: {
   attempt: {
     status: string;

@@ -17,8 +17,11 @@ export function isGoetheA1AdultProfile(input: {
   format_profile?: string | null | undefined;
   code?: string | null | undefined;
 }): boolean {
-  if (input.format_profile === GOETHE_A1_ADULT_PROFILE) return true;
+  // Training modules never use Goethe exam scoring.
+  if (input.format_profile === "ga_training_module_v1") return false;
   const code = (input.code ?? "").toUpperCase();
+  if (code.startsWith("GA-")) return false;
+  if (input.format_profile === GOETHE_A1_ADULT_PROFILE) return true;
   return code === "A1-SIM-01" || code.startsWith("A1-SIM-");
 }
 

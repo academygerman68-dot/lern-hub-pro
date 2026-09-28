@@ -16,6 +16,10 @@ describe("a1 goethe scoring", () => {
     expect(isGoetheA1AdultProfile({ format_profile: "goethe_a1_adult_v1" })).toBe(true);
     expect(isGoetheA1AdultProfile({ code: "A1-SIM-01" })).toBe(true);
     expect(isGoetheA1AdultProfile({ code: "B1-MT01" })).toBe(false);
+    expect(isGoetheA1AdultProfile({ code: "GA-A1-M01" })).toBe(false);
+    expect(
+      isGoetheA1AdultProfile({ format_profile: "ga_training_module_v1", code: "GA-A1-M01" }),
+    ).toBe(false);
   });
 
   it("converts raw 60 to 100 and applies pass threshold", () => {

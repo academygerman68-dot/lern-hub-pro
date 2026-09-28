@@ -29,19 +29,19 @@ describe("exam labels", () => {
     });
     expect(examCatalogAction({ latestStatus: "submitted", hasUngradedWriting: true })).toEqual({
       label: "En attente de correction",
-      cta: "Voir le résultat provisoire",
+      cta: "Score provisoire",
       action: "provisional",
     });
     expect(examCatalogAction({ latestStatus: "graded", hasUngradedWriting: false })).toEqual({
       label: "Terminé",
-      cta: "Voir mes résultats",
+      cta: "Voir la correction",
       action: "final",
     });
     expect(examCatalogAction({ latestStatus: "graded", hasUngradedWriting: true }).action).toBe(
       "provisional",
     );
     expect(examCatalogAction({ latestStatus: "expired", hasUngradedWriting: false }).cta).toBe(
-      "Voir le résultat provisoire",
+      "Score provisoire",
     );
   });
 });

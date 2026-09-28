@@ -1,0 +1,208 @@
+{
+  "schema_version": "1.0",
+  "source": {
+    "name": "Deutsch Lernen",
+    "url": "https://mega.nz/folder/LEFC3BbR#NBHEPxuWb1ynXKpj3zXvvA",
+    "size_gb": 12.8,
+    "inventoried_at": "2026-09-28"
+  },
+  "policy": {
+    "note": "Commercial textbooks (Hueber Schritte, Cornelsen Intensiv, Goethe/TELC prep). Do not commit PDFs/audio into git. Use as reference to design academy-owned original exercises (same approach as A1-SIM-01).",
+    "local_cache": "data/exams/a1-b1-series/source/ (gitignored)"
+  },
+  "recommended_spine": {
+    "title": "German Academy — Parcours A1→B1",
+    "rationale": "Schritte Plus Neu Intensivtrainer gives a coherent lesson progression with exercises + MP3; Intensiv Grammatik/Wortschatz densifies drills; Goethe Prüfungstraining closes with exam format.",
+    "tracks": [
+      {
+        "id": "course-drills",
+        "label": "Entraînement progressif (leçons)",
+        "primary_sources": [
+          "A1/Schritte Plus NEU A1 Intensivtrainer",
+          "A2/Schritte Plus Neu Intensivtrainer A2",
+          "B1/Schritte Plus Neu B1 Intensivtrainer"
+        ],
+        "support_sources": [
+          "A1/Deutsch Intensiv Grammatik A1.pdf",
+          "A1/Deutsch Intensiv Wortschatz A1.pdf",
+          "A2/Deutsch Intensiv Grammatik A2.pdf",
+          "A2/Deutsch intensiv Wortschatz A2.pdf",
+          "A1-B1/Grammatik/Deutsch Übungsgrammatik für die Grundstufe PLUS.pdf",
+          "A1-B1/Wortschatz/wortschatztrainer deutsch als fremdsprache A1-B1 DUDEN-ocr.pdf",
+          "B1/Wortschatz & Grammatik B1 Neu.pdf"
+        ]
+      },
+      {
+        "id": "exam-sims",
+        "label": "Examens blancs de fin de niveau",
+        "primary_sources": [
+          "existing: A1-SIM-01 (original academy)",
+          "B1 Goethe-OSD/Prüfungstraining Goethe- ÖSD-Zertifikat B1 - 2024 (structure + audio reference)",
+          "existing: B1-MT01..15 bank (OCR draft)",
+          "planned: A2-SIM-01 original academy"
+        ],
+        "avoid_for_v1": [
+          "Full Schritte Kursbuch dump (too long, copyright-heavy)",
+          "B2 / Extra / video packs"
+        ]
+      }
+    ]
+  },
+  "proposed_series": [
+    {
+      "code": "GA-A1-M01",
+      "level": "A1",
+      "module": 1,
+      "theme": "Ankommen & Vorstellen",
+      "skills": ["grammatik", "wortschatz", "hoeren", "schreiben"],
+      "source_hint": "Schritte A1 Intensivtrainer L1–L2 + Intensiv Grammatik A1 ch. Präsens/sein/heißen"
+    },
+    {
+      "code": "GA-A1-M02",
+      "level": "A1",
+      "module": 2,
+      "theme": "Familie & Freunde",
+      "skills": ["grammatik", "wortschatz", "hoeren", "schreiben"],
+      "source_hint": "Schritte A1 Intensivtrainer L3–L4"
+    },
+    {
+      "code": "GA-A1-M03",
+      "level": "A1",
+      "module": 3,
+      "theme": "Einkaufen & Essen",
+      "skills": ["grammatik", "wortschatz", "hoeren", "schreiben"],
+      "source_hint": "Schritte A1 Intensivtrainer L5–L6 + Alltag vocabulary"
+    },
+    {
+      "code": "GA-A1-M04",
+      "level": "A1",
+      "module": 4,
+      "theme": "Alltag & Termine",
+      "skills": ["grammatik", "wortschatz", "hoeren", "schreiben"],
+      "source_hint": "Schritte A1 Intensivtrainer L7–L8"
+    },
+    {
+      "code": "GA-A1-M05",
+      "level": "A1",
+      "module": 5,
+      "theme": "Wohnen & Stadt",
+      "skills": ["grammatik", "wortschatz", "hoeren", "schreiben"],
+      "source_hint": "Schritte A1 Intensivtrainer L9–L10"
+    },
+    {
+      "code": "GA-A1-M06",
+      "level": "A1",
+      "module": 6,
+      "theme": "Gesundheit & Freizeit",
+      "skills": ["grammatik", "wortschatz", "hoeren", "schreiben"],
+      "source_hint": "Schritte A1 Intensivtrainer L11–L12"
+    },
+    {
+      "code": "A1-SIM-01",
+      "level": "A1",
+      "module": "capstone",
+      "theme": "Examen blanc A1 complet",
+      "skills": ["hoeren", "lesen", "schreiben", "sprechen"],
+      "status": "shipped",
+      "source_hint": "Academy original (already published)"
+    },
+    {
+      "code": "GA-A2-M01",
+      "level": "A2",
+      "module": 1,
+      "theme": "Beruf & Tagesablauf",
+      "skills": ["grammatik", "wortschatz", "hoeren", "schreiben"],
+      "source_hint": "Schritte A2 Intensivtrainer early lessons + Perfekt"
+    },
+    {
+      "code": "GA-A2-M02",
+      "level": "A2",
+      "module": 2,
+      "theme": "Reisen & Unterkunft",
+      "skills": ["grammatik", "wortschatz", "hoeren", "schreiben"],
+      "source_hint": "Schritte A2 Intensivtrainer mid block"
+    },
+    {
+      "code": "GA-A2-M03",
+      "level": "A2",
+      "module": 3,
+      "theme": "Medien & Meinungen",
+      "skills": ["grammatik", "wortschatz", "hoeren", "schreiben"],
+      "source_hint": "Schritte A2 Intensivtrainer + Nebensätze weil/dass"
+    },
+    {
+      "code": "GA-A2-M04",
+      "level": "A2",
+      "module": 4,
+      "theme": "Gesundheit & Umwelt",
+      "skills": ["grammatik", "wortschatz", "hoeren", "schreiben"],
+      "source_hint": "Schritte A2 Intensivtrainer late lessons"
+    },
+    {
+      "code": "A2-SIM-01",
+      "level": "A2",
+      "module": "capstone",
+      "theme": "Examen blanc A2 complet",
+      "skills": ["hoeren", "lesen", "schreiben", "sprechen"],
+      "status": "planned",
+      "source_hint": "Original academy sim (mirror A1-SIM profile, A2 CEFR)"
+    },
+    {
+      "code": "GA-B1-M01",
+      "level": "B1",
+      "module": 1,
+      "theme": "Arbeit & Ausbildung",
+      "skills": ["grammatik", "wortschatz", "hoeren", "schreiben"],
+      "source_hint": "Schritte B1 Intensivtrainer L1–L3"
+    },
+    {
+      "code": "GA-B1-M02",
+      "level": "B1",
+      "module": 2,
+      "theme": "Gesellschaft & Nachrichten",
+      "skills": ["grammatik", "wortschatz", "hoeren", "schreiben"],
+      "source_hint": "Schritte B1 Intensivtrainer mid + Passiv/Konjunktiv II intro"
+    },
+    {
+      "code": "GA-B1-M03",
+      "level": "B1",
+      "module": 3,
+      "theme": "Formelle Kommunikation",
+      "skills": ["schreiben", "lesen", "wortschatz"],
+      "source_hint": "Schreiben und Sprechen Themen B1 + formal letters"
+    },
+    {
+      "code": "GA-B1-M04",
+      "level": "B1",
+      "module": 4,
+      "theme": "Prüfungstraining intégral",
+      "skills": ["hoeren", "lesen", "schreiben", "sprechen"],
+      "source_hint": "Goethe Prüfungstraining 2024 structure (reference only)"
+    },
+    {
+      "code": "B1-MT01",
+      "level": "B1",
+      "module": "capstone",
+      "theme": "Examen blanc B1 (bank existante)",
+      "skills": ["hoeren", "lesen", "schreiben", "sprechen"],
+      "status": "draft_in_repo",
+      "source_hint": "data/exams/b1-exam-bank (OCR, not published)"
+    }
+  ],
+  "first_build_batch": {
+    "priority": 1,
+    "items": ["GA-A1-M01", "GA-A1-M02", "GA-A1-M03"],
+    "format": "interactive drills (single_choice, form_fill, short_text) + optional audio",
+    "output_path": "data/exams/a1-b1-series/modules/"
+  },
+  "mega_top_level": [
+    { "name": "A1", "role": "course + intensiv drills + audio" },
+    { "name": "A2", "role": "course + intensiv drills (large)" },
+    { "name": "B1", "role": "course + intensiv drills" },
+    { "name": "A1-B1", "role": "cross-level grammar/vocab trainers" },
+    { "name": "B1 Goethe-OSD", "role": "exam prep Goethe/ÖSD + audio" },
+    { "name": "B1 TELC", "role": "exam prep TELC + audio" },
+    { "name": "Extra", "role": "verbs/adj — optional later" },
+    { "name": "B2", "role": "out of scope for this series" }
+  ]
+}

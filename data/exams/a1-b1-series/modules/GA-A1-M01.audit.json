@@ -1,0 +1,220 @@
+{
+  "module_id": "GA-A1-M01",
+  "audited_at": "2026-09-28",
+  "decision": "MODULE PILOTE VALIDÉ (contenu)",
+  "decision_scope": {
+    "content_schema_audio_draft": "VALIDÉ",
+    "interactive_student_runner": "NON FAIT — anomaly restante",
+    "ui_screenshots_live": "NON FAIT — pas de runner branché"
+  },
+  "positioning": {
+    "kind": "training_module",
+    "format_profile": "ga_training_module_v1",
+    "not": ["A1-SIM-01", "goethe_scoring", "timed_exam", "certificate"]
+  },
+  "provenance": {
+    "content_origin": "original",
+    "publisher_content_embedded": false,
+    "commercial_media_used": false,
+    "author": "German Academy",
+    "version": "1.0.0",
+    "commercial_pdf_paths_in_client_payload": false
+  },
+  "audio": {
+    "file": "public/exam-media/ga-a1-m01/hoeren-vorstellen.mp3",
+    "origin": "edge-tts German Academy script",
+    "duration_seconds": 18,
+    "mega_mp3_used": false
+  },
+  "changes": [
+    "Rewrote module to schema v1 with provenance and correction flags",
+    "Fixed formal heißen (Wie heißen Sie? → correct A)",
+    "Added Hören + Sprechen + révision; balanced 13 activities",
+    "Generated original MP3",
+    "Added Zod validator + student payload stripper",
+    "Draft curriculum course/module/unit/lesson (status draft)",
+    "Hardened isGoetheA1AdultProfile to ignore GA-* / ga_training_module_v1"
+  ],
+  "activities": [
+    {
+      "id": "GA-A1-M01-W01",
+      "skill": "wortschatz",
+      "activity_type": "single_choice",
+      "objective": "Salutation du matin",
+      "theme": "Begrüßung",
+      "focus": "Guten Morgen",
+      "difficulty": "guided",
+      "points": 1,
+      "correct": "B",
+      "media": null
+    },
+    {
+      "id": "GA-A1-M01-W02",
+      "skill": "wortschatz",
+      "activity_type": "single_choice",
+      "objective": "Prise de congé",
+      "theme": "Abschied",
+      "focus": "Tschüss",
+      "difficulty": "guided",
+      "points": 1,
+      "correct": "C",
+      "media": null
+    },
+    {
+      "id": "GA-A1-M01-G01",
+      "skill": "grammatik",
+      "activity_type": "single_choice",
+      "objective": "heißen + Sie",
+      "theme": "Name sagen",
+      "focus": "heißen",
+      "difficulty": "guided",
+      "points": 1,
+      "correct": "A",
+      "media": null
+    },
+    {
+      "id": "GA-A1-M01-G02",
+      "skill": "grammatik",
+      "activity_type": "form_fill",
+      "objective": "sein ich/Sie",
+      "theme": "Beruf / Status",
+      "focus": "sein",
+      "difficulty": "semi_guided",
+      "points": 2,
+      "correct": { "1": "bin", "2": "Sind" },
+      "media": null
+    },
+    {
+      "id": "GA-A1-M01-G03",
+      "skill": "grammatik",
+      "activity_type": "single_choice",
+      "objective": "kommen / woher",
+      "theme": "Herkunft",
+      "focus": "kommen",
+      "difficulty": "guided",
+      "points": 1,
+      "correct": "A",
+      "media": null
+    },
+    {
+      "id": "GA-A1-M01-G04",
+      "skill": "grammatik",
+      "activity_type": "single_choice",
+      "objective": "wohnen / wo",
+      "theme": "Wohnort",
+      "focus": "wohnen",
+      "difficulty": "guided",
+      "points": 1,
+      "correct": "B",
+      "media": null
+    },
+    {
+      "id": "GA-A1-M01-G05",
+      "skill": "grammatik",
+      "activity_type": "single_choice",
+      "objective": "sprechen + langues",
+      "theme": "Sprachen",
+      "focus": "sprechen",
+      "difficulty": "semi_guided",
+      "points": 1,
+      "correct": "A",
+      "media": null
+    },
+    {
+      "id": "GA-A1-M01-L01",
+      "skill": "lesen",
+      "activity_type": "true_false",
+      "objective": "Lire provenance vs ville",
+      "theme": "Kurze Vorstellung",
+      "focus": "kommen aus / wohnen in",
+      "difficulty": "semi_guided",
+      "points": 1,
+      "correct": false,
+      "media": null
+    },
+    {
+      "id": "GA-A1-M01-H01",
+      "skill": "hoeren",
+      "activity_type": "listening",
+      "objective": "Nom dans le dialogue",
+      "theme": "Dialog Vorstellen",
+      "focus": "Name",
+      "difficulty": "semi_guided",
+      "points": 1,
+      "correct": "A",
+      "media": "/exam-media/ga-a1-m01/hoeren-vorstellen.mp3"
+    },
+    {
+      "id": "GA-A1-M01-H02",
+      "skill": "hoeren",
+      "activity_type": "listening",
+      "objective": "Ville de résidence",
+      "theme": "Dialog Vorstellen",
+      "focus": "Wohnort",
+      "difficulty": "semi_guided",
+      "points": 1,
+      "correct": "B",
+      "media": "/exam-media/ga-a1-m01/hoeren-vorstellen.mp3"
+    },
+    {
+      "id": "GA-A1-M01-S01",
+      "skill": "schreiben",
+      "activity_type": "writing",
+      "objective": "Courte présentation écrite",
+      "theme": "Selbstvorstellung",
+      "focus": "écriture libre",
+      "difficulty": "autonomous",
+      "points": 4,
+      "correct": null,
+      "media": null
+    },
+    {
+      "id": "GA-A1-M01-O01",
+      "skill": "sprechen",
+      "activity_type": "speaking",
+      "objective": "Présentation orale + épellation",
+      "theme": "Mündlich vorstellen",
+      "focus": "sprechen / buchstabieren",
+      "difficulty": "autonomous",
+      "points": 4,
+      "correct": null,
+      "media": null
+    },
+    {
+      "id": "GA-A1-M01-R01",
+      "skill": "revision",
+      "activity_type": "single_choice",
+      "objective": "Réviser wie/wo/woher",
+      "theme": "Abschluss-Revision",
+      "focus": "W-Fragen",
+      "difficulty": "autonomous",
+      "points": 1,
+      "correct": "B",
+      "media": null
+    }
+  ],
+  "skills_covered": [
+    "wortschatz",
+    "grammatik",
+    "lesen",
+    "hoeren",
+    "schreiben",
+    "sprechen",
+    "revision"
+  ],
+  "validation": {
+    "vitest_training_module": "6 passed",
+    "vitest_with_goethe_guard": "12 passed (earlier combined run)",
+    "json_schema_zod": "ok",
+    "student_payload_no_keys": "ok",
+    "commercial_marker_guard": "ok",
+    "draft_migration_applied": "ok (omxemusaqgzkogqvcdfw)",
+    "a1_sim_01_untouched": true
+  },
+  "remaining_anomalies": [
+    "Pas de runner étudiant interactif (progression, autosave, feedback live, micro) — JSON + curriculum draft seulement",
+    "Pas de captures UI étudiant/enseignant du parcours activité par activité",
+    "Import interactif type examen non branché (volontaire: éviter Goethe / attempts)",
+    "Build production non rejoué dans ce rapport (typecheck lancé en parallèle)"
+  ]
+}
