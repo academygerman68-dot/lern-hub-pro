@@ -16,6 +16,12 @@ interface ImportMetaEnv {
   readonly VITE_JITSI_DOMAIN?: string;
   /** Public 8x8 JaaS app id (vpaas-magic-cookie-…). Not a secret. */
   readonly VITE_JAAS_APP_ID?: string;
+  /** Full git SHA injected at build time (non-secret deploy fingerprint). */
+  readonly VITE_APP_GIT_SHA?: string;
+  /** Optional alias for git SHA. */
+  readonly VITE_GIT_SHA?: string;
+  /** ISO build timestamp injected at build time. */
+  readonly VITE_APP_BUILT_AT?: string;
 }
 
 interface ImportMeta {

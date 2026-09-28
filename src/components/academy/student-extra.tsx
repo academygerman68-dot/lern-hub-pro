@@ -23,6 +23,7 @@ import {
   MessagingService,
   RecordingService,
 } from "@/services/academy-services";
+import { getAppBuildInfo } from "@/lib/build-info";
 import { SettingsService } from "@/services/supabase/settings-service";
 import { DangerZoneAccountDeletion } from "./danger-zone-account-deletion";
 import { DocumentViewer } from "./document-viewer";
@@ -1428,6 +1429,7 @@ export function DirectorSettings() {
             <TabsTrigger value="paiements">Paiements</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="apparence">Apparence</TabsTrigger>
+            <TabsTrigger value="diagnostic">Diagnostic</TabsTrigger>
             <TabsTrigger value="securite">Sécurité</TabsTrigger>
           </TabsList>
 
@@ -1645,6 +1647,42 @@ export function DirectorSettings() {
                 Chaque utilisateur peut changer la langue depuis la barre de navigation. La langue
                 par défaut s’applique aux nouveaux comptes et aux visiteurs.
               </p>
+            </Surface>
+          </TabsContent>
+
+          <TabsContent value="diagnostic">
+            <Surface className="space-y-3 p-6">
+              <h2 className="font-semibold">Build déployé</h2>
+              <p className="text-sm text-muted-foreground">
+                Empreinte non sensible du front servi. Aucune clé ni secret n’est affiché ici.
+              </p>
+              {(() => {
+                const build = getAppBuildInfo();
+                return (
+                  <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-muted-foreground">SHA court</dt>
+                      <dd className="font-mono">{build.gitSha}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">SHA complet</dt>
+                      <dd className="break-all font-mono text-xs">{build.gitShaFull}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Build at</dt>
+                      <dd className="font-mono text-xs">{build.builtAt}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Fichier public</dt>
+                      <dd>
+                        <a className="underline" href="/build-info.json" target="_blank" rel="noreferrer">
+                          /build-info.json
+                        </a>
+                      </dd>
+                    </div>
+                  </dl>
+                );
+              })()}
             </Surface>
           </TabsContent>
 

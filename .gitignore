@@ -32,6 +32,9 @@ a1-complete-package-tmp/
 .wrangler/
 .dev.vars
 
+# Generated at build time (SHA + timestamp; no secrets)
+public/build-info.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
