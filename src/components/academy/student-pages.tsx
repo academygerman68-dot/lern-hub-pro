@@ -11,7 +11,7 @@ import {
 } from "./student-extra";
 import { StudentLearningPage } from "./academic-pages";
 import { StudentExamsPage } from "./exam-pages";
-import { TrainingPages } from "./training-pages";
+import { RetiredTrainingRedirect } from "./retired-training-redirect";
 import { StudentMaterialsPage } from "./student-materials-page";
 import { LiveClassesPage } from "./live-pages";
 import { StudentPaymentsPage } from "./finance-pages";
@@ -76,8 +76,7 @@ export function StudentPages({ page: pageProp }: { page?: AcademyPage } = {}) {
     return <Assignments detail={page === "assignment-detail"} />;
   if (page === "exams" || page === "mock-exam" || page === "exam-result")
     return <StudentExamsPage mode={page} />;
-  if (page === "training") return <TrainingPages mode="catalog" />;
-  if (page === "training-module") return <TrainingPages mode="module" />;
+  if (page === "training" || page === "training-module") return <RetiredTrainingRedirect />;
   if (page === "b1-preview") {
     return (
       <Surface className="p-8 text-center">

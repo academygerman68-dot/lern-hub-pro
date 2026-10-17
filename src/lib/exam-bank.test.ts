@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { validateExamBank } from "./exam-bank";
+import { splitBankPoints, validateExamBank } from "./exam-bank";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const bankPath = resolve(__dirname, "../../data/exams/german-academy-a1-exams.json");
@@ -22,10 +22,17 @@ describe("A1 exam bank", () => {
       expect(exam.total_points).toBe(50);
       expect(exam.automatic_points).toBe(40);
       expect(exam.manual_points).toBe(10);
+      const split = splitBankPoints(exam);
+      expect(split).toEqual({ automatic: 40, manual: 10, total: 50 });
+      const schreiben = exam.sections.find((section) => section.type === "schreiben");
+      expect(schreiben?.max_points).toBe(20);
+      expect(schreiben?.questions.find((question) => question.type === "form_fill")?.points).toBe(
+        10,
+      );
+      expect(schreiben?.questions.find((question) => question.type === "writing")?.points).toBe(10);
 
       const lesen = exam.sections.find((s) => s.type === "lesen");
       const hoeren = exam.sections.find((s) => s.type === "hoeren");
-      const schreiben = exam.sections.find((s) => s.type === "schreiben");
       expect(lesen?.questions).toHaveLength(15);
       expect(hoeren?.questions).toHaveLength(15);
       expect(schreiben?.questions).toHaveLength(2);
@@ -61,6 +68,7 @@ describe("complete A1 adult simulation", () => {
     expect(exam.total_points).toBe(60);
     expect(exam.automatic_points).toBe(35);
     expect(exam.manual_points).toBe(25);
+    expect(splitBankPoints(exam)).toEqual({ automatic: 35, manual: 25, total: 60 });
     expect(exam.sections.map((section) => section.type).sort()).toEqual([
       "hoeren",
       "lesen",

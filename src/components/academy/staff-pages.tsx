@@ -27,7 +27,7 @@ import { WEEKDAY_OPTIONS } from "@/services/supabase/class-schedule-service";
 import type { AccountStatus, AcademyPage, Level, Student } from "@/types/academy";
 import { useAcademy } from "./academy-context";
 import { QueryState } from "./query-state";
-import { TrainingPages } from "./training-pages";
+import { RetiredTrainingRedirect } from "./retired-training-redirect";
 import {
   PageHeader,
   Metric,
@@ -85,10 +85,13 @@ export function TeacherPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "exams") return <DirectorExamsPage />;
   if (page === "b1-exam") return <B1ExamWorkspace />;
   if (page === "b1-preview") return <StudentExamStaffPreview />;
-  if (page === "training") return <TrainingPages mode="catalog" />;
-  if (page === "training-module") return <TrainingPages mode="module" />;
-  if (page === "training-preview") return <TrainingPages mode="preview" />;
-  if (page === "training-corrections") return <TrainingPages mode="corrections" />;
+  if (
+    page === "training" ||
+    page === "training-module" ||
+    page === "training-preview" ||
+    page === "training-corrections"
+  )
+    return <RetiredTrainingRedirect />;
   if (page === "live" || page === "meeting")
     return <LiveClassesPage meeting={page === "meeting"} />;
   if (page === "recordings") return <RecordingsPage />;
@@ -99,22 +102,27 @@ export function TeacherPages({ page: pageProp }: { page?: AcademyPage } = {}) {
 }
 
 function TeacherStudents() {
+  const { t } = useAcademy();
   const { classesQuery, primaryClass, selector } = useClassSelection();
   const rosterQuery = useClassRoster(primaryClass?.id);
   return (
     <>
       <PageHeader
-        title="Étudiants"
+        title={t("teacher.students.title")}
         action={selector}
-        subtitle={primaryClass ? `Assignés via ${primaryClass.name}` : "Étudiants de vos groupes"}
+        subtitle={
+          primaryClass
+            ? `${t("teacher.students.subtitle.assigned")} ${primaryClass.name}`
+            : t("teacher.students.subtitle.empty")
+        }
       />
       <QueryState
         isLoading={classesQuery.isLoading || rosterQuery.isLoading}
         isError={classesQuery.isError || rosterQuery.isError}
         error={(classesQuery.error ?? rosterQuery.error) as Error | null}
         isEmpty={!rosterQuery.data?.length}
-        emptyTitle="Aucun étudiant assigné"
-        emptyMessage="Les étudiants apparaissent ici dès qu’ils sont inscrits dans vos groupes."
+        emptyTitle={t("teacher.students.emptyTitle")}
+        emptyMessage={t("teacher.students.emptyMessage")}
         onRetry={() => {
           void classesQuery.refetch();
           void rosterQuery.refetch();
@@ -124,10 +132,10 @@ function TeacherStudents() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Étudiant</th>
-                <th>Niveau</th>
-                <th>Groupe</th>
-                <th>Abonnement</th>
+                <th>{t("teacher.students.col.student")}</th>
+                <th>{t("teacher.students.col.level")}</th>
+                <th>{t("teacher.students.col.group")}</th>
+                <th>{t("teacher.students.col.subscription")}</th>
               </tr>
             </thead>
             <tbody>
@@ -142,10 +150,10 @@ function TeacherStudents() {
                   <td>
                     <Status tone={student.subscription === "ACTIVE" ? "green" : "amber"}>
                       {student.subscription === "ACTIVE"
-                        ? "Actif"
+                        ? t("teacher.subscription.active")
                         : student.subscription === "PAST_DUE"
-                          ? "En retard"
-                          : "Suspendu"}
+                          ? t("teacher.subscription.pastDue")
+                          : t("teacher.subscription.suspended")}
                     </Status>
                   </td>
                 </tr>
@@ -159,6 +167,7 @@ function TeacherStudents() {
 }
 
 function TeacherClass() {
+  const { t } = useAcademy();
   const { classesQuery, primaryClass, selector } = useClassSelection();
   const rosterQuery = useClassRoster(primaryClass?.id);
   const enrolled = rosterQuery.data?.length ?? primaryClass?.size ?? 0;
@@ -169,35 +178,35 @@ function TeacherClass() {
   return (
     <>
       <PageHeader
-        title={primaryClass?.name ?? "Mon groupe"}
+        title={primaryClass?.name ?? t("teacher.class.fallback")}
         subtitle={
           primaryClass
-            ? `${enrolled}/${capacity} inscrits · ${remaining} place${remaining !== 1 ? "s" : ""} restante${remaining !== 1 ? "s" : ""} · ${primaryClass.schedule} · ${primaryClass.teacher}`
-            : "Groupes qui vous sont assignés"
+            ? `${enrolled}/${capacity} ${t("teacher.class.enrolled").toLowerCase()} · ${remaining} ${t("teacher.class.remaining").toLowerCase()} · ${primaryClass.schedule} · ${primaryClass.teacher}`
+            : t("teacher.class.assigned")
         }
-        action={isFull ? <Status tone="red">Complet</Status> : undefined}
+        action={isFull ? <Status tone="red">{t("teacher.class.full")}</Status> : undefined}
       />
       {selector}
       <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <Metric label="Inscrits" value={String(enrolled || "—")} />
-        <Metric label="Capacité" value={capacity ? String(capacity) : "—"} />
-        <Metric label="Places restantes" value={capacity ? String(remaining) : "—"} />
+        <Metric label={t("teacher.class.enrolled")} value={String(enrolled || "—")} />
+        <Metric label={t("teacher.class.capacity")} value={capacity ? String(capacity) : "—"} />
+        <Metric label={t("teacher.class.remaining")} value={capacity ? String(remaining) : "—"} />
       </div>
       <QueryState
         isLoading={classesQuery.isLoading || rosterQuery.isLoading}
         isError={classesQuery.isError || rosterQuery.isError}
         error={(classesQuery.error ?? rosterQuery.error) as Error | null}
         isEmpty={!rosterQuery.data?.length}
-        emptyMessage="Aucun étudiant inscrit dans ce groupe pour le moment."
+        emptyMessage={t("teacher.class.empty")}
       >
         <Surface className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Étudiant</th>
-                <th>Progression</th>
-                <th>Moyenne</th>
-                <th>Statut</th>
+                <th>{t("teacher.class.col.student")}</th>
+                <th>{t("teacher.class.col.progress")}</th>
+                <th>{t("teacher.class.col.average")}</th>
+                <th>{t("teacher.class.col.status")}</th>
               </tr>
             </thead>
             <tbody>
@@ -216,7 +225,7 @@ function TeacherClass() {
                   </td>
                   <td>{student.average || "—"}%</td>
                   <td>
-                    <Status tone="green">Actif</Status>
+                    <Status tone="green">{t("teacher.class.active")}</Status>
                   </td>
                 </tr>
               ))}
@@ -239,10 +248,13 @@ export function DirectorPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   if (page === "exams") return <DirectorExamsPage />;
   if (page === "b1-exam") return <B1ExamWorkspace />;
   if (page === "b1-preview") return <StudentExamStaffPreview />;
-  if (page === "training") return <TrainingPages mode="catalog" />;
-  if (page === "training-module") return <TrainingPages mode="module" />;
-  if (page === "training-preview") return <TrainingPages mode="preview" />;
-  if (page === "training-corrections") return <TrainingPages mode="corrections" />;
+  if (
+    page === "training" ||
+    page === "training-module" ||
+    page === "training-preview" ||
+    page === "training-corrections"
+  )
+    return <RetiredTrainingRedirect />;
   if (page === "payments" || page === "subscriptions" || page === "invoices" || page === "payroll")
     return <FinancePages mode={page === "payroll" ? "payments" : page} />;
   if (page === "audit") return <AuditPage />;

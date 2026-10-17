@@ -542,6 +542,10 @@ const substitutions: Array<readonly [RegExp, Pair]> = [
 export function localizeInterfaceText(value: string, locale: Locale) {
   const trimmed = value.trim();
   if (!trimmed) return value;
+  if (locale === "de") {
+    const known = translateKnownValue("de", trimmed);
+    return known === trimmed ? value : value.replace(trimmed, known);
+  }
   const exactEntry = Object.entries(copy).find(
     ([source, pair]) => source === trimmed || pair[0] === trimmed || pair[1] === trimmed,
   );

@@ -81,16 +81,19 @@ describe("Examens blancs navigation pages", () => {
     expect(shellNavPageIds("director")).toContain("corrections");
   });
 
-  it("orders student learning nav: resources → assignments → exams → training → courses", () => {
+  it("orders student learning nav without a separate Entraînements tab", () => {
     const ids = shellNavPageIds("student");
-    const learning = ids.slice(0, 6);
-    expect(learning).toEqual([
+    expect(ids.slice(0, 5)).toEqual([
       "dashboard",
       "materials",
       "assignments",
       "exams",
-      "training",
       "courses",
     ]);
+    expect(ids).not.toContain("training");
+    expect(shellNavPageIds("teacher")).not.toContain("training-preview");
+    expect(shellNavPageIds("teacher")).not.toContain("training-corrections");
+    expect(shellNavPageIds("director")).not.toContain("training-preview");
+    expect(shellNavPageIds("director")).not.toContain("training-corrections");
   });
 });

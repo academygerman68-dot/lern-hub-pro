@@ -815,7 +815,16 @@ export const SupabaseExamService = {
       p_answer: input.answer,
       p_flagged: input.flagged ?? false,
     });
-    if (error) throw error;
+    if (error) {
+      if ((error.message ?? "").includes("ATTEMPT_EXPIRED")) {
+        const expired = new Error(
+          "Le temps écrit est écoulé. Cette réponse n’a pas été enregistrée.",
+        );
+        expired.name = "ATTEMPT_EXPIRED";
+        throw expired;
+      }
+      throw error;
+    }
     return data as ExamAnswer;
   },
 
@@ -1039,7 +1048,9 @@ export const SupabaseExamService = {
   async getResult(attemptId: string): Promise<ExamResultView> {
     const attempt = await this.getAttempt(attemptId);
     if (!attempt) throw new Error("ATTEMPT_NOT_FOUND");
-    if (attempt.status === "in_progress") throw new Error("ATTEMPT_NOT_SUBMITTED");
+    if (attempt.status === "in_progress" || attempt.status === "expired") {
+      throw new Error("ATTEMPT_NOT_SUBMITTED");
+    }
 
     const exam = await this.getExam(attempt.exam_id);
     const answers = await this.listAnswers(attemptId);
@@ -1097,9 +1108,7 @@ export const SupabaseExamService = {
     const percentage = Number(attempt.percentage ?? 0);
     const pass = Number(exam?.pass_percentage ?? 60);
     const awaitingManual =
-      attempt.status === "submitted" ||
-      attempt.status === "expired" ||
-      schreibenItems.some((item) => item.pending);
+      attempt.status === "submitted" || schreibenItems.some((item) => item.pending);
 
     return {
       attempt,
@@ -1119,7 +1128,7 @@ export const SupabaseExamService = {
       score,
       maxScore,
       automaticScore,
-      automaticMax: automaticMax || 40,
+      automaticMax,
       schreibenItems,
       awaitingManual,
     };

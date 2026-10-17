@@ -32,7 +32,7 @@ function localizeTree(root: Node, locale: Locale) {
 
 export function InterfaceLocalizer({ locale }: { locale: Locale }) {
   useEffect(() => {
-    document.documentElement.lang = locale === "ar" ? "ar" : "fr";
+    document.documentElement.lang = locale === "ar" ? "ar" : locale === "de" ? "de" : "fr";
     document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
     localizeTree(document.body, locale);
     const observer = new MutationObserver((mutations) => {

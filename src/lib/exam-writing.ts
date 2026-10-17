@@ -30,24 +30,28 @@ export function isManualQuestionType(type: string) {
 export function studentExamProgressLabel(
   status: string | null | undefined,
   hasUngradedWriting: boolean,
-): "À faire" | "En cours" | "En attente de correction" | "Terminé" {
+): "À faire" | "En cours" | "Temps écoulé" | "En attente de correction" | "Terminé" {
   if (!status) return "À faire";
   if (status === "in_progress") return "En cours";
+  if (status === "expired") return "Temps écoulé";
   if (status === "graded" && !hasUngradedWriting) return "Terminé";
-  if (status === "submitted" || status === "expired" || hasUngradedWriting) {
+  if (status === "submitted" || hasUngradedWriting) {
     return "En attente de correction";
   }
   return "À faire";
 }
 
-/** Counts completed attempts the same way as start_exam_attempt (submitted + graded). */
+/** Counts attempts that consume a slot: submitted, graded, and leftover expired rows. */
 export function countCompletedExamAttempts(
   attempts: Array<{ exam_id: string; status: string }>,
   examId: string,
 ): number {
   return attempts.filter(
     (attempt) =>
-      attempt.exam_id === examId && (attempt.status === "submitted" || attempt.status === "graded"),
+      attempt.exam_id === examId &&
+      (attempt.status === "submitted" ||
+        attempt.status === "graded" ||
+        attempt.status === "expired"),
   ).length;
 }
 
@@ -62,6 +66,38 @@ export function canRetakeExam(input: {
 
 export function examAttemptsLeft(completedAttempts: number, maxAttempts: number): number {
   return Math.max(0, maxAttempts - completedAttempts);
+}
+
+/** Headline figures already stored on the attempt. Does not recompute Goethe ×1.66. */
+export function officialExamResultFigures(input: {
+  goetheA1: boolean;
+  awaiting: boolean;
+  serverScore: number | null;
+  serverMax: number | null;
+  serverPercentage: number | null;
+  automaticScore: number | null;
+  automaticMax: number | null;
+}): { score: number; max: number; percentage: number } {
+  const percentage = Number.isFinite(input.serverPercentage) ? Number(input.serverPercentage) : 0;
+  if (input.awaiting) {
+    return {
+      score: input.automaticScore ?? 0,
+      max: input.automaticMax ?? 0,
+      percentage,
+    };
+  }
+  if (input.goetheA1) {
+    return {
+      score: input.serverScore ?? 0,
+      max: 60,
+      percentage,
+    };
+  }
+  return {
+    score: input.serverScore ?? 0,
+    max: input.serverMax ?? 0,
+    percentage,
+  };
 }
 
 export function attemptGradingStatus(status: string, hasUngradedManual: boolean) {

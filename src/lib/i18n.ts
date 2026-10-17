@@ -21,9 +21,6 @@ const fr = {
   "nav.recordings": "Rediffusions",
   "nav.assignments": "Devoirs",
   "nav.exams": "Examens blancs",
-  "nav.training": "Entraînement",
-  "nav.trainingPreview": "Aperçu entraînement",
-  "nav.trainingCorrections": "Corrections entraînement",
   "nav.corrections": "Corrections",
   "nav.progress": "Progression",
   "nav.payments": "Paiements",
@@ -63,6 +60,43 @@ const fr = {
   "role.student": "Étudiant",
   "role.teacher": "Professeur",
   "role.director": "Direction",
+  "teacher.students.title": "Étudiants",
+  "teacher.students.subtitle.empty": "Étudiants de vos groupes",
+  "teacher.students.subtitle.assigned": "Assignés via",
+  "teacher.students.emptyTitle": "Aucun étudiant assigné",
+  "teacher.students.emptyMessage":
+    "Les étudiants apparaissent ici dès qu’ils sont inscrits dans vos groupes.",
+  "teacher.students.col.student": "Étudiant",
+  "teacher.students.col.level": "Niveau",
+  "teacher.students.col.group": "Groupe",
+  "teacher.students.col.subscription": "Abonnement",
+  "teacher.subscription.active": "Actif",
+  "teacher.subscription.pastDue": "En retard",
+  "teacher.subscription.suspended": "Suspendu",
+  "teacher.class.fallback": "Mon groupe",
+  "teacher.class.assigned": "Groupes qui vous sont assignés",
+  "teacher.class.full": "Complet",
+  "teacher.class.enrolled": "Inscrits",
+  "teacher.class.capacity": "Capacité",
+  "teacher.class.remaining": "Places restantes",
+  "teacher.class.empty": "Aucun étudiant inscrit dans ce groupe pour le moment.",
+  "teacher.class.col.student": "Étudiant",
+  "teacher.class.col.progress": "Progression",
+  "teacher.class.col.average": "Moyenne",
+  "teacher.class.col.status": "Statut",
+  "teacher.class.active": "Actif",
+  "teacher.courses.title": "Cours",
+  "teacher.courses.pickLevel": "Consultez et créez des cours pour les niveaux de vos groupes.",
+  "teacher.courses.level": "Niveau",
+  "teacher.courses.allLevels": "Tous les niveaux",
+  "teacher.courses.create": "Créer un cours",
+  "teacher.courses.groupProgress": "Progression des groupes",
+  "teacher.courses.catalog": "Catalogue",
+  "teacher.studio": "Studio en allemand",
+  "teacher.courses.skeleton":
+    "Les cours A1–B2 enregistrés sont des squelettes (un module et deux leçons par niveau). Ce n’est pas un programme complet.",
+  "teacher.courses.emptyTitle": "Aucun niveau",
+  "teacher.courses.emptyMessage": "Les niveaux de l’académie apparaîtront ici.",
 };
 
 const ar: typeof fr = {
@@ -86,9 +120,6 @@ const ar: typeof fr = {
   "nav.recordings": "الإعادات",
   "nav.assignments": "الواجبات",
   "nav.exams": "الامتحانات",
-  "nav.training": "التدريب",
-  "nav.trainingPreview": "معاينة التدريب",
-  "nav.trainingCorrections": "تصحيحات التدريب",
   "nav.corrections": "التصحيحات",
   "nav.progress": "التقدّم",
   "nav.payments": "المدفوعات",
@@ -128,22 +159,166 @@ const ar: typeof fr = {
   "role.student": "طالب",
   "role.teacher": "أستاذ",
   "role.director": "الإدارة",
+  "teacher.students.title": "الطلاب",
+  "teacher.students.subtitle.empty": "طلاب مجموعاتك",
+  "teacher.students.subtitle.assigned": "معيّنون عبر",
+  "teacher.students.emptyTitle": "لا يوجد طلاب معيّنون",
+  "teacher.students.emptyMessage": "يظهر الطلاب هنا عند تسجيلهم في مجموعاتك.",
+  "teacher.students.col.student": "الطالب",
+  "teacher.students.col.level": "المستوى",
+  "teacher.students.col.group": "المجموعة",
+  "teacher.students.col.subscription": "الاشتراك",
+  "teacher.subscription.active": "نشط",
+  "teacher.subscription.pastDue": "متأخر",
+  "teacher.subscription.suspended": "موقوف",
+  "teacher.class.fallback": "مجموعتي",
+  "teacher.class.assigned": "المجموعات المسندة إليك",
+  "teacher.class.full": "مكتملة",
+  "teacher.class.enrolled": "المسجلون",
+  "teacher.class.capacity": "الطاقة",
+  "teacher.class.remaining": "المقاعد المتبقية",
+  "teacher.class.empty": "لا يوجد طلاب مسجلون في هذه المجموعة حالياً.",
+  "teacher.class.col.student": "الطالب",
+  "teacher.class.col.progress": "التقدّم",
+  "teacher.class.col.average": "المعدل",
+  "teacher.class.col.status": "الحالة",
+  "teacher.class.active": "نشط",
+  "teacher.courses.title": "الدورات",
+  "teacher.courses.pickLevel": "اطلع على الدورات وأنشئها لمستويات مجموعاتك.",
+  "teacher.courses.level": "المستوى",
+  "teacher.courses.allLevels": "كل المستويات",
+  "teacher.courses.create": "إنشاء دورة",
+  "teacher.courses.groupProgress": "تقدّم المجموعات",
+  "teacher.courses.catalog": "الفهرس",
+  "teacher.studio": "الاستوديو بالألمانية",
+  "teacher.courses.skeleton":
+    "دورات A1–B2 المحفوظة هي هياكل أولية (وحدة واحدة ودرسان لكل مستوى). ليست منهجاً مكتملاً.",
+  "teacher.courses.emptyTitle": "لا توجد مستويات",
+  "teacher.courses.emptyMessage": "ستظهر مستويات الأكاديمية هنا.",
 };
 
-const dictionaries: Record<Locale, Record<string, string>> = { fr, ar };
+const de: typeof fr = {
+  "brand.tagline": "Deutsch lernen. Die Zukunft aufbauen.",
+  "login.welcome": "Willkommen zurück",
+  "login.title": "Anmeldung an der Akademie",
+  "login.subtitle": "Setzen Sie Ihren Deutschkurs fort.",
+  "login.email": "E-Mail",
+  "login.password": "Passwort",
+  "login.forgot": "Passwort vergessen?",
+  "login.submit": "Anmelden",
+  "login.signing": "Anmeldung läuft…",
+  "login.demo": "SCHNELLER DEMO-ZUGANG",
+  "login.footer": "Prototyp-Umgebung · Demonstrationsdaten",
+  "login.invalid": "E-Mail oder Passwort ist falsch.",
+  "login.reset": "Wenn diese E-Mail existiert, wurde ein Link zum Zurücksetzen gesendet.",
+  "nav.home": "Start",
+  "nav.overview": "Übersicht",
+  "nav.learning": "Lernen",
+  "nav.live": "Live",
+  "nav.recordings": "Aufzeichnungen",
+  "nav.assignments": "Aufgaben",
+  "nav.exams": "Probeprüfungen",
+  "nav.corrections": "Korrekturen",
+  "nav.progress": "Fortschritt",
+  "nav.payments": "Zahlungen",
+  "nav.messages": "Nachrichten",
+  "nav.profile": "Profil",
+  "nav.materials": "Materialien",
+  "nav.calendar": "Kalender",
+  "nav.classes": "Meine Gruppen",
+  "nav.groups": "Gruppen",
+  "nav.lessons": "Lektionen",
+  "nav.students": "Lernende",
+  "nav.teachers": "Lehrkräfte",
+  "nav.courses": "Kurse",
+  "nav.levels": "Niveaus",
+  "nav.subscriptions": "Abonnements",
+  "nav.invoices": "Rechnungen",
+  "nav.reports": "Berichte",
+  "nav.settings": "Einstellungen",
+  "nav.audit": "Prüfprotokoll",
+  "nav.payroll": "Gehälter",
+  "nav.signout": "Abmelden",
+  "nav.section.learning": "Lernen",
+  "nav.section.account": "Konto",
+  "nav.section.teaching": "Unterricht",
+  "nav.section.academy": "Akademie",
+  "nav.section.operations": "Betrieb",
+  "nav.tab.home": "Start",
+  "nav.tab.materials": "Materialien",
+  "nav.tab.assignments": "Aufgaben",
+  "nav.tab.exams": "Prüfungen",
+  "nav.tab.courses": "Kurse",
+  "shell.admin": "Verwaltung der Akademie",
+  "shell.teacher": "Lehrstudio",
+  "shell.student": "Lernbereich",
+  "shell.notifications": "Benachrichtigungen",
+  "shell.language": "Sprache",
+  "role.student": "Lernende",
+  "role.teacher": "Lehrkraft",
+  "role.director": "Leitung",
+  "teacher.students.title": "Lernende",
+  "teacher.students.subtitle.empty": "Lernende Ihrer Gruppen",
+  "teacher.students.subtitle.assigned": "Zugeordnet über",
+  "teacher.students.emptyTitle": "Keine Lernenden zugeordnet",
+  "teacher.students.emptyMessage":
+    "Lernende erscheinen hier, sobald sie in Ihren Gruppen eingeschrieben sind.",
+  "teacher.students.col.student": "Lernende",
+  "teacher.students.col.level": "Niveau",
+  "teacher.students.col.group": "Gruppe",
+  "teacher.students.col.subscription": "Abonnement",
+  "teacher.subscription.active": "Aktiv",
+  "teacher.subscription.pastDue": "Überfällig",
+  "teacher.subscription.suspended": "Ausgesetzt",
+  "teacher.class.fallback": "Meine Gruppe",
+  "teacher.class.assigned": "Ihnen zugeordnete Gruppen",
+  "teacher.class.full": "Voll",
+  "teacher.class.enrolled": "Eingeschrieben",
+  "teacher.class.capacity": "Kapazität",
+  "teacher.class.remaining": "Freie Plätze",
+  "teacher.class.empty": "In dieser Gruppe ist derzeit niemand eingeschrieben.",
+  "teacher.class.col.student": "Lernende",
+  "teacher.class.col.progress": "Fortschritt",
+  "teacher.class.col.average": "Durchschnitt",
+  "teacher.class.col.status": "Status",
+  "teacher.class.active": "Aktiv",
+  "teacher.courses.title": "Kurse",
+  "teacher.courses.pickLevel": "Kurse der Niveaus Ihrer Gruppen ansehen und anlegen.",
+  "teacher.courses.level": "Niveau",
+  "teacher.courses.allLevels": "Alle Niveaus",
+  "teacher.courses.create": "Kurs anlegen",
+  "teacher.courses.groupProgress": "Gruppenfortschritt",
+  "teacher.courses.catalog": "Katalog",
+  "teacher.studio": "Studio auf Deutsch",
+  "teacher.courses.skeleton":
+    "Die gespeicherten Kurse A1–B2 sind Platzhalter (ein Modul und zwei Lektionen je Niveau). Das ist kein vollständiger Lehrplan.",
+  "teacher.courses.emptyTitle": "Keine Niveaus",
+  "teacher.courses.emptyMessage": "Die Niveaus der Akademie erscheinen hier.",
+};
+
+const dictionaries: Record<Locale, Record<string, string>> = { fr, ar, de };
 
 export function translate(locale: Locale, key: string) {
   return dictionaries[locale][key] ?? dictionaries.fr[key] ?? key;
 }
 
+/** Teacher studio stays German. The stored learner locale is left unchanged. */
+export function teacherInterfaceLocale(role: string | null | undefined, locale: Locale): Locale {
+  return role === "teacher" ? "de" : locale;
+}
+
 export function translateKnownValue(locale: Locale, value: string) {
   for (const dictionaryKey of Object.keys(dictionaries.fr)) {
     const key = dictionaryKey as keyof typeof fr;
-    if (dictionaries.fr[key] === value || dictionaries.ar[key] === value) {
+    if (
+      dictionaries.fr[key] === value ||
+      dictionaries.ar[key] === value ||
+      dictionaries.de[key] === value
+    ) {
       return dictionaries[locale][key] ?? value;
     }
   }
   return value;
 }
 
-export const localeLabels: Record<Locale, string> = { fr: "fr", ar: "ar" };
+export const localeLabels: Record<Locale, string> = { fr: "fr", ar: "ar", de: "de" };

@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode }
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { isDemoAuthAllowed } from "@/lib/auth-config";
-import { translate } from "@/lib/i18n";
+import { teacherInterfaceLocale, translate } from "@/lib/i18n";
 import type { Profile } from "@/lib/roles";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { AuthService, AccessService } from "@/services/academy-services";
@@ -177,10 +177,12 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof document === "undefined") return;
-    document.documentElement.lang = locale;
-    document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
-    window.localStorage.setItem(LOCALE_KEY, locale);
-  }, [locale]);
+    const interfaceLocale = teacherInterfaceLocale(session?.user.role, locale);
+    document.documentElement.lang = interfaceLocale;
+    document.documentElement.dir = interfaceLocale === "ar" ? "rtl" : "ltr";
+    const storedLocale = locale === "ar" ? "ar" : "fr";
+    window.localStorage.setItem(LOCALE_KEY, storedLocale);
+  }, [locale, session?.user.role]);
 
   const persist = useCallback(
     (next: PersistedSession | null) => {
@@ -320,11 +322,13 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
       selectedStudentId: session?.selectedStudentId ?? "ST-001",
       locale,
       setLocale: (nextLocale) => {
-        setLocaleState(nextLocale);
-        if (session) persist({ ...session, locale: nextLocale });
+        if (session?.user.role === "teacher") return;
+        const learnerLocale = nextLocale === "ar" ? "ar" : "fr";
+        setLocaleState(learnerLocale);
+        if (session) persist({ ...session, locale: learnerLocale });
       },
-      t: (key) => translate(locale, key),
-      l: (fr, ar) => (locale === "ar" ? ar : fr),
+      t: (key) => translate(teacherInterfaceLocale(session?.user.role, locale), key),
+      l: (fr, ar) => (locale === "ar" && session?.user.role !== "teacher" ? ar : fr),
       lastScore,
       setLastScore,
       session,
@@ -348,7 +352,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
 
   return (
     <AcademyContext.Provider value={value}>
-      <InterfaceLocalizer locale={locale} />
+      <InterfaceLocalizer locale={teacherInterfaceLocale(session?.user.role, locale)} />
       {children}
     </AcademyContext.Provider>
   );

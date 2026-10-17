@@ -55,9 +55,10 @@ describe("exam final score with QCM + writing", () => {
       { exam_id: "e1", status: "graded" },
       { exam_id: "e1", status: "submitted" },
       { exam_id: "e1", status: "in_progress" },
+      { exam_id: "e1", status: "expired" },
       { exam_id: "e2", status: "graded" },
     ];
-    expect(countCompletedExamAttempts(attempts, "e1")).toBe(2);
+    expect(countCompletedExamAttempts(attempts, "e1")).toBe(3);
     expect(examAttemptsLeft(2, 3)).toBe(1);
     expect(canRetakeExam({ latestStatus: "graded", completedAttempts: 2, maxAttempts: 3 })).toBe(
       true,

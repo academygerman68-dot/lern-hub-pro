@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -30,6 +30,7 @@ import {
   usePublishExam,
   usePublishedExams,
   useStartExam,
+  useSubmitExam,
 } from "@/hooks/use-academy-data";
 import { ExamService, GradeAssistService } from "@/services/academy-services";
 import type { GradeAssistSuggestion } from "@/services/supabase/grade-assist-service";
@@ -62,6 +63,7 @@ import {
   countWritingStats,
   examAttemptsLeft,
   isManualQuestionType,
+  officialExamResultFigures,
   studentExamProgressLabel,
 } from "@/lib/exam-writing";
 import {
@@ -72,7 +74,7 @@ import {
   oralRubricFromMeta,
   parseOralAnswer,
 } from "@/lib/exam-oral";
-import { examCatalogAction } from "@/lib/exam-labels";
+import { examCatalogAction, examCatalogKind, historicalPartialExamNotice } from "@/lib/exam-labels";
 import {
   applySuggestionToWritingRubric,
   formatGradeAssistRubric,
@@ -96,9 +98,9 @@ import {
 } from "@/lib/exam-runner-ux";
 import { countHorenAudioReady, countHorenAudioVerifiedSlots } from "@/lib/horen-audio-slots";
 import {
+  a1MentionFromHundred,
   allowedScoresFromMeta,
   isGoetheA1AdultProfile,
-  summarizeA1Result,
 } from "@/lib/a1-goethe-scoring";
 import { ExamAudioPreflight } from "./exam-audio-preflight";
 import {
@@ -206,7 +208,7 @@ function shortBankId(bankQuestionId: string | null | undefined, fallback: string
 
 function progressTone(label: ReturnType<typeof studentExamProgressLabel>) {
   if (label === "Terminé") return "green" as const;
-  if (label === "En cours") return "amber" as const;
+  if (label === "En cours" || label === "Temps écoulé") return "amber" as const;
   if (label === "En attente de correction") return "amber" as const;
   return "gray" as const;
 }
@@ -224,6 +226,8 @@ function StudentExamCatalog() {
   const examsQuery = usePublishedExams();
   const attemptsQuery = useMyExamAttempts();
   const startExam = useStartExam();
+  const startLockedRef = useRef(false);
+  const submitExam = useSubmitExam();
   const accessQuery = useAcademicAccess();
   const [preflightExam, setPreflightExam] = useState<{
     id: string;
@@ -262,7 +266,7 @@ function StudentExamCatalog() {
     <div className="animate-fade-in space-y-5">
       <PageHeader
         title="Examens blancs"
-        subtitle="Entraînez-vous dans les conditions de l’examen officiel de votre niveau."
+        subtitle="Simulations de votre niveau : durée, format et résultats au moment prévu."
       />
       <QueryState
         isLoading={examsQuery.isLoading || attemptsQuery.isLoading || accessQuery.isLoading}
@@ -270,7 +274,7 @@ function StudentExamCatalog() {
         error={(examsQuery.error ?? attemptsQuery.error ?? accessQuery.error) as Error | null}
         isEmpty={!examsQuery.data?.length}
         emptyTitle="Aucun examen disponible pour le moment"
-        emptyMessage="Les examens blancs de votre niveau seront publiés ici. Revenez bientôt pour vous entraîner."
+        emptyMessage="Les examens blancs de votre niveau seront publiés ici."
         onRetry={() => {
           void examsQuery.refetch();
           void attemptsQuery.refetch();
@@ -286,6 +290,8 @@ function StudentExamCatalog() {
             busy={startExam.isPending}
             onCancel={() => setPreflightExam(null)}
             onConfirm={() => {
+              if (startLockedRef.current || startExam.isPending) return;
+              startLockedRef.current = true;
               startExam.mutate(preflightExam.id, {
                 onSuccess: (attempt) => {
                   persistExamSession(preflightExam.id, attempt.id);
@@ -293,6 +299,9 @@ function StudentExamCatalog() {
                   navigate("mock-exam");
                 },
                 onError: (err) => toast.error(err.message),
+                onSettled: () => {
+                  startLockedRef.current = false;
+                },
               });
             }}
           />
@@ -302,8 +311,7 @@ function StudentExamCatalog() {
             const examAttempts = attemptsByExam.get(exam.id) ?? [];
             const latest = pickStudentCatalogAttempt(examAttempts);
             const gradedAttempt = pickLatestGradedAttempt(examAttempts);
-            const hasUngradedWriting =
-              latest?.status === "submitted" || latest?.status === "expired";
+            const hasUngradedWriting = latest?.status === "submitted";
             const catalog = examCatalogAction({
               latestStatus: latest?.status,
               hasUngradedWriting,
@@ -344,12 +352,24 @@ function StudentExamCatalog() {
                 });
                 return;
               }
+              if (
+                !window.confirm(
+                  `Démarrer « ${exam.title} » ? Le chronomètre de ${exam.duration_minutes} minutes commence tout de suite.`,
+                )
+              ) {
+                return;
+              }
+              if (startLockedRef.current || startExam.isPending) return;
+              startLockedRef.current = true;
               startExam.mutate(exam.id, {
                 onSuccess: (attempt) => {
                   persistExamSession(exam.id, attempt.id);
                   navigate("mock-exam");
                 },
                 onError: (err) => toast.error(err.message),
+                onSettled: () => {
+                  startLockedRef.current = false;
+                },
               });
             };
             return (
@@ -358,6 +378,11 @@ function StudentExamCatalog() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                        {examCatalogKind(exam.code) === "historical-partial"
+                          ? "Partiel · "
+                          : examCatalogKind(exam.code) === "a1-simulation"
+                            ? "Simulation A1 · "
+                            : ""}
                         {exam.level?.code ?? "—"}
                         {exam.class?.name ? ` · ${exam.class.name}` : " · Niveau entier"} ·{" "}
                         {goetheA1 ? `écrit ${writtenMins} min` : `${exam.duration_minutes} min`}
@@ -365,6 +390,11 @@ function StudentExamCatalog() {
                       <h2 className="mt-2 text-xl font-semibold tracking-tight">{exam.title}</h2>
                       {exam.description ? (
                         <p className="mt-2 text-sm text-muted-foreground">{exam.description}</p>
+                      ) : null}
+                      {historicalPartialExamNotice(exam.code) ? (
+                        <p className="mt-2 text-sm text-amber-900">
+                          {historicalPartialExamNotice(exam.code)}
+                        </p>
                       ) : null}
                       <p className="mt-2 text-sm text-muted-foreground">
                         {goetheA1
@@ -376,9 +406,13 @@ function StudentExamCatalog() {
                       {goetheA1 ? (
                         <p className="mt-1 text-xs text-muted-foreground">
                           Compétences : Hören · Lesen · Schreiben · Sprechen (15 pts chacune · 60
-                          bruts → /100)
+                          bruts → /100). Simulation interne, non affiliée au Goethe-Institut.
                         </p>
                       ) : null}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Le score est calculé sur le serveur à l’envoi. Une tentative envoyée ou
+                        expirée compte dans la limite.
+                      </p>
                     </div>
                     <Status tone={progressTone(progressLabel)}>{progressLabel}</Status>
                   </div>
@@ -431,6 +465,25 @@ function StudentExamCatalog() {
                   {catalog.action === "start" ? (
                     <Button disabled={startExam.isPending} onClick={launchExam}>
                       <Play aria-hidden />
+                      {catalog.cta}
+                    </Button>
+                  ) : null}
+                  {catalog.action === "finalize" && latest ? (
+                    <Button
+                      disabled={submitExam.isPending}
+                      onClick={() => {
+                        submitExam.mutate(latest.id, {
+                          onSuccess: () => {
+                            persistExamSession(exam.id, latest.id, { openReview: false });
+                            toast.success(
+                              "Tentative clôturée. Le score utilise les réponses déjà enregistrées.",
+                            );
+                            navigate("exam-result");
+                          },
+                          onError: (err) => toast.error(err.message),
+                        });
+                      }}
+                    >
                       {catalog.cta}
                     </Button>
                   ) : null}
@@ -536,32 +589,19 @@ function StudentExamResult() {
     resultQuery.data?.exam as { format_profile?: string | null } | null | undefined
   )?.format_profile;
   const goetheA1 = isGoetheA1AdultProfile({ format_profile: examProfile, code: examCode });
-  const a1Summary = goetheA1
-    ? summarizeA1Result({
-        rawBySkill: {
-          hoeren: Number(skills["hoeren"]?.score ?? 0),
-          lesen: Number(skills["lesen"]?.score ?? 0),
-          schreiben: Number(skills["schreiben"]?.score ?? 0),
-          sprechen: Number(skills["sprechen"]?.score ?? 0),
-        },
-        awaitingManual: awaiting,
-      })
-    : null;
-  const displayScore = awaiting
-    ? (resultQuery.data?.automaticScore ?? 0)
-    : goetheA1
-      ? (a1Summary?.rawTotal ?? resultQuery.data?.score ?? 0)
-      : (resultQuery.data?.score ?? 0);
-  const displayMax = awaiting
-    ? (resultQuery.data?.automaticMax ?? (goetheA1 ? 35 : 40))
-    : goetheA1
-      ? 60
-      : (resultQuery.data?.maxScore ?? 50);
-  const displayPct = goetheA1
-    ? (a1Summary?.score100 ?? Number(resultQuery.data?.percentage ?? 0))
-    : displayMax > 0
-      ? Math.round((displayScore / displayMax) * 10000) / 100
-      : 0;
+  const figures = officialExamResultFigures({
+    goetheA1,
+    awaiting,
+    serverScore: resultQuery.data ? Number(resultQuery.data.score ?? 0) : null,
+    serverMax: resultQuery.data ? Number(resultQuery.data.maxScore ?? 0) : null,
+    serverPercentage: resultQuery.data ? Number(resultQuery.data.percentage ?? 0) : null,
+    automaticScore: resultQuery.data?.automaticScore ?? null,
+    automaticMax: resultQuery.data?.automaticMax ?? null,
+  });
+  const displayScore = figures.score;
+  const displayMax = figures.max;
+  const displayPct = figures.percentage;
+  const mention = goetheA1 ? a1MentionFromHundred(displayPct) : null;
 
   const objectiveItems = useMemo(
     () => (reviewQuery.data?.items ?? []).filter((item) => !isManualQuestionType(item.type)),
@@ -618,9 +658,7 @@ function StudentExamResult() {
       .join(", ");
   };
 
-  const passed = goetheA1
-    ? Boolean(a1Summary?.passed)
-    : Boolean(resultQuery.data?.passed);
+  const passed = Boolean(resultQuery.data?.passed);
   const heroTone = awaiting ? "provisional" : passed ? "passed" : "failed";
 
   return (
@@ -688,8 +726,8 @@ function StudentExamResult() {
               {awaiting
                 ? " · Schreiben / Sprechen encore en correction — le score final arrivera bientôt."
                 : goetheA1
-                  ? ` · Brut ${displayScore}/60 · ${a1Summary?.mention ?? ""} · ${
-                      a1Summary?.passed ? "bestanden" : "nicht bestanden"
+                  ? ` · Brut ${displayScore}/60 · ${mention ?? ""} · ${
+                      passed ? "bestanden" : "nicht bestanden"
                     }`
                   : ` · ${displayPct.toFixed(0)} %`}
             </p>

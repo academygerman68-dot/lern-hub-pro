@@ -321,6 +321,32 @@ export function validateExamBank(raw: unknown): {
   return { ok: issues.length === 0, data: bank, issues };
 }
 
+/** Writing and speaking are manual. form_fill stays automatic even inside Schreiben. */
+export function isAutomaticBankQuestion(question: {
+  type: string;
+  automatic_grading?: boolean;
+}): boolean {
+  if (question.type === "writing" || question.type === "speaking") return false;
+  if (question.automatic_grading === false) return false;
+  return true;
+}
+
+export function splitBankPoints(exam: {
+  sections: Array<{
+    questions: Array<{ type: string; points: number; automatic_grading?: boolean }>;
+  }>;
+}): { automatic: number; manual: number; total: number } {
+  let automatic = 0;
+  let manual = 0;
+  for (const section of exam.sections) {
+    for (const question of section.questions) {
+      if (isAutomaticBankQuestion(question)) automatic += question.points;
+      else manual += question.points;
+    }
+  }
+  return { automatic, manual, total: automatic + manual };
+}
+
 export function resolveChoiceOptions(
   choices: z.infer<typeof choiceSchema>[],
 ): Array<{ value: string; label: string }> {

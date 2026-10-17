@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   A1_PASS_SCORE_100,
   A1_RAW_MAX,
+  A1_SKILL_RAW_MAX,
   a1ConversionTable,
   a1MentionFromHundred,
   a1PassedFromHundred,
   convertA1RawToHundred,
+  convertA1SkillToHundred,
   isGoetheA1AdultProfile,
   SCHREIBEN_TEIL2_ALLOWED,
   summarizeA1Result,
@@ -46,6 +48,44 @@ describe("a1 goethe scoring", () => {
     // Guard against the buggy round(..., 2) SQL path that yielded 99.60.
     expect(Number((60 * 1.66).toFixed(2))).toBe(99.6);
     expect(convertA1RawToHundred(60)).not.toBe(99.6);
+  });
+
+  it("covers minimum, threshold, intermediate and maximum raw scores", () => {
+    expect(convertA1RawToHundred(0)).toBe(0);
+    expect(convertA1RawToHundred(-4)).toBe(0);
+    expect(convertA1RawToHundred(Number.NaN)).toBe(0);
+    expect(convertA1RawToHundred(1)).toBe(2);
+    expect(convertA1RawToHundred(35)).toBe(58);
+    expect(a1PassedFromHundred(convertA1RawToHundred(35))).toBe(false);
+    expect(convertA1RawToHundred(36)).toBe(60);
+    expect(a1PassedFromHundred(convertA1RawToHundred(36))).toBe(true);
+    expect(convertA1RawToHundred(59)).toBe(98);
+    expect(convertA1RawToHundred(60)).toBe(100);
+    expect(convertA1RawToHundred(60)).toBeLessThanOrEqual(100);
+  });
+
+  it("caps each skill and counts Schreiben and Sprechen only once", () => {
+    expect(convertA1SkillToHundred("sprechen", 0)).toBe(0);
+    expect(convertA1SkillToHundred("sprechen", A1_SKILL_RAW_MAX)).toBe(25);
+    expect(convertA1SkillToHundred("sprechen", 40)).toBe(25);
+    expect(convertA1SkillToHundred("schreiben", 40)).toBe(Math.round(15 * (75 / 45)));
+
+    const result = summarizeA1Result({
+      rawBySkill: { hoeren: 1, lesen: 0, schreiben: 15, sprechen: 15 },
+    });
+    expect(result.rawTotal).toBe(31);
+    expect(result.rawTotal).toBeLessThanOrEqual(A1_RAW_MAX);
+    expect(result.score100).toBe(convertA1RawToHundred(31));
+    expect(result.score100).toBeLessThanOrEqual(100);
+    expect(result.oral100).toBe(25);
+    expect(result.score100).not.toBe(result.written100 + result.oral100);
+
+    const ceiling = summarizeA1Result({
+      rawBySkill: { hoeren: 15, lesen: 15, schreiben: 15, sprechen: 15 },
+    });
+    expect(ceiling.rawTotal).toBe(60);
+    expect(ceiling.score100).toBe(100);
+    expect(ceiling.passed).toBe(true);
   });
 
   it("assigns mentions from /100 score", () => {

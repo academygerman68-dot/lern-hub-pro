@@ -218,7 +218,7 @@ function statusLabel(status: string) {
 }
 
 export function DirectorCoursesPage() {
-  const { role } = useAcademy();
+  const { role, t } = useAcademy();
   const classesQuery = useClasses();
   const coursesQuery = useCourses();
   const levelsQuery = useLevels();
@@ -296,39 +296,44 @@ export function DirectorCoursesPage() {
           variant={view === "catalog" ? "default" : "outline"}
           onClick={() => setView("catalog")}
         >
-          Catalogue (niveau)
+          {role === "teacher" ? t("teacher.courses.catalog") : "Catalogue (niveau)"}
         </Button>
         <Button
           size="sm"
           variant={view === "group-progress" ? "default" : "outline"}
           onClick={() => setView("group-progress")}
         >
-          Progression des groupes
+          {role === "teacher" ? t("teacher.courses.groupProgress") : "Progression des groupes"}
         </Button>
       </div>
       {view === "group-progress" ? <GroupProgressPage /> : null}
       {view === "catalog" ? (
         <>
       <PageHeader
-        title="Cours"
+        title={role === "teacher" ? t("teacher.courses.title") : "Cours"}
         subtitle={
           selectedLevel
-            ? `Niveau ${selectedLevel.code} — ${selectedLevel.name}`
+            ? `${role === "teacher" ? t("teacher.courses.level") : "Niveau"} ${selectedLevel.code} — ${selectedLevel.name}`
             : isDirectorRole(role)
               ? "Choisissez un niveau pour consulter et créer des cours."
-              : "Consultez et créez des cours pour les niveaux de vos groupes."
+              : t("teacher.courses.pickLevel")
         }
         action={
           selectedLevel ? (
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setSelectedLevelId(null)}>
-                Tous les niveaux
+                {role === "teacher" ? t("teacher.courses.allLevels") : "Tous les niveaux"}
               </Button>
-              <Button onClick={openCreate}>+ Créer un cours</Button>
+              <Button onClick={openCreate}>
+                {role === "teacher" ? `+ ${t("teacher.courses.create")}` : "+ Créer un cours"}
+              </Button>
             </div>
           ) : undefined
         }
       />
+      {role === "teacher" ? (
+        <p className="mb-4 text-sm text-muted-foreground">{t("teacher.courses.skeleton")}</p>
+      ) : null}
 
       {!selectedLevelId ? (
         <QueryState
@@ -336,8 +341,12 @@ export function DirectorCoursesPage() {
           isError={levelsQuery.isError}
           error={levelsQuery.error}
           isEmpty={!levels.length}
-          emptyTitle="Aucun niveau"
-          emptyMessage="Les niveaux de l’académie apparaîtront ici."
+          emptyTitle={role === "teacher" ? t("teacher.courses.emptyTitle") : "Aucun niveau"}
+          emptyMessage={
+            role === "teacher"
+              ? t("teacher.courses.emptyMessage")
+              : "Les niveaux de l’académie apparaîtront ici."
+          }
           onRetry={() => void levelsQuery.refetch()}
         >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

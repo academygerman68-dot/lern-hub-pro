@@ -19,7 +19,6 @@ import {
   Users,
   Video,
   X,
-  Dumbbell,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
@@ -31,7 +30,7 @@ import {
   useNotifications,
   useUnreadNotificationCount,
 } from "@/hooks/use-academy-data";
-import type { AcademyPage, Locale } from "@/types/academy";
+import type { AcademyPage } from "@/types/academy";
 import { useAcademy } from "./academy-context";
 import { StudentMobileTabBar } from "./student-mobile-tabbar";
 
@@ -47,7 +46,6 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
         ["materials", "nav.materials", Library],
         ["assignments", "nav.assignments", ClipboardCheck],
         ["exams", "nav.exams", FileText],
-        ["training", "nav.training", Dumbbell],
         ["courses", "nav.courses", BookOpen],
         ["progress", "nav.progress", BarChart3],
         ["live", "nav.live", Video],
@@ -75,8 +73,6 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
         ["materials", "nav.materials", Library],
         ["assignments", "nav.assignments", ClipboardCheck],
         ["exams", "nav.exams", FileText],
-        ["training-preview", "nav.trainingPreview", Dumbbell],
-        ["training-corrections", "nav.trainingCorrections", ClipboardCheck],
         ["corrections", "nav.corrections", ClipboardCheck],
         ["live", "nav.live", Video],
       ],
@@ -108,8 +104,6 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
       items: [
         ["assignments", "nav.assignments", ClipboardCheck],
         ["exams", "nav.exams", FileText],
-        ["training-preview", "nav.trainingPreview", Dumbbell],
-        ["training-corrections", "nav.trainingCorrections", ClipboardCheck],
         ["corrections", "nav.corrections", ClipboardCheck],
         ["live", "nav.live", Video],
       ],
@@ -166,22 +160,27 @@ export function AppShell({ children }: { children: ReactNode }) {
   const unread = unreadQuery.data ?? 0;
   const notificationRows = notificationsQuery.data ?? [];
 
-  const languageSwitch = (
-    <div className="flex gap-1" role="group" aria-label="Language">
-      {(["fr", "ar"] as Locale[]).map((code) => (
-        <button
-          key={code}
-          type="button"
-          onClick={() => setLocale(code)}
-          className={`min-h-9 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
-            locale === code ? "bg-soft-blue text-primary" : "text-muted-foreground hover:bg-muted"
-          }`}
-        >
-          {localeLabels[code]}
-        </button>
-      ))}
-    </div>
-  );
+  const languageSwitch =
+    role === "teacher" ? (
+      <span className="min-h-9 rounded-md bg-soft-blue px-2.5 py-1 text-[11px] font-medium text-primary">
+        {t("teacher.studio")}
+      </span>
+    ) : (
+      <div className="flex gap-1" role="group" aria-label={t("shell.language")}>
+        {(["fr", "ar"] as const).map((code) => (
+          <button
+            key={code}
+            type="button"
+            onClick={() => setLocale(code)}
+            className={`min-h-9 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
+              locale === code ? "bg-soft-blue text-primary" : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {localeLabels[code]}
+          </button>
+        ))}
+      </div>
+    );
 
   const sidebar = (
     <>

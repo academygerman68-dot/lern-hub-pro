@@ -42,6 +42,24 @@ import { HorenTeilAudioPlayer } from "./horen-teil-audio-player";
 import { QueryState } from "./query-state";
 import { ProgressLine, Surface } from "./primitives";
 import { isGoetheA1AdultProfile } from "@/lib/a1-goethe-scoring";
+import {
+  attemptTabLockKey,
+  decideAttemptTab,
+  parseAttemptTabLock,
+} from "@/lib/exam-attempt-tab";
+import {
+  ackDraftIfCurrent,
+  acquireSubmitLock,
+  clearAttemptDraft,
+  draftSaveStatus,
+  listDrafts,
+  mergeServerAnswersWithDrafts,
+  noteDraftEntry,
+  readAttemptDraft,
+  releaseSubmitLock,
+  writeAttemptDraft,
+  type AttemptDraftEntry,
+} from "@/lib/exam-attempt-draft";
 
 const EXAM_ID_KEY = "ga_active_exam_id";
 const ATTEMPT_ID_KEY = "ga_active_attempt_id";
@@ -151,6 +169,10 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
   const attemptId = isPreview ? null : liveSession.attemptId;
 
   const examQuery = useExam(examId || undefined);
+  const isGoetheA1 = isGoetheA1AdultProfile({
+    format_profile: examQuery.data?.format_profile,
+    code: examQuery.data?.code,
+  });
   const attemptQuery = useExamAttempt(isPreview ? null : attemptId);
   const answersQuery = useExamAnswers(isPreview ? null : attemptId);
   const saveAnswer = useSaveExamAnswer();
@@ -163,16 +185,65 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
   const [flagged, setFlagged] = useState<Record<string, boolean>>({});
   const [oralPreviewUrls, setOralPreviewUrls] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [serverExpired, setServerExpired] = useState(false);
+  const [otherTabActive, setOtherTabActive] = useState(false);
+  const [tabClaim, setTabClaim] = useState(0);
   const [liveAudioUrl, setLiveAudioUrl] = useState<string | null>(null);
   const [audioRefreshing, setAudioRefreshing] = useState(false);
-  const dirtyRef = useRef<Set<string>>(new Set());
+  const draftsRef = useRef<Record<string, AttemptDraftEntry>>({});
+  const [unsavedCount, setUnsavedCount] = useState(0);
   const hydratedAttemptRef = useRef<string | null>(null);
   const autoSubmitStartedRef = useRef(false);
+  const submitLockRef = useRef({ held: false });
+  const tabIdRef = useRef("");
+  const forceTabRef = useRef(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    setServerExpired(false);
+  }, [attemptId]);
+
+  useEffect(() => {
+    if (isPreview || !attemptId || typeof localStorage === "undefined") return;
+    const key = attemptTabLockKey(attemptId);
+    if (!tabIdRef.current) {
+      tabIdRef.current =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `tab-${Math.random().toString(36).slice(2)}`;
+    }
+    const tick = () => {
+      const force = forceTabRef.current;
+      forceTabRef.current = false;
+      const decision = decideAttemptTab({
+        stored: parseAttemptTabLock(localStorage.getItem(key)),
+        tabId: tabIdRef.current,
+        now: Date.now(),
+        staleAfterMs: 15_000,
+        force,
+      });
+      setOtherTabActive(decision.action === "blocked");
+      if (decision.action === "own") {
+        localStorage.setItem(key, JSON.stringify(decision.lock));
+      }
+    };
+    tick();
+    const timer = window.setInterval(tick, 4000);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === key) tick();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("storage", onStorage);
+      const stored = parseAttemptTabLock(localStorage.getItem(key));
+      if (stored?.tabId === tabIdRef.current) localStorage.removeItem(key);
+    };
+  }, [attemptId, isPreview, tabClaim]);
 
   useEffect(() => {
     if (!isPreview || !examId) return;
@@ -193,20 +264,17 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
     const attemptKey = attemptId ?? "";
     if (hydratedAttemptRef.current !== attemptKey) {
       hydratedAttemptRef.current = attemptKey;
-      dirtyRef.current = new Set();
-      const next: Record<string, Json> = {};
-      const flags: Record<string, boolean> = {};
-      for (const row of rows) {
-        next[row.question_id] = row.answer;
-        flags[row.question_id] = row.flagged;
-      }
-      setLocalAnswers(next);
-      setFlagged(flags);
+      const stored = attemptId ? readAttemptDraft(attemptId) : {};
+      draftsRef.current = stored;
+      setUnsavedCount(Object.keys(stored).length);
+      const merged = mergeServerAnswersWithDrafts(rows, stored);
+      setLocalAnswers(merged.answers);
+      setFlagged(merged.flagged);
     } else {
       setLocalAnswers((prev) => {
         const next = { ...prev };
         for (const row of rows) {
-          if (dirtyRef.current.has(row.question_id)) continue;
+          if (draftsRef.current[row.question_id]) continue;
           next[row.question_id] = row.answer;
         }
         return next;
@@ -214,7 +282,7 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
       setFlagged((prev) => {
         const next = { ...prev };
         for (const row of rows) {
-          if (dirtyRef.current.has(row.question_id)) continue;
+          if (draftsRef.current[row.question_id]) continue;
           next[row.question_id] = row.flagged;
         }
         return next;
@@ -285,30 +353,46 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
   const remaining = isPreview ? "Aperçu" : formatRemaining(attemptQuery.data?.expires_at);
   const expired =
     !isPreview &&
-    attemptQuery.data?.expires_at != null &&
-    new Date(attemptQuery.data.expires_at).getTime() <= now;
+    (serverExpired ||
+      (attemptQuery.data?.expires_at != null &&
+        new Date(attemptQuery.data.expires_at).getTime() <= now));
 
   useEffect(() => {
     if (isPreview || !expired || !attemptId || submitExam.isPending || submitting) return;
-    if (attemptQuery.data?.status !== "in_progress") return;
+    // Goethe A1 keeps the attempt open so Sprechen can still be recorded, then sent.
+    if (isGoetheA1) return;
+    const status = attemptQuery.data?.status;
+    if (status !== "in_progress" && status !== "expired") return;
     if (autoSubmitStartedRef.current) return;
+    if (!acquireSubmitLock(submitLockRef.current)) return;
     autoSubmitStartedRef.current = true;
     let cancelled = false;
     void (async () => {
       try {
-        await flushPendingWrites();
-        if (cancelled) return;
+        try {
+          await flushPendingWrites();
+        } catch {
+          // The server already rejects new answers after expires_at.
+        }
+        if (cancelled) {
+          autoSubmitStartedRef.current = false;
+          releaseSubmitLock(submitLockRef.current);
+          return;
+        }
         await new Promise<void>((resolve, reject) => {
           submitExam.mutate(attemptId, {
             onSuccess: () => resolve(),
             onError: (err) => reject(err),
           });
         });
+        finishSubmittedAttempt();
+        releaseSubmitLock(submitLockRef.current);
         if (cancelled) return;
-        toast.message("Temps écoulé — examen envoyé");
+        toast.message("Temps écoulé — examen envoyé avec les réponses enregistrées");
         navigate("exam-result");
       } catch (err) {
         autoSubmitStartedRef.current = false;
+        releaseSubmitLock(submitLockRef.current);
         toast.error(err instanceof Error ? err.message : "Envoi automatique impossible");
       }
     })();
@@ -325,23 +409,46 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
     navigate,
     isPreview,
     submitting,
+    isGoetheA1,
   ]);
 
-  const persist = (questionId: string, answer: Json, isFlagged?: boolean) => {
-    dirtyRef.current.add(questionId);
-    if (isPreview || !attemptId) return;
+  const rememberDraft = (questionId: string, answer: Json, isFlagged?: boolean) => {
+    const flaggedValue =
+      isFlagged ?? draftsRef.current[questionId]?.flagged ?? flagged[questionId] ?? false;
+    const noted = noteDraftEntry(draftsRef.current, {
+      questionId,
+      answer,
+      flagged: flaggedValue,
+    });
+    draftsRef.current = noted.drafts;
+    setUnsavedCount(Object.keys(noted.drafts).length);
+    if (attemptId) writeAttemptDraft(attemptId, noted.drafts);
+    setLocalAnswers((prev) => ({ ...prev, [questionId]: answer }));
+    if (isFlagged !== undefined) {
+      setFlagged((prev) => ({ ...prev, [questionId]: isFlagged }));
+    }
+  };
+
+  const persistDraft = (questionId: string) => {
+    const entry = draftsRef.current[questionId];
+    if (!entry || isPreview || !attemptId) return;
+    const revision = entry.revision;
     saveAnswer.mutate(
       {
         attemptId,
         questionId,
-        answer,
-        flagged: isFlagged ?? flagged[questionId] ?? false,
+        answer: entry.answer,
+        flagged: entry.flagged,
       },
       {
         onSuccess: () => {
-          dirtyRef.current.delete(questionId);
+          const next = ackDraftIfCurrent(draftsRef.current, questionId, revision);
+          draftsRef.current = next;
+          setUnsavedCount(Object.keys(next).length);
+          writeAttemptDraft(attemptId, next);
         },
         onError: (err) => {
+          if (err instanceof Error && err.name === "ATTEMPT_EXPIRED") setServerExpired(true);
           toast.error(err.message || "Échec de l’enregistrement");
         },
       },
@@ -349,33 +456,36 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
   };
 
   const flushPendingWrites = async () => {
-    if (isPreview || !attemptId || !current) return;
-    if (
-      isWritingOnlyQuestionType(current.type) ||
-      current.type === "form_fill" ||
-      isManualQuestionType(current.type) ||
-      isChoiceQuestionType(current.type)
-    ) {
-      const value = localAnswers[current.id];
-      if (value !== undefined) {
-        try {
-          await ExamService.saveAnswer({
-            attemptId,
-            questionId: current.id,
-            answer: value,
-            flagged: flagged[current.id] ?? false,
-          });
-          dirtyRef.current.delete(current.id);
-        } catch (err) {
-          throw err instanceof Error ? err : new Error("Échec de l’enregistrement");
-        }
+    if (isPreview || !attemptId) return;
+    const pending = listDrafts(draftsRef.current);
+    for (const draft of pending) {
+      try {
+        await ExamService.saveAnswer({
+          attemptId,
+          questionId: draft.questionId,
+          answer: draft.answer,
+          flagged: draft.flagged,
+        });
+      } catch (err) {
+        if (err instanceof Error && err.name === "ATTEMPT_EXPIRED") setServerExpired(true);
+        throw err instanceof Error ? err : new Error("Échec de l’enregistrement");
       }
+      const next = ackDraftIfCurrent(draftsRef.current, draft.questionId, draft.revision);
+      draftsRef.current = next;
+      setUnsavedCount(Object.keys(next).length);
+      writeAttemptDraft(attemptId, next);
     }
     let waits = 0;
     while (saveAnswer.isPending && waits < 40) {
       await sleep(100);
       waits += 1;
     }
+  };
+
+  const finishSubmittedAttempt = () => {
+    if (attemptId) clearAttemptDraft(attemptId);
+    draftsRef.current = {};
+    setUnsavedCount(0);
   };
 
   const currentTeil = current ? questionTeil(current.metadata) : null;
@@ -425,8 +535,9 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
     if (!isManualQuestionType(current.type)) return;
     const value = localAnswers[current.id];
     if (value === undefined) return;
+    const questionId = current.id;
     const timer = window.setTimeout(() => {
-      persist(current.id, value);
+      persistDraft(questionId);
     }, 800);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce local draft only
@@ -436,8 +547,9 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
     if (isPreview || !current || !attemptId || current.type !== "form_fill") return;
     const value = localAnswers[current.id];
     if (value === undefined) return;
+    const questionId = current.id;
     const timer = window.setTimeout(() => {
-      persist(current.id, value);
+      persistDraft(questionId);
     }, 800);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce form_fill draft
@@ -530,10 +642,6 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
   const audioPlayerKey = horenAudioKey;
   const showModuleNav = skillNav.length > 1 || teilNav.length > 1;
   const isB1 = isB1ModelltestCode(examQuery.data?.code);
-  const isGoetheA1 = isGoetheA1AdultProfile({
-    format_profile: examQuery.data?.format_profile,
-    code: examQuery.data?.code,
-  });
   const playbackCount =
     typeof currentMeta["playback_count"] === "number"
       ? currentMeta["playback_count"]
@@ -586,6 +694,11 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
         ? formatStudentFacingText(passage)
         : passage
       : null;
+  const saveStatus = draftSaveStatus({
+    pending: saveAnswer.isPending || uploadOral.isPending,
+    unsaved: unsavedCount,
+    failed: saveAnswer.isError,
+  });
 
   return (
     <QueryState
@@ -624,8 +737,12 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                   : ""}
               </p>
             </div>
-            <span className="inline-flex items-center gap-2 rounded-md border border-alert/20 bg-alert-soft px-3 py-1.5 text-sm font-medium text-alert">
-              <Clock3 className="size-4" />
+            <span
+              className="inline-flex items-center gap-2 rounded-md border border-alert/20 bg-alert-soft px-3 py-1.5 text-sm font-medium text-alert"
+              role="timer"
+              aria-label={isPreview ? "Aperçu, sans chronomètre" : `Temps restant ${remaining}`}
+            >
+              <Clock3 className="size-4" aria-hidden />
               {remaining}
             </span>
           </div>
@@ -675,6 +792,26 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
           />
         </header>
 
+        {otherTabActive && !isPreview ? (
+          <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <p>Cette tentative est ouverte dans un autre onglet. Les réponses de cet onglet ne sont pas envoyées.</p>
+            <Button
+              className="mt-3"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                forceTabRef.current = true;
+                setTabClaim((value) => value + 1);
+              }}
+            >
+              Continuer dans cet onglet
+            </Button>
+          </div>
+        ) : null}
+        <fieldset
+          disabled={otherTabActive && !isPreview}
+          className="min-w-0 border-0 p-0 disabled:opacity-70"
+        >
         <div className="grid gap-6 lg:grid-cols-[1fr_14rem]">
           <Surface className="p-6 sm:p-8">
             <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -733,11 +870,18 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
 
             {isSpeakingType && isGoetheA1 ? (
               <p className="mt-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                Entraînement oral enregistré — hors chronomètre écrit (
+                Expression orale. Le chronomètre écrit (
                 {examQuery.data?.written_duration_minutes ??
                   examQuery.data?.duration_minutes ??
                   65}{" "}
-                min). Enregistrez ou déposez votre audio pour chaque Teil.
+                min) fige Hören, Lesen et Schreiben. Vous pouvez encore enregistrer l’oral, puis
+                envoyer la tentative.
+              </p>
+            ) : null}
+            {expired && isGoetheA1 ? (
+              <p className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                Temps écrit écoulé. Les réponses déjà enregistrées sont conservées. Enregistrez
+                l’oral s’il manque, puis clôturez la tentative.
               </p>
             ) : null}
 
@@ -755,10 +899,11 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                           ? "border-primary bg-primary/5 font-medium text-foreground shadow-soft"
                           : "border-border hover:border-primary/40"
                       }`}
+                      aria-pressed={selected}
                       onClick={() => {
                         if (expired) return;
-                        setLocalAnswers((prev) => ({ ...prev, [current.id]: option.value }));
-                        persist(current.id, option.value);
+                        rememberDraft(current.id, option.value);
+                        persistDraft(current.id);
                       }}
                     >
                       <span
@@ -786,15 +931,10 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                         value={formFillDraft[field.key] ?? ""}
                         disabled={expired || attemptQuery.data?.status !== "in_progress"}
                         onChange={(e) => {
-                          const next = {
-                            ...formFillDraft,
-                            [field.key]: e.target.value,
-                          };
-                          setLocalAnswers((prev) => ({ ...prev, [current.id]: next }));
-                          dirtyRef.current.add(current.id);
-                        }}
-                        onBlur={() => {
-                          persist(current.id, formFillAnswer(localAnswers[current.id]));
+                          const base = formFillAnswer(
+                            draftsRef.current[current.id]?.answer ?? localAnswers[current.id],
+                          );
+                          rememberDraft(current.id, { ...base, [field.key]: e.target.value });
                         }}
                       />
                     </label>
@@ -807,7 +947,7 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                   disabled={
                     isPreview
                       ? false
-                      : expired || attemptQuery.data?.status !== "in_progress"
+                      : attemptQuery.data?.status !== "in_progress" || (expired && !isGoetheA1)
                   }
                   hasAudio={
                     isPreview
@@ -838,7 +978,14 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                       file,
                       flagged: flagged[current.id] ?? false,
                     });
-                    dirtyRef.current.delete(current.id);
+                    const nextDrafts = ackDraftIfCurrent(
+                      draftsRef.current,
+                      current.id,
+                      draftsRef.current[current.id]?.revision ?? -1,
+                    );
+                    draftsRef.current = nextDrafts;
+                    setUnsavedCount(Object.keys(nextDrafts).length);
+                    if (attemptId) writeAttemptDraft(attemptId, nextDrafts);
                     setLocalAnswers((prev) => ({ ...prev, [current.id]: saved.answer }));
                     try {
                       const signed = await ExamService.getAnswerAudioSignedUrl(saved);
@@ -873,13 +1020,8 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                     placeholder="Saisissez votre réponse…"
                     disabled={expired || attemptQuery.data?.status !== "in_progress"}
                     onChange={(e) => {
-                      const value = e.target.value;
-                      setLocalAnswers((prev) => ({ ...prev, [current.id]: value }));
-                      dirtyRef.current.add(current.id);
-                    }}
-                    onBlur={() => {
-                      if (!current || expired) return;
-                      persist(current.id, localAnswers[current.id] ?? "");
+                      if (!current) return;
+                      rememberDraft(current.id, e.target.value);
                     }}
                   />
                   <p className="mt-2 text-xs text-muted-foreground">
@@ -922,8 +1064,10 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                   onClick={() => {
                     if (!current) return;
                     const next = !(flagged[current.id] ?? false);
-                    setFlagged((prev) => ({ ...prev, [current.id]: next }));
-                    persist(current.id, localAnswers[current.id] ?? null, next);
+                    const answer =
+                      draftsRef.current[current.id]?.answer ?? localAnswers[current.id] ?? null;
+                    rememberDraft(current.id, answer, next);
+                    persistDraft(current.id);
                   }}
                 >
                   <Flag className="size-4" />
@@ -938,21 +1082,24 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                     disabled={
                       submitExam.isPending ||
                       submitting ||
-                      saveAnswer.isPending ||
-                      expired ||
-                      attemptQuery.data?.status !== "in_progress"
+                      (saveAnswer.isPending && !expired) ||
+                      (attemptQuery.data?.status !== "in_progress" &&
+                        attemptQuery.data?.status !== "expired")
                     }
                     onClick={() => {
                       if (!attemptId) return;
+                      if (!acquireSubmitLock(submitLockRef.current)) return;
                       if (
                         !window.confirm(
                           "Envoyer définitivement cet examen ? Vous ne pourrez plus modifier vos réponses.",
                         )
                       ) {
+                        releaseSubmitLock(submitLockRef.current);
                         return;
                       }
                       setSubmitting(true);
                       void flushPendingWrites()
+                        .catch(() => undefined)
                         .then(
                           () =>
                             new Promise<void>((resolve, reject) => {
@@ -963,16 +1110,20 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                             }),
                         )
                         .then(() => {
+                          finishSubmittedAttempt();
                           toast.success("Examen envoyé");
                           navigate("exam-result");
                         })
                         .catch((err: Error) => {
                           toast.error(err.message || "Remise impossible");
                         })
-                        .finally(() => setSubmitting(false));
+                        .finally(() => {
+                          releaseSubmitLock(submitLockRef.current);
+                          setSubmitting(false);
+                        });
                     }}
                   >
-                    Envoyer
+                    {expired ? "Clôturer" : "Envoyer"}
                   </Button>
                 )}
               </div>
@@ -1001,6 +1152,8 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                   <button
                     key={q.id}
                     type="button"
+                    aria-label={`Question ${i + 1}${isCurrent ? ", question affichée" : ""}`}
+                    aria-current={isCurrent ? "true" : undefined}
                     onClick={() => {
                       void flushPendingWrites()
                         .then(() => setIndex(i))
@@ -1019,11 +1172,18 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
                 );
               })}
             </div>
-            {!isPreview && saveAnswer.isPending ? (
-              <p className="mt-3 text-xs text-muted-foreground">Enregistrement…</p>
-            ) : null}
-            {!isPreview && saveAnswer.isError ? (
-              <p className="mt-3 text-xs text-destructive">Échec d’enregistrement</p>
+            {!isPreview ? (
+              <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
+                {saveStatus === "pending"
+                  ? "Enregistrement…"
+                  : saveStatus === "failed"
+                    ? "Échec d’enregistrement — la réponse reste sur cet appareil"
+                    : saveStatus === "unsaved"
+                      ? "Modification pas encore sur le serveur"
+                      : saveAnswer.isSuccess
+                        ? "Enregistré sur le serveur"
+                        : "Aucune modification en attente"}
+              </p>
             ) : null}
             {isPreview ? (
               <p className="mt-3 text-xs text-muted-foreground">
@@ -1032,6 +1192,7 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
             ) : null}
           </Surface>
         </div>
+        </fieldset>
       </div>
     </QueryState>
   );

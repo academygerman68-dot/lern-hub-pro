@@ -1,6 +1,6 @@
 export type Role = "student" | "teacher" | "director";
 export type SubscriptionStatus = "ACTIVE" | "PAST_DUE" | "SUSPENDED";
-export type Locale = "fr" | "ar";
+export type Locale = "fr" | "ar" | "de";
 export type Level = "A1" | "A2" | "B1" | "B2";
 export type AccountStatus = "active" | "pending" | "restricted" | "suspended" | "archived";
 

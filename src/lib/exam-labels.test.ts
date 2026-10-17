@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { examCatalogAction, examQuestionTypeLabel, examSkillLabel } from "./exam-labels";
+import {
+  examCatalogAction,
+  examQuestionTypeLabel,
+  examSkillLabel,
+  examCatalogKind,
+  historicalPartialExamNotice,
+} from "./exam-labels";
 
 describe("exam labels", () => {
   it("maps question types without raw codes in UI labels", () => {
@@ -8,6 +14,17 @@ describe("exam labels", () => {
     expect(examQuestionTypeLabel("multiple_choice")).toBe("Choix multiple");
     expect(examQuestionTypeLabel("writing")).toBe("Expression écrite");
     expect(examQuestionTypeLabel("listening")).toBe("Écoute");
+  });
+
+  it("labels the historical A1 bank as partial and leaves the complete sim unlabeled", () => {
+    expect(historicalPartialExamNotice("A1-01")).toMatch(/partielle/);
+    expect(historicalPartialExamNotice("A1-02")).toMatch(/50 points/);
+    expect(historicalPartialExamNotice("a1-03")).toMatch(/audio/);
+    expect(historicalPartialExamNotice("A1-SIM-01")).toBeNull();
+    expect(examCatalogKind("A1-01")).toBe("historical-partial");
+    expect(examCatalogKind("A1-SIM-01")).toBe("a1-simulation");
+    expect(examCatalogKind("B1-MT01")).toBe("unspecified");
+    expect(historicalPartialExamNotice("B1-MT01")).toBeNull();
   });
 
   it("maps skills to french section names", () => {
@@ -40,8 +57,10 @@ describe("exam labels", () => {
     expect(examCatalogAction({ latestStatus: "graded", hasUngradedWriting: true }).action).toBe(
       "provisional",
     );
-    expect(examCatalogAction({ latestStatus: "expired", hasUngradedWriting: false }).cta).toBe(
-      "Score provisoire",
-    );
+    expect(examCatalogAction({ latestStatus: "expired", hasUngradedWriting: false })).toEqual({
+      label: "Temps écoulé",
+      cta: "Clôturer la tentative",
+      action: "finalize",
+    });
   });
 });

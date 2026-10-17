@@ -24,6 +24,7 @@ import { setLiveSessionId } from "@/lib/live-class-session";
 import { formatLiveDate, formatLiveTime, liveStatusLabel } from "@/lib/live-meeting";
 import { AssignmentService } from "@/services/academy-services";
 import { useAcademy } from "./academy-context";
+import { studentNextStep } from "@/lib/student-next-step";
 import { paymentStatusLabel } from "./finance-pages";
 import { QueryState } from "./query-state";
 import { Eyebrow, Status } from "./premium-kit";
@@ -74,7 +75,19 @@ export function PremiumStudentDashboard() {
   const levelExams = (examsQuery.data ?? [])
     .filter((exam) => !exam.level?.code || exam.level.code === level)
     .slice(0, 3);
-  const recentAttempt = (attemptsQuery.data ?? [])[0];
+  const recentAttempt = (attemptsQuery.data ?? []).find(
+    (attempt) => attempt.status === "submitted" || attempt.status === "graded",
+  );
+  const dueAssignmentCount = (assignmentsQuery.data ?? []).filter(
+    (item) => item.status === "published" || item.status === "Publié",
+  ).length;
+  const nextStep = studentNextStep({
+    hasInProgressExam: (attemptsQuery.data ?? []).some(
+      (attempt) => attempt.status === "in_progress",
+    ),
+    dueAssignmentCount,
+    availableExamCount: levelExams.length,
+  });
   const identityMissing =
     !studentsQuery.isLoading && !studentsQuery.isError && !myStudent && Boolean(user?.email);
 
@@ -174,7 +187,11 @@ export function PremiumStudentDashboard() {
               </div>
             ) : null}
           </div>
-          <Button className="mt-6 w-full" variant="outline" onClick={() => navigate("profile")}>
+          <Button className="mt-6 w-full" onClick={() => navigate(nextStep.page)}>
+            {nextStep.cta}
+          </Button>
+          <p className="mt-3 text-sm text-muted-foreground">{nextStep.detail}</p>
+          <Button className="mt-3 w-full" variant="outline" onClick={() => navigate("profile")}>
             {l("Mon profil", "ملفي")}
           </Button>
         </div>
@@ -232,7 +249,7 @@ export function PremiumStudentDashboard() {
             className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary"
             onClick={() => navigate("exams")}
           >
-            {l("Entraînement", "تدرّب")} <ChevronRight className="size-4" />
+            {l("Examens blancs", "الامتحانات")} <ChevronRight className="size-4" />
           </button>
         </Surface>
 

@@ -71,6 +71,9 @@ describe("billing UX statuses", () => {
   });
 
   it("picks the next open installment", () => {
+    const future = new Date();
+    future.setDate(future.getDate() + 20);
+    const dueDate = future.toISOString().slice(0, 10);
     const next = pickNextInstallment(
       [
         {
@@ -86,8 +89,8 @@ describe("billing UX statuses", () => {
           status: "pending",
           amount: 1200,
           currency: "MAD",
-          billing_period: "2026-09",
-          due_date: "2026-09-30",
+          billing_period: dueDate.slice(0, 7),
+          due_date: dueDate,
         },
       ],
       [],
