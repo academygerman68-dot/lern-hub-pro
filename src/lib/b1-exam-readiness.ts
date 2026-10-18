@@ -10,14 +10,8 @@
  */
 
 import type { Json } from "@/types/database";
-import {
-  validateExamCompleteness,
-  type ExamCompletenessQuestion,
-} from "@/lib/exam-completeness";
-import {
-  countHorenAudioReady,
-  countHorenAudioVerifiedSlots,
-} from "@/lib/horen-audio-slots";
+import { validateExamCompleteness, type ExamCompletenessQuestion } from "@/lib/exam-completeness";
+import { countHorenAudioReady, countHorenAudioVerifiedSlots } from "@/lib/horen-audio-slots";
 
 export type B1ReadinessQuestion = {
   id?: string;
@@ -115,15 +109,11 @@ function isPlaceholderQuestion(q: ExamCompletenessQuestion): boolean {
   return /OCR (in)?compl[eè]te|placeholder|Frage \d+ —/i.test(q.prompt || "");
 }
 
-function optionMatches(
-  options: ExamCompletenessQuestion["options"],
-  token: string,
-): boolean {
+function optionMatches(options: ExamCompletenessQuestion["options"], token: string): boolean {
   const want = token.toLowerCase();
   return (options ?? []).some(
     (o) =>
-      String(o.value ?? "").toLowerCase() === want ||
-      String(o.label ?? "").toLowerCase() === want,
+      String(o.value ?? "").toLowerCase() === want || String(o.label ?? "").toLowerCase() === want,
   );
 }
 
@@ -200,7 +190,9 @@ export function computeB1ExamReadiness(exam: B1ReadinessExamInput): B1ExamReadin
     if (q.skill === "sprechen" || q.type === "speaking") sprechenTasks += 1;
   }
 
-  const objectiveTotal = questions.filter((q) => q.skill === "lesen" || q.skill === "hoeren").length;
+  const objectiveTotal = questions.filter(
+    (q) => q.skill === "lesen" || q.skill === "hoeren",
+  ).length;
   const confirmedAnswerKeys = countAnswerKeys(questions);
   const missingKeysCount = countMissingKeys(questions);
   const audioSlots = countHorenAudioReady(questions);
@@ -235,7 +227,11 @@ export function computeB1ExamReadiness(exam: B1ReadinessExamInput): B1ExamReadin
       blockers.push("Barème pédagogique interne, à confirmer");
     }
   }
-  if (confirmedAnswerKeys === 0 && objectiveTotal > 0 && !blockers.some((b) => /clé|réponse/i.test(b))) {
+  if (
+    confirmedAnswerKeys === 0 &&
+    objectiveTotal > 0 &&
+    !blockers.some((b) => /clé|réponse/i.test(b))
+  ) {
     blockers.push("clés de correction structurées non fournies");
   }
 
@@ -289,7 +285,11 @@ export function computeB1ExamReadiness(exam: B1ReadinessExamInput): B1ExamReadin
   }
 
   const progressDetail = [
-    { label: "Structure", earned: questions.length > 0 ? weights.structure : 0, max: weights.structure },
+    {
+      label: "Structure",
+      earned: questions.length > 0 ? weights.structure : 0,
+      max: weights.structure,
+    },
     {
       label: "Transcription (hors placeholders)",
       earned:
@@ -309,9 +309,7 @@ export function computeB1ExamReadiness(exam: B1ReadinessExamInput): B1ExamReadin
     {
       label: "Corrigés objectifs",
       earned:
-        objectiveTotal > 0
-          ? Math.round((confirmedAnswerKeys / objectiveTotal) * weights.keys)
-          : 0,
+        objectiveTotal > 0 ? Math.round((confirmedAnswerKeys / objectiveTotal) * weights.keys) : 0,
       max: weights.keys,
     },
     {

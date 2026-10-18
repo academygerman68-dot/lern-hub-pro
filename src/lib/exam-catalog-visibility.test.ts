@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { shellNavPageIds } from "@/components/academy/shell";
 import { isPageForRole } from "./academy-logic";
-import {
-  EXAM_BLANCS_PAGES_BY_ROLE,
-  resolvePublishedExamCatalog,
-} from "./exam-catalog-visibility";
+import { EXAM_BLANCS_PAGES_BY_ROLE, resolvePublishedExamCatalog } from "./exam-catalog-visibility";
 
 describe("resolvePublishedExamCatalog", () => {
   /** Must match the published A1 bank already in DB (never re-seed to "fix" empty catalog). */
@@ -83,13 +80,7 @@ describe("Examens blancs navigation pages", () => {
 
   it("orders student learning nav without a separate Entraînements tab", () => {
     const ids = shellNavPageIds("student");
-    expect(ids.slice(0, 5)).toEqual([
-      "dashboard",
-      "materials",
-      "assignments",
-      "exams",
-      "courses",
-    ]);
+    expect(ids.slice(0, 5)).toEqual(["dashboard", "materials", "assignments", "exams", "courses"]);
     expect(ids).not.toContain("training");
     expect(shellNavPageIds("teacher")).not.toContain("training-preview");
     expect(shellNavPageIds("teacher")).not.toContain("training-corrections");

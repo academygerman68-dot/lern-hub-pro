@@ -207,10 +207,7 @@ export const SupabasePaymentService = {
     return String(data);
   },
 
-  async ensureFlexibleBilling(input: {
-    includeFuturePack: boolean;
-    currency?: string | null;
-  }) {
+  async ensureFlexibleBilling(input: { includeFuturePack: boolean; currency?: string | null }) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (requireClient() as any).rpc("ensure_flexible_billing_payments", {
       p_include_future_pack: input.includeFuturePack,

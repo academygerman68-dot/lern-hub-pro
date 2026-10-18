@@ -46,7 +46,10 @@ describe("B1 exam bank core", () => {
     expect(result.stats.invented_keys_flagged).toBe(0);
 
     for (const exam of bank.exams) {
-      const types = exam.sections.map((s) => s.type).sort().join(",");
+      const types = exam.sections
+        .map((s) => s.type)
+        .sort()
+        .join(",");
       expect(types).toBe("hoeren,lesen,schreiben,sprechen");
       expect(exam.integrity.answer_keys_invented).toBe(false);
       expect(exam.integrity.answer_keys_included).toBe(false);

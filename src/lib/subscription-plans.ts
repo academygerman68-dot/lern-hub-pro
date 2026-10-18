@@ -59,11 +59,7 @@ export function amountToMad(
 
 /** Normalize public settings from listPublic (rows) or getMap (Record) — never throw. */
 export function normalizeAppSettingRows(
-  rows:
-    | Array<{ key: string; value: unknown }>
-    | Record<string, unknown>
-    | null
-    | undefined,
+  rows: Array<{ key: string; value: unknown }> | Record<string, unknown> | null | undefined,
 ): Array<{ key: string; value: unknown }> {
   if (rows == null) return [];
   if (Array.isArray(rows)) return rows;
@@ -74,11 +70,7 @@ export function normalizeAppSettingRows(
 }
 
 export function parseBillingTariffSettings(
-  rows:
-    | Array<{ key: string; value: unknown }>
-    | Record<string, unknown>
-    | null
-    | undefined,
+  rows: Array<{ key: string; value: unknown }> | Record<string, unknown> | null | undefined,
 ): BillingTariffMap {
   const out: BillingTariffMap = {};
   for (const row of normalizeAppSettingRows(rows)) {
@@ -93,8 +85,8 @@ export function parseBillingTariffSettings(
     else if (raw && typeof raw === "object" && !Array.isArray(raw)) {
       // jsonb number sometimes stored as plain JSON number already handled above;
       // object shapes are ignored (no silent invented amount from {}.value).
-      const nested = (raw as { amount?: unknown; value?: unknown }).amount
-        ?? (raw as { value?: unknown }).value;
+      const nested =
+        (raw as { amount?: unknown; value?: unknown }).amount ?? (raw as { value?: unknown }).value;
       amount = typeof nested === "number" || typeof nested === "string" ? Number(nested) : null;
     }
     if (amount == null || !Number.isFinite(amount) || amount <= 0) continue;
@@ -104,22 +96,14 @@ export function parseBillingTariffSettings(
 }
 
 export function parseEurToMadRate(
-  rows:
-    | Array<{ key: string; value: unknown }>
-    | Record<string, unknown>
-    | null
-    | undefined,
+  rows: Array<{ key: string; value: unknown }> | Record<string, unknown> | null | undefined,
 ): number {
   const list = normalizeAppSettingRows(rows);
   const row = list.find((r) => r.key === "billing_fx_eur_to_mad");
   if (!row) return EUR_TO_MAD_RATE;
   const raw = row.value;
   const n =
-    typeof raw === "number"
-      ? raw
-      : typeof raw === "string"
-        ? Number(raw)
-        : Number(raw as never);
+    typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : Number(raw as never);
   return Number.isFinite(n) && n > 0 ? n : EUR_TO_MAD_RATE;
 }
 

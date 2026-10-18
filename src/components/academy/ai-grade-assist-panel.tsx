@@ -120,9 +120,7 @@ export function AiGradeAssistPanel({
               ❌ Erreurs détectées
             </h5>
             {suggestion.errors.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                ✅ Aucune erreur importante détectée.
-              </p>
+              <p className="text-sm text-muted-foreground">✅ Aucune erreur importante détectée.</p>
             ) : (
               <div className="grid gap-3">
                 {suggestion.errors.map((error, index) => (

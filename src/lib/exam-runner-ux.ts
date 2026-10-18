@@ -42,10 +42,7 @@ export function stableHorenAudioKey(input: {
 
 export function isChoiceQuestionType(type: string | null | undefined): boolean {
   return (
-    type === "single_choice" ||
-    type === "true_false" ||
-    type === "listening" ||
-    type === "matching"
+    type === "single_choice" || type === "true_false" || type === "listening" || type === "matching"
   );
 }
 
@@ -60,17 +57,20 @@ export function examLevelCode(exam: {
   return match?.[1] ?? "";
 }
 
-export function filterExamsByLevel<T extends { level?: { code?: string | null } | null; code?: string | null }>(
-  exams: T[],
-  filter: ExamLevelFilter,
-): T[] {
+export function filterExamsByLevel<
+  T extends { level?: { code?: string | null } | null; code?: string | null },
+>(exams: T[], filter: ExamLevelFilter): T[] {
   if (filter === "all") return exams;
   return exams.filter((exam) => examLevelCode(exam) === filter);
 }
 
 /** B1 Modelltests sort numerically (MT01…MT15); others keep title order. */
 export function sortExamsForCatalog<
-  T extends { title?: string | null; code?: string | null; level?: { code?: string | null } | null },
+  T extends {
+    title?: string | null;
+    code?: string | null;
+    level?: { code?: string | null } | null;
+  },
 >(exams: T[]): T[] {
   return exams.slice().sort((a, b) => {
     const aB1 = isB1ModelltestCode(a.code);
@@ -134,7 +134,9 @@ export function pedagogicalQuestionLabel(input: {
       : typeof meta["question_number"] === "number"
         ? meta["question_number"]
         : null;
-  const n = explicit ?? (Number.isFinite(input.sortOrder) ? Number(input.sortOrder) : input.indexInSkill + 1);
+  const n =
+    explicit ??
+    (Number.isFinite(input.sortOrder) ? Number(input.sortOrder) : input.indexInSkill + 1);
   const skill = input.skill ?? "";
   if (skill === "schreiben") return `Aufgabe ${n}`;
   if (skill === "sprechen") {

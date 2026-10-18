@@ -8,21 +8,13 @@
  * - Prefer creating needs_review questions over dropping structure
  */
 
-import {
-  detectSprechenRole,
-  splitSchreibenPageBundle,
-} from "./b1-ocr-transform.ts";
+import { detectSprechenRole, splitSchreibenPageBundle } from "./b1-ocr-transform.ts";
 import type { B1DraftExam, B1DraftQuestion, B1DraftSection, B1ExamBank } from "./b1-exam-bank.ts";
 
 export type B1ReviewStatus = "needs_review" | "verified";
 
 export type B1StructuredQuestionType =
-  | "true_false"
-  | "single_choice"
-  | "matching"
-  | "listening"
-  | "writing"
-  | "speaking";
+  "true_false" | "single_choice" | "matching" | "listening" | "writing" | "speaking";
 
 export type B1StructuredOption = {
   id: string;
@@ -116,7 +108,12 @@ export type B1ProposedAnswerKeyBlock = {
   note: string;
 };
 
-const LESEN_TEIL_RANGES: Array<{ teil: number; from: number; to: number; type: B1StructuredQuestionType }> = [
+const LESEN_TEIL_RANGES: Array<{
+  teil: number;
+  from: number;
+  to: number;
+  type: B1StructuredQuestionType;
+}> = [
   { teil: 1, from: 1, to: 6, type: "true_false" },
   { teil: 2, from: 7, to: 12, type: "single_choice" },
   { teil: 3, from: 13, to: 19, type: "matching" },
@@ -167,7 +164,11 @@ function stripStandaloneRf(text: string): string {
     .replace(/\n{3,}/g, "\n\n");
 }
 
-function joinPages(questions: B1DraftQuestion[]): { text: string; pageIds: string[]; sources: unknown[] } {
+function joinPages(questions: B1DraftQuestion[]): {
+  text: string;
+  pageIds: string[];
+  sources: unknown[];
+} {
   const pageIds: string[] = [];
   const sources: unknown[] = [];
   const parts: string[] = [];
@@ -293,7 +294,9 @@ export function extractLesenPassageBody(prompt: string): string {
 function extractPressPassage(prompt: string): string {
   const cleaned = cleanNoise(prompt);
   const beispielIdx = cleaned.search(/\n\s*Beispiel\b/i);
-  const taskIdx = cleaned.search(/(?:^|\n)\s*(?:[\[@])?\s*(?:7|8|9|10|11|12|27|28|29|30)\s*[A-Za-zÄÖÜäöüß.]/);
+  const taskIdx = cleaned.search(
+    /(?:^|\n)\s*(?:[[@])?\s*(?:7|8|9|10|11|12|27|28|29|30)\s*[A-Za-zÄÖÜäöüß.]/,
+  );
   let end = cleaned.length;
   if (beispielIdx >= 0) end = Math.min(end, beispielIdx);
   if (taskIdx >= 0) end = Math.min(end, taskIdx);
@@ -338,8 +341,7 @@ function lesenPageLayout(section: B1DraftSection): {
     t1.find((p) => isRfStatementPage(p.prompt)) ??
     t1.find((p) => /Beispiel/i.test(p.prompt) && /Richtig/i.test(p.prompt)) ??
     null;
-  const passage =
-    t1.find((p) => p !== statement && !isRfStatementPage(p.prompt)) ?? t1[0] ?? null;
+  const passage = t1.find((p) => p !== statement && !isRfStatementPage(p.prompt)) ?? t1[0] ?? null;
 
   return {
     teil1Passage: passage,
@@ -374,7 +376,10 @@ export function extractTrueFalseStatements(
     // Drop everything through Beispiel marker (keep text after Beispiel on same chunk)
     const beispielIdx = chunk.search(/\bBeispiel\b/i);
     if (beispielIdx >= 0) {
-      chunk = chunk.slice(beispielIdx).replace(/^\s*Beispiel\s*/i, "").trim();
+      chunk = chunk
+        .slice(beispielIdx)
+        .replace(/^\s*Beispiel\s*/i, "")
+        .trim();
     }
     chunk = chunk
       .replace(/^(?:\d+\s*)?(?:Teil\s*\d+\s*)?(?:LESEN|HOREN|HÖREN)\s*/i, "")
@@ -415,7 +420,12 @@ export function extractTrueFalseStatements(
     if (!chunk || chunk.length < 8) continue;
     if (/^Zertifikat/i.test(chunk)) continue;
     // Skip Beispiel residue that is only the example statement when we still have enough
-    rfStatements.push(chunk.replace(/\n+/g, " ").replace(/\s{2,}/g, " ").trim());
+    rfStatements.push(
+      chunk
+        .replace(/\n+/g, " ")
+        .replace(/\s{2,}/g, " ")
+        .trim(),
+    );
   }
 
   // Drop leading Beispiel statement when we have expectedCount+1
@@ -427,7 +437,7 @@ export function extractTrueFalseStatements(
 
   // Fallback: line merge without RF pairs
   if (statements.length < expectedCount) {
-    let body = cleaned
+    const body = cleaned
       .replace(/^[\s\S]*?\bBeispiel\b\s*/i, "")
       .replace(/^(?:\d+\s*)?(?:Teil\s*\d+\s*)?(?:LESEN|HOREN|HÖREN)\s*/i, "")
       .trim();
@@ -476,7 +486,10 @@ export function extractSingleChoiceItems(
   prompt: string,
   from: number,
   to: number,
-): Map<number, { prompt: string; options: B1StructuredOption[]; status: "structured" | "needs_review" }> {
+): Map<
+  number,
+  { prompt: string; options: B1StructuredOption[]; status: "structured" | "needs_review" }
+> {
   const text = cleanNoise(prompt);
   const result = new Map<
     number,
@@ -490,7 +503,7 @@ export function extractSingleChoiceItems(
     const after = work.slice(beispiel + 1);
     // End Beispiel at next in-range number marker or "In diesem" / clear task start
     const endBeispiel = after.search(
-      /\n\s*(?:[\[@])?\s*([7-9]|1[0-2]|2[7-9]|30)\s*[A-Za-zÄÖÜäöüß.]|\nIn\s*diesem/i,
+      /\n\s*(?:[[@])?\s*([7-9]|1[0-2]|2[7-9]|30)\s*[A-Za-zÄÖÜäöüß.]|\nIn\s*diesem/i,
     );
     if (endBeispiel > 0) {
       work = work.slice(0, beispiel) + after.slice(endBeispiel);
@@ -499,8 +512,7 @@ export function extractSingleChoiceItems(
     }
   }
 
-  const markerRe =
-    /(?:^|\n)\s*(?:[\[@]|\b)?\s*([0-9]{1,2})(?=[A-Za-zÄÖÜäöüß.…]|\s)/g;
+  const markerRe = /(?:^|\n)\s*(?:[[@]|\b)?\s*([0-9]{1,2})(?=[A-Za-zÄÖÜäöüß.…]|\s)/g;
   const markers: Array<{ n: number; index: number; raw: string }> = [];
   let m: RegExpExecArray | null;
   while ((m = markerRe.exec(work)) !== null) {
@@ -514,7 +526,7 @@ export function extractSingleChoiceItems(
   const parseChunk = (
     chunkRaw: string,
   ): { prompt: string; options: B1StructuredOption[]; status: "structured" | "needs_review" } => {
-    let chunk = chunkRaw.replace(/^(?:[\[@])?\s*\d{1,2}\s*/, "").trim();
+    const chunk = chunkRaw.replace(/^(?:[[@])?\s*\d{1,2}\s*/, "").trim();
     const lines = chunk
       .split(/\n/)
       .map((l) => l.trim())
@@ -533,7 +545,10 @@ export function extractSingleChoiceItems(
     let optionLines: string[];
     if (lines.length >= 4) {
       optionLines = lines.slice(-3);
-      stem = lines.slice(0, lines.length - 3).join(" ").trim();
+      stem = lines
+        .slice(0, lines.length - 3)
+        .join(" ")
+        .trim();
     } else if (lines.length === 3) {
       // 3 lines: likely stem missing or 3 options only — treat first as stem if long
       if (lines[0]!.length > 40) {
@@ -551,7 +566,7 @@ export function extractSingleChoiceItems(
     const options: B1StructuredOption[] = optionLines.slice(0, 3).map((t, idx) => ({
       id: ABC_LABELS[idx] ?? String(idx),
       label: ABC_LABELS[idx] ?? String(idx),
-      text: t.replace(/^[@•·\-]\s*/, "").trim(),
+      text: t.replace(/^[@•·-]\s*/, "").trim(),
     }));
 
     return {
@@ -577,7 +592,7 @@ export function extractSingleChoiceItems(
   /** Split a long chunk that ate following unnumbered a/b/c questions. */
   const expandUnnumberedStems = (startN: number, chunkRaw: string) => {
     const lines = chunkRaw
-      .replace(/^(?:[\[@])?\s*\d{1,2}\s*/, "")
+      .replace(/^(?:[[@])?\s*\d{1,2}\s*/, "")
       .split(/\n/)
       .map((l) => l.trim())
       .filter(
@@ -631,16 +646,14 @@ export function extractSingleChoiceItems(
 
   // Also try expand from first marker across full remaining block when many missing
   const missingEarly = [];
-  for (let n = from; n <= to; n++) if (!result.has(n) || !result.get(n)!.options.length) missingEarly.push(n);
+  for (let n = from; n <= to; n++)
+    if (!result.has(n) || !result.get(n)!.options.length) missingEarly.push(n);
   if (missingEarly.length > 0 && markers.length > 0) {
     const first = markers[0]!;
     const end = markers.length > 1 ? markers[1]!.index : work.length;
     // Prefer full span from first marker to last content before next numbered band
     const lastMarker = markers[markers.length - 1]!;
-    const spanEnd =
-      markers.length === 1
-        ? work.length
-        : lastMarker.index + 800;
+    const spanEnd = markers.length === 1 ? work.length : lastMarker.index + 800;
     expandUnnumberedStems(first.n, work.slice(first.index, Math.min(work.length, spanEnd)));
   }
 
@@ -651,7 +664,7 @@ export function extractSingleChoiceItems(
   if (missing.length > 0) {
     // Q7-style: "In diesemText..." after Beispiel, before first numbered marker
     const inDiesem = work.match(
-      /((?:^|\n)In\s*diesem[\s\S]*?)(?=\n\s*(?:[\[@])?\s*(?:[89]|1[0-2]|2[7-9]|30)\s*[A-Za-zÄÖÜ]|$)/i,
+      /((?:^|\n)In\s*diesem[\s\S]*?)(?=\n\s*(?:[[@])?\s*(?:[89]|1[0-2]|2[7-9]|30)\s*[A-Za-zÄÖÜ]|$)/i,
     );
     if (inDiesem && missing.includes(from) && !result.has(from)) {
       result.set(from, parseChunk(inDiesem[1]!.trim()));
@@ -673,7 +686,7 @@ export function extractSingleChoiceItems(
         .map((l) => l.trim())
         .filter(Boolean);
       if (lines.length >= 8) {
-        const withoutNum = lines[0]!.replace(/^(?:[\[@])?\s*\d{1,2}\s*/, "");
+        const withoutNum = lines[0]!.replace(/^(?:[[@])?\s*\d{1,2}\s*/, "");
         const rest = [withoutNum, ...lines.slice(1)];
         let splitAt = 4;
         for (let li = 3; li < rest.length - 2; li++) {
@@ -701,7 +714,10 @@ export function extractMatchingItems(
   prompt: string,
   from: number,
   to: number,
-): Map<number, { prompt: string; options: B1StructuredOption[]; status: "structured" | "needs_review" }> {
+): Map<
+  number,
+  { prompt: string; options: B1StructuredOption[]; status: "structured" | "needs_review" }
+> {
   const text = cleanNoise(prompt);
   const result = new Map<
     number,
@@ -741,7 +757,10 @@ export function extractMatchingItems(
     });
   }
   // Always offer 0 as "keine passende Anzeige" when instruction mentions it
-  if (/keine\s*passende|schreibenSie\s*0|\b0\b/i.test(text) && !adOptions.some((o) => o.id === "0")) {
+  if (
+    /keine\s*passende|schreibenSie\s*0|\b0\b/i.test(text) &&
+    !adOptions.some((o) => o.id === "0")
+  ) {
     adOptions.push({ id: "0", label: "0", text: "keine passende Anzeige" });
   }
 
@@ -757,7 +776,12 @@ export function extractMatchingItems(
     result.set(cur.n, {
       prompt: chunk,
       options: adOptions.length > 0 ? adOptions : [],
-      status: chunk.length > 10 ? (adOptions.length >= 3 ? "structured" : "needs_review") : "needs_review",
+      status:
+        chunk.length > 10
+          ? adOptions.length >= 3
+            ? "structured"
+            : "needs_review"
+          : "needs_review",
     });
   }
 
@@ -765,7 +789,10 @@ export function extractMatchingItems(
   const missing = [];
   for (let n = from; n <= to; n++) if (!result.has(n)) missing.push(n);
   if (missing.length > 0 && markers.length >= 2) {
-    const lines = text.split(/\n/).map((l) => l.trim()).filter(Boolean);
+    const lines = text
+      .split(/\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
     const unnumbered: Array<{ index: number; text: string }> = [];
     for (let li = 0; li < lines.length; li++) {
       const line = lines[li]!;
@@ -775,7 +802,10 @@ export function extractMatchingItems(
         continue;
       if (line.length < 20) continue;
       // Must look like a person situation, not an ad headline
-      if (!/\b(und|ist|hat|möchte|mochte|will|suchen|verbringt|reisen|Urlaub)\b/i.test(line) && line.length < 40)
+      if (
+        !/\b(und|ist|hat|möchte|mochte|will|suchen|verbringt|reisen|Urlaub)\b/i.test(line) &&
+        line.length < 40
+      )
         continue;
       const absIndex = text.indexOf(line);
       if (absIndex < 0) continue;
@@ -804,21 +834,35 @@ export function extractMatchingItems(
 }
 
 function fillRange(
-  found: Map<number, { prompt: string; options: B1StructuredOption[]; status: "structured" | "needs_review" }>,
+  found: Map<
+    number,
+    { prompt: string; options: B1StructuredOption[]; status: "structured" | "needs_review" }
+  >,
   from: number,
   to: number,
   fallbackOptions: B1StructuredOption[] | null,
-): Map<number, { prompt: string; options: B1StructuredOption[]; status: "structured" | "needs_review" | "placeholder" }> {
+): Map<
+  number,
+  {
+    prompt: string;
+    options: B1StructuredOption[];
+    status: "structured" | "needs_review" | "placeholder";
+  }
+> {
   const out = new Map<
     number,
-    { prompt: string; options: B1StructuredOption[]; status: "structured" | "needs_review" | "placeholder" }
+    {
+      prompt: string;
+      options: B1StructuredOption[];
+      status: "structured" | "needs_review" | "placeholder";
+    }
   >();
   for (let n = from; n <= to; n++) {
     const hit = found.get(n);
     if (hit) {
       out.set(n, {
         ...hit,
-        options: hit.options.length > 0 ? hit.options : fallbackOptions ?? [],
+        options: hit.options.length > 0 ? hit.options : (fallbackOptions ?? []),
       });
     } else {
       out.set(n, {
@@ -841,7 +885,7 @@ function extractLesenTeil4Items(
   const kommentareIdx = text.search(/\n\s*Kommentare\b/i);
   const roster = kommentareIdx >= 0 ? text.slice(0, kommentareIdx) : text;
 
-  const re = /(?:^|\n)\s*(?:[\[O])?([0-9]{1,2})\s*([A-ZÄÖÜ][a-zäöüßA-ZÄÖÜ]+)/g;
+  const re = /(?:^|\n)\s*(?:[[O])?([0-9]{1,2})\s*([A-ZÄÖÜ][a-zäöüßA-ZÄÖÜ]+)/g;
   let mm: RegExpExecArray | null;
   while ((mm = re.exec(roster)) !== null) {
     let n = Number(mm[1]);
@@ -862,9 +906,7 @@ function extractLesenTeil4Items(
 function extractLesenAdOptions(prompt: string): B1StructuredOption[] {
   const text = cleanNoise(prompt);
   const adOptions: B1StructuredOption[] = [];
-  const adMatches = text.matchAll(
-    /(?:^|\n)\s*([a-jA-J])\s*[).:\-–]?\s*([^\n]{8,})/g,
-  );
+  const adMatches = text.matchAll(/(?:^|\n)\s*([a-jA-J])\s*[).:\-–]?\s*([^\n]{8,})/g);
   for (const am of adMatches) {
     const label = am[1]!.toLowerCase();
     if (adOptions.some((o) => o.label === label)) continue;
@@ -872,7 +914,10 @@ function extractLesenAdOptions(prompt: string): B1StructuredOption[] {
     if (/^(Susanne|Thomas|Familie|Herr|Frau|Karl|Eva)\b/i.test(am[2]!)) continue;
     adOptions.push({ id: label, label, text: am[2]!.trim() });
   }
-  if (/keine\s*passende|schreibenSie\s*0|\b0\b/i.test(text) && !adOptions.some((o) => o.id === "0")) {
+  if (
+    /keine\s*passende|schreibenSie\s*0|\b0\b/i.test(text) &&
+    !adOptions.some((o) => o.id === "0")
+  ) {
     adOptions.push({ id: "0", label: "0", text: "keine passende Anzeige" });
   }
   return adOptions.sort((a, b) => a.label.localeCompare(b.label));
@@ -890,7 +935,7 @@ export function transformLesenSection(exam: B1DraftExam): B1StructuredQuestion[]
     const statementPage =
       layout.teil1Statements && isRfStatementPage(layout.teil1Statements.prompt)
         ? layout.teil1Statements
-        : sortPages(section).find((p) => isRfStatementPage(p.prompt)) ?? layout.teil1Statements;
+        : (sortPages(section).find((p) => isRfStatementPage(p.prompt)) ?? layout.teil1Statements);
 
     const passagePage = layout.teil1Passage;
     const passage = passagePage ? extractLesenPassageBody(passagePage.prompt) : null;
@@ -946,7 +991,11 @@ export function transformLesenSection(exam: B1DraftExam): B1StructuredQuestion[]
   {
     const pages = layout.teil2.length ? layout.teil2 : pagesForTeil(section, 2);
     const joined = joinPages(pages);
-    const passage = pages.map((p) => extractPressPassage(p.prompt)).filter(Boolean).join("\n\n") || null;
+    const passage =
+      pages
+        .map((p) => extractPressPassage(p.prompt))
+        .filter(Boolean)
+        .join("\n\n") || null;
     const found = extractSingleChoiceItems(joined.text, 7, 12);
     const filled = fillRange(found, 7, 12, null);
     for (const [n, item] of filled) {
@@ -1041,8 +1090,7 @@ export function transformLesenSection(exam: B1DraftExam): B1StructuredQuestion[]
     const passage = extractPressPassage(joined.text) || extractLesenPassageBody(joined.text);
     // Passage is the museum text after questions on P08 — take block after Q30 options
     const museumIdx = joined.text.search(/\n\s*Deutsches\s*Museum\b/i);
-    const passageFinal =
-      museumIdx >= 0 ? cleanNoise(joined.text.slice(museumIdx)).trim() : passage;
+    const passageFinal = museumIdx >= 0 ? cleanNoise(joined.text.slice(museumIdx)).trim() : passage;
     const found = extractSingleChoiceItems(joined.text, 27, 30);
     const filled = fillRange(found, 27, 30, null);
     for (const [n, item] of filled) {
@@ -1070,9 +1118,7 @@ export function transformLesenSection(exam: B1DraftExam): B1StructuredQuestion[]
 }
 
 /** Parse Hören Teil1: Text1..Text5 each yield RF then MC → Q1–10. Skip Beispiel. */
-function parseHoerenTeil1(
-  prompt: string,
-): Map<
+function parseHoerenTeil1(prompt: string): Map<
   number,
   {
     prompt: string;
@@ -1109,7 +1155,7 @@ function parseHoerenTeil1(
     let mcChunk = "";
     if (rfParts.length >= 2) {
       rfPrompt = rfParts[0]!
-        .replace(/^(?:[\[@])?\s*\d{1,2}\s*/, "")
+        .replace(/^(?:[[@])?\s*\d{1,2}\s*/, "")
         .replace(/\n+/g, " ")
         .replace(/\s{2,}/g, " ")
         .trim();
@@ -1120,7 +1166,7 @@ function parseHoerenTeil1(
         .split(/\n/)
         .map((l) => l.trim())
         .filter(Boolean);
-      rfPrompt = (lines[0] ?? "").replace(/^(?:[\[@])?\s*\d{1,2}\s*/, "");
+      rfPrompt = (lines[0] ?? "").replace(/^(?:[[@])?\s*\d{1,2}\s*/, "");
       mcChunk = lines.slice(1).join("\n");
     }
 
@@ -1139,17 +1185,17 @@ function parseHoerenTeil1(
     let stem = "";
     let optLines: string[] = [];
     if (mcLines.length >= 4) {
-      const first = mcLines[0]!.replace(/^(?:[\[@])?\s*\d{1,2}\s*/, "");
+      const first = mcLines[0]!.replace(/^(?:[[@])?\s*\d{1,2}\s*/, "");
       stem = [first, ...mcLines.slice(1, mcLines.length - 3)].join(" ").trim();
       optLines = mcLines.slice(-3);
     } else if (mcLines.length >= 1) {
-      stem = mcLines[0]!.replace(/^(?:[\[@])?\s*\d{1,2}\s*/, "");
+      stem = mcLines[0]!.replace(/^(?:[[@])?\s*\d{1,2}\s*/, "");
       optLines = mcLines.slice(1, 4);
     }
     const options: B1StructuredOption[] = optLines.map((t, idx) => ({
       id: ABC_LABELS[idx] ?? String(idx),
       label: ABC_LABELS[idx] ?? String(idx),
-      text: t.replace(/^[@•·\-]\s*/, "").trim(),
+      text: t.replace(/^[@•·-]\s*/, "").trim(),
     }));
     result.set(base + 1, {
       prompt: stem,
@@ -1173,19 +1219,22 @@ function parseHoerenTeil1(
  */
 function parseHoerenTeil2Mc(
   prompt: string,
-): Map<number, { prompt: string; options: B1StructuredOption[]; status: "structured" | "needs_review" }> {
+): Map<
+  number,
+  { prompt: string; options: B1StructuredOption[]; status: "structured" | "needs_review" }
+> {
   let text = cleanNoise(prompt);
   // Drop HOREN/Teil2/1/2 instruction block — keep from situational stem or first task
   const cut =
     text.search(/\nSie\s*sind\s*auf/i) >= 0
       ? text.search(/\nSie\s*sind\s*auf/i)
-      : text.search(/\n\s*(?:[\[@])?\s*(?:1[1-5]|1(?=[A-ZÄÖÜ])|3(?=[A-ZÄÖÜ]))/);
+      : text.search(/\n\s*(?:[[@])?\s*(?:1[1-5]|1(?=[A-ZÄÖÜ])|3(?=[A-ZÄÖÜ]))/);
   if (cut >= 0) text = text.slice(cut);
 
   // Remap truncated OCR numbers only when clearly task stems (not "1/2")
   text = text
-    .replace(/(?:^|\n)\s*(?:[\[@])?\s*1(?=[A-ZÄÖÜa-zäöü]{3,})/g, "\n11")
-    .replace(/(?:^|\n)\s*(?:[\[@])?\s*3(?=[A-ZÄÖÜa-zäöü]{3,})/g, "\n13");
+    .replace(/(?:^|\n)\s*(?:[[@])?\s*1(?=[A-ZÄÖÜa-zäöü]{3,})/g, "\n11")
+    .replace(/(?:^|\n)\s*(?:[[@])?\s*3(?=[A-ZÄÖÜa-zäöü]{3,})/g, "\n13");
 
   return extractSingleChoiceItems(text, 11, 15);
 }
@@ -1196,7 +1245,7 @@ function parseHoerenTeil3Rf(prompt: string): string[] {
   // Also strip leading Beispiel if present in statements
   return statements.map((s) =>
     s
-      .replace(/^(?:[\[@])?\s*\d{1,2}\s*/, "")
+      .replace(/^(?:[[@])?\s*\d{1,2}\s*/, "")
       .replace(/\n+/g, " ")
       .trim(),
   );
@@ -1227,8 +1276,8 @@ function parseHoerenTeil4(prompt: string): {
 
   const items = new Map<number, string>();
   // Drop Beispiel line
-  let body = text.replace(/\n\s*Beispiel\b[^\n]*/i, "\n");
-  const re = /(?:^|\n)\s*(?:[\[O])?([0-9]{1,2})\s*([A-ZÄÖÜa-zäöü][^\n]{3,})/g;
+  const body = text.replace(/\n\s*Beispiel\b[^\n]*/i, "\n");
+  const re = /(?:^|\n)\s*(?:[[O])?([0-9]{1,2})\s*([A-ZÄÖÜa-zäöü][^\n]{3,})/g;
   let mm: RegExpExecArray | null;
   const rawHits: Array<{ n: number; text: string; index: number }> = [];
   while ((mm = re.exec(body)) !== null) {
@@ -1402,11 +1451,7 @@ export function transformHoerenSection(exam: B1DraftExam): B1StructuredQuestion[
             : "placeholder",
           points: 1,
           ocr_raw_prompt: joined.text.slice(0, 2000),
-          notes: [
-            "hoeren_objective",
-            "subtype:matching",
-            ...(opts ? [] : ["missing_options"]),
-          ],
+          notes: ["hoeren_objective", "subtype:matching", ...(opts ? [] : ["missing_options"])],
         }),
       );
     }
@@ -1551,7 +1596,11 @@ export function transformSprechenSection(exam: B1DraftExam): B1StructuredQuestio
         sources: [page.source],
         transform_status: detected === role ? "structured" : "needs_review",
         points: 0,
-        notes: [`sprechen_teil2`, `role:${role}`, detected ? `detected:${detected}` : "role_inferred"],
+        notes: [
+          `sprechen_teil2`,
+          `role:${role}`,
+          detected ? `detected:${detected}` : "role_inferred",
+        ],
         ocr_raw_prompt: page.prompt,
       }),
     );
@@ -1684,8 +1733,10 @@ function statsForExam(exam: B1StructuredExam): B1ExamStructureStats {
   if (lesenQs.length !== 30) blockers.push(`lesen_count=${lesenQs.length}`);
   if (hoerenQs.length !== 30) blockers.push(`hoeren_count=${hoerenQs.length}`);
   if (schreibenQs.length !== 3) blockers.push(`schreiben_count=${schreibenQs.length}`);
-  if (!sprechen.some((q) => q.teil === 2 && q.role === "A")) blockers.push("sprechen_missing_teil2_A");
-  if (!sprechen.some((q) => q.teil === 2 && q.role === "B")) blockers.push("sprechen_missing_teil2_B");
+  if (!sprechen.some((q) => q.teil === 2 && q.role === "A"))
+    blockers.push("sprechen_missing_teil2_A");
+  if (!sprechen.some((q) => q.teil === 2 && q.role === "B"))
+    blockers.push("sprechen_missing_teil2_B");
   if (all.some((q) => q.answer_key !== null)) blockers.push("answer_key_present");
 
   return {

@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
-import {
-  toStudentTrainingPayload,
-  validateTrainingModule,
-} from "./training-module-schema";
+import { toStudentTrainingPayload, validateTrainingModule } from "./training-module-schema";
 import { isExamSimulationCode, isTrainingModuleProfile } from "./training-module";
 
 const modulesDir = path.resolve("data/exams/a1-b1-series/modules");
@@ -65,9 +62,7 @@ describe("GA-A1-M02 / GA-A1-M03 draft modules", () => {
     expect(new Set(ids).size).toBe(ids.length);
 
     const m01Blob = JSON.stringify(m01.module.activities.map((a) => a.prompt)).toLowerCase();
-    expect(m02.module.activities.some((a) => m01Blob.includes(a.prompt.toLowerCase()))).toBe(
-      false,
-    );
+    expect(m02.module.activities.some((a) => m01Blob.includes(a.prompt.toLowerCase()))).toBe(false);
   });
 
   it("covers runner activity types used by M02/M03 without hardcoded pages", () => {

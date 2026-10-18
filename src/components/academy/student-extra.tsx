@@ -18,11 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { queryKeys } from "@/lib/query-keys";
-import {
-  AssignmentService,
-  MessagingService,
-  RecordingService,
-} from "@/services/academy-services";
+import { AssignmentService, MessagingService, RecordingService } from "@/services/academy-services";
 import { getAppBuildInfo } from "@/lib/build-info";
 import { SettingsService } from "@/services/supabase/settings-service";
 import { DangerZoneAccountDeletion } from "./danger-zone-account-deletion";
@@ -1675,7 +1671,12 @@ export function DirectorSettings() {
                     <div>
                       <dt className="text-muted-foreground">Fichier public</dt>
                       <dd>
-                        <a className="underline" href="/build-info.json" target="_blank" rel="noreferrer">
+                        <a
+                          className="underline"
+                          href="/build-info.json"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
                           /build-info.json
                         </a>
                       </dd>

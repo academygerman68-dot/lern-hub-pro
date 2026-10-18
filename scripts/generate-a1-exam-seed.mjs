@@ -23,7 +23,8 @@ function mapType(sectionType, questionType) {
 }
 
 const hasProfileColumns = bank.exams.some(
-  (e) => e.format_profile || e.written_duration_minutes != null || e.speaking_duration_minutes != null,
+  (e) =>
+    e.format_profile || e.written_duration_minutes != null || e.speaking_duration_minutes != null,
 );
 
 const lines = [];

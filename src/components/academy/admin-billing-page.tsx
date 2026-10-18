@@ -1015,7 +1015,8 @@ export function FinancePages({ mode }: { mode: string }) {
                     Mensuelle ({formatMoneyAmount(catalogAmount("monthly", currency), currency)})
                   </option>
                   <option value="quarterly">
-                    Trimestrielle ({formatMoneyAmount(catalogAmount("quarterly", currency), currency)})
+                    Trimestrielle (
+                    {formatMoneyAmount(catalogAmount("quarterly", currency), currency)})
                   </option>
                 </select>
                 <select
@@ -1244,7 +1245,10 @@ export function FinancePages({ mode }: { mode: string }) {
               </select>
               <p className="text-sm text-muted-foreground">
                 Tarif :{" "}
-                {formatMoneyAmount(catalogAmount(planEdit.plan, planEdit.currency), planEdit.currency)}
+                {formatMoneyAmount(
+                  catalogAmount(planEdit.plan, planEdit.currency),
+                  planEdit.currency,
+                )}
               </p>
             </div>
           ) : null}

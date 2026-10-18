@@ -101,9 +101,7 @@ export function ReplayEditorModal({ open, editing, role, userId, onClose }: Prop
         <select
           className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
           value={form.classId}
-          onChange={(e) =>
-            setForm((f) => ({ ...f, classId: e.target.value, sessionId: "" }))
-          }
+          onChange={(e) => setForm((f) => ({ ...f, classId: e.target.value, sessionId: "" }))}
         >
           <option value="">Groupe</option>
           {(classesQuery.data ?? []).map((c) => (
@@ -196,12 +194,7 @@ export function ReplayRowActions({ recording, canManage, onEdit, onPlay }: ListA
   const deleteRecording = useDeleteRecording();
   return (
     <div className="flex flex-wrap gap-2">
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={recording.status !== "ready"}
-        onClick={onPlay}
-      >
+      <Button size="sm" variant="outline" disabled={recording.status !== "ready"} onClick={onPlay}>
         {recording.status === "ready" ? "Lire" : "Indisponible"}
       </Button>
       {canManage ? (

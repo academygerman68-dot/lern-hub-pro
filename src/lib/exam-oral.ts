@@ -101,7 +101,11 @@ export function buildOralStoragePath(input: {
   fileName: string;
 }): string {
   const ext = input.fileName.includes(".")
-    ? input.fileName.split(".").pop()!.toLowerCase().replace(/[^a-z0-9]/g, "") || "webm"
+    ? input.fileName
+        .split(".")
+        .pop()!
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "") || "webm"
     : "webm";
   const safeExt = ext.slice(0, 8);
   return `exam-oral/${input.attemptId}/${input.studentId}/${input.questionId}-${crypto.randomUUID()}.${safeExt}`;

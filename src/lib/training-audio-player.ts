@@ -6,12 +6,7 @@
 /** HTMLMediaElement.HAVE_CURRENT_DATA — enough buffered to begin playback. */
 export const MEDIA_READY_THRESHOLD = 2;
 
-export type TrainingAudioUiStatus =
-  | "loading"
-  | "ready"
-  | "playing"
-  | "paused"
-  | "error";
+export type TrainingAudioUiStatus = "loading" | "ready" | "playing" | "paused" | "error";
 
 export type TrainingAudioPlayRejection = {
   name: string;
@@ -142,10 +137,7 @@ export function interpretPlayRejection(input: {
   if (input.intentionalStop || input.rejection.name === "AbortError") {
     return { ignore: true, nextStatus: "paused", message: null };
   }
-  if (
-    input.rejection.name === "NotSupportedError" &&
-    !isMediaReadyEnough(input.readyState)
-  ) {
+  if (input.rejection.name === "NotSupportedError" && !isMediaReadyEnough(input.readyState)) {
     return {
       ignore: false,
       nextStatus: "loading",

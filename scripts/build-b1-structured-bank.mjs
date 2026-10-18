@@ -18,10 +18,7 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_IN = resolve(__dirname, "../data/exams/b1-exam-bank/b1-exam-bank.complete.json");
-const DEFAULT_OUT = resolve(
-  __dirname,
-  "../data/exams/b1-exam-bank/b1-exam-bank.structured.json",
-);
+const DEFAULT_OUT = resolve(__dirname, "../data/exams/b1-exam-bank/b1-exam-bank.structured.json");
 const KEYS_OUT = resolve(__dirname, "../tmp/b1-answer-keys-proposed.json");
 const STATS_OUT = resolve(__dirname, "../tmp/b1-structure-stats.json");
 

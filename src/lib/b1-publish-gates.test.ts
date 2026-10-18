@@ -27,9 +27,7 @@ describe("b1 publish gates (readiness + completeness)", () => {
     ];
     const report = validateExamCompleteness(questions);
     expect(report.ok).toBe(false);
-    expect(report.issues.some((i) => i.includes("Audio Hören non vérifié (contenu)"))).toBe(
-      true,
-    );
+    expect(report.issues.some((i) => i.includes("Audio Hören non vérifié (contenu)"))).toBe(true);
 
     const readiness = computeB1ExamReadiness({
       code: "B1-MT01",

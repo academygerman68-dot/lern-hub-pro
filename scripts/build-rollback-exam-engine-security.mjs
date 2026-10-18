@@ -5,10 +5,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 function extractFunction(sql, name) {
-  const re = new RegExp(
-    `CREATE OR REPLACE FUNCTION public\\.${name}[\\s\\S]*?\\n\\$\\$;`,
-    "m",
-  );
+  const re = new RegExp(`CREATE OR REPLACE FUNCTION public\\.${name}[\\s\\S]*?\\n\\$\\$;`, "m");
   const match = sql.match(re);
   if (!match) throw new Error(`Function ${name} not found`);
   return match[0];

@@ -24,10 +24,7 @@ import {
   loadB1ExamBank,
   validateB1ExamBank,
 } from "../src/lib/b1-exam-bank.ts";
-import {
-  detectSprechenRole,
-  splitSchreibenPageBundle,
-} from "../src/lib/b1-ocr-transform.ts";
+import { detectSprechenRole, splitSchreibenPageBundle } from "../src/lib/b1-ocr-transform.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const COMPLETE_JSON = resolve(__dirname, "../data/exams/b1-exam-bank/b1-exam-bank.complete.json");
@@ -128,7 +125,10 @@ function mapDbQuestionType(sectionType, questionType, importMode) {
 }
 
 function provisionalPoints(sectionType, question) {
-  if (typeof question.points === "number" && question.points_rubric === "provisional_needs_review") {
+  if (
+    typeof question.points === "number" &&
+    question.points_rubric === "provisional_needs_review"
+  ) {
     return question.points;
   }
   if (sectionType === "lesen" || sectionType === "hoeren") {
@@ -441,8 +441,7 @@ async function rebuildExamPageBundles(supabase, levelId, exam) {
       sortOrder += 1;
       const importMode = "page_bundle";
       const questionId = stableUuid(`question:${question.id}`);
-      const role =
-        section.type === "sprechen" ? detectSprechenRole(question.prompt) : null;
+      const role = section.type === "sprechen" ? detectSprechenRole(question.prompt) : null;
       const metadata = {
         bank_question_id: question.id,
         import_mode: importMode,
@@ -515,7 +514,9 @@ async function runDryRun(bankPath) {
     console.log(`Lesen questions: ${lesen} (expected ${15 * 30})`);
     console.log(`Hören questions: ${hoeren} (expected ${15 * 30})`);
     console.log(`Schreiben tasks: ${schreiben} (expected ${15 * 3})`);
-    console.log("Publishable: false · answer keys: not imported · points: provisional_needs_review");
+    console.log(
+      "Publishable: false · answer keys: not imported · points: provisional_needs_review",
+    );
   } else {
     console.log(formatB1DryRunMarkdown(report));
   }

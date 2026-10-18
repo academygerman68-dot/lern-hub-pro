@@ -29,8 +29,7 @@ export function extractSingleChoiceItems(prompt, from, to) {
     }
   }
 
-  const markerRe =
-    /(?:^|\n)\s*(?:[\[@]|\b)?\s*([0-9]{1,2})(?=[A-Za-zÄÖÜäöüß.…]|\s)/g;
+  const markerRe = /(?:^|\n)\s*(?:[\[@]|\b)?\s*([0-9]{1,2})(?=[A-Za-zÄÖÜäöüß.…]|\s)/g;
   const markers = [];
   let m;
   while ((m = markerRe.exec(work)) !== null) {
@@ -61,7 +60,10 @@ export function extractSingleChoiceItems(prompt, from, to) {
     let optionLines;
     if (lines.length >= 4) {
       optionLines = lines.slice(-3);
-      stem = lines.slice(0, lines.length - 3).join(" ").trim();
+      stem = lines
+        .slice(0, lines.length - 3)
+        .join(" ")
+        .trim();
     } else if (lines.length === 3) {
       if (lines[0].length > 40) {
         stem = lines[0];
@@ -189,7 +191,10 @@ export function extractMatchingItems(prompt, from, to) {
     if (adOptions.some((o) => o.label === label)) continue;
     adOptions.push({ id: label, label, text: am[2].trim() });
   }
-  if (/keine\s*passende|schreibenSie\s*0|\b0\b/i.test(text) && !adOptions.some((o) => o.id === "0")) {
+  if (
+    /keine\s*passende|schreibenSie\s*0|\b0\b/i.test(text) &&
+    !adOptions.some((o) => o.id === "0")
+  ) {
     adOptions.push({ id: "0", label: "0", text: "keine passende Anzeige" });
   }
 
@@ -203,14 +208,22 @@ export function extractMatchingItems(prompt, from, to) {
     result.set(cur.n, {
       prompt: chunk,
       options: adOptions.length > 0 ? adOptions : [],
-      status: chunk.length > 10 ? (adOptions.length >= 3 ? "structured" : "needs_review") : "needs_review",
+      status:
+        chunk.length > 10
+          ? adOptions.length >= 3
+            ? "structured"
+            : "needs_review"
+          : "needs_review",
     });
   }
 
   const missing = [];
   for (let n = from; n <= to; n++) if (!result.has(n)) missing.push(n);
   if (missing.length > 0 && markers.length >= 2) {
-    const lines = text.split(/\n/).map((l) => l.trim()).filter(Boolean);
+    const lines = text
+      .split(/\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
     const unnumbered = [];
     for (const line of lines) {
       if (/^\d{1,2}\s*[A-Za-zÄÖÜäöüß]/.test(line)) continue;

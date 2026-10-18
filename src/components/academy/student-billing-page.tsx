@@ -251,7 +251,11 @@ export function StudentPaymentsPage() {
         if (cancelled) return;
         setServerQuote(quote);
         setDeclaredAmount(String(quote.expectedAmount));
-        if (!quote.available && quote.firstEligibleStart && quote.firstEligibleStart !== startMonth) {
+        if (
+          !quote.available &&
+          quote.firstEligibleStart &&
+          quote.firstEligibleStart !== startMonth
+        ) {
           setFormError(
             `Mois de départ indisponible (${quote.conflictMonths.join(", ") || "chevauchement"}). Premier mois éligible : ${monthOptionLabel(quote.firstEligibleStart)}.`,
           );
@@ -347,7 +351,11 @@ export function StudentPaymentsPage() {
         return;
       }
       const declared = Number(declaredAmount);
-      if (Number.isFinite(expected) && Number.isFinite(declared) && Math.abs(declared - expected) > 0.009) {
+      if (
+        Number.isFinite(expected) &&
+        Number.isFinite(declared) &&
+        Math.abs(declared - expected) > 0.009
+      ) {
         // Keep submitting — admin reviews amount mismatch via declared vs expected.
         toast.message(
           `Montant déclaré (${declared}) différent du prix attendu (${expected}). L’administration vérifiera l’écart.`,
@@ -775,8 +783,8 @@ export function StudentPaymentsPage() {
           <DialogHeader>
             <DialogTitle>Déclarer mon paiement</DialogTitle>
             <DialogDescription>
-              Choisissez une formule (mensuelle ou trimestrielle), le mois de départ, puis joignez le
-              justificatif. Le prix est calculé côté serveur.
+              Choisissez une formule (mensuelle ou trimestrielle), le mois de départ, puis joignez
+              le justificatif. Le prix est calculé côté serveur.
             </DialogDescription>
           </DialogHeader>
 
@@ -869,7 +877,9 @@ export function StudentPaymentsPage() {
 
             <div>
               <p className="mb-2 text-sm font-medium">4. Justificatif</p>
-              {identityHint ? <p className="mb-2 text-sm text-destructive">{identityHint}</p> : null}
+              {identityHint ? (
+                <p className="mb-2 text-sm text-destructive">{identityHint}</p>
+              ) : null}
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm">
                   Montant versé ({billing.currency})
@@ -953,10 +963,7 @@ export function StudentPaymentsPage() {
             </Button>
             <Button
               disabled={
-                Boolean(blockReason) ||
-                formBusy ||
-                quoteLoading ||
-                !effectiveQuote.available
+                Boolean(blockReason) || formBusy || quoteLoading || !effectiveQuote.available
               }
               onClick={() => void handleSubmitProof()}
             >

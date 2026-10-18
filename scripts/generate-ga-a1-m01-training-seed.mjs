@@ -1,8 +1,6 @@
 import fs from "fs";
 
-const def = JSON.parse(
-  fs.readFileSync("data/exams/a1-b1-series/modules/GA-A1-M01.json", "utf8"),
-);
+const def = JSON.parse(fs.readFileSync("data/exams/a1-b1-series/modules/GA-A1-M01.json", "utf8"));
 const json = JSON.stringify(def).replace(/\$/g, "");
 
 function dollar(tag, value) {
@@ -38,8 +36,5 @@ ON CONFLICT (code) DO UPDATE SET
   updated_at = now();
 `;
 
-fs.writeFileSync(
-  "supabase/migrations/20260928171000_seed_ga_a1_m01_training_module.sql",
-  sql,
-);
+fs.writeFileSync("supabase/migrations/20260928171000_seed_ga_a1_m01_training_module.sql", sql);
 console.log("OK seed bytes", sql.length);

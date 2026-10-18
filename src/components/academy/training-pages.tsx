@@ -162,7 +162,10 @@ export function TrainingModuleOverviewPage({ preview = false }: { preview?: bool
         title={def?.title ?? code}
         subtitle={`${code} · ${def?.level ?? ""} · module d’entraînement`}
         action={
-          <Button variant="ghost" onClick={() => navigate(preview ? "training-preview" : "training")}>
+          <Button
+            variant="ghost"
+            onClick={() => navigate(preview ? "training-preview" : "training")}
+          >
             Catalogue
           </Button>
         }
@@ -202,9 +205,7 @@ export function TrainingModuleOverviewPage({ preview = false }: { preview?: bool
           </p>
           <p>
             <span className="font-medium">Compétences :</span>{" "}
-            {(def?.skills ?? [])
-              .map((s) => TRAINING_SKILL_LABELS[s] ?? s)
-              .join(", ")}
+            {(def?.skills ?? []).map((s) => TRAINING_SKILL_LABELS[s] ?? s).join(", ")}
           </p>
           <p>
             <span className="font-medium">Activités :</span> {def?.activities?.length ?? 0}
@@ -446,7 +447,9 @@ export function TeacherTrainingCorrectionsPage() {
                 <tr key={a.id} className="border-b border-border/60">
                   <td className="p-2">{a.module?.code ?? "—"}</td>
                   <td className="p-2">{a.status}</td>
-                  <td className="p-2">{new Date(a.updated_at ?? a.started_at).toLocaleString("fr-FR")}</td>
+                  <td className="p-2">
+                    {new Date(a.updated_at ?? a.started_at).toLocaleString("fr-FR")}
+                  </td>
                   <td className="p-2">
                     <Button
                       size="sm"
@@ -495,4 +498,3 @@ export function TrainingPages({
   if (mode === "corrections") return <TeacherTrainingCorrectionsPage />;
   return <TrainingModuleOverviewPage preview={nav.preview} />;
 }
-

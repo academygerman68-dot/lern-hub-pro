@@ -123,8 +123,8 @@ export function ExamAudioPreflight({
         </li>
         <li>Matériel : casque recommandé, micro pour Sprechen, connexion stable.</li>
         <li>
-          Remise : une confirmation explicite verrouille la tentative ; le résultat définitif
-          attend la correction manuelle de Schreiben / Sprechen.
+          Remise : une confirmation explicite verrouille la tentative ; le résultat définitif attend
+          la correction manuelle de Schreiben / Sprechen.
         </li>
       </ul>
 

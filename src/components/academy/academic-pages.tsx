@@ -309,309 +309,318 @@ export function DirectorCoursesPage() {
       {view === "group-progress" ? <GroupProgressPage /> : null}
       {view === "catalog" ? (
         <>
-      <PageHeader
-        title={role === "teacher" ? t("teacher.courses.title") : "Cours"}
-        subtitle={
-          selectedLevel
-            ? `${role === "teacher" ? t("teacher.courses.level") : "Niveau"} ${selectedLevel.code} — ${selectedLevel.name}`
-            : isDirectorRole(role)
-              ? "Choisissez un niveau pour consulter et créer des cours."
-              : t("teacher.courses.pickLevel")
-        }
-        action={
-          selectedLevel ? (
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setSelectedLevelId(null)}>
-                {role === "teacher" ? t("teacher.courses.allLevels") : "Tous les niveaux"}
-              </Button>
-              <Button onClick={openCreate}>
-                {role === "teacher" ? `+ ${t("teacher.courses.create")}` : "+ Créer un cours"}
-              </Button>
-            </div>
-          ) : undefined
-        }
-      />
-      {role === "teacher" ? (
-        <p className="mb-4 text-sm text-muted-foreground">{t("teacher.courses.skeleton")}</p>
-      ) : null}
+          <PageHeader
+            title={role === "teacher" ? t("teacher.courses.title") : "Cours"}
+            subtitle={
+              selectedLevel
+                ? `${role === "teacher" ? t("teacher.courses.level") : "Niveau"} ${selectedLevel.code} — ${selectedLevel.name}`
+                : isDirectorRole(role)
+                  ? "Choisissez un niveau pour consulter et créer des cours."
+                  : t("teacher.courses.pickLevel")
+            }
+            action={
+              selectedLevel ? (
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setSelectedLevelId(null)}>
+                    {role === "teacher" ? t("teacher.courses.allLevels") : "Tous les niveaux"}
+                  </Button>
+                  <Button onClick={openCreate}>
+                    {role === "teacher" ? `+ ${t("teacher.courses.create")}` : "+ Créer un cours"}
+                  </Button>
+                </div>
+              ) : undefined
+            }
+          />
+          {role === "teacher" ? (
+            <p className="mb-4 text-sm text-muted-foreground">{t("teacher.courses.skeleton")}</p>
+          ) : null}
 
-      {!selectedLevelId ? (
-        <QueryState
-          isLoading={levelsQuery.isLoading}
-          isError={levelsQuery.isError}
-          error={levelsQuery.error}
-          isEmpty={!levels.length}
-          emptyTitle={role === "teacher" ? t("teacher.courses.emptyTitle") : "Aucun niveau"}
-          emptyMessage={
-            role === "teacher"
-              ? t("teacher.courses.emptyMessage")
-              : "Les niveaux de l’académie apparaîtront ici."
-          }
-          onRetry={() => void levelsQuery.refetch()}
-        >
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {levels.map((level) => {
-              const count = hideArchivedStatus(coursesQuery.data ?? []).filter(
-                (course) =>
-                  course.level_id === level.id &&
-                  (isDirectorRole(role) || teacherScope.levelIds.has(course.level_id)),
-              ).length;
-              return (
-                <button
-                  key={level.id}
-                  type="button"
-                  className="rounded-xl border border-border bg-card p-5 text-left shadow-soft transition duration-200 hover:-translate-y-0.5 hover:shadow-card motion-reduce:transform-none"
-                  onClick={() => setSelectedLevelId(level.id)}
-                >
-                  <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                    Niveau
-                  </p>
-                  <div className="mt-3">
-                    <LevelBadge code={level.code} />
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">{level.name}</p>
-                  <p className="mt-3 text-sm font-medium">{count} cours</p>
-                </button>
-              );
-            })}
-          </div>
-        </QueryState>
-      ) : (
-        <QueryState
-          isLoading={coursesQuery.isLoading}
-          isError={coursesQuery.isError}
-          error={coursesQuery.error}
-          isEmpty={!courses.length}
-          emptyTitle="Aucun cours"
-          emptyMessage="Créez le premier cours de ce niveau."
-          onRetry={() => void coursesQuery.refetch()}
-        >
-          <div className="space-y-3">
-            {courses.map((course) => (
-              <Surface className="p-5" key={course.id}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <LevelBadge code={course.level?.code ?? selectedLevel?.code} />
-                      <span className="text-xs text-muted-foreground">
-                        {COURSE_KIND_LABELS[course.content_kind]}
-                      </span>
-                    </div>
-                    <h2 className="mt-2 text-lg font-semibold tracking-tight">{course.title}</h2>
-                    {course.description ? (
-                      <p className="mt-1 text-sm text-muted-foreground">{course.description}</p>
-                    ) : null}
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {formatFrDate(course.created_at)}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Status tone={course.status === "published" ? "green" : "amber"}>
-                      {statusLabel(course.status)}
-                    </Status>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        if (isTextContentKind(course.content_kind)) {
-                          toast.message(course.description?.trim() || "Aucun texte enregistré.");
-                          return;
-                        }
-                        void openLinkOrFile(
-                          course.title,
-                          course.content_kind,
-                          course.mime_type,
-                          () => CourseService.getCourseMaterialUrl(course),
-                        );
-                      }}
+          {!selectedLevelId ? (
+            <QueryState
+              isLoading={levelsQuery.isLoading}
+              isError={levelsQuery.isError}
+              error={levelsQuery.error}
+              isEmpty={!levels.length}
+              emptyTitle={role === "teacher" ? t("teacher.courses.emptyTitle") : "Aucun niveau"}
+              emptyMessage={
+                role === "teacher"
+                  ? t("teacher.courses.emptyMessage")
+                  : "Les niveaux de l’académie apparaîtront ici."
+              }
+              onRetry={() => void levelsQuery.refetch()}
+            >
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {levels.map((level) => {
+                  const count = hideArchivedStatus(coursesQuery.data ?? []).filter(
+                    (course) =>
+                      course.level_id === level.id &&
+                      (isDirectorRole(role) || teacherScope.levelIds.has(course.level_id)),
+                  ).length;
+                  return (
+                    <button
+                      key={level.id}
+                      type="button"
+                      className="rounded-xl border border-border bg-card p-5 text-left shadow-soft transition duration-200 hover:-translate-y-0.5 hover:shadow-card motion-reduce:transform-none"
+                      onClick={() => setSelectedLevelId(level.id)}
                     >
-                      {isTextContentKind(course.content_kind) ? "Voir le texte" : "Ouvrir"}
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button size="sm" variant="outline" aria-label="Actions du cours">
-                          <MoreHorizontal className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEdit(course)}>
-                          Modifier
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          disabled={deleteCourse.isPending}
-                          className="text-destructive focus:text-destructive"
+                      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                        Niveau
+                      </p>
+                      <div className="mt-3">
+                        <LevelBadge code={level.code} />
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">{level.name}</p>
+                      <p className="mt-3 text-sm font-medium">{count} cours</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </QueryState>
+          ) : (
+            <QueryState
+              isLoading={coursesQuery.isLoading}
+              isError={coursesQuery.isError}
+              error={coursesQuery.error}
+              isEmpty={!courses.length}
+              emptyTitle="Aucun cours"
+              emptyMessage="Créez le premier cours de ce niveau."
+              onRetry={() => void coursesQuery.refetch()}
+            >
+              <div className="space-y-3">
+                {courses.map((course) => (
+                  <Surface className="p-5" key={course.id}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <LevelBadge code={course.level?.code ?? selectedLevel?.code} />
+                          <span className="text-xs text-muted-foreground">
+                            {COURSE_KIND_LABELS[course.content_kind]}
+                          </span>
+                        </div>
+                        <h2 className="mt-2 text-lg font-semibold tracking-tight">
+                          {course.title}
+                        </h2>
+                        {course.description ? (
+                          <p className="mt-1 text-sm text-muted-foreground">{course.description}</p>
+                        ) : null}
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatFrDate(course.created_at)}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Status tone={course.status === "published" ? "green" : "amber"}>
+                          {statusLabel(course.status)}
+                        </Status>
+                        <Button
+                          size="sm"
                           onClick={() => {
-                            if (!window.confirm(`Supprimer le cours « ${course.title} » ?`)) return;
-                            deleteCourse.mutate(course.id, {
-                              onSuccess: () => toast.success("Cours supprimé"),
-                              onError: (err) => toast.error(err.message),
-                            });
+                            if (isTextContentKind(course.content_kind)) {
+                              toast.message(
+                                course.description?.trim() || "Aucun texte enregistré.",
+                              );
+                              return;
+                            }
+                            void openLinkOrFile(
+                              course.title,
+                              course.content_kind,
+                              course.mime_type,
+                              () => CourseService.getCourseMaterialUrl(course),
+                            );
                           }}
                         >
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              </Surface>
-            ))}
-          </div>
-        </QueryState>
-      )}
+                          {isTextContentKind(course.content_kind) ? "Voir le texte" : "Ouvrir"}
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" aria-label="Actions du cours">
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEdit(course)}>
+                              Modifier
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              disabled={deleteCourse.isPending}
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => {
+                                if (!window.confirm(`Supprimer le cours « ${course.title} » ?`))
+                                  return;
+                                deleteCourse.mutate(course.id, {
+                                  onSuccess: () => toast.success("Cours supprimé"),
+                                  onError: (err) => toast.error(err.message),
+                                });
+                              }}
+                            >
+                              Supprimer
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  </Surface>
+                ))}
+              </div>
+            </QueryState>
+          )}
 
-      {open && selectedLevelId && (
-        <div className="mobile-modal">
-          <Surface className="mobile-modal-panel max-h-[90dvh] space-y-4 overflow-y-auto">
-            <h2 className="text-lg font-semibold">
-              {editingId ? "Modifier le cours" : `Nouveau cours · ${selectedLevel?.code}`}
-            </h2>
-            <Input placeholder="Titre" value={title} onChange={(e) => setTitle(e.target.value)} />
-            <Textarea
-              placeholder="Description (facultative)"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-            <ContentAttachmentUploader
-              kinds={["text", "pdf", "link", "image", "audio"]}
-              value={attachment}
-              onChange={setAttachment}
-              disabled={saving}
-              uploading={saving}
-              error={formError}
-              hasExistingFile={existingFile && isFileContentKind(attachment.kind)}
-              requiredFileWhenNew={!isTextContentKind(attachment.kind)}
-              textPlaceholder="Contenu textuel du cours (ex. sujet d’expression écrite)…"
-              onClearExisting={() => {
-                setExistingFile(false);
-              }}
-            />
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setOpen(false);
-                  resetForm();
-                }}
-              >
-                Annuler
-              </Button>
-              <Button
-                disabled={
-                  !title.trim() || saving || createCourse.isPending || updateCourse.isPending
-                }
-                onClick={() => {
-                  void (async () => {
-                    setFormError(null);
-                    const kind = attachment.kind as CourseKind;
-                    if (isTextContentKind(kind)) {
-                      const textError = validateTextContentBody(attachment.text || description);
-                      if (textError) {
-                        setFormError(textError);
-                        return;
-                      }
-                    }
-                    if (kind === "link" && !isValidHttpUrl(attachment.url)) {
-                      setFormError("Saisissez une URL valide (http ou https).");
-                      return;
-                    }
-                    if (isFileContentKind(kind) && attachment.file) {
-                      const fileError = validateFileForKind(attachment.file, kind);
-                      if (fileError) {
-                        setFormError(fileError);
-                        return;
-                      }
-                    }
-                    if (isFileContentKind(kind) && !attachment.file && !existingFile) {
-                      if (!editingId) {
-                        setFormError("Ajoutez un fichier.");
-                        return;
-                      }
-                    }
-                    setSaving(true);
-                    try {
-                      let storageBucket: string | null = null;
-                      let storagePath: string | null = null;
-                      let mimeType: string | null = null;
-                      const url: string | null = kind === "link" ? attachment.url.trim() : null;
-                      if (attachment.file && isFileContentKind(kind)) {
-                        const uploaded = await CourseService.uploadCourseMaterial(
-                          attachment.file,
-                          `courses/${selectedLevelId}`,
-                        );
-                        storageBucket = uploaded.storageBucket;
-                        storagePath = uploaded.storagePath;
-                        mimeType = uploaded.mimeType;
-                      }
-                      const textBody = (attachment.text || description).trim();
-                      const resolvedDescription = isTextContentKind(kind)
-                        ? textBody
-                        : description.trim() || null;
-                      if (editingId) {
-                        const patch: Database["public"]["Tables"]["courses"]["Update"] = {
-                          title: title.trim(),
-                          level_id: selectedLevelId,
-                          description: resolvedDescription,
-                          content_kind: kind,
-                          content_url: url,
-                          status: "published",
-                        };
-                        if (isTextContentKind(kind)) {
-                          patch.storage_bucket = null;
-                          patch.storage_path = null;
-                          patch.mime_type = "text/plain";
-                        } else if (storagePath) {
-                          patch.storage_bucket = storageBucket;
-                          patch.storage_path = storagePath;
-                          patch.mime_type = mimeType;
-                        } else if (!existingFile && !attachment.file && kind !== "link") {
-                          patch.storage_bucket = null;
-                          patch.storage_path = null;
-                          patch.mime_type = null;
-                        }
-                        await updateCourse.mutateAsync({ id: editingId, patch });
-                        toast.success("Cours mis à jour");
-                      } else {
-                        await createCourse.mutateAsync({
-                          title: title.trim(),
-                          levelId: selectedLevelId,
-                          ...(resolvedDescription ? { description: resolvedDescription } : {}),
-                          contentKind: kind,
-                          contentUrl: url,
-                          storageBucket: isTextContentKind(kind) ? null : storageBucket,
-                          storagePath: isTextContentKind(kind) ? null : storagePath,
-                          mimeType: isTextContentKind(kind) ? "text/plain" : mimeType,
-                          status: "published",
-                        });
-                        toast.success("Cours créé");
-                      }
+          {open && selectedLevelId && (
+            <div className="mobile-modal">
+              <Surface className="mobile-modal-panel max-h-[90dvh] space-y-4 overflow-y-auto">
+                <h2 className="text-lg font-semibold">
+                  {editingId ? "Modifier le cours" : `Nouveau cours · ${selectedLevel?.code}`}
+                </h2>
+                <Input
+                  placeholder="Titre"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+                <Textarea
+                  placeholder="Description (facultative)"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+                <ContentAttachmentUploader
+                  kinds={["text", "pdf", "link", "image", "audio"]}
+                  value={attachment}
+                  onChange={setAttachment}
+                  disabled={saving}
+                  uploading={saving}
+                  error={formError}
+                  hasExistingFile={existingFile && isFileContentKind(attachment.kind)}
+                  requiredFileWhenNew={!isTextContentKind(attachment.kind)}
+                  textPlaceholder="Contenu textuel du cours (ex. sujet d’expression écrite)…"
+                  onClearExisting={() => {
+                    setExistingFile(false);
+                  }}
+                />
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
                       setOpen(false);
                       resetForm();
-                    } catch (err) {
-                      setFormError(
-                        err instanceof Error ? err.message : "Enregistrement impossible",
-                      );
-                    } finally {
-                      setSaving(false);
+                    }}
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    disabled={
+                      !title.trim() || saving || createCourse.isPending || updateCourse.isPending
                     }
-                  })();
-                }}
-              >
-                Enregistrer
-              </Button>
+                    onClick={() => {
+                      void (async () => {
+                        setFormError(null);
+                        const kind = attachment.kind as CourseKind;
+                        if (isTextContentKind(kind)) {
+                          const textError = validateTextContentBody(attachment.text || description);
+                          if (textError) {
+                            setFormError(textError);
+                            return;
+                          }
+                        }
+                        if (kind === "link" && !isValidHttpUrl(attachment.url)) {
+                          setFormError("Saisissez une URL valide (http ou https).");
+                          return;
+                        }
+                        if (isFileContentKind(kind) && attachment.file) {
+                          const fileError = validateFileForKind(attachment.file, kind);
+                          if (fileError) {
+                            setFormError(fileError);
+                            return;
+                          }
+                        }
+                        if (isFileContentKind(kind) && !attachment.file && !existingFile) {
+                          if (!editingId) {
+                            setFormError("Ajoutez un fichier.");
+                            return;
+                          }
+                        }
+                        setSaving(true);
+                        try {
+                          let storageBucket: string | null = null;
+                          let storagePath: string | null = null;
+                          let mimeType: string | null = null;
+                          const url: string | null = kind === "link" ? attachment.url.trim() : null;
+                          if (attachment.file && isFileContentKind(kind)) {
+                            const uploaded = await CourseService.uploadCourseMaterial(
+                              attachment.file,
+                              `courses/${selectedLevelId}`,
+                            );
+                            storageBucket = uploaded.storageBucket;
+                            storagePath = uploaded.storagePath;
+                            mimeType = uploaded.mimeType;
+                          }
+                          const textBody = (attachment.text || description).trim();
+                          const resolvedDescription = isTextContentKind(kind)
+                            ? textBody
+                            : description.trim() || null;
+                          if (editingId) {
+                            const patch: Database["public"]["Tables"]["courses"]["Update"] = {
+                              title: title.trim(),
+                              level_id: selectedLevelId,
+                              description: resolvedDescription,
+                              content_kind: kind,
+                              content_url: url,
+                              status: "published",
+                            };
+                            if (isTextContentKind(kind)) {
+                              patch.storage_bucket = null;
+                              patch.storage_path = null;
+                              patch.mime_type = "text/plain";
+                            } else if (storagePath) {
+                              patch.storage_bucket = storageBucket;
+                              patch.storage_path = storagePath;
+                              patch.mime_type = mimeType;
+                            } else if (!existingFile && !attachment.file && kind !== "link") {
+                              patch.storage_bucket = null;
+                              patch.storage_path = null;
+                              patch.mime_type = null;
+                            }
+                            await updateCourse.mutateAsync({ id: editingId, patch });
+                            toast.success("Cours mis à jour");
+                          } else {
+                            await createCourse.mutateAsync({
+                              title: title.trim(),
+                              levelId: selectedLevelId,
+                              ...(resolvedDescription ? { description: resolvedDescription } : {}),
+                              contentKind: kind,
+                              contentUrl: url,
+                              storageBucket: isTextContentKind(kind) ? null : storageBucket,
+                              storagePath: isTextContentKind(kind) ? null : storagePath,
+                              mimeType: isTextContentKind(kind) ? "text/plain" : mimeType,
+                              status: "published",
+                            });
+                            toast.success("Cours créé");
+                          }
+                          setOpen(false);
+                          resetForm();
+                        } catch (err) {
+                          setFormError(
+                            err instanceof Error ? err.message : "Enregistrement impossible",
+                          );
+                        } finally {
+                          setSaving(false);
+                        }
+                      })();
+                    }}
+                  >
+                    Enregistrer
+                  </Button>
+                </div>
+              </Surface>
             </div>
-          </Surface>
-        </div>
-      )}
-      <DocumentViewer
-        open={Boolean(preview)}
-        onClose={() => setPreview(null)}
-        title={preview?.title ?? ""}
-        url={preview?.url ?? null}
-        mimeType={preview?.mimeType}
-        loading={preview?.loading}
-        error={preview?.error}
-      />
+          )}
+          <DocumentViewer
+            open={Boolean(preview)}
+            onClose={() => setPreview(null)}
+            title={preview?.title ?? ""}
+            url={preview?.url ?? null}
+            mimeType={preview?.mimeType}
+            loading={preview?.loading}
+            error={preview?.error}
+          />
         </>
       ) : null}
     </>
@@ -619,7 +628,6 @@ export function DirectorCoursesPage() {
 }
 
 export { MaterialsLibraryPage } from "./materials-library-page";
-
 
 export function StudentLearningPage() {
   const { navigate, user, profile } = useAcademy();
@@ -807,11 +815,8 @@ export function StudentLearningPage() {
                     className="mt-4"
                     variant="outline"
                     onClick={() =>
-                      void openLinkOrFile(
-                        course.title,
-                        course.content_kind,
-                        course.mime_type,
-                        () => CourseService.getCourseMaterialUrl(course),
+                      void openLinkOrFile(course.title, course.content_kind, course.mime_type, () =>
+                        CourseService.getCourseMaterialUrl(course),
                       )
                     }
                   >
@@ -959,12 +964,9 @@ export function DirectorAssignmentsPage() {
       kind: (row.content_kind as MediaKind) || "text",
       url: row.content_url ?? "",
       file: null,
-      text:
-        row.content_kind === "text" ? row.instructions || row.description || "" : "",
+      text: row.content_kind === "text" ? row.instructions || row.description || "" : "",
     });
-    setExistingFile(
-      Boolean(row.content_url || row.attachment_path) && row.content_kind !== "text",
-    );
+    setExistingFile(Boolean(row.content_url || row.attachment_path) && row.content_kind !== "text");
     setFormError(null);
     setOpen(true);
   };
@@ -1213,7 +1215,9 @@ export function DirectorAssignmentsPage() {
               uploading={saving}
               error={formError}
               requiredFileWhenNew={false}
-              hasExistingFile={existingFile && !clearAttachment && isFileContentKind(attachment.kind)}
+              hasExistingFile={
+                existingFile && !clearAttachment && isFileContentKind(attachment.kind)
+              }
               textPlaceholder="Sujet d’expression écrite ou consignes textuelles…"
               onClearExisting={() => {
                 setClearAttachment(true);
@@ -1272,9 +1276,7 @@ export function DirectorAssignmentsPage() {
                     }
                     const kind = attachment.kind as MediaKind;
                     if (isTextContentKind(kind)) {
-                      const textError = validateTextContentBody(
-                        attachment.text || description,
-                      );
+                      const textError = validateTextContentBody(attachment.text || description);
                       if (textError) {
                         setFormError(textError);
                         return;
@@ -1295,7 +1297,9 @@ export function DirectorAssignmentsPage() {
                     try {
                       const maxScore = resolvedMaxScore();
                       if (maxScore == null) {
-                        setFormError("Indiquez un barème positif (/10, /20, /50, /100 ou personnalisé).");
+                        setFormError(
+                          "Indiquez un barème positif (/10, /20, /50, /100 ou personnalisé).",
+                        );
                         return;
                       }
                       let attachmentBucket: string | null | undefined;
@@ -1322,7 +1326,7 @@ export function DirectorAssignmentsPage() {
                           maxScore,
                           contentKind: kind,
                           contentUrl: kind === "link" ? attachment.url.trim() || null : null,
-                          mimeType: isTextContentKind(kind) ? "text/plain" : mimeType ?? null,
+                          mimeType: isTextContentKind(kind) ? "text/plain" : (mimeType ?? null),
                         };
                         if (publishedAt) {
                           patch.publishedAt = new Date(publishedAt).toISOString();
@@ -1366,15 +1370,11 @@ export function DirectorAssignmentsPage() {
                             : new Date().toISOString(),
                           contentKind: kind,
                           contentUrl: kind === "link" ? attachment.url.trim() || null : null,
-                          mimeType: isTextContentKind(kind)
-                            ? "text/plain"
-                            : (mimeType ?? null),
+                          mimeType: isTextContentKind(kind) ? "text/plain" : (mimeType ?? null),
                           attachmentBucket: isTextContentKind(kind)
                             ? null
                             : (attachmentBucket ?? null),
-                          attachmentPath: isTextContentKind(kind)
-                            ? null
-                            : (attachmentPath ?? null),
+                          attachmentPath: isTextContentKind(kind) ? null : (attachmentPath ?? null),
                           createdBy: user?.id ?? null,
                           status: "published",
                         });

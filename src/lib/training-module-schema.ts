@@ -119,9 +119,7 @@ const provenanceSchema = z.object({
 export const trainingModuleSchema = z
   .object({
     schema_version: z.literal("1.0"),
-    module_id: z
-      .string()
-      .regex(/^GA-[A-C][0-9]-M\d{2}$/, "module_id must look like GA-A1-M01"),
+    module_id: z.string().regex(/^GA-[A-C][0-9]-M\d{2}$/, "module_id must look like GA-A1-M01"),
     kind: z.literal("training_module"),
     format_profile: z.literal(TRAINING_MODULE_PROFILE),
     level: z.enum(TRAINING_LEVELS),
@@ -136,15 +134,7 @@ export const trainingModuleSchema = z
     grammar_targets: z.array(z.string().min(1)).min(3),
     skills: z
       .array(
-        z.enum([
-          "wortschatz",
-          "grammatik",
-          "lesen",
-          "hoeren",
-          "schreiben",
-          "sprechen",
-          "revision",
-        ]),
+        z.enum(["wortschatz", "grammatik", "lesen", "hoeren", "schreiben", "sprechen", "revision"]),
       )
       .min(5),
     publication_status: z.enum(["draft", "published", "archived"]),
@@ -315,8 +305,7 @@ export const trainingModuleSchema = z
 export type TrainingModule = z.infer<typeof trainingModuleSchema>;
 
 export type TrainingModuleValidationResult =
-  | { ok: true; module: TrainingModule }
-  | { ok: false; errors: string[] };
+  { ok: true; module: TrainingModule } | { ok: false; errors: string[] };
 
 export function validateTrainingModule(raw: unknown): TrainingModuleValidationResult {
   const parsed = trainingModuleSchema.safeParse(raw);

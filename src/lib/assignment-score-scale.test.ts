@@ -18,8 +18,8 @@ describe("assignment-score-scale", () => {
     expect(formatGradedScore({ score: 14, gradedMaxScore: 20, currentMaxScore: 100 })).toBe(
       "14 / 20",
     );
-    expect(
-      scoreScaleChangedWarning({ gradedMaxScore: 20, currentMaxScore: 100 }),
-    ).toContain("n’a pas été recalculée");
+    expect(scoreScaleChangedWarning({ gradedMaxScore: 20, currentMaxScore: 100 })).toContain(
+      "n’a pas été recalculée",
+    );
   });
 });

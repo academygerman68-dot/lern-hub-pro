@@ -22,7 +22,8 @@ export type B1ContentStatusInput = {
   metadata?: Record<string, unknown> | Json | null;
   options?: Array<{ label?: string | null; value?: string | null }> | null;
   correct_values?: string[] | null;
-  answer_key?: { correct_values?: string[] | null } | Array<{ correct_values?: string[] | null }> | null;
+  answer_key?:
+    { correct_values?: string[] | null } | Array<{ correct_values?: string[] | null }> | null;
 };
 
 export type B1ContentStatusResult = {
@@ -72,7 +73,10 @@ function needsObjectiveKey(type: string, skill: string): boolean {
   );
 }
 
-function keyCompatible(opts: Array<{ label?: string | null; value?: string | null }>, keys: string[]) {
+function keyCompatible(
+  opts: Array<{ label?: string | null; value?: string | null }>,
+  keys: string[],
+) {
   if (!keys.length) return false;
   if (!opts.length) return false;
   return keys.every((k) => opts.some((o) => o.value === k || o.label === k));
@@ -116,7 +120,17 @@ export function classifyB1QuestionContent(input: B1ContentStatusInput): B1Conten
     if (!(path && bucket) && !url) reasons.push("missing_audio");
   }
 
-  if (reasons.some((r) => r === "placeholder_ocr" || r === "empty_prompt" || r === "empty_options" || r === "missing_key" || r === "incompatible_key" || r === "missing_audio")) {
+  if (
+    reasons.some(
+      (r) =>
+        r === "placeholder_ocr" ||
+        r === "empty_prompt" ||
+        r === "empty_options" ||
+        r === "missing_key" ||
+        r === "incompatible_key" ||
+        r === "missing_audio",
+    )
+  ) {
     return { status: "blocked", reasons, teil, pedagogicalNumber };
   }
 
@@ -129,7 +143,10 @@ export function classifyB1QuestionContent(input: B1ContentStatusInput): B1Conten
   if (meta["points_rubric"] === "provisional_needs_review") {
     reasons.push("provisional_rubric");
   }
-  if ((skill === "hoeren" || type === "listening") && meta["audio_verification_status"] !== "content_verified") {
+  if (
+    (skill === "hoeren" || type === "listening") &&
+    meta["audio_verification_status"] !== "content_verified"
+  ) {
     reasons.push("audio_unverified");
   }
   if (!isStudentSafeQuestion({ prompt, metadata: meta })) {

@@ -63,11 +63,7 @@ describe("exam-runner-ux", () => {
     ];
     const b1 = filterExamsByLevel(exams, "B1");
     expect(b1).toHaveLength(3);
-    expect(sortExamsForCatalog(b1).map((e) => e.code)).toEqual([
-      "B1-MT01",
-      "B1-MT02",
-      "B1-MT15",
-    ]);
+    expect(sortExamsForCatalog(b1).map((e) => e.code)).toEqual(["B1-MT01", "B1-MT02", "B1-MT15"]);
     expect(examLevelCode(exams[1]!)).toBe("A1");
   });
 
@@ -85,7 +81,9 @@ describe("exam-runner-ux", () => {
     });
     try {
       expect(loadPreviewDraft("exam-ssr")).toEqual({ answers: {}, flagged: {}, index: 0 });
-      expect(() => savePreviewDraft("exam-ssr", { answers: {}, flagged: {}, index: 0 })).not.toThrow();
+      expect(() =>
+        savePreviewDraft("exam-ssr", { answers: {}, flagged: {}, index: 0 }),
+      ).not.toThrow();
     } finally {
       if (previous) Object.defineProperty(globalThis, "sessionStorage", previous);
       else Reflect.deleteProperty(globalThis, "sessionStorage");

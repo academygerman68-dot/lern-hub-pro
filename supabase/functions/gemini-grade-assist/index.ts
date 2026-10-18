@@ -76,9 +76,7 @@ const DEFAULT_CRITERIA = [
   { id: "grammar_and_spelling", label: "Grammaire / orthographe" },
 ] as const;
 
-type GeminiPart =
-  | { text: string }
-  | { inlineData: { mimeType: string; data: string } };
+type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
 
 function respond(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
@@ -104,7 +102,10 @@ function logGeminiDiag(payload: Record<string, unknown>) {
   console.log(JSON.stringify({ scope: "gemini-grade-assist", ...payload }));
 }
 
-function classifyGeminiHttp(status: number, providerMessage: string): {
+function classifyGeminiHttp(
+  status: number,
+  providerMessage: string,
+): {
   code: string;
   http: number;
 } {
@@ -114,7 +115,10 @@ function classifyGeminiHttp(status: number, providerMessage: string): {
   if (status === 429) {
     return { code: "GEMINI_RATE_LIMIT", http: 429 };
   }
-  if (status === 503 || /high demand|try again later|unavailable|overloaded/i.test(providerMessage)) {
+  if (
+    status === 503 ||
+    /high demand|try again later|unavailable|overloaded/i.test(providerMessage)
+  ) {
     return { code: "GEMINI_RATE_LIMIT", http: 429 };
   }
   if (status === 404 || /no longer available|not found|not supported for/i.test(providerMessage)) {
@@ -183,9 +187,7 @@ function normalizeCriteria(raw: unknown, maxScore: number) {
       const id = asString(record.id);
       const label =
         asString(record.label) ||
-        (id
-          ? DEFAULT_CRITERIA.find((c) => c.id === id)?.label || id.replace(/_/g, " ")
-          : "");
+        (id ? DEFAULT_CRITERIA.find((c) => c.id === id)?.label || id.replace(/_/g, " ") : "");
       const max = Math.max(1, asNumber(record.max_score ?? record.max, maxScore / 4));
       const score = clampScore(asNumber(record.score, Number.NaN), max);
       if (!label || !Number.isFinite(asNumber(record.score, Number.NaN))) continue;
@@ -408,8 +410,7 @@ Deno.serve(async (req) => {
     return respond(422, {
       error: "UNREADABLE_ATTACHMENT",
       secret_present: true,
-      message:
-        "Aucune réponse textuelle ni fichier image/PDF lisible pour la pré-correction IA.",
+      message: "Aucune réponse textuelle ni fichier image/PDF lisible pour la pré-correction IA.",
     });
   }
 

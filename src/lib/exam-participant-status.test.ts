@@ -22,12 +22,12 @@ describe("exam-participant-status", () => {
   });
 
   it("maps attempt statuses to staff tracking labels", () => {
-    expect(
-      resolveExamParticipantStatus({ attempt: { status: "in_progress" } }),
-    ).toBe("in_progress");
-    expect(
-      resolveExamParticipantStatus({ attempt: { status: "submitted" } }),
-    ).toBe("awaiting_grade");
+    expect(resolveExamParticipantStatus({ attempt: { status: "in_progress" } })).toBe(
+      "in_progress",
+    );
+    expect(resolveExamParticipantStatus({ attempt: { status: "submitted" } })).toBe(
+      "awaiting_grade",
+    );
     expect(resolveExamParticipantStatus({ attempt: { status: "graded" } })).toBe("graded");
     expect(examParticipantStatusLabel("awaiting_grade")).toBe("En attente de correction");
   });

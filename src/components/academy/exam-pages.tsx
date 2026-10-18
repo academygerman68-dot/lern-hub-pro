@@ -53,10 +53,7 @@ import {
   isDirectorRole,
   scopedClassOrLevelItemVisible,
 } from "@/lib/academy-logic";
-import {
-  pickLatestGradedAttempt,
-  pickStudentCatalogAttempt,
-} from "@/lib/exam-participant-status";
+import { pickLatestGradedAttempt, pickStudentCatalogAttempt } from "@/lib/exam-participant-status";
 import {
   canRetakeExam,
   countCompletedExamAttempts,
@@ -139,11 +136,7 @@ const RUBRIC_LABELS: Record<string, string> = {
   number: "Numéro",
 };
 
-function persistExamSession(
-  examId: string,
-  attemptId: string,
-  options?: { openReview?: boolean },
-) {
+function persistExamSession(examId: string, attemptId: string, options?: { openReview?: boolean }) {
   if (typeof sessionStorage === "undefined") return;
   sessionStorage.setItem(EXAM_ID_KEY, examId);
   sessionStorage.setItem(ATTEMPT_ID_KEY, attemptId);
@@ -338,8 +331,7 @@ function StudentExamCatalog() {
               format_profile: examExt.format_profile,
               code: exam.code,
             });
-            const writtenMins =
-              examExt.written_duration_minutes ?? exam.duration_minutes;
+            const writtenMins = examExt.written_duration_minutes ?? exam.duration_minutes;
             const speakingMins = examExt.speaking_duration_minutes ?? (goetheA1 ? 15 : null);
             const launchExam = () => {
               if (goetheA1) {
@@ -567,7 +559,6 @@ function StudentExamCatalog() {
   );
 }
 
-
 function StudentExamResult() {
   const { navigate } = useAcademy();
   const session = readExamSession();
@@ -707,7 +698,11 @@ function StudentExamResult() {
                 heroTone === "failed" ? "text-primary-foreground/70" : "text-muted-foreground",
               )}
             >
-              {awaiting ? "Résultat provisoire" : passed ? "Résultat final · bestanden" : "Résultat final"}
+              {awaiting
+                ? "Résultat provisoire"
+                : passed
+                  ? "Résultat final · bestanden"
+                  : "Résultat final"}
             </p>
             <h1 className="mt-2 font-display text-3xl md:text-4xl">
               {awaiting
@@ -983,7 +978,10 @@ function StudentExamResult() {
                         : {};
                     const oral = isSpeakingQuestionType(item.type);
                     return (
-                      <Surface className="space-y-3 border border-soft-blue/80 bg-soft-blue/20 p-5" key={item.question_id}>
+                      <Surface
+                        className="space-y-3 border border-soft-blue/80 bg-soft-blue/20 p-5"
+                        key={item.question_id}
+                      >
                         <p className="text-xs font-semibold tracking-wide text-primary uppercase">
                           {oral ? "Expression orale" : "Expression écrite"}
                         </p>
@@ -1334,7 +1332,8 @@ export function ExamWritingGradingPanel({ examId }: { examId: string }) {
                               const useDiscrete = allowed.length > 0;
                               return (
                                 <label key={rubricKey} className="block text-xs">
-                                  {RUBRIC_LABELS[rubricKey] ?? rubricKey} (/{rubric[rubricKey] ?? 0})
+                                  {RUBRIC_LABELS[rubricKey] ?? rubricKey} (/{rubric[rubricKey] ?? 0}
+                                  )
                                   {useDiscrete ? (
                                     <Select
                                       value={draft[rubricKey] ?? ""}
@@ -1715,9 +1714,7 @@ export function DirectorExamsPage() {
                       skill: s.skill,
                       title: s.title,
                       questions: (Array.isArray(s.questions) ? s.questions : []).map((q) => {
-                        const key = Array.isArray(q.answer_key)
-                          ? q.answer_key[0]
-                          : q.answer_key;
+                        const key = Array.isArray(q.answer_key) ? q.answer_key[0] : q.answer_key;
                         return {
                           id: q.id,
                           prompt: q.prompt,
@@ -2035,9 +2032,7 @@ export function DirectorExamsPage() {
                     }
                     const kind = attachment.kind as MediaKind;
                     if (isTextContentKind(kind)) {
-                      const textError = validateTextContentBody(
-                        attachment.text || instructions,
-                      );
+                      const textError = validateTextContentBody(attachment.text || instructions);
                       if (textError) {
                         setFormError(textError);
                         return;

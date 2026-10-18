@@ -13,7 +13,8 @@ import {
 } from "@/lib/training-runner-ux";
 
 function baseActivity(
-  overrides: Partial<StudentTrainingActivity> & Pick<StudentTrainingActivity, "activity_type" | "id">,
+  overrides: Partial<StudentTrainingActivity> &
+    Pick<StudentTrainingActivity, "activity_type" | "id">,
 ): StudentTrainingActivity {
   return {
     order: 1,

@@ -42,12 +42,8 @@ function ChoiceList({
   multi,
 }: BaseProps & { multi?: boolean }) {
   const selected = multi
-    ? new Set(
-        value && "values" in value && Array.isArray(value.values) ? value.values : [],
-      )
-    : new Set(
-        value && "value" in value && typeof value.value === "string" ? [value.value] : [],
-      );
+    ? new Set(value && "values" in value && Array.isArray(value.values) ? value.values : [])
+    : new Set(value && "value" in value && typeof value.value === "string" ? [value.value] : []);
   const groupId = useId();
 
   return (
@@ -87,8 +83,7 @@ function ChoiceList({
 }
 
 function TrueFalseView(props: BaseProps) {
-  const current =
-    props.value && "value" in props.value ? Boolean(props.value.value) : null;
+  const current = props.value && "value" in props.value ? Boolean(props.value.value) : null;
   return (
     <div className="flex flex-wrap gap-3" role="group" aria-label="Vrai ou faux">
       {[
@@ -125,9 +120,7 @@ function FormFillView({ activity, disabled, value, onChange }: BaseProps) {
               lang="de"
               disabled={disabled}
               value={fields[field.id] ?? ""}
-              onChange={(e) =>
-                onChange({ fields: { ...fields, [field.id]: e.target.value } })
-              }
+              onChange={(e) => onChange({ fields: { ...fields, [field.id]: e.target.value } })}
               autoComplete="off"
             />
           </div>
@@ -138,7 +131,12 @@ function FormFillView({ activity, disabled, value, onChange }: BaseProps) {
 }
 
 function ShortTextView({ activity, disabled, value, onChange }: BaseProps) {
-  const text = value && "text" in value ? value.text : value && "value" in value && typeof value.value === "string" ? value.value : "";
+  const text =
+    value && "text" in value
+      ? value.text
+      : value && "value" in value && typeof value.value === "string"
+        ? value.value
+        : "";
   const id = `st-${activity.id}`;
   return (
     <div className="space-y-1.5">
@@ -155,7 +153,7 @@ function ShortTextView({ activity, disabled, value, onChange }: BaseProps) {
 }
 
 function WritingView({ activity, disabled, value, onChange }: BaseProps) {
-  const text = value && "text" in value ? value.text ?? "" : "";
+  const text = value && "text" in value ? (value.text ?? "") : "";
   const id = `wr-${activity.id}`;
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
   return (
@@ -174,9 +172,7 @@ function WritingView({ activity, disabled, value, onChange }: BaseProps) {
       </div>
       <p className="text-xs text-muted-foreground">
         {words} mot{words === 1 ? "" : "s"}
-        {activity.recommended_words
-          ? ` · objectif ≈ ${activity.recommended_words} mots`
-          : ""}
+        {activity.recommended_words ? ` · objectif ≈ ${activity.recommended_words} mots` : ""}
       </p>
       {activity.rubric?.length ? (
         <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm">
@@ -323,9 +319,7 @@ function SpeakingView({
     }
   };
 
-  const hasMedia =
-    Boolean(localUrl) ||
-    Boolean(value && "media" in value && value.media?.path);
+  const hasMedia = Boolean(localUrl) || Boolean(value && "media" in value && value.media?.path);
 
   return (
     <div className="space-y-4">
@@ -427,7 +421,13 @@ function FeedbackBlock({ feedback }: Pick<BaseProps, "feedback">) {
   );
 }
 
-function UnknownActivity({ activity, reason }: { activity: StudentTrainingActivity; reason: string }) {
+function UnknownActivity({
+  activity,
+  reason,
+}: {
+  activity: StudentTrainingActivity;
+  reason: string;
+}) {
   return (
     <div
       className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm"

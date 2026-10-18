@@ -1,10 +1,5 @@
 export type ExamParticipantStatus =
-  | "not_started"
-  | "in_progress"
-  | "submitted"
-  | "awaiting_grade"
-  | "graded"
-  | "no_show";
+  "not_started" | "in_progress" | "submitted" | "awaiting_grade" | "graded" | "no_show";
 
 export type ExamParticipantRow = {
   studentId: string;
@@ -30,9 +25,13 @@ export function examParticipantStatusLabel(status: ExamParticipantStatus): strin
 }
 
 /** Prefer the latest meaningful attempt for a student. */
-export function pickLatestAttempt<T extends { started_at?: string | null; submitted_at?: string | null; created_at?: string | null }>(
-  attempts: T[],
-): T | null {
+export function pickLatestAttempt<
+  T extends {
+    started_at?: string | null;
+    submitted_at?: string | null;
+    created_at?: string | null;
+  },
+>(attempts: T[]): T | null {
   if (!attempts.length) return null;
   return [...attempts].sort((a, b) => {
     const ta = Date.parse(a.submitted_at || a.started_at || a.created_at || "") || 0;

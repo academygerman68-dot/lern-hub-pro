@@ -141,9 +141,7 @@ describe("exam completeness — Hören audio", () => {
       },
     ]);
     expect(report.ok).toBe(false);
-    expect(report.issues.some((i) => i.includes("Audio Hören non vérifié (contenu)"))).toBe(
-      true,
-    );
+    expect(report.issues.some((i) => i.includes("Audio Hören non vérifié (contenu)"))).toBe(true);
     expect(report.issues.some((i) => i.includes("OCR non validé"))).toBe(true);
   });
 

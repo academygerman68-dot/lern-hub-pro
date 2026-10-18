@@ -11,7 +11,13 @@ describe("library resources catalogue", () => {
   it("maps active subtype rows to select options by domain", () => {
     const rows = [
       { domain: "academic", code: "cours", label_fr: "Cours", active: true, sort_order: 10 },
-      { domain: "academic", code: "exercices", label_fr: "Exercices", active: true, sort_order: 20 },
+      {
+        domain: "academic",
+        code: "exercices",
+        label_fr: "Exercices",
+        active: true,
+        sort_order: 20,
+      },
       {
         domain: "professional",
         code: "visa",

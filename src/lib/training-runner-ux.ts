@@ -3,13 +3,7 @@ import type { TrainingActivityType } from "@/lib/training-module";
 export type TrainingSaveStatus = "idle" | "saving" | "saved" | "error";
 
 export type TrainingAnswerStatusUi =
-  | "todo"
-  | "in_progress"
-  | "answered"
-  | "validated"
-  | "review"
-  | "pending_review"
-  | "draft";
+  "todo" | "in_progress" | "answered" | "validated" | "review" | "pending_review" | "draft";
 
 export const TRAINING_ANSWER_STATUS_LABELS: Record<TrainingAnswerStatusUi, string> = {
   todo: "À faire",
@@ -101,7 +95,8 @@ export type StudentTrainingDefinition = {
 
 export function mapAnswerStatusToUi(status: string | null | undefined): TrainingAnswerStatusUi {
   if (!status || status === "todo") return "todo";
-  if (status === "in_progress" || status === "draft") return status === "draft" ? "draft" : "in_progress";
+  if (status === "in_progress" || status === "draft")
+    return status === "draft" ? "draft" : "in_progress";
   if (status === "answered") return "answered";
   if (status === "validated") return "validated";
   if (status === "review") return "review";
@@ -109,10 +104,12 @@ export function mapAnswerStatusToUi(status: string | null | undefined): Training
   return "todo";
 }
 
-export function activityStatusFromAnswer(row: {
-  status: string;
-  is_correct: boolean | null;
-} | null): TrainingAnswerStatusUi {
+export function activityStatusFromAnswer(
+  row: {
+    status: string;
+    is_correct: boolean | null;
+  } | null,
+): TrainingAnswerStatusUi {
   if (!row) return "todo";
   if (row.status === "validated" && row.is_correct === false) return "review";
   return mapAnswerStatusToUi(row.status);
@@ -175,10 +172,7 @@ export function validateActivityProps(activity: StudentTrainingActivity): string
   if (type === "speaking" && !activity.speaking_card) {
     return "Carte Sprechen manquante.";
   }
-  if (
-    (activity.skill === "hoeren" || type === "listening") &&
-    !activity.media?.audio_url
-  ) {
+  if ((activity.skill === "hoeren" || type === "listening") && !activity.media?.audio_url) {
     return "Audio Hören manquant.";
   }
   return null;

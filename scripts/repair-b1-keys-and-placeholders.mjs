@@ -21,10 +21,7 @@ const STRUCTURED_JSON = resolve(
   __dirname,
   "../data/exams/b1-exam-bank/b1-exam-bank.structured.json",
 );
-const COMPLETE_JSON = resolve(
-  __dirname,
-  "../data/exams/b1-exam-bank/b1-exam-bank.complete.json",
-);
+const COMPLETE_JSON = resolve(__dirname, "../data/exams/b1-exam-bank/b1-exam-bank.complete.json");
 
 const STANDARD_TF = new Set(["richtig", "falsch"]);
 const STANDARD_JN = new Set(["ja", "nein"]);
@@ -132,8 +129,7 @@ function isBetterBankQuestion(bankQ, dbQ) {
   if (!bankPrompt || isPlaceholderPrompt(bankPrompt)) return false;
   const dbPrompt = String(dbQ.prompt || "").trim();
   const dbMeta = asMeta(dbQ.metadata);
-  const dbIsPh =
-    dbMeta.transform_status === "placeholder" || isPlaceholderPrompt(dbPrompt);
+  const dbIsPh = dbMeta.transform_status === "placeholder" || isPlaceholderPrompt(dbPrompt);
   if (!dbIsPh) return false;
   // Prefer bank when it has a non-placeholder prompt and (ideally) options.
   if (bankPrompt === dbPrompt && (bankQ.options?.length || 0) <= (dbQ.options?.length || 0)) {
@@ -195,7 +191,11 @@ async function countStats(supabase) {
           missingKeys += 1;
           continue;
         }
-        if (opts.length > 0 && !optionMatches(opts, String(cv).toLowerCase()) && !optionMatches(opts, String(cv))) {
+        if (
+          opts.length > 0 &&
+          !optionMatches(opts, String(cv).toLowerCase()) &&
+          !optionMatches(opts, String(cv))
+        ) {
           missingKeys += 1;
         } else {
           compatibleKeys += 1;
@@ -319,7 +319,7 @@ async function main() {
             String(bankQ.prompt || "").length > 20 &&
             !isPlaceholderPrompt(bankQ.prompt)
               ? "needs_review"
-              : meta.review_status ?? "needs_review",
+              : (meta.review_status ?? "needs_review"),
           ocr_raw: meta.ocr_raw ?? meta.ocr_raw_prompt ?? null,
           bank_question_id: bankQ.id ?? bankId,
         };
@@ -397,7 +397,13 @@ async function main() {
               : typeof meta.ocr_raw === "string"
                 ? meta.ocr_raw
                 : null;
-          await ensureOption(supabase, q.id, token, opts.length + 1, ocrHint || displayLabelForToken(token));
+          await ensureOption(
+            supabase,
+            q.id,
+            token,
+            opts.length + 1,
+            ocrHint || displayLabelForToken(token),
+          );
           optionsInserted += 1;
           opts.push({ label: token, value: token });
         }

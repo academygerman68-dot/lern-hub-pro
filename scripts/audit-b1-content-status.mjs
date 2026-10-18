@@ -66,7 +66,8 @@ function classify(q, skill) {
   const reasons = [];
   const opts = q.options || [];
   const keys = q.answer_key?.correct_values || [];
-  const needsKey = ["lesen", "hoeren"].includes(skill) &&
+  const needsKey =
+    ["lesen", "hoeren"].includes(skill) &&
     ["single_choice", "true_false", "matching", "listening", "multiple_choice"].includes(type);
 
   if (isPlaceholder(prompt, meta)) reasons.push("placeholder_ocr");
@@ -82,9 +83,18 @@ function classify(q, skill) {
     reasons.push("missing_audio");
   }
 
-  if (reasons.some((r) =>
-    ["placeholder_ocr", "empty_prompt", "empty_options", "missing_key", "incompatible_key", "missing_audio"].includes(r),
-  )) {
+  if (
+    reasons.some((r) =>
+      [
+        "placeholder_ocr",
+        "empty_prompt",
+        "empty_options",
+        "missing_key",
+        "incompatible_key",
+        "missing_audio",
+      ].includes(r),
+    )
+  ) {
     return { status: "blocked", reasons, teil: teilN };
   }
 
@@ -93,7 +103,10 @@ function classify(q, skill) {
     reasons.push("transcription_unverified");
   }
   if (meta.points_rubric === "provisional_needs_review") reasons.push("provisional_rubric");
-  if ((skill === "hoeren" || type === "listening") && meta.audio_verification_status !== "content_verified") {
+  if (
+    (skill === "hoeren" || type === "listening") &&
+    meta.audio_verification_status !== "content_verified"
+  ) {
     reasons.push("audio_unverified");
   }
 
@@ -128,7 +141,8 @@ async function main() {
   const report = {
     generated_at: new Date().toISOString(),
     playback_authority: "exam_questions.media_path → ExamService.getExam signed URL",
-    inventory_table: "exam_audio_tracks (admin mirror only; 0 content_verified expected until human listen)",
+    inventory_table:
+      "exam_audio_tracks (admin mirror only; 0 content_verified expected until human listen)",
     exams: [],
   };
 
@@ -138,13 +152,22 @@ async function main() {
     const blockedItems = [];
     const audioPaths = {};
 
-    for (const section of (exam.sections || []).slice().sort((a, b) => a.sort_order - b.sort_order)) {
-      for (const q of (section.questions || []).slice().sort((a, b) => a.sort_order - b.sort_order)) {
+    for (const section of (exam.sections || [])
+      .slice()
+      .sort((a, b) => a.sort_order - b.sort_order)) {
+      for (const q of (section.questions || [])
+        .slice()
+        .sort((a, b) => a.sort_order - b.sort_order)) {
         const c = classify(q, section.skill);
         totals.questions += 1;
         totals[c.status] += 1;
         const key = `${section.skill}:teil-${c.teil ?? "?"}`;
-        bySkillTeil[key] = bySkillTeil[key] || { ready: 0, needs_review: 0, blocked: 0, questions: 0 };
+        bySkillTeil[key] = bySkillTeil[key] || {
+          ready: 0,
+          needs_review: 0,
+          blocked: 0,
+          questions: 0,
+        };
         bySkillTeil[key].questions += 1;
         bySkillTeil[key][c.status] += 1;
         if (c.status === "blocked") {
@@ -183,7 +206,8 @@ async function main() {
       structure: {
         lesen: (exam.sections || []).find((s) => s.skill === "lesen")?.questions?.length ?? 0,
         hoeren: (exam.sections || []).find((s) => s.skill === "hoeren")?.questions?.length ?? 0,
-        schreiben: (exam.sections || []).find((s) => s.skill === "schreiben")?.questions?.length ?? 0,
+        schreiben:
+          (exam.sections || []).find((s) => s.skill === "schreiben")?.questions?.length ?? 0,
         sprechen: (exam.sections || []).find((s) => s.skill === "sprechen")?.questions?.length ?? 0,
       },
       totals,
@@ -197,7 +221,8 @@ async function main() {
           verification_status: t.verification_status,
         })),
         slots_technically_available: [1, 2, 3, 4].filter((s) => audioPaths[s]).length,
-        slots_human_verified: inv.filter((t) => t.verification_status === "content_verified").length,
+        slots_human_verified: inv.filter((t) => t.verification_status === "content_verified")
+          .length,
         inventory_divergence: divergence,
       },
     });

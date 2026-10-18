@@ -1,42 +1,39 @@
-import {
-  BookOpen,
-  ClipboardCheck,
-  FileText,
-  Home,
-  Library,
-  type LucideIcon,
-} from "lucide-react";
+import { BookOpen, ClipboardCheck, FileText, Home, Library, type LucideIcon } from "lucide-react";
 import type { AcademyPage } from "@/types/academy";
 import { useAcademy } from "./academy-context";
 
-const TABS: readonly { id: AcademyPage; labelKey: string; Icon: LucideIcon; match: AcademyPage[] }[] =
-  [
-    { id: "dashboard", labelKey: "nav.tab.home", Icon: Home, match: ["dashboard"] },
-    {
-      id: "materials",
-      labelKey: "nav.tab.materials",
-      Icon: Library,
-      match: ["materials"],
-    },
-    {
-      id: "assignments",
-      labelKey: "nav.tab.assignments",
-      Icon: ClipboardCheck,
-      match: ["assignments", "assignment-detail"],
-    },
-    {
-      id: "exams",
-      labelKey: "nav.tab.exams",
-      Icon: FileText,
-      match: ["exams", "mock-exam", "exam-result"],
-    },
-    {
-      id: "courses",
-      labelKey: "nav.tab.courses",
-      Icon: BookOpen,
-      match: ["courses", "lesson"],
-    },
-  ];
+const TABS: readonly {
+  id: AcademyPage;
+  labelKey: string;
+  Icon: LucideIcon;
+  match: AcademyPage[];
+}[] = [
+  { id: "dashboard", labelKey: "nav.tab.home", Icon: Home, match: ["dashboard"] },
+  {
+    id: "materials",
+    labelKey: "nav.tab.materials",
+    Icon: Library,
+    match: ["materials"],
+  },
+  {
+    id: "assignments",
+    labelKey: "nav.tab.assignments",
+    Icon: ClipboardCheck,
+    match: ["assignments", "assignment-detail"],
+  },
+  {
+    id: "exams",
+    labelKey: "nav.tab.exams",
+    Icon: FileText,
+    match: ["exams", "mock-exam", "exam-result"],
+  },
+  {
+    id: "courses",
+    labelKey: "nav.tab.courses",
+    Icon: BookOpen,
+    match: ["courses", "lesson"],
+  },
+];
 
 export function StudentMobileTabBar() {
   const { role, page, navigate, t } = useAcademy();

@@ -261,7 +261,9 @@ export function B1ExamWorkspace() {
                 ))}
               </ul>
               <ul className="text-sm text-muted-foreground">
-                <li>Lesen : {readiness.lesenReady}/{readiness.lesenTotal}</li>
+                <li>
+                  Lesen : {readiness.lesenReady}/{readiness.lesenTotal}
+                </li>
                 <li>
                   Hören : {readiness.audioReady}/4 pistes · Vérification {readiness.audioVerified}/4
                 </li>
@@ -324,8 +326,7 @@ export function B1ExamWorkspace() {
 
           <TabsContent value="hoeren" className="space-y-3">
             {audioSlots.map((slot) => {
-              const qs =
-                bySkill("hoeren")?.questions?.filter((q) => teilOf(q) === slot.part) ?? [];
+              const qs = bySkill("hoeren")?.questions?.filter((q) => teilOf(q) === slot.part) ?? [];
               return (
                 <Surface key={slot.part} className="space-y-3 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -346,7 +347,12 @@ export function B1ExamWorkspace() {
                     <p className="text-xs text-amber-800 dark:text-amber-200">{slot.note}</p>
                   ) : null}
                   {signedByPart[slot.part] ? (
-                    <audio className="w-full" controls src={signedByPart[slot.part]} preload="metadata" />
+                    <audio
+                      className="w-full"
+                      controls
+                      src={signedByPart[slot.part]}
+                      preload="metadata"
+                    />
                   ) : (
                     <p className="text-sm text-muted-foreground">
                       {slot.hasAudio
@@ -398,9 +404,17 @@ export function B1ExamWorkspace() {
                   </p>
                   <p className="text-xs text-muted-foreground">Statut : {a.status}</p>
                   <label className="block text-xs font-medium">OCR original</label>
-                  <Textarea readOnly value={a.ocrOriginal.slice(0, 2000)} className="min-h-24 text-xs" />
+                  <Textarea
+                    readOnly
+                    value={a.ocrOriginal.slice(0, 2000)}
+                    className="min-h-24 text-xs"
+                  />
                   <label className="block text-xs font-medium">Texte pédagogique</label>
-                  <Textarea readOnly value={a.corrected.slice(0, 2000)} className="min-h-20 text-xs" />
+                  <Textarea
+                    readOnly
+                    value={a.corrected.slice(0, 2000)}
+                    className="min-h-20 text-xs"
+                  />
                   <p className="text-xs text-muted-foreground">
                     Options : {a.options.slice(0, 8).join(" · ") || "—"}
                   </p>
@@ -410,16 +424,14 @@ export function B1ExamWorkspace() {
                       variant="secondary"
                       onClick={() => {
                         setTab("edit");
-                        toast.success("Ouvrez le constructeur ci-dessous pour corriger la question.");
+                        toast.success(
+                          "Ouvrez le constructeur ci-dessous pour corriger la question.",
+                        );
                       }}
                     >
                       Ouvrir le constructeur
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => navigate("exams")}
-                    >
+                    <Button size="sm" variant="outline" onClick={() => navigate("exams")}>
                       Retour catalogue (Modifier)
                     </Button>
                   </div>
@@ -445,7 +457,9 @@ export function B1ExamWorkspace() {
                     ...(exam?.id ? { examId: exam.id } : {}),
                   })
                 }
-              >                Lancer le test étudiant
+              >
+                {" "}
+                Lancer le test étudiant
               </Button>
             </Surface>
           </TabsContent>

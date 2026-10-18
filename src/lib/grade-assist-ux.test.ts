@@ -21,16 +21,25 @@ describe("grade-assist UX helpers", () => {
   });
 
   it("does not map generic Edge Function failures to unconfigured", () => {
-    expect(mapGradeAssistErrorCode("GEMINI_AUTH_ERROR")).not.toBe(GRADE_ASSIST_UNCONFIGURED_MESSAGE);
-    expect(mapGradeAssistErrorCode("GEMINI_MODEL_ERROR")).not.toBe(GRADE_ASSIST_UNCONFIGURED_MESSAGE);
-    expect(mapGradeAssistErrorCode("GEMINI_MODEL_ERROR", "models/gemini-2.5-flash is no longer available")).toMatch(
-      /indisponible/i,
+    expect(mapGradeAssistErrorCode("GEMINI_AUTH_ERROR")).not.toBe(
+      GRADE_ASSIST_UNCONFIGURED_MESSAGE,
     );
+    expect(mapGradeAssistErrorCode("GEMINI_MODEL_ERROR")).not.toBe(
+      GRADE_ASSIST_UNCONFIGURED_MESSAGE,
+    );
+    expect(
+      mapGradeAssistErrorCode(
+        "GEMINI_MODEL_ERROR",
+        "models/gemini-2.5-flash is no longer available",
+      ),
+    ).toMatch(/indisponible/i);
     expect(mapGradeAssistErrorCode("GEMINI_RATE_LIMIT")).toMatch(/saturé|Réessayez/i);
     expect(mapGradeAssistErrorCode("GEMINI_PROVIDER_ERROR")).not.toBe(
       GRADE_ASSIST_UNCONFIGURED_MESSAGE,
     );
-    expect(mapGradeAssistErrorCode("GEMINI_NOT_CONFIGURED")).toBe(GRADE_ASSIST_UNCONFIGURED_MESSAGE);
+    expect(mapGradeAssistErrorCode("GEMINI_NOT_CONFIGURED")).toBe(
+      GRADE_ASSIST_UNCONFIGURED_MESSAGE,
+    );
   });
 
   it("requires exploitable text only for non-multimodal file-only remises", () => {

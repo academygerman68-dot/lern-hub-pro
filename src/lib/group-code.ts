@@ -74,9 +74,7 @@ export function suggestGroupCode(input: {
   const level = (input.levelCode || "XX").trim().toUpperCase().replace(/\s+/g, "");
   const prefix = `${level}-${period}-${initials}-`;
   const used = new Set(
-    (input.existingReferences ?? [])
-      .map((r) => (r ?? "").trim().toUpperCase())
-      .filter(Boolean),
+    (input.existingReferences ?? []).map((r) => (r ?? "").trim().toUpperCase()).filter(Boolean),
   );
 
   for (let seq = 1; seq <= 99; seq += 1) {

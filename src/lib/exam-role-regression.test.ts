@@ -4,10 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { shellNavPageIds } from "@/components/academy/shell";
 import { isPageForRole } from "./academy-logic";
-import {
-  EXAM_BLANCS_PAGES_BY_ROLE,
-  resolvePublishedExamCatalog,
-} from "./exam-catalog-visibility";
+import { EXAM_BLANCS_PAGES_BY_ROLE, resolvePublishedExamCatalog } from "./exam-catalog-visibility";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const securityMigration = resolve(

@@ -53,13 +53,14 @@ export function ExamOralAnswerComposer({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const mime =
-        MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-          ? "audio/webm;codecs=opus"
-          : MediaRecorder.isTypeSupported("audio/webm")
-            ? "audio/webm"
-            : undefined;
-      const recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : undefined;
+      const recorder = mime
+        ? new MediaRecorder(stream, { mimeType: mime })
+        : new MediaRecorder(stream);
       chunksRef.current = [];
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) chunksRef.current.push(event.data);
@@ -108,7 +109,12 @@ export function ExamOralAnswerComposer({
       </p>
       <div className="flex flex-wrap gap-2">
         {!recording ? (
-          <Button type="button" variant="outline" disabled={disabled || uploading} onClick={() => void startRecording()}>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={disabled || uploading}
+            onClick={() => void startRecording()}
+          >
             <Mic className="size-4" />
             Enregistrer
           </Button>
@@ -154,7 +160,9 @@ export function ExamOralAnswerComposer({
           Votre navigateur ne lit pas l’audio.
         </audio>
       ) : hasAudio ? (
-        <p className="text-sm text-muted-foreground">Audio déposé (aperçu en cours de chargement…)</p>
+        <p className="text-sm text-muted-foreground">
+          Audio déposé (aperçu en cours de chargement…)
+        </p>
       ) : (
         <p className="text-sm text-muted-foreground">Aucun enregistrement pour l’instant.</p>
       )}

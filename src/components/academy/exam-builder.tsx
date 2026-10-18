@@ -256,9 +256,7 @@ function HorenSlotVerificationPanel({
                 <p className="font-medium">Teil {slot.part}</p>
                 <p className="text-xs text-muted-foreground">
                   {slot.hasAudio ? slot.mediaPath || "fichier présent" : "piste absente"}
-                  {slot.verificationStatus
-                    ? ` · ${slot.verificationStatus}`
-                    : " · needs_review"}
+                  {slot.verificationStatus ? ` · ${slot.verificationStatus}` : " · needs_review"}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -428,9 +426,7 @@ export function ExamBuilder({ examId }: { examId: string }) {
           <p className="mt-1 text-muted-foreground">
             {horenSlotMode
               ? `Hören : ${horenStats.ready}/4 pistes disponibles${
-                  horenVerified != null
-                    ? ` · ${horenVerified}/4 pistes vérifiées par écoute`
-                    : ""
+                  horenVerified != null ? ` · ${horenVerified}/4 pistes vérifiées par écoute` : ""
                 }`
               : `Écoute : ${horenStats.ready} / ${horenStats.total} audios prêts`}
           </p>
@@ -615,8 +611,8 @@ export function ExamBuilder({ examId }: { examId: string }) {
         </label>
         {qType === "writing" ? (
           <p className="text-xs text-muted-foreground">
-            Type rédaction : saisissez le texte, ajoutez les points, puis publiez l’examen quand
-            il est complet.
+            Type rédaction : saisissez le texte, ajoutez les points, puis publiez l’examen quand il
+            est complet.
           </p>
         ) : null}
         {qType === "speaking" ? (

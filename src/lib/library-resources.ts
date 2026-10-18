@@ -11,7 +11,13 @@ import type { TeacherScope } from "@/lib/academy-logic";
 export type LibraryAudienceMode = "everyone" | "level" | "class" | "classes";
 
 export function subtypeOptionsForDomain(
-  rows: Array<{ domain: string; code: string; label_fr: string; active: boolean; sort_order: number }>,
+  rows: Array<{
+    domain: string;
+    code: string;
+    label_fr: string;
+    active: boolean;
+    sort_order: number;
+  }>,
   domain: string,
   selected?: string | null,
 ) {
@@ -80,11 +86,18 @@ export function validateAttachmentList(
   opts?: { allowEmptyExisting?: boolean },
 ) {
   if (!drafts.length) {
-    return opts?.allowEmptyExisting ? null : "Ajoutez au moins un support (fichier, lien ou texte).";
+    return opts?.allowEmptyExisting
+      ? null
+      : "Ajoutez au moins un support (fichier, lien ou texte).";
   }
   for (let i = 0; i < drafts.length; i += 1) {
     const err = validateAttachmentDraft(drafts[i]!, {
-      requireFile: !(opts?.allowEmptyExisting && !drafts[i]!.file && !drafts[i]!.url && !drafts[i]!.text),
+      requireFile: !(
+        opts?.allowEmptyExisting &&
+        !drafts[i]!.file &&
+        !drafts[i]!.url &&
+        !drafts[i]!.text
+      ),
     });
     if (err) return `Support ${i + 1} : ${err}`;
   }

@@ -93,7 +93,9 @@ async function main() {
     const dupIds = ids.filter((id, i) => ids.indexOf(id) !== i);
 
     for (const skill of ["lesen", "hoeren", "schreiben", "sprechen"]) {
-      const qs = (bySkill[skill]?.questions || []).slice().sort((a, b) => a.sort_order - b.sort_order);
+      const qs = (bySkill[skill]?.questions || [])
+        .slice()
+        .sort((a, b) => a.sort_order - b.sort_order);
       const orders = qs.map((q) => q.sort_order);
       const dupOrders = orders.filter((o, i) => orders.indexOf(o) !== i);
       for (const q of qs) {
@@ -189,9 +191,7 @@ async function main() {
       });
     }
 
-    const distinctPaths = new Set(
-      [...audioBySlot.values()].flatMap((s) => [...s]),
-    );
+    const distinctPaths = new Set([...audioBySlot.values()].flatMap((s) => [...s]));
     let audioCross = false;
     const pathToSlots = new Map();
     for (const [slot, paths] of audioBySlot) {
@@ -208,9 +208,7 @@ async function main() {
     const mkCount = missingKeys.filter(
       (p) => p.exam_id === exam.code && (p.reason !== "key_incompatible_with_options" || true),
     ).length;
-    const missingObjective = missingKeys.filter(
-      (p) => p.exam_id === exam.code && !p.reason,
-    ).length;
+    const missingObjective = missingKeys.filter((p) => p.exam_id === exam.code && !p.reason).length;
     const incompatible = missingKeys.filter(
       (p) => p.exam_id === exam.code && p.reason === "key_incompatible_with_options",
     ).length;
@@ -220,7 +218,9 @@ async function main() {
       return qs.some((q) => asMeta(q.metadata).audio_verification_status === "content_verified");
     }).length;
 
-    const rubric = allQs.every((q) => asMeta(q.metadata).points_rubric === "provisional_needs_review")
+    const rubric = allQs.every(
+      (q) => asMeta(q.metadata).points_rubric === "provisional_needs_review",
+    )
       ? "provisional_needs_review"
       : allQs.some((q) => asMeta(q.metadata).points_basis === "official_pdf")
         ? "official_claimed"
@@ -272,7 +272,9 @@ async function main() {
       distinct_audios: distinctPaths.size,
       audios_content_verified: verifiedSlots,
       scoring: rubric,
-      publication: publishBlockers.length ? `bloqué: ${publishBlockers.join("; ")}` : "prêt (théorique)",
+      publication: publishBlockers.length
+        ? `bloqué: ${publishBlockers.join("; ")}`
+        : "prêt (théorique)",
       publish_blockers: publishBlockers,
       duplicate_ids: [...new Set(dupIds)],
     });
@@ -346,9 +348,7 @@ async function main() {
     );
   }
   console.log("\nWrote tmp/b1-*-audit.json + b1-live-summary.json");
-  console.log(
-    `A1 intact: ${(a1 || []).map((x) => `${x.code}:${x.status}`).join(", ") || "none"}`,
-  );
+  console.log(`A1 intact: ${(a1 || []).map((x) => `${x.code}:${x.status}`).join(", ") || "none"}`);
 }
 
 main().catch((err) => {

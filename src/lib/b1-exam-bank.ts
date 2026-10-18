@@ -334,7 +334,11 @@ export function validateB1ExamBank(raw: unknown): B1ValidationResult {
     }
 
     if (exam.status !== "draft") {
-      issues.push({ path: `${exam.id}.status`, message: "status must be draft", severity: "error" });
+      issues.push({
+        path: `${exam.id}.status`,
+        message: "status must be draft",
+        severity: "error",
+      });
     }
 
     if (exam.publishable !== false) {
@@ -396,7 +400,10 @@ export function validateB1ExamBank(raw: unknown): B1ValidationResult {
         severity: "error",
       });
     } else {
-      const types = exam.sections.map((s) => s.type).sort().join(",");
+      const types = exam.sections
+        .map((s) => s.type)
+        .sort()
+        .join(",");
       const expected = [...REQUIRED_SECTIONS].sort().join(",");
       if (types === expected) {
         stats.sections_ok += 1;
@@ -533,8 +540,7 @@ export function validateB1ExamBank(raw: unknown): B1ValidationResult {
       });
     }
     const keySource = manifest?.official_answer_key_source as
-      | { structured_keys_imported?: boolean }
-      | undefined;
+      { structured_keys_imported?: boolean } | undefined;
     if (keySource?.structured_keys_imported === true) {
       stats.invented_keys_flagged += 1;
       issues.push({
@@ -661,7 +667,9 @@ export function inventoryLocalAudiFolders(rootDirListing: AudiFolderListing[]): 
       let status: AudiInventoryRow["status"];
       if (!examId) {
         status = "bloqué";
-        notes = notes ? `${notes}; dossier non mappable vers B1-MTnn` : "dossier non mappable vers B1-MTnn";
+        notes = notes
+          ? `${notes}; dossier non mappable vers B1-MTnn`
+          : "dossier non mappable vers B1-MTnn";
       } else if (proposedTeil == null || confidence === "à confirmer") {
         status = "ambigu";
       } else {
@@ -742,10 +750,7 @@ export function buildB1DryRunReport(
   const warnings = issues.filter((i) => i.severity === "warning");
 
   const exams = (bank.exams ?? []).map((exam) => {
-    const pageCount = exam.sections.reduce(
-      (n, s) => n + (s.questions?.length ?? 0),
-      0,
-    );
+    const pageCount = exam.sections.reduce((n, s) => n + (s.questions?.length ?? 0), 0);
     return {
       id: exam.id,
       title: exam.title,
@@ -776,8 +781,9 @@ export function buildB1DryRunReport(
     report.audio_inventory = {
       rows: audioInventory,
       mapped_folders: new Set(audioInventory.filter((r) => r.examId).map((r) => r.folder)).size,
-      blocked_folders: new Set(audioInventory.filter((r) => r.status === "bloqué").map((r) => r.folder))
-        .size,
+      blocked_folders: new Set(
+        audioInventory.filter((r) => r.status === "bloqué").map((r) => r.folder),
+      ).size,
       ambiguous_rows: audioInventory.filter((r) => r.status === "ambigu").length,
     };
   }
@@ -800,10 +806,14 @@ export function formatB1DryRunMarkdown(report: B1DryRunReport): string {
   lines.push(`| Metric | Value | Expected |`);
   lines.push(`| --- | ---: | ---: |`);
   lines.push(`| Exams | ${report.stats.exams} | ${report.stats.expected_exams} |`);
-  lines.push(`| Unique PDF pages | ${report.stats.unique_pages} | ${report.stats.expected_pages} |`);
+  lines.push(
+    `| Unique PDF pages | ${report.stats.unique_pages} | ${report.stats.expected_pages} |`,
+  );
   lines.push(`| Sections OK | ${report.stats.sections_ok} | 15 |`);
   lines.push(`| Questions/pages | ${report.stats.questions} | 240 |`);
-  lines.push(`| Expected audio slots | ${report.stats.expected_audio} | ${report.stats.expected_audio_target} |`);
+  lines.push(
+    `| Expected audio slots | ${report.stats.expected_audio} | ${report.stats.expected_audio_target} |`,
+  );
   lines.push(`| Non-null answer keys | ${report.stats.non_null_answer_keys} | 0 |`);
   lines.push(`| Non-zero points | ${report.stats.non_zero_points} | 0 |`);
   lines.push(`| Invented-key flags | ${report.stats.invented_keys_flagged} | 0 |`);

@@ -58,13 +58,23 @@ export type TrainingAnswerRow = {
   answered_at: string | null;
 };
 
-function client() {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function client(): any {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return requireClient() as any;
 }
 
 export const TrainingService = {
   async listModulesForCatalog(): Promise<
-    Array<{ id: string; code: string; title: string; theme: string | null; level_code: string; status: string; estimated_minutes: number }>
+    Array<{
+      id: string;
+      code: string;
+      title: string;
+      theme: string | null;
+      level_code: string;
+      status: string;
+      estimated_minutes: number;
+    }>
   > {
     const { data, error } = await client()
       .from("training_modules")
@@ -83,7 +93,10 @@ export const TrainingService = {
     return data as TrainingLearnerModule;
   },
 
-  async startOrResume(code: string, kind: TrainingAttemptKind = "live"): Promise<TrainingAttemptRow> {
+  async startOrResume(
+    code: string,
+    kind: TrainingAttemptKind = "live",
+  ): Promise<TrainingAttemptRow> {
     const { data, error } = await client().rpc("start_or_resume_training_attempt", {
       p_module_code: code,
       p_kind: kind,
@@ -194,7 +207,10 @@ export const TrainingService = {
     });
     if (error) throw error;
     if (input.previousPath && input.previousPath !== path) {
-      await supabase.storage.from("training-oral").remove([input.previousPath]).catch(() => undefined);
+      await supabase.storage
+        .from("training-oral")
+        .remove([input.previousPath])
+        .catch(() => undefined);
     }
     return { bucket: "training-oral", path, mimeType: input.mimeType };
   },

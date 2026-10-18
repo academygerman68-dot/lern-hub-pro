@@ -32,15 +32,20 @@ for (const [skill, rules] of Object.entries(expected)) {
   if (points !== rules.points) errors.push(`${skill}: question points sum to ${points}`);
   rules.parts.forEach((count, index) => {
     const actual = section.questions.filter((question) => question.part === index + 1).length;
-    if (actual !== count) errors.push(`${skill} Teil ${index + 1}: expected ${count}, found ${actual}`);
+    if (actual !== count)
+      errors.push(`${skill} Teil ${index + 1}: expected ${count}, found ${actual}`);
   });
   for (const question of section.questions) {
     if (ids.has(question.id)) errors.push(`Duplicate id ${question.id}`);
     ids.add(question.id);
-    if (!question.instruction && !question.prompt) errors.push(`${question.id}: missing instruction`);
+    if (!question.instruction && !question.prompt)
+      errors.push(`${question.id}: missing instruction`);
     if (["true_false", "single_choice"].includes(question.type)) {
-      const values = question.choices.map((choice) => typeof choice === "string" ? choice : choice.id);
-      if (!values.includes(question.correct_answer)) errors.push(`${question.id}: invalid answer key`);
+      const values = question.choices.map((choice) =>
+        typeof choice === "string" ? choice : choice.id,
+      );
+      if (!values.includes(question.correct_answer))
+        errors.push(`${question.id}: invalid answer key`);
     }
   }
 }
@@ -48,7 +53,8 @@ for (const [skill, rules] of Object.entries(expected)) {
 const horen = exam?.sections?.find((item) => item.type === "hoeren");
 for (const part of [1, 2, 3]) {
   const file = `public/exam-media/a1-sim-01/hoeren-teil-${part}.mp3`;
-  if (!existsSync(file) || statSync(file).size < 100_000) errors.push(`Missing or invalid audio ${file}`);
+  if (!existsSync(file) || statSync(file).size < 100_000)
+    errors.push(`Missing or invalid audio ${file}`);
   const questions = horen?.questions?.filter((question) => question.part === part) ?? [];
   const expectedUrl = `/exam-media/a1-sim-01/hoeren-teil-${part}.mp3`;
   if (questions.some((question) => question.audio_url !== expectedUrl)) {
@@ -62,4 +68,3 @@ if (errors.length) {
 }
 
 console.log("A1-SIM-01 valid: 4 skills, 60 raw points, 35 questions/tasks, 3 audio tracks.");
-

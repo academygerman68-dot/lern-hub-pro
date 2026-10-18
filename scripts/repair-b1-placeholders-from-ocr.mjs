@@ -10,10 +10,7 @@ import { createHash } from "node:crypto";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  extractMatchingItems,
-  extractSingleChoiceItems,
-} from "./lib/b1-extractors.mjs";
+import { extractMatchingItems, extractSingleChoiceItems } from "./lib/b1-extractors.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_REF = "omxemusaqgzkogqvcdfw";
@@ -156,16 +153,9 @@ async function main() {
         }
 
         // true_false / listening: keep placeholder if OCR cannot yield a clear stem
-        if (
-          !fixed &&
-          (q.type === "true_false" || q.type === "listening") &&
-          ocr.length > 40
-        ) {
+        if (!fixed && (q.type === "true_false" || q.type === "listening") && ocr.length > 40) {
           // Do not invent — only clear numbered line for this question
-          const re = new RegExp(
-            `(?:^|\\n)\\s*${n}\\s*([A-Za-zÄÖÜäöüß][^\\n]{12,200})`,
-            "m",
-          );
+          const re = new RegExp(`(?:^|\\n)\\s*${n}\\s*([A-Za-zÄÖÜäöüß][^\\n]{12,200})`, "m");
           const m = ocr.match(re);
           if (m?.[1] && !/OCR|unvollst/i.test(m[1])) {
             fixed = {

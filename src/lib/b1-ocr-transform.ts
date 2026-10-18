@@ -58,10 +58,7 @@ function extractRecommendedWords(text: string): string | null {
  * Split a Schreiben page bundle when Aufgabe 1/2/3 markers are present.
  * Does not invent sample answers or points.
  */
-export function splitSchreibenPageBundle(
-  prompt: string,
-  _source?: unknown,
-): SchreibenSplitTask[] {
+export function splitSchreibenPageBundle(prompt: string, _source?: unknown): SchreibenSplitTask[] {
   if (!prompt || typeof prompt !== "string") return [];
 
   const normalized = cleanupGluedOcrMarkers(prompt);
@@ -129,7 +126,10 @@ export function detectSprechenRole(prompt: string): "A" | "B" | null {
     return "B";
   }
 
-  const headerLines = prompt.split(/\n/).slice(0, 6).map((l) => l.trim());
+  const headerLines = prompt
+    .split(/\n/)
+    .slice(0, 6)
+    .map((l) => l.trim());
   const header = headerLines.join("\n");
 
   // Explicit A/B on its own line near a Kandid* header (common OCR layout)
@@ -144,10 +144,14 @@ export function detectSprechenRole(prompt: string): "A" | "B" | null {
   // Truncated patterns observed in the bank:
   // - A sheets often OCR as "andidat" / "andid" (lost leading K), anywhere in header
   // - B sheets often keep "Kandid" / "Kandida" (and sometimes a following "B")
-  if (headerLines.some((l) => /^andidat$/i.test(l) || /^andidat\b/i.test(l) || /^andid$/i.test(l))) {
+  if (
+    headerLines.some((l) => /^andidat$/i.test(l) || /^andidat\b/i.test(l) || /^andid$/i.test(l))
+  ) {
     return "A";
   }
-  if (headerLines.some((l) => /^kandida$/i.test(l) || /^kandid$/i.test(l) || /^kandidat$/i.test(l))) {
+  if (
+    headerLines.some((l) => /^kandida$/i.test(l) || /^kandid$/i.test(l) || /^kandidat$/i.test(l))
+  ) {
     if (/\bB\b/.test(header)) return "B";
     // Leading K retained without A → treat as B sheet heuristic
     return "B";

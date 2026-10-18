@@ -85,9 +85,7 @@ describe("training audio player readiness", () => {
   });
 
   it("does not auto-loop reloads; only user retry / source change reload", () => {
-    expect(shouldReloadSource({ reason: "auto", autoAttempts: 0, maxAutoAttempts: 0 })).toBe(
-      false,
-    );
+    expect(shouldReloadSource({ reason: "auto", autoAttempts: 0, maxAutoAttempts: 0 })).toBe(false);
     expect(shouldReloadSource({ reason: "auto", autoAttempts: 0, maxAutoAttempts: 1 })).toBe(true);
     expect(shouldReloadSource({ reason: "auto", autoAttempts: 1, maxAutoAttempts: 1 })).toBe(false);
     expect(shouldReloadSource({ reason: "source_change", autoAttempts: 0 })).toBe(true);

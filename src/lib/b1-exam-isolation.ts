@@ -3,7 +3,9 @@
  */
 
 export function extractB1MtNumber(code: string | null | undefined): number | null {
-  const m = String(code ?? "").trim().match(/^B1-MT(\d{2})$/i);
+  const m = String(code ?? "")
+    .trim()
+    .match(/^B1-MT(\d{2})$/i);
   return m ? Number(m[1]) : null;
 }
 

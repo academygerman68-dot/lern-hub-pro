@@ -14,10 +14,7 @@ export function buildAssignmentSubmissionStoragePath(input: {
   return `submissions/${input.assignmentId}/${input.studentId}/${objectId}.${ext}`;
 }
 
-export function isForeignStudentSubmissionPath(
-  path: string,
-  ownStudentId: string,
-): boolean {
+export function isForeignStudentSubmissionPath(path: string, ownStudentId: string): boolean {
   const parts = path.split("/").filter(Boolean);
   if (parts[0] !== "submissions" || parts.length < 3) return true;
   return parts[2] !== ownStudentId;
@@ -29,8 +26,7 @@ function readErrorField(error: unknown, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
-const FRIENDLY_STORAGE =
-  "Impossible d'envoyer votre fichier. Vérifiez le format ou réessayez.";
+const FRIENDLY_STORAGE = "Impossible d'envoyer votre fichier. Vérifiez le format ou réessayez.";
 const FRIENDLY_SUBMISSION =
   "Impossible d'enregistrer votre remise. Réessayez ou contactez l'administration.";
 

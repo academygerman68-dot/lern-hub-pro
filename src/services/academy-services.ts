@@ -955,7 +955,9 @@ export const PaymentService = {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabasePaymentService.ensureMySubscriptionPayment(period);
   },
-  async ensureFlexibleBilling(input: Parameters<typeof SupabasePaymentService.ensureFlexibleBilling>[0]) {
+  async ensureFlexibleBilling(
+    input: Parameters<typeof SupabasePaymentService.ensureFlexibleBilling>[0],
+  ) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
     return SupabasePaymentService.ensureFlexibleBilling(input);
   },

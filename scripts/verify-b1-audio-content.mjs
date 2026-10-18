@@ -47,7 +47,9 @@ function asMeta(m) {
 async function main() {
   const key = loadServiceRole();
   const supabase = createClient(PROJECT_URL, key, { auth: { persistSession: false } });
-  const inventory = existsSync(INV) ? JSON.parse(await import("node:fs").then((fs) => fs.readFileSync(INV, "utf8"))) : null;
+  const inventory = existsSync(INV)
+    ? JSON.parse(await import("node:fs").then((fs) => fs.readFileSync(INV, "utf8")))
+    : null;
 
   const { data: exams, error } = await supabase
     .from("exams")
@@ -83,8 +85,7 @@ async function main() {
       );
       const duration = Number(entry?.meta?.duration_seconds ?? invRow?.duree_s);
       const band = BANDS[slot];
-      const durationOk =
-        Number.isFinite(duration) && duration >= band[0] && duration <= band[1];
+      const durationOk = Number.isFinite(duration) && duration >= band[0] && duration <= band[1];
 
       // Cross-check: if duration better matches another Teil band, flag swap risk
       let betterSlot = null;
@@ -175,7 +176,10 @@ async function main() {
     unverified: results.filter((r) => r.status === "unverified").length,
     items: results,
   };
-  writeFileSync(resolve(__dirname, "../tmp/b1-audio-verification-audit.json"), JSON.stringify(out, null, 2));
+  writeFileSync(
+    resolve(__dirname, "../tmp/b1-audio-verification-audit.json"),
+    JSON.stringify(out, null, 2),
+  );
   console.log(
     `Audio verify: content_verified=${contentVerified} needs_review=${needsReview} invalid=${invalid}`,
   );

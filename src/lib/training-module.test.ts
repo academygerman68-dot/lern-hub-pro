@@ -6,19 +6,14 @@ import {
   isTrainingModuleProfile,
   TRAINING_MODULE_PROFILE,
 } from "./training-module";
-import {
-  toStudentTrainingPayload,
-  validateTrainingModule,
-} from "./training-module-schema";
+import { toStudentTrainingPayload, validateTrainingModule } from "./training-module-schema";
 
 const modulePath = path.resolve("data/exams/a1-b1-series/modules/GA-A1-M01.json");
 
 describe("training module identity", () => {
   it("recognizes GA training codes and never treats them as exam sims", () => {
     expect(isTrainingModuleProfile({ code: "GA-A1-M01" })).toBe(true);
-    expect(
-      isTrainingModuleProfile({ format_profile: TRAINING_MODULE_PROFILE }),
-    ).toBe(true);
+    expect(isTrainingModuleProfile({ format_profile: TRAINING_MODULE_PROFILE })).toBe(true);
     expect(isExamSimulationCode("GA-A1-M01")).toBe(false);
     expect(isExamSimulationCode("A1-SIM-01")).toBe(true);
     expect(isExamSimulationCode("B1-MT01")).toBe(true);

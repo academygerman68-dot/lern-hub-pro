@@ -19,9 +19,7 @@ function readEnv(value: unknown): string {
 
 export function getAppBuildInfo(): AppBuildInfo {
   const full =
-    readEnv(import.meta.env.VITE_APP_GIT_SHA) ||
-    readEnv(import.meta.env.VITE_GIT_SHA) ||
-    "unknown";
+    readEnv(import.meta.env.VITE_APP_GIT_SHA) || readEnv(import.meta.env.VITE_GIT_SHA) || "unknown";
   const builtAt = readEnv(import.meta.env.VITE_APP_BUILT_AT) || "unknown";
   return {
     app: "lern-hub-pro",

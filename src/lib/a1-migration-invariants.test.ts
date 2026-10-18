@@ -64,9 +64,7 @@ describe("A1 migration invariants", () => {
       /mins := coalesce\(exam_row\.written_duration_minutes, exam_row\.duration_minutes, 65\);/,
     );
     // Goethe structure gates only when profile/code match.
-    expect(security).toMatch(
-      /IF v_profile = 'goethe_a1_adult_v1' OR v_code = 'A1-SIM-01' THEN/,
-    );
+    expect(security).toMatch(/IF v_profile = 'goethe_a1_adult_v1' OR v_code = 'A1-SIM-01' THEN/);
   });
 
   it("rollback is self-contained with full function bodies and honest headers", () => {

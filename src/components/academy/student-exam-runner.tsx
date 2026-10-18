@@ -15,10 +15,7 @@ import {
   useUploadOralExamAnswer,
 } from "@/hooks/use-academy-data";
 import { isB1ModelltestCode } from "@/lib/b1-exam-readiness";
-import {
-  formatStudentFacingText,
-  isStudentSafeQuestion,
-} from "@/lib/b1-student-content";
+import { formatStudentFacingText, isStudentSafeQuestion } from "@/lib/b1-student-content";
 import { countWritingStats, isManualQuestionType } from "@/lib/exam-writing";
 import {
   hasOralAudioAnswer,
@@ -42,11 +39,7 @@ import { HorenTeilAudioPlayer } from "./horen-teil-audio-player";
 import { QueryState } from "./query-state";
 import { ProgressLine, Surface } from "./primitives";
 import { isGoetheA1AdultProfile } from "@/lib/a1-goethe-scoring";
-import {
-  attemptTabLockKey,
-  decideAttemptTab,
-  parseAttemptTabLock,
-} from "@/lib/exam-attempt-tab";
+import { attemptTabLockKey, decideAttemptTab, parseAttemptTabLock } from "@/lib/exam-attempt-tab";
 import {
   ackDraftIfCurrent,
   acquireSubmitLock,
@@ -669,17 +662,9 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
     isPreview ||
     isStudentSafeQuestion({ prompt: current.prompt, metadata: current.metadata });
   const displayPrompt =
-    current && contentSafe
-      ? isB1
-        ? formatStudentFacingText(current.prompt)
-        : current.prompt
-      : "";
+    current && contentSafe ? (isB1 ? formatStudentFacingText(current.prompt) : current.prompt) : "";
   const displayInstruction =
-    instruction && contentSafe
-      ? isB1
-        ? formatStudentFacingText(instruction)
-        : instruction
-      : null;
+    instruction && contentSafe ? (isB1 ? formatStudentFacingText(instruction) : instruction) : null;
   const prevPassage =
     index > 0 && questions[index - 1]
       ? (() => {
@@ -794,7 +779,10 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
 
         {otherTabActive && !isPreview ? (
           <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            <p>Cette tentative est ouverte dans un autre onglet. Les réponses de cet onglet ne sont pas envoyées.</p>
+            <p>
+              Cette tentative est ouverte dans un autre onglet. Les réponses de cet onglet ne sont
+              pas envoyées.
+            </p>
             <Button
               className="mt-3"
               size="sm"
@@ -812,386 +800,389 @@ export function StudentExamRunner({ mode = "live" }: { mode?: RunnerMode }) {
           disabled={otherTabActive && !isPreview}
           className="min-w-0 border-0 p-0 disabled:opacity-70"
         >
-        <div className="grid gap-6 lg:grid-cols-[1fr_14rem]">
-          <Surface className="p-6 sm:p-8">
-            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              {current ? current.sectionTitle : ""}
-            </p>
-            {!contentSafe ? (
-              <div className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/5 p-4 text-sm">
-                <p className="font-medium text-foreground">{pedLabel} — contenu indisponible</p>
-                <p className="mt-1 text-muted-foreground">
-                  Cette question n’est pas encore prête pour les étudiants (transcription à
-                  vérifier). Elle reste comptée dans l’examen ; contactez votre professeur.
+          <div className="grid gap-6 lg:grid-cols-[1fr_14rem]">
+            <Surface className="p-6 sm:p-8">
+              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                {current ? current.sectionTitle : ""}
+              </p>
+              {!contentSafe ? (
+                <div className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/5 p-4 text-sm">
+                  <p className="font-medium text-foreground">{pedLabel} — contenu indisponible</p>
+                  <p className="mt-1 text-muted-foreground">
+                    Cette question n’est pas encore prête pour les étudiants (transcription à
+                    vérifier). Elle reste comptée dans l’examen ; contactez votre professeur.
+                  </p>
+                </div>
+              ) : null}
+              {displayInstruction ? (
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">{displayInstruction}</p>
+              ) : null}
+              {displayPassage ? (
+                <div className="mt-4 whitespace-pre-wrap rounded-md border border-border bg-muted/30 p-4 text-sm leading-6">
+                  {displayPassage}
+                </div>
+              ) : null}
+              {contentSafe ? (
+                <h2 className="mt-4 text-xl font-semibold leading-snug sm:text-2xl">
+                  {displayPrompt}
+                </h2>
+              ) : null}
+
+              {isSpeakingType && sprechenRole ? (
+                <p className="mt-3 text-sm font-medium text-foreground">
+                  Rôle : Kandidat {sprechenRole}
                 </p>
-              </div>
-            ) : null}
-            {displayInstruction ? (
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">{displayInstruction}</p>
-            ) : null}
-            {displayPassage ? (
-              <div className="mt-4 whitespace-pre-wrap rounded-md border border-border bg-muted/30 p-4 text-sm leading-6">
-                {displayPassage}
-              </div>
-            ) : null}
-            {contentSafe ? (
-              <h2 className="mt-4 text-xl font-semibold leading-snug sm:text-2xl">
-                {displayPrompt}
-              </h2>
-            ) : null}
+              ) : null}
 
-            {isSpeakingType && sprechenRole ? (
-              <p className="mt-3 text-sm font-medium text-foreground">
-                Rôle : Kandidat {sprechenRole}
-              </p>
-            ) : null}
+              {isSpeakingType && isB1 && currentMeta["support_only"] === true ? (
+                <p className="mt-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                  Support candidat — utilisez le rôle indiqué ; ne présentez pas les deux sujets
+                  sauf consigne contraire.
+                </p>
+              ) : null}
 
-            {isSpeakingType && isB1 && currentMeta["support_only"] === true ? (
-              <p className="mt-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                Support candidat — utilisez le rôle indiqué ; ne présentez pas les deux sujets sauf
-                consigne contraire.
-              </p>
-            ) : null}
+              {(current?.type === "listening" || current?.skill === "hoeren") && (
+                <div className="mt-5">
+                  <HorenTeilAudioPlayer
+                    playerKey={audioPlayerKey}
+                    audioUrl={audioUrl}
+                    teil={currentTeil}
+                    playbackCount={Number.isFinite(playbackCount) ? Number(playbackCount) : null}
+                    strictExamMode={strictHoren}
+                    disabled={expired}
+                    reloading={audioRefreshing}
+                    onReload={() => void refreshAudio()}
+                  />
+                </div>
+              )}
 
-            {(current?.type === "listening" || current?.skill === "hoeren") && (
-              <div className="mt-5">
-                <HorenTeilAudioPlayer
-                  playerKey={audioPlayerKey}
-                  audioUrl={audioUrl}
-                  teil={currentTeil}
-                  playbackCount={Number.isFinite(playbackCount) ? Number(playbackCount) : null}
-                  strictExamMode={strictHoren}
-                  disabled={expired}
-                  reloading={audioRefreshing}
-                  onReload={() => void refreshAudio()}
-                />
-              </div>
-            )}
+              {isSpeakingType && isGoetheA1 ? (
+                <p className="mt-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  Expression orale. Le chronomètre écrit (
+                  {examQuery.data?.written_duration_minutes ??
+                    examQuery.data?.duration_minutes ??
+                    65}{" "}
+                  min) fige Hören, Lesen et Schreiben. Vous pouvez encore enregistrer l’oral, puis
+                  envoyer la tentative.
+                </p>
+              ) : null}
+              {expired && isGoetheA1 ? (
+                <p className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                  Temps écrit écoulé. Les réponses déjà enregistrées sont conservées. Enregistrez
+                  l’oral s’il manque, puis clôturez la tentative.
+                </p>
+              ) : null}
 
-            {isSpeakingType && isGoetheA1 ? (
-              <p className="mt-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                Expression orale. Le chronomètre écrit (
-                {examQuery.data?.written_duration_minutes ??
-                  examQuery.data?.duration_minutes ??
-                  65}{" "}
-                min) fige Hören, Lesen et Schreiben. Vous pouvez encore enregistrer l’oral, puis
-                envoyer la tentative.
-              </p>
-            ) : null}
-            {expired && isGoetheA1 ? (
-              <p className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-                Temps écrit écoulé. Les réponses déjà enregistrées sont conservées. Enregistrez
-                l’oral s’il manque, puis clôturez la tentative.
-              </p>
-            ) : null}
+              <div className="mt-6 space-y-3">
+                {contentSafe &&
+                  current &&
+                  isChoiceQuestionType(current.type) &&
+                  (current.options ?? []).map((option) => {
+                    const selected = answerValue(localAnswers[current.id]) === option.value;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        disabled={expired || attemptQuery.data?.status !== "in_progress"}
+                        className={`flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left text-sm transition duration-150 disabled:opacity-60 ${
+                          selected
+                            ? "border-primary bg-primary/5 font-medium text-foreground shadow-soft"
+                            : "border-border hover:border-primary/40"
+                        }`}
+                        aria-pressed={selected}
+                        onClick={() => {
+                          if (expired) return;
+                          rememberDraft(current.id, option.value);
+                          persistDraft(current.id);
+                        }}
+                      >
+                        <span
+                          className={`grid size-4 shrink-0 place-items-center rounded-full border ${
+                            selected ? "border-primary bg-primary" : "border-muted-foreground/40"
+                          }`}
+                          aria-hidden
+                        >
+                          {selected ? (
+                            <span className="size-1.5 rounded-full bg-primary-foreground" />
+                          ) : null}
+                        </span>
+                        <span>{option.label}</span>
+                      </button>
+                    );
+                  })}
 
-            <div className="mt-6 space-y-3">
-              {contentSafe && current && isChoiceQuestionType(current.type) &&
-                (current.options ?? []).map((option) => {
-                  const selected = answerValue(localAnswers[current.id]) === option.value;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
+                {contentSafe && current?.type === "form_fill" && (
+                  <div className="space-y-3">
+                    {formFields.map((field) => (
+                      <label key={field.key} className="block text-sm">
+                        <span className="font-medium">{field.key}</span>
+                        <Input
+                          className="mt-1"
+                          value={formFillDraft[field.key] ?? ""}
+                          disabled={expired || attemptQuery.data?.status !== "in_progress"}
+                          onChange={(e) => {
+                            const base = formFillAnswer(
+                              draftsRef.current[current.id]?.answer ?? localAnswers[current.id],
+                            );
+                            rememberDraft(current.id, { ...base, [field.key]: e.target.value });
+                          }}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {contentSafe && isSpeakingType && current && (isPreview || attemptId) ? (
+                  <ExamOralAnswerComposer
+                    disabled={
+                      isPreview
+                        ? false
+                        : attemptQuery.data?.status !== "in_progress" || (expired && !isGoetheA1)
+                    }
+                    hasAudio={
+                      isPreview
+                        ? Boolean(oralPreviewUrls[current.id])
+                        : hasOralAudioAnswer({
+                            answer: localAnswers[current.id],
+                            answer_media_path:
+                              (answersQuery.data ?? []).find(
+                                (row) => row.question_id === current.id,
+                              )?.answer_media_path ?? null,
+                          })
+                    }
+                    previewUrl={oralPreviewUrls[current.id] ?? null}
+                    uploading={uploadOral.isPending}
+                    onUpload={async (file) => {
+                      if (isPreview) {
+                        const url = URL.createObjectURL(file);
+                        setOralPreviewUrls((prev) => ({ ...prev, [current.id]: url }));
+                        setLocalAnswers((prev) => ({
+                          ...prev,
+                          [current.id]: { preview: true, name: file.name },
+                        }));
+                        toast.message("Aperçu — audio non enregistré sur le serveur");
+                        return;
+                      }
+                      const saved = await uploadOral.mutateAsync({
+                        attemptId: attemptId!,
+                        questionId: current.id,
+                        file,
+                        flagged: flagged[current.id] ?? false,
+                      });
+                      const nextDrafts = ackDraftIfCurrent(
+                        draftsRef.current,
+                        current.id,
+                        draftsRef.current[current.id]?.revision ?? -1,
+                      );
+                      draftsRef.current = nextDrafts;
+                      setUnsavedCount(Object.keys(nextDrafts).length);
+                      if (attemptId) writeAttemptDraft(attemptId, nextDrafts);
+                      setLocalAnswers((prev) => ({ ...prev, [current.id]: saved.answer }));
+                      try {
+                        const signed = await ExamService.getAnswerAudioSignedUrl(saved);
+                        if (signed) {
+                          setOralPreviewUrls((prev) => ({ ...prev, [current.id]: signed }));
+                        }
+                      } catch {
+                        /* preview optional */
+                      }
+                      toast.success("Audio oral enregistré");
+                    }}
+                  />
+                ) : null}
+
+                {contentSafe && isWritingType && current && (
+                  <div>
+                    {requirements.length > 0 ? (
+                      <ul className="mb-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                        {requirements.map((req) => (
+                          <li key={req}>{req}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {recommendedWords ? (
+                      <p className="mb-3 text-xs text-muted-foreground">
+                        Nombre de mots conseillé : {recommendedWords}
+                      </p>
+                    ) : null}
+                    <Textarea
+                      className="min-h-52 text-base leading-relaxed"
+                      value={answerValue(localAnswers[current.id])}
+                      placeholder="Saisissez votre réponse…"
                       disabled={expired || attemptQuery.data?.status !== "in_progress"}
-                      className={`flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left text-sm transition duration-150 disabled:opacity-60 ${
-                        selected
-                          ? "border-primary bg-primary/5 font-medium text-foreground shadow-soft"
-                          : "border-border hover:border-primary/40"
-                      }`}
-                      aria-pressed={selected}
+                      onChange={(e) => {
+                        if (!current) return;
+                        rememberDraft(current.id, e.target.value);
+                      }}
+                    />
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {writingStats.words} mot{writingStats.words === 1 ? "" : "s"} ·{" "}
+                      {writingStats.characters} caractère
+                      {writingStats.characters === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    disabled={index === 0}
+                    onClick={() => {
+                      void flushPendingWrites()
+                        .then(() => setIndex((v) => v - 1))
+                        .catch((err: Error) => toast.error(err.message));
+                    }}
+                  >
+                    Précédent
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={index >= questions.length - 1}
+                    onClick={() => {
+                      void flushPendingWrites()
+                        .then(() => setIndex((v) => v + 1))
+                        .catch((err: Error) => toast.error(err.message));
+                    }}
+                  >
+                    Suivant
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      if (!current) return;
+                      const next = !(flagged[current.id] ?? false);
+                      const answer =
+                        draftsRef.current[current.id]?.answer ?? localAnswers[current.id] ?? null;
+                      rememberDraft(current.id, answer, next);
+                      persistDraft(current.id);
+                    }}
+                  >
+                    <Flag className="size-4" />
+                    {flagged[current?.id ?? ""] ? "Marquée" : "Marquer"}
+                  </Button>
+                  {isPreview ? (
+                    <Button variant="secondary" onClick={() => navigate("exams")}>
+                      Fermer l’aperçu
+                    </Button>
+                  ) : (
+                    <Button
+                      disabled={
+                        submitExam.isPending ||
+                        submitting ||
+                        (saveAnswer.isPending && !expired) ||
+                        (attemptQuery.data?.status !== "in_progress" &&
+                          attemptQuery.data?.status !== "expired")
+                      }
                       onClick={() => {
-                        if (expired) return;
-                        rememberDraft(current.id, option.value);
-                        persistDraft(current.id);
+                        if (!attemptId) return;
+                        if (!acquireSubmitLock(submitLockRef.current)) return;
+                        if (
+                          !window.confirm(
+                            "Envoyer définitivement cet examen ? Vous ne pourrez plus modifier vos réponses.",
+                          )
+                        ) {
+                          releaseSubmitLock(submitLockRef.current);
+                          return;
+                        }
+                        setSubmitting(true);
+                        void flushPendingWrites()
+                          .catch(() => undefined)
+                          .then(
+                            () =>
+                              new Promise<void>((resolve, reject) => {
+                                submitExam.mutate(attemptId, {
+                                  onSuccess: () => resolve(),
+                                  onError: (err) => reject(err),
+                                });
+                              }),
+                          )
+                          .then(() => {
+                            finishSubmittedAttempt();
+                            toast.success("Examen envoyé");
+                            navigate("exam-result");
+                          })
+                          .catch((err: Error) => {
+                            toast.error(err.message || "Remise impossible");
+                          })
+                          .finally(() => {
+                            releaseSubmitLock(submitLockRef.current);
+                            setSubmitting(false);
+                          });
                       }}
                     >
-                      <span
-                        className={`grid size-4 shrink-0 place-items-center rounded-full border ${
-                          selected ? "border-primary bg-primary" : "border-muted-foreground/40"
-                        }`}
-                        aria-hidden
-                      >
-                        {selected ? (
-                          <span className="size-1.5 rounded-full bg-primary-foreground" />
-                        ) : null}
-                      </span>
-                      <span>{option.label}</span>
+                      {expired ? "Clôturer" : "Envoyer"}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </Surface>
+
+            <Surface className="h-fit p-4">
+              <p className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                Navigation
+              </p>
+              <div className="grid grid-cols-5 gap-2 sm:grid-cols-4 lg:grid-cols-3">
+                {questions.map((q, i) => {
+                  const raw = localAnswers[q.id];
+                  const answered =
+                    raw !== undefined &&
+                    raw !== null &&
+                    (Boolean(parseOralAnswer(raw)) ||
+                      (typeof raw === "object" && !Array.isArray(raw)
+                        ? Object.values(raw as Record<string, unknown>).some(
+                            (v) => String(v ?? "").trim() !== "",
+                          )
+                        : answerValue(raw) !== ""));
+                  const isCurrent = i === index;
+                  const isFlagged = flagged[q.id];
+                  return (
+                    <button
+                      key={q.id}
+                      type="button"
+                      aria-label={`Question ${i + 1}${isCurrent ? ", question affichée" : ""}`}
+                      aria-current={isCurrent ? "true" : undefined}
+                      onClick={() => {
+                        void flushPendingWrites()
+                          .then(() => setIndex(i))
+                          .catch((err: Error) => toast.error(err.message));
+                      }}
+                      className={`grid size-9 place-items-center rounded-md text-xs font-medium ${
+                        isCurrent
+                          ? "bg-primary text-primary-foreground"
+                          : answered
+                            ? "bg-secondary text-primary"
+                            : "border border-border text-muted-foreground"
+                      } ${isFlagged ? "ring-2 ring-alert/40" : ""}`}
+                    >
+                      {i + 1}
                     </button>
                   );
                 })}
-
-              {contentSafe && current?.type === "form_fill" && (
-                <div className="space-y-3">
-                  {formFields.map((field) => (
-                    <label key={field.key} className="block text-sm">
-                      <span className="font-medium">{field.key}</span>
-                      <Input
-                        className="mt-1"
-                        value={formFillDraft[field.key] ?? ""}
-                        disabled={expired || attemptQuery.data?.status !== "in_progress"}
-                        onChange={(e) => {
-                          const base = formFillAnswer(
-                            draftsRef.current[current.id]?.answer ?? localAnswers[current.id],
-                          );
-                          rememberDraft(current.id, { ...base, [field.key]: e.target.value });
-                        }}
-                      />
-                    </label>
-                  ))}
-                </div>
-              )}
-
-              {contentSafe && isSpeakingType && current && (isPreview || attemptId) ? (
-                <ExamOralAnswerComposer
-                  disabled={
-                    isPreview
-                      ? false
-                      : attemptQuery.data?.status !== "in_progress" || (expired && !isGoetheA1)
-                  }
-                  hasAudio={
-                    isPreview
-                      ? Boolean(oralPreviewUrls[current.id])
-                      : hasOralAudioAnswer({
-                          answer: localAnswers[current.id],
-                          answer_media_path:
-                            (answersQuery.data ?? []).find((row) => row.question_id === current.id)
-                              ?.answer_media_path ?? null,
-                        })
-                  }
-                  previewUrl={oralPreviewUrls[current.id] ?? null}
-                  uploading={uploadOral.isPending}
-                  onUpload={async (file) => {
-                    if (isPreview) {
-                      const url = URL.createObjectURL(file);
-                      setOralPreviewUrls((prev) => ({ ...prev, [current.id]: url }));
-                      setLocalAnswers((prev) => ({
-                        ...prev,
-                        [current.id]: { preview: true, name: file.name },
-                      }));
-                      toast.message("Aperçu — audio non enregistré sur le serveur");
-                      return;
-                    }
-                    const saved = await uploadOral.mutateAsync({
-                      attemptId: attemptId!,
-                      questionId: current.id,
-                      file,
-                      flagged: flagged[current.id] ?? false,
-                    });
-                    const nextDrafts = ackDraftIfCurrent(
-                      draftsRef.current,
-                      current.id,
-                      draftsRef.current[current.id]?.revision ?? -1,
-                    );
-                    draftsRef.current = nextDrafts;
-                    setUnsavedCount(Object.keys(nextDrafts).length);
-                    if (attemptId) writeAttemptDraft(attemptId, nextDrafts);
-                    setLocalAnswers((prev) => ({ ...prev, [current.id]: saved.answer }));
-                    try {
-                      const signed = await ExamService.getAnswerAudioSignedUrl(saved);
-                      if (signed) {
-                        setOralPreviewUrls((prev) => ({ ...prev, [current.id]: signed }));
-                      }
-                    } catch {
-                      /* preview optional */
-                    }
-                    toast.success("Audio oral enregistré");
-                  }}
-                />
+              </div>
+              {!isPreview ? (
+                <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
+                  {saveStatus === "pending"
+                    ? "Enregistrement…"
+                    : saveStatus === "failed"
+                      ? "Échec d’enregistrement — la réponse reste sur cet appareil"
+                      : saveStatus === "unsaved"
+                        ? "Modification pas encore sur le serveur"
+                        : saveAnswer.isSuccess
+                          ? "Enregistré sur le serveur"
+                          : "Aucune modification en attente"}
+                </p>
               ) : null}
-
-              {contentSafe && isWritingType && current && (
-                <div>
-                  {requirements.length > 0 ? (
-                    <ul className="mb-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                      {requirements.map((req) => (
-                        <li key={req}>{req}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  {recommendedWords ? (
-                    <p className="mb-3 text-xs text-muted-foreground">
-                      Nombre de mots conseillé : {recommendedWords}
-                    </p>
-                  ) : null}
-                  <Textarea
-                    className="min-h-52 text-base leading-relaxed"
-                    value={answerValue(localAnswers[current.id])}
-                    placeholder="Saisissez votre réponse…"
-                    disabled={expired || attemptQuery.data?.status !== "in_progress"}
-                    onChange={(e) => {
-                      if (!current) return;
-                      rememberDraft(current.id, e.target.value);
-                    }}
-                  />
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {writingStats.words} mot{writingStats.words === 1 ? "" : "s"} ·{" "}
-                    {writingStats.characters} caractère
-                    {writingStats.characters === 1 ? "" : "s"}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  disabled={index === 0}
-                  onClick={() => {
-                    void flushPendingWrites()
-                      .then(() => setIndex((v) => v - 1))
-                      .catch((err: Error) => toast.error(err.message));
-                  }}
-                >
-                  Précédent
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={index >= questions.length - 1}
-                  onClick={() => {
-                    void flushPendingWrites()
-                      .then(() => setIndex((v) => v + 1))
-                      .catch((err: Error) => toast.error(err.message));
-                  }}
-                >
-                  Suivant
-                </Button>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    if (!current) return;
-                    const next = !(flagged[current.id] ?? false);
-                    const answer =
-                      draftsRef.current[current.id]?.answer ?? localAnswers[current.id] ?? null;
-                    rememberDraft(current.id, answer, next);
-                    persistDraft(current.id);
-                  }}
-                >
-                  <Flag className="size-4" />
-                  {flagged[current?.id ?? ""] ? "Marquée" : "Marquer"}
-                </Button>
-                {isPreview ? (
-                  <Button variant="secondary" onClick={() => navigate("exams")}>
-                    Fermer l’aperçu
-                  </Button>
-                ) : (
-                  <Button
-                    disabled={
-                      submitExam.isPending ||
-                      submitting ||
-                      (saveAnswer.isPending && !expired) ||
-                      (attemptQuery.data?.status !== "in_progress" &&
-                        attemptQuery.data?.status !== "expired")
-                    }
-                    onClick={() => {
-                      if (!attemptId) return;
-                      if (!acquireSubmitLock(submitLockRef.current)) return;
-                      if (
-                        !window.confirm(
-                          "Envoyer définitivement cet examen ? Vous ne pourrez plus modifier vos réponses.",
-                        )
-                      ) {
-                        releaseSubmitLock(submitLockRef.current);
-                        return;
-                      }
-                      setSubmitting(true);
-                      void flushPendingWrites()
-                        .catch(() => undefined)
-                        .then(
-                          () =>
-                            new Promise<void>((resolve, reject) => {
-                              submitExam.mutate(attemptId, {
-                                onSuccess: () => resolve(),
-                                onError: (err) => reject(err),
-                              });
-                            }),
-                        )
-                        .then(() => {
-                          finishSubmittedAttempt();
-                          toast.success("Examen envoyé");
-                          navigate("exam-result");
-                        })
-                        .catch((err: Error) => {
-                          toast.error(err.message || "Remise impossible");
-                        })
-                        .finally(() => {
-                          releaseSubmitLock(submitLockRef.current);
-                          setSubmitting(false);
-                        });
-                    }}
-                  >
-                    {expired ? "Clôturer" : "Envoyer"}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </Surface>
-
-          <Surface className="h-fit p-4">
-            <p className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              Navigation
-            </p>
-            <div className="grid grid-cols-5 gap-2 sm:grid-cols-4 lg:grid-cols-3">
-              {questions.map((q, i) => {
-                const raw = localAnswers[q.id];
-                const answered =
-                  raw !== undefined &&
-                  raw !== null &&
-                  (Boolean(parseOralAnswer(raw)) ||
-                    (typeof raw === "object" && !Array.isArray(raw)
-                      ? Object.values(raw as Record<string, unknown>).some(
-                          (v) => String(v ?? "").trim() !== "",
-                        )
-                      : answerValue(raw) !== ""));
-                const isCurrent = i === index;
-                const isFlagged = flagged[q.id];
-                return (
-                  <button
-                    key={q.id}
-                    type="button"
-                    aria-label={`Question ${i + 1}${isCurrent ? ", question affichée" : ""}`}
-                    aria-current={isCurrent ? "true" : undefined}
-                    onClick={() => {
-                      void flushPendingWrites()
-                        .then(() => setIndex(i))
-                        .catch((err: Error) => toast.error(err.message));
-                    }}
-                    className={`grid size-9 place-items-center rounded-md text-xs font-medium ${
-                      isCurrent
-                        ? "bg-primary text-primary-foreground"
-                        : answered
-                          ? "bg-secondary text-primary"
-                          : "border border-border text-muted-foreground"
-                    } ${isFlagged ? "ring-2 ring-alert/40" : ""}`}
-                  >
-                    {i + 1}
-                  </button>
-                );
-              })}
-            </div>
-            {!isPreview ? (
-              <p className="mt-3 text-xs text-muted-foreground" aria-live="polite">
-                {saveStatus === "pending"
-                  ? "Enregistrement…"
-                  : saveStatus === "failed"
-                    ? "Échec d’enregistrement — la réponse reste sur cet appareil"
-                    : saveStatus === "unsaved"
-                      ? "Modification pas encore sur le serveur"
-                      : saveAnswer.isSuccess
-                        ? "Enregistré sur le serveur"
-                        : "Aucune modification en attente"}
-              </p>
-            ) : null}
-            {isPreview ? (
-              <p className="mt-3 text-xs text-muted-foreground">
-                Mode aperçu — aucune tentative officielle.
-              </p>
-            ) : null}
-          </Surface>
-        </div>
+              {isPreview ? (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Mode aperçu — aucune tentative officielle.
+                </p>
+              ) : null}
+            </Surface>
+          </div>
         </fieldset>
       </div>
     </QueryState>

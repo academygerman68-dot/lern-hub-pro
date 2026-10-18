@@ -2,9 +2,8 @@ import fs from "fs";
 import path from "path";
 
 async function loadValidator() {
-  const { validateTrainingModule, toStudentTrainingPayload } = await import(
-    "../src/lib/training-module-schema.ts"
-  );
+  const { validateTrainingModule, toStudentTrainingPayload } =
+    await import("../src/lib/training-module-schema.ts");
   return { validateTrainingModule, toStudentTrainingPayload };
 }
 

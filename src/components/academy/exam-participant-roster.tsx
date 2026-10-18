@@ -58,8 +58,7 @@ export function ExamParticipantRosterPanel({ examId }: { examId: string }) {
 
       <div className="flex flex-wrap gap-2">
         {FILTERS.map((item) => {
-          const count =
-            item.id === "all" ? (rosterQuery.data?.length ?? 0) : counts[item.id];
+          const count = item.id === "all" ? (rosterQuery.data?.length ?? 0) : counts[item.id];
           return (
             <Button
               key={item.id}

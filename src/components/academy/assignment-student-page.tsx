@@ -103,8 +103,7 @@ export function Assignments({ detail }: { detail: boolean }) {
     });
 
   const filtered = useMemo(
-    () =>
-      published.filter((row) => matchesAssignmentFilter(uxFor(row.id, row.due_at), filter)),
+    () => published.filter((row) => matchesAssignmentFilter(uxFor(row.id, row.due_at), filter)),
     [published, filter, submissionByAssignment],
   );
 
@@ -172,81 +171,81 @@ export function Assignments({ detail }: { detail: boolean }) {
                   </p>
                   {(selected.content_url || selected.attachment_path) &&
                     selected.content_kind !== "text" && (
-                    <div className="space-y-2 border-t border-border/70 pt-4">
-                      <h3 className="text-sm font-semibold">2. Documents</h3>
-                      <p className="text-xs text-muted-foreground">Pièces jointes à consulter</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setPreview({
-                              title: selected.title,
-                              url: null,
-                              mimeType: selected.mime_type,
-                              loading: true,
-                              error: null,
-                            });
-                            void AssignmentService.getAttachmentUrl(selected)
-                              .then((url) => {
-                                if (selected.content_kind === "link") {
-                                  window.open(url, "_blank", "noopener,noreferrer");
-                                  setPreview(null);
-                                  return;
-                                }
-                                setPreview({
-                                  title: selected.title,
-                                  url,
-                                  mimeType: selected.mime_type,
-                                  loading: false,
-                                  error: null,
-                                });
-                              })
-                              .catch((err: Error) =>
-                                setPreview({
-                                  title: selected.title,
-                                  url: null,
-                                  mimeType: selected.mime_type,
-                                  loading: false,
-                                  error: err.message,
-                                }),
-                              );
-                          }}
-                        >
-                          Voir
-                        </Button>
-                        {selected.content_kind !== "link" && (
+                      <div className="space-y-2 border-t border-border/70 pt-4">
+                        <h3 className="text-sm font-semibold">2. Documents</h3>
+                        <p className="text-xs text-muted-foreground">Pièces jointes à consulter</p>
+                        <div className="flex flex-wrap gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() =>
-                              void (async () => {
-                                try {
-                                  const url = await AssignmentService.getAttachmentUrl(selected);
-                                  const response = await fetch(url);
-                                  const blob = await response.blob();
-                                  const objectUrl = URL.createObjectURL(blob);
-                                  const a = document.createElement("a");
-                                  a.href = objectUrl;
-                                  a.download = selected.title;
-                                  a.click();
-                                  URL.revokeObjectURL(objectUrl);
-                                } catch (err) {
-                                  toast.error(
-                                    err instanceof Error
-                                      ? err.message
-                                      : "Téléchargement impossible",
-                                  );
-                                }
-                              })()
-                            }
+                            onClick={() => {
+                              setPreview({
+                                title: selected.title,
+                                url: null,
+                                mimeType: selected.mime_type,
+                                loading: true,
+                                error: null,
+                              });
+                              void AssignmentService.getAttachmentUrl(selected)
+                                .then((url) => {
+                                  if (selected.content_kind === "link") {
+                                    window.open(url, "_blank", "noopener,noreferrer");
+                                    setPreview(null);
+                                    return;
+                                  }
+                                  setPreview({
+                                    title: selected.title,
+                                    url,
+                                    mimeType: selected.mime_type,
+                                    loading: false,
+                                    error: null,
+                                  });
+                                })
+                                .catch((err: Error) =>
+                                  setPreview({
+                                    title: selected.title,
+                                    url: null,
+                                    mimeType: selected.mime_type,
+                                    loading: false,
+                                    error: err.message,
+                                  }),
+                                );
+                            }}
                           >
-                            Télécharger
+                            Voir
                           </Button>
-                        )}
+                          {selected.content_kind !== "link" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                void (async () => {
+                                  try {
+                                    const url = await AssignmentService.getAttachmentUrl(selected);
+                                    const response = await fetch(url);
+                                    const blob = await response.blob();
+                                    const objectUrl = URL.createObjectURL(blob);
+                                    const a = document.createElement("a");
+                                    a.href = objectUrl;
+                                    a.download = selected.title;
+                                    a.click();
+                                    URL.revokeObjectURL(objectUrl);
+                                  } catch (err) {
+                                    toast.error(
+                                      err instanceof Error
+                                        ? err.message
+                                        : "Téléchargement impossible",
+                                    );
+                                  }
+                                })()
+                              }
+                            >
+                              Télécharger
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
                 </Surface>
 
                 <Surface className="space-y-4 p-6">

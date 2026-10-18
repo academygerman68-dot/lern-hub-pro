@@ -94,8 +94,7 @@ export function toStudentFacingQuestion(input: {
     typeof meta["instruction"] === "string" ? formatStudentFacingText(meta["instruction"]) : null;
   const passage =
     typeof meta["passage"] === "string" ? formatStudentFacingText(meta["passage"]) : null;
-  const role =
-    typeof meta["role"] === "string" && meta["role"].trim() ? meta["role"].trim() : null;
+  const role = typeof meta["role"] === "string" && meta["role"].trim() ? meta["role"].trim() : null;
   const requirements = Array.isArray(meta["requirements"])
     ? meta["requirements"]
         .filter((x): x is string => typeof x === "string")

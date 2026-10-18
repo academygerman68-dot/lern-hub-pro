@@ -215,8 +215,7 @@ export const SupabaseExamService = {
     const ext = file.name.split(".").pop()?.toLowerCase() || "mp3";
     const path = `exam-audio/${questionId}/${crypto.randomUUID()}.${ext}`;
     const contentType =
-      file.type ||
-      (ext === "wav" ? "audio/wav" : ext === "m4a" ? "audio/mp4" : "audio/mpeg");
+      file.type || (ext === "wav" ? "audio/wav" : ext === "m4a" ? "audio/mp4" : "audio/mpeg");
     const { error: uploadError } = await supabase.storage
       .from("course-materials")
       .upload(path, file, {
@@ -495,9 +494,7 @@ export const SupabaseExamService = {
       const message = error.message ?? "";
       if (message.includes("EXAM_INCOMPLETE")) {
         const detail = error.details || message.replace(/^EXAM_INCOMPLETE:\s*/i, "");
-        throw new Error(
-          `Examen incomplet — publication impossible.${detail ? ` ${detail}` : ""}`,
-        );
+        throw new Error(`Examen incomplet — publication impossible.${detail ? ` ${detail}` : ""}`);
       }
       throw error;
     }
@@ -633,10 +630,12 @@ export const SupabaseExamService = {
       fileName: input.file.name || "oral.webm",
     });
     const contentType = input.file.type || "audio/webm";
-    const { error: uploadError } = await supabase.storage.from("course-materials").upload(path, input.file, {
-      upsert: false,
-      contentType,
-    });
+    const { error: uploadError } = await supabase.storage
+      .from("course-materials")
+      .upload(path, input.file, {
+        upsert: false,
+        contentType,
+      });
     if (uploadError) throw uploadError;
 
     const { data, error } = await supabase.rpc("save_exam_oral_answer", {
@@ -677,7 +676,9 @@ export const SupabaseExamService = {
     const bucket = answer.answer_media_bucket;
     const path = answer.answer_media_path;
     if (bucket && path) {
-      const { data, error } = await requireClient().storage.from(bucket).createSignedUrl(path, expiresIn);
+      const { data, error } = await requireClient()
+        .storage.from(bucket)
+        .createSignedUrl(path, expiresIn);
       if (error) throw error;
       return data.signedUrl;
     }

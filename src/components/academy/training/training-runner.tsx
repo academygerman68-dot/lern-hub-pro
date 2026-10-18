@@ -70,8 +70,7 @@ export function TrainingModuleRunner({ code, preview = false, onExit }: Props) {
 
   const definition = moduleQuery.data?.definition as StudentTrainingDefinition | undefined;
   const activities = useMemo(
-    () =>
-      [...(definition?.activities ?? [])].sort((a, b) => a.order - b.order),
+    () => [...(definition?.activities ?? [])].sort((a, b) => a.order - b.order),
     [definition],
   );
 
@@ -187,15 +186,14 @@ export function TrainingModuleRunner({ code, preview = false, onExit }: Props) {
       if (dirty) await persistDraft(localAnswer, activity.id, activity.activity_type);
       const row = answerMap.get(activity.id);
       const mediaFromAnswer =
-        localAnswer && "media" in localAnswer && localAnswer.media
-          ? localAnswer.media
-          : null;
+        localAnswer && "media" in localAnswer && localAnswer.media ? localAnswer.media : null;
       return TrainingService.submitManual({
         attemptId,
         activityId: activity.id,
         activityType: activity.activity_type as "writing" | "speaking",
         answer: localAnswer as never,
-        mediaBucket: oralMedia?.bucket ?? mediaFromAnswer?.bucket ?? row?.answer_media_bucket ?? null,
+        mediaBucket:
+          oralMedia?.bucket ?? mediaFromAnswer?.bucket ?? row?.answer_media_bucket ?? null,
         mediaPath: oralMedia?.path ?? mediaFromAnswer?.path ?? row?.answer_media_path ?? null,
         mimeType: oralMedia?.mimeType ?? row?.answer_mime_type ?? null,
         durationSeconds: row?.answer_duration_seconds ?? null,
@@ -220,16 +218,14 @@ export function TrainingModuleRunner({ code, preview = false, onExit }: Props) {
 
   const doneCount = activities.filter((a) => {
     const st = activityStatusFromAnswer(answerMap.get(a.id) ?? null);
-    return (
-      st === "validated" ||
-      st === "answered" ||
-      st === "pending_review" ||
-      st === "review"
-    );
+    return st === "validated" || st === "answered" || st === "pending_review" || st === "review";
   }).length;
 
   const goExit = () => {
-    if (dirty && !window.confirm("Des réponses ne sont pas encore enregistrées. Quitter quand même ?")) {
+    if (
+      dirty &&
+      !window.confirm("Des réponses ne sont pas encore enregistrées. Quitter quand même ?")
+    ) {
       return;
     }
     if (onExit) onExit();
@@ -343,9 +339,11 @@ export function TrainingModuleRunner({ code, preview = false, onExit }: Props) {
                     {TRAINING_SKILL_LABELS[activity.skill] ?? activity.skill}
                   </Status>
                   <Status>
-                    {TRAINING_ANSWER_STATUS_LABELS[
-                      activityStatusFromAnswer(answerMap.get(activity.id) ?? null)
-                    ]}
+                    {
+                      TRAINING_ANSWER_STATUS_LABELS[
+                        activityStatusFromAnswer(answerMap.get(activity.id) ?? null)
+                      ]
+                    }
                   </Status>
                 </div>
                 <p className="text-sm text-muted-foreground">{activity.instruction}</p>
@@ -379,9 +377,7 @@ export function TrainingModuleRunner({ code, preview = false, onExit }: Props) {
                       previousPath:
                         oralMedia?.path ??
                         existing?.answer_media_path ??
-                        (localAnswer && "media" in localAnswer
-                          ? localAnswer.media?.path
-                          : null) ??
+                        (localAnswer && "media" in localAnswer ? localAnswer.media?.path : null) ??
                         null,
                     });
                     setOralMedia(uploaded);
@@ -425,9 +421,7 @@ export function TrainingModuleRunner({ code, preview = false, onExit }: Props) {
                     variant="secondary"
                     className="min-h-11"
                     disabled={activityIndex >= activities.length - 1}
-                    onClick={() =>
-                      setActivityIndex((i) => Math.min(activities.length - 1, i + 1))
-                    }
+                    onClick={() => setActivityIndex((i) => Math.min(activities.length - 1, i + 1))}
                   >
                     Suivant
                     <ChevronRight className="ml-1 size-4" />
@@ -520,4 +514,3 @@ export function TrainingModuleRunner({ code, preview = false, onExit }: Props) {
     </QueryState>
   );
 }
-

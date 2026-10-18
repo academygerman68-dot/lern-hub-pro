@@ -25,13 +25,7 @@ export function isExamSimulationCode(code: string | null | undefined): boolean {
 }
 
 export type TrainingSkill =
-  | "wortschatz"
-  | "grammatik"
-  | "lesen"
-  | "hoeren"
-  | "schreiben"
-  | "sprechen"
-  | "revision";
+  "wortschatz" | "grammatik" | "lesen" | "hoeren" | "schreiben" | "sprechen" | "revision";
 
 export type TrainingActivityType =
   | "single_choice"

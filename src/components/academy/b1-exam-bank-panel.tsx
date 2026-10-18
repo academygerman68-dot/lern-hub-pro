@@ -26,7 +26,11 @@ export function B1ExamBankPanel({ exams, alwaysShow = true }: Props) {
   const [anomaliesFor, setAnomaliesFor] = useState<string | null>(null);
 
   const b1Exams = useMemo(
-    () => exams.filter((exam) => isB1ModelltestCode(exam.code)).slice().sort(sortB1),
+    () =>
+      exams
+        .filter((exam) => isB1ModelltestCode(exam.code))
+        .slice()
+        .sort(sortB1),
     [exams],
   );
 
@@ -129,9 +133,7 @@ export function B1ExamBankPanel({ exams, alwaysShow = true }: Props) {
                 <li>Schreiben : {readiness.schreibenTasks}/3 tâches</li>
                 <li>Sprechen : {readiness.sprechenTasks} activités</li>
                 <li>
-                  {reviewCount > 0
-                    ? `${reviewCount} élément(s) à vérifier`
-                    : "Rien à vérifier"}
+                  {reviewCount > 0 ? `${reviewCount} élément(s) à vérifier` : "Rien à vérifier"}
                 </li>
               </ul>
 
@@ -163,10 +165,7 @@ export function B1ExamBankPanel({ exams, alwaysShow = true }: Props) {
               ) : null}
 
               <div className="mt-auto flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => navigate("b1-exam", { examCode: code })}
-                >
+                <Button size="sm" onClick={() => navigate("b1-exam", { examCode: code })}>
                   Ouvrir
                 </Button>
                 <Button

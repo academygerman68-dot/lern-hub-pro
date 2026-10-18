@@ -882,12 +882,8 @@ export function useSaveExamAnswer() {
 export function useUploadOralExamAnswer() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: {
-      attemptId: string;
-      questionId: string;
-      file: File;
-      flagged?: boolean;
-    }) => ExamService.uploadOralAnswer(input),
+    mutationFn: (input: { attemptId: string; questionId: string; file: File; flagged?: boolean }) =>
+      ExamService.uploadOralAnswer(input),
     onSuccess: async (_data, vars) => {
       await qc.invalidateQueries({ queryKey: queryKeys.exams.answers(vars.attemptId) });
     },

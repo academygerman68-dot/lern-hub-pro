@@ -185,10 +185,7 @@ export function CorrectionsCenter() {
                       </Button>
                     </div>
                     {open && item.kind === "assignment" && item.assignmentId && item.classId ? (
-                      <AssignmentGrading
-                        assignmentId={item.assignmentId}
-                        classId={item.classId}
-                      />
+                      <AssignmentGrading assignmentId={item.assignmentId} classId={item.classId} />
                     ) : null}
                     {open && item.kind === "exam" && item.examId ? (
                       <ExamWritingGradingPanel examId={item.examId} />

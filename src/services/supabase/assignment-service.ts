@@ -166,9 +166,11 @@ export const SupabaseAssignmentService = {
   },
 
   async listAttachments(assignmentId: string) {
-    const { data, error } = await (requireClient() as unknown as {
-      from: (t: string) => ReturnType<ReturnType<typeof getSupabase>["from"]>;
-    })
+    const { data, error } = await (
+      requireClient() as unknown as {
+        from: (t: string) => ReturnType<ReturnType<typeof getSupabase>["from"]>;
+      }
+    )
       .from("assignment_attachments")
       .select("*")
       .eq("assignment_id", assignmentId)

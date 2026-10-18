@@ -38,8 +38,10 @@ function requireClient() {
 }
 
 /** Untyped access for tables not yet fully mirrored in generated Database types. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function fromPending(table: "library_item_classes" | "library_subtypes" | "library_item_attachments"): any {
+function fromPending(
+  table: "library_item_classes" | "library_subtypes" | "library_item_attachments",
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (requireClient() as any).from(table);
 }
@@ -295,7 +297,7 @@ export const SupabaseLibraryService = {
           audience === "class"
             ? (input.classId ?? null)
             : audience === "classes"
-              ? multiIds[0] ?? null
+              ? (multiIds[0] ?? null)
               : null,
         level_code: audience === "everyone" ? null : (input.levelCode ?? null),
         language: input.language ?? "de",
@@ -306,7 +308,8 @@ export const SupabaseLibraryService = {
         file_size: input.fileSize ?? null,
         external_url: input.externalUrl ?? null,
         created_by: input.createdBy ?? null,
-        published_at: visibility === "staff" || visibility === "private" ? null : new Date().toISOString(),
+        published_at:
+          visibility === "staff" || visibility === "private" ? null : new Date().toISOString(),
       })
       .select("*")
       .single();
@@ -564,13 +567,18 @@ export const SupabaseLibraryService = {
       }
       await replaceAttachments(id, prepared);
       const primary = prepared[0];
-      if (primary?.existing?.storage_path || primary?.externalUrl || primary?.contentKind === "text") {
+      if (
+        primary?.existing?.storage_path ||
+        primary?.externalUrl ||
+        primary?.contentKind === "text"
+      ) {
         await requireClient()
           .from("library_items")
           .update({
             content_kind: primary.contentKind,
             storage_bucket: primary.existing?.storage_bucket ?? "library",
-            storage_path: primary.existing?.storage_path ?? `resources/external/${crypto.randomUUID()}`,
+            storage_path:
+              primary.existing?.storage_path ?? `resources/external/${crypto.randomUUID()}`,
             mime_type: primary.existing?.mime_type ?? null,
             external_url: primary.externalUrl?.trim() || primary.existing?.external_url || null,
           })

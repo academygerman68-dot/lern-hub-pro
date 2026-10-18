@@ -161,7 +161,11 @@ async function main() {
   mkdirSync(resolve(__dirname, "../tmp"), { recursive: true });
   writeFileSync(
     resolve(__dirname, "../tmp/b1-matching-key-repair.json"),
-    JSON.stringify({ generated_at: new Date().toISOString(), fixed: log.length, items: log }, null, 2),
+    JSON.stringify(
+      { generated_at: new Date().toISOString(), fixed: log.length, items: log },
+      null,
+      2,
+    ),
   );
   console.log(`Matching key repair: fixed=${log.length}`);
 }

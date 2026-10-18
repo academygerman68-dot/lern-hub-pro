@@ -19,12 +19,19 @@ import { createClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
-import {
-  inventoryLocalAudiFolders,
-  mapDriveAudiFolderName,
-} from "../src/lib/b1-exam-bank.ts";
+import { inventoryLocalAudiFolders, mapDriveAudiFolderName } from "../src/lib/b1-exam-bank.ts";
 
-const AUDIO_EXT = new Set([".mp3", ".mpeg", ".mpg", ".wav", ".m4a", ".ogg", ".flac", ".aac", ".mp4"]);
+const AUDIO_EXT = new Set([
+  ".mp3",
+  ".mpeg",
+  ".mpg",
+  ".wav",
+  ".m4a",
+  ".ogg",
+  ".flac",
+  ".aac",
+  ".mp4",
+]);
 const BUCKET = "course-materials";
 
 function parseArgs(argv) {
@@ -165,7 +172,9 @@ async function main() {
     console.log("");
     console.log("Usage:");
     console.log("  node scripts/inventory-b1-audio.mjs <path>");
-    console.log("  node scripts/attach-b1-audio.mjs <path> [--from-inventory tmp/b1-audio-inventory.json] [--dry-run]");
+    console.log(
+      "  node scripts/attach-b1-audio.mjs <path> [--from-inventory tmp/b1-audio-inventory.json] [--dry-run]",
+    );
     console.log("");
     console.log("Preferred storage: exams/b1/b1-mtNN/hoeren/teil-N.ext");
     process.exit(0);
@@ -180,7 +189,14 @@ async function main() {
     root = root || inv.root;
     const rows = inv.rows || [];
     attachable = rows
-      .filter((r) => r.statut === "prêt" && r.examen && r.teil_propose && r.fichier && r.fichier !== "— MANQUANT —")
+      .filter(
+        (r) =>
+          r.statut === "prêt" &&
+          r.examen &&
+          r.teil_propose &&
+          r.fichier &&
+          r.fichier !== "— MANQUANT —",
+      )
       .map((r) => ({
         folder: r.dossier,
         examId: r.examen,
@@ -198,14 +214,17 @@ async function main() {
     try {
       listing = buildListing(args.root);
     } catch (err) {
-      console.error(`Cannot read ${args.root}: ${err instanceof Error ? err.message : String(err)}`);
+      console.error(
+        `Cannot read ${args.root}: ${err instanceof Error ? err.message : String(err)}`,
+      );
       process.exit(1);
     }
     const rows = inventoryLocalAudiFolders(listing);
     attachable = rows
       .filter((r) => {
         if (r.status === "prêt" && r.examId && r.proposedTeil) return true;
-        if (args.confirmAmbiguous && r.status === "ambigu" && r.examId && r.proposedTeil) return true;
+        if (args.confirmAmbiguous && r.status === "ambigu" && r.examId && r.proposedTeil)
+          return true;
         return false;
       })
       .map((r) => ({
@@ -216,7 +235,9 @@ async function main() {
         proposedTeil: r.proposedTeil,
         chemin: resolve(args.root, r.folder, r.file),
       }));
-    skipped = rows.filter((r) => !attachable.some((a) => a.file === r.file && a.folder === r.folder));
+    skipped = rows.filter(
+      (r) => !attachable.some((a) => a.file === r.file && a.folder === r.folder),
+    );
   }
 
   console.log("# B1 audio attach");
@@ -292,7 +313,9 @@ async function main() {
 
       for (const question of questions) {
         const prevMeta =
-          question.metadata && typeof question.metadata === "object" && !Array.isArray(question.metadata)
+          question.metadata &&
+          typeof question.metadata === "object" &&
+          !Array.isArray(question.metadata)
             ? { ...question.metadata }
             : {};
         const metadata = {

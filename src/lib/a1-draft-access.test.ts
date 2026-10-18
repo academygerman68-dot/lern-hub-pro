@@ -29,9 +29,7 @@ describe("A1-SIM-01 draft access & publish separation", () => {
   const publishSql = readFileSync(publishScript, "utf8");
 
   it("students only see published exams via RLS + student_can_access_exam", () => {
-    expect(examsSelect).toMatch(
-      /status = 'published' AND public\.student_can_access_exam\(id\)/,
-    );
+    expect(examsSelect).toMatch(/status = 'published' AND public\.student_can_access_exam\(id\)/);
     expect(studentAccess).toMatch(/e\.status = 'published'/);
     // Draft rows are therefore invisible to students.
   });

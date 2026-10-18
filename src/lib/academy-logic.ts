@@ -154,9 +154,9 @@ export function scopedLibraryItemVisible(
     return Boolean(item.class_id && scope.classIds.has(item.class_id));
   }
   if (item.audience === "classes") {
-    const ids = (item.classIds?.length ? item.classIds : item.class_id ? [item.class_id] : []).filter(
-      Boolean,
-    ) as string[];
+    const ids = (
+      item.classIds?.length ? item.classIds : item.class_id ? [item.class_id] : []
+    ).filter(Boolean) as string[];
     if (!ids.length) return false;
     return ids.some((id) => scope.classIds.has(id));
   }

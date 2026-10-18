@@ -7,13 +7,31 @@
  * Exit 0 always (inventory only). Writes tmp/b1-audio-inventory.json
  */
 import { createHash } from "node:crypto";
-import { createReadStream, readdirSync, readFileSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import {
+  createReadStream,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+  mkdirSync,
+} from "node:fs";
 import { basename, extname, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { mapDriveAudiFolderName } from "../src/lib/b1-exam-bank.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const AUDIO_EXT = new Set([".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac", ".mp4", ".mpeg", ".mpg", ".webm"]);
+const AUDIO_EXT = new Set([
+  ".mp3",
+  ".wav",
+  ".m4a",
+  ".ogg",
+  ".flac",
+  ".aac",
+  ".mp4",
+  ".mpeg",
+  ".mpg",
+  ".webm",
+]);
 
 function sha256File(path) {
   return new Promise((resolveHash, reject) => {
@@ -45,9 +63,7 @@ function sniffMime(buf, ext) {
 
 /** WhatsApp: "… at 22.02.17.mpeg" before "… at 22.02.17 (1).mpeg"; then by time. */
 function whatsappNaturalKey(name) {
-  const m = name.match(
-    /(\d{4}-\d{2}-\d{2})\s+at\s+(\d{1,2})\.(\d{2})\.(\d{2})(?:\s*\((\d+)\))?/i,
-  );
+  const m = name.match(/(\d{4}-\d{2}-\d{2})\s+at\s+(\d{1,2})\.(\d{2})\.(\d{2})(?:\s*\((\d+)\))?/i);
   if (m) {
     const dup = m[5] ? Number(m[5]) : 0;
     return [

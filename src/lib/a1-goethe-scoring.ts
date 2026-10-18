@@ -6,12 +6,7 @@ export const A1_PASS_SCORE_100 = 60;
 export const A1_RAW_MAX = 60;
 export const A1_SKILL_RAW_MAX = 15;
 
-export type A1Mention =
-  | "sehr gut"
-  | "gut"
-  | "befriedigend"
-  | "ausreichend"
-  | "nicht bestanden";
+export type A1Mention = "sehr gut" | "gut" | "befriedigend" | "ausreichend" | "nicht bestanden";
 
 export function isGoetheA1AdultProfile(input: {
   format_profile?: string | null | undefined;

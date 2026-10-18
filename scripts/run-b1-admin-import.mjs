@@ -38,9 +38,7 @@ function loadServiceRoleFromCli() {
     { encoding: "utf8", shell: true },
   );
   if (res.status !== 0) {
-    throw new Error(
-      `CLI api-keys failed (exit ${res.status}). Authenticate with: supabase login`,
-    );
+    throw new Error(`CLI api-keys failed (exit ${res.status}). Authenticate with: supabase login`);
   }
   // stdout only — ignore stderr version banners mixed by shells
   let raw = (res.stdout || "").trim();
@@ -81,7 +79,10 @@ function runNode(script, scriptArgs, env) {
   if (res.stdout) process.stdout.write(res.stdout);
   if (res.stderr) {
     // redact any accidental JWT-looking tokens
-    const cleaned = res.stderr.replace(/eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/g, "eyJ***REDACTED***");
+    const cleaned = res.stderr.replace(
+      /eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/g,
+      "eyJ***REDACTED***",
+    );
     process.stderr.write(cleaned);
   }
   return res.status ?? 1;

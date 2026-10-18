@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import {
-  toStudentTrainingPayload,
-  validateTrainingModule,
-} from "@/lib/training-module-schema";
+import { toStudentTrainingPayload, validateTrainingModule } from "@/lib/training-module-schema";
 import { isExamSimulationCode, isTrainingModuleProfile } from "@/lib/training-module";
 
 const ROOT = process.cwd();

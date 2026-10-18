@@ -92,7 +92,7 @@ function draftsToInputs(items: MultiAttachmentItem[]): LibraryAttachmentInput[] 
     contentKind: item.kind as MediaKind,
     file: item.file,
     externalUrl: item.kind === "link" ? item.url : null,
-    textBody: item.kind === "text" ? item.text ?? null : null,
+    textBody: item.kind === "text" ? (item.text ?? null) : null,
   }));
 }
 
@@ -131,7 +131,15 @@ export function MaterialsLibraryPage() {
     createMultiAttachmentItem("document"),
   ]);
   const [existingAttachmentMeta, setExistingAttachmentMeta] = useState<
-    Array<{ id: string; storage_bucket: string | null; storage_path: string | null; mime_type: string | null; file_size: number | null; external_url: string | null; text_body: string | null }>
+    Array<{
+      id: string;
+      storage_bucket: string | null;
+      storage_path: string | null;
+      mime_type: string | null;
+      file_size: number | null;
+      external_url: string | null;
+      text_body: string | null;
+    }>
   >([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewState | null>(null);
@@ -367,7 +375,13 @@ export function MaterialsLibraryPage() {
       }
       return;
     }
-    setPreview({ title: titleLabel, url: null, mimeType: mime ?? null, loading: true, error: null });
+    setPreview({
+      title: titleLabel,
+      url: null,
+      mimeType: mime ?? null,
+      loading: true,
+      error: null,
+    });
     try {
       const url = await loader();
       setPreview({ title: titleLabel, url, mimeType: mime ?? null, loading: false, error: null });
@@ -469,9 +483,11 @@ export function MaterialsLibraryPage() {
         contentKind: item.kind as MediaKind,
         file: item.file,
         externalUrl: item.kind === "link" ? item.url : null,
-        textBody: item.kind === "text" ? item.text ?? null : null,
+        textBody: item.kind === "text" ? (item.text ?? null) : null,
         existing:
-          !hasNewFile && existing && (existing.storage_path || existing.external_url || existing.text_body)
+          !hasNewFile &&
+          existing &&
+          (existing.storage_path || existing.external_url || existing.text_body)
             ? {
                 id: existing.id,
                 library_item_id: editingId ?? "",
@@ -482,7 +498,7 @@ export function MaterialsLibraryPage() {
                 mime_type: existing.mime_type,
                 file_size: existing.file_size,
                 external_url: hasLink ? item.url : existing.external_url,
-                text_body: hasText ? item.text ?? null : existing.text_body,
+                text_body: hasText ? (item.text ?? null) : existing.text_body,
                 label: null,
               }
             : null,
@@ -503,7 +519,7 @@ export function MaterialsLibraryPage() {
               effectiveAudience === "class"
                 ? classId || null
                 : effectiveAudience === "classes"
-                  ? targetClassIds[0] ?? null
+                  ? (targetClassIds[0] ?? null)
                   : null,
             classIds: targetClassIds,
             subtype,
@@ -540,7 +556,7 @@ export function MaterialsLibraryPage() {
           effectiveAudience === "class"
             ? classId || null
             : effectiveAudience === "classes"
-              ? targetClassIds[0] ?? null
+              ? (targetClassIds[0] ?? null)
               : null,
         classIds: targetClassIds,
         subtype,
@@ -592,9 +608,7 @@ export function MaterialsLibraryPage() {
               : "Bibliothèque académique, administrative et annonces — diffusion ciblée."
         }
         action={
-          !isStudent ? (
-            <Button onClick={openCreate}>Ajouter une ressource</Button>
-          ) : undefined
+          !isStudent ? <Button onClick={openCreate}>Ajouter une ressource</Button> : undefined
         }
       />
 
@@ -634,11 +648,7 @@ export function MaterialsLibraryPage() {
           ))}
         </select>
         {isAdmin ? (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setSubtypeConfigOpen((v) => !v)}
-          >
+          <Button size="sm" variant="outline" onClick={() => setSubtypeConfigOpen((v) => !v)}>
             {subtypeConfigOpen ? "Fermer la config" : "Configurer les sous-types"}
           </Button>
         ) : null}
@@ -890,7 +900,9 @@ export function MaterialsLibraryPage() {
                     }}
                   >
                     <option value="">
-                      {audience === "level" ? "Choisir le niveau" : "Filtrer les groupes (facultatif)"}
+                      {audience === "level"
+                        ? "Choisir le niveau"
+                        : "Filtrer les groupes (facultatif)"}
                     </option>
                     {(levelsQuery.data ?? [])
                       .filter((level) => isAdmin || teacherScope.levelCodes.has(level.code))
@@ -1080,20 +1092,15 @@ export function MaterialsLibraryPage() {
                         {AUDIENCE_LABELS[item.audience as keyof typeof AUDIENCE_LABELS] ??
                           item.audience}
                       </td>
-                      <td className="text-sm whitespace-nowrap">
-                        {formatFrDate(item.created_at)}
-                      </td>
+                      <td className="text-sm whitespace-nowrap">{formatFrDate(item.created_at)}</td>
                       <td className="whitespace-nowrap">
                         <div className="flex flex-wrap justify-end gap-1">
                           <Button
                             size="sm"
                             variant="secondary"
                             onClick={() =>
-                              void openSupport(
-                                item.title,
-                                item.content_kind,
-                                item.mime_type,
-                                () => LibraryService.getSignedUrl(item),
+                              void openSupport(item.title, item.content_kind, item.mime_type, () =>
+                                LibraryService.getSignedUrl(item),
                               )
                             }
                           >

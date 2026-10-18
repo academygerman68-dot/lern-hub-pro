@@ -12,7 +12,12 @@ import {
   useClassRoster,
   useGradeAssignment,
 } from "@/hooks/use-academy-data";
-import { formatFrDate, isTextContentKind, MEDIA_KIND_LABELS, validateFileForKind } from "@/lib/academic-content";
+import {
+  formatFrDate,
+  isTextContentKind,
+  MEDIA_KIND_LABELS,
+  validateFileForKind,
+} from "@/lib/academic-content";
 import { setLiveSessionId } from "@/lib/live-class-session";
 import { openExternalMeeting } from "@/lib/live-meeting";
 import {
@@ -29,10 +34,7 @@ import {
   gradeAssistNeedsExploitableText,
   isGradeAssistMultimodalPath,
 } from "@/lib/grade-assist-ux";
-import {
-  formatGradedScore,
-  scoreScaleChangedWarning,
-} from "@/lib/assignment-score-scale";
+import { formatGradedScore, scoreScaleChangedWarning } from "@/lib/assignment-score-scale";
 import { useAcademy } from "./academy-context";
 import { AiGradeAssistPanel } from "./ai-grade-assist-panel";
 import { ContentAttachmentUploader, type AttachmentDraft } from "./content-attachment-uploader";
@@ -280,45 +282,45 @@ function AssignmentSubmission({ assignment }: { assignment: Assignment }) {
       </p>
       {(assignment.content_url || assignment.attachment_path) &&
         !isTextContentKind(assignment.content_kind) && (
-        <Button
-          variant="outline"
-          onClick={() => {
-            setPreview({
-              title: assignment.title,
-              url: null,
-              mimeType: assignment.mime_type,
-              loading: true,
-              error: null,
-            });
-            void AssignmentService.getAttachmentUrl(assignment)
-              .then((url) => {
-                if (assignment.content_kind === "link") {
-                  window.open(url, "_blank", "noopener,noreferrer");
-                  setPreview(null);
-                  return;
-                }
-                setPreview({
-                  title: assignment.title,
-                  url,
-                  mimeType: assignment.mime_type,
-                  loading: false,
-                  error: null,
-                });
-              })
-              .catch((err: Error) =>
-                setPreview({
-                  title: assignment.title,
-                  url: null,
-                  mimeType: assignment.mime_type,
-                  loading: false,
-                  error: err.message,
-                }),
-              );
-          }}
-        >
-          {assignment.content_kind === "link" ? "Ouvrir le lien" : "Ouvrir la pièce jointe"}
-        </Button>
-      )}
+          <Button
+            variant="outline"
+            onClick={() => {
+              setPreview({
+                title: assignment.title,
+                url: null,
+                mimeType: assignment.mime_type,
+                loading: true,
+                error: null,
+              });
+              void AssignmentService.getAttachmentUrl(assignment)
+                .then((url) => {
+                  if (assignment.content_kind === "link") {
+                    window.open(url, "_blank", "noopener,noreferrer");
+                    setPreview(null);
+                    return;
+                  }
+                  setPreview({
+                    title: assignment.title,
+                    url,
+                    mimeType: assignment.mime_type,
+                    loading: false,
+                    error: null,
+                  });
+                })
+                .catch((err: Error) =>
+                  setPreview({
+                    title: assignment.title,
+                    url: null,
+                    mimeType: assignment.mime_type,
+                    loading: false,
+                    error: err.message,
+                  }),
+                );
+            }}
+          >
+            {assignment.content_kind === "link" ? "Ouvrir le lien" : "Ouvrir la pièce jointe"}
+          </Button>
+        )}
       <QueryState
         isLoading={query.isLoading}
         isError={query.isError}
@@ -796,10 +798,7 @@ function GradeForm({
       setAiMessage(GRADE_ASSIST_NEEDS_TEXT_MESSAGE);
       return;
     }
-    if (
-      !submission.content_text?.trim() &&
-      !isGradeAssistMultimodalPath(submission.file_path)
-    ) {
+    if (!submission.content_text?.trim() && !isGradeAssistMultimodalPath(submission.file_path)) {
       setAiSuggestion(null);
       setAiMessage(GRADE_ASSIST_NEEDS_TEXT_MESSAGE);
       return;

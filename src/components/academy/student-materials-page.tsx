@@ -102,7 +102,13 @@ export function StudentMaterialsPage() {
       }
       return;
     }
-    setPreview({ title: titleLabel, url: null, mimeType: mime ?? null, loading: true, error: null });
+    setPreview({
+      title: titleLabel,
+      url: null,
+      mimeType: mime ?? null,
+      loading: true,
+      error: null,
+    });
     try {
       const url = await loader();
       setPreview({ title: titleLabel, url, mimeType: mime ?? null, loading: false, error: null });
@@ -239,9 +245,7 @@ export function StudentMaterialsPage() {
                                 await downloadFromUrl(url, item.title);
                               } catch (err) {
                                 toast.error(
-                                  err instanceof Error
-                                    ? err.message
-                                    : "Téléchargement impossible",
+                                  err instanceof Error ? err.message : "Téléchargement impossible",
                                 );
                               }
                             })()
