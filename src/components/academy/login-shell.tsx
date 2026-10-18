@@ -37,30 +37,30 @@ export function LoginShell({
         </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
-        <div
-          className="gla-login-languages"
-          role="group"
-          aria-label={l("Langue de l’interface", "لغة الواجهة")}
-        >
-          <Globe2 size={15} aria-hidden="true" />
-          <button
-            type="button"
-            lang="fr"
-            aria-pressed={locale === "fr"}
-            onClick={() => setLocale("fr")}
+          <div
+            className="gla-login-languages"
+            role="group"
+            aria-label={l("Langue de l’interface", "لغة الواجهة")}
           >
-            FR
-          </button>
-          <span aria-hidden="true">/</span>
-          <button
-            type="button"
-            lang="ar"
-            aria-pressed={locale === "ar"}
-            onClick={() => setLocale("ar")}
-          >
-            العربية
-          </button>
-        </div>
+            <Globe2 size={15} aria-hidden="true" />
+            <button
+              type="button"
+              lang="fr"
+              aria-pressed={locale === "fr"}
+              onClick={() => setLocale("fr")}
+            >
+              FR
+            </button>
+            <span aria-hidden="true">/</span>
+            <button
+              type="button"
+              lang="ar"
+              aria-pressed={locale === "ar"}
+              onClick={() => setLocale("ar")}
+            >
+              العربية
+            </button>
+          </div>
         </div>
       </header>
 

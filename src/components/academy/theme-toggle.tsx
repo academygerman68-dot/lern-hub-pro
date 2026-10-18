@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
-import { applyColorScheme, readColorScheme, writeColorScheme, type ColorScheme } from "@/lib/color-scheme";
+import {
+  applyColorScheme,
+  readColorScheme,
+  writeColorScheme,
+  type ColorScheme,
+} from "@/lib/color-scheme";
 import { useAcademy } from "./academy-context";
 
 export function useColorScheme() {
