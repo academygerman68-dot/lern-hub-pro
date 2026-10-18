@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowUpRight, BookOpen, Globe2, LockKeyhole } from "lucide-react";
 import { useAcademy } from "./academy-context";
+import { ThemeToggle } from "./theme-toggle";
 import "./login.css";
 
 export function LoginShell({
@@ -34,6 +35,8 @@ export function LoginShell({
             <span>{l("LA LANGUE. LES POSSIBILITÉS.", "لغة تفتح آفاقًا جديدة.")}</span>
           </div>
         </div>
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
         <div
           className="gla-login-languages"
           role="group"
@@ -57,6 +60,7 @@ export function LoginShell({
           >
             العربية
           </button>
+        </div>
         </div>
       </header>
 

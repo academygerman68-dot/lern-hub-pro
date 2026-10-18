@@ -133,6 +133,7 @@
   --media-grid: oklch(1 0 0 / 0.18);
   --director-fill: oklch(1 0 0 / 0.1);
   --director-tick: oklch(1 0 0 / 0.45);
+  color-scheme: light;
 }
 
 .dark {
@@ -168,7 +169,21 @@
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.76 0.16 74);
+  --brand: oklch(0.76 0.16 74);
   --brand-foreground: oklch(0.97 0.008 80);
+  --meeting: oklch(0.32 0.05 250);
+  --meeting-panel: oklch(0.28 0.04 250);
+  --success: oklch(0.72 0.12 165);
+  --success-soft: oklch(0.28 0.04 165);
+  --warning-soft: oklch(0.32 0.05 85);
+  --alert: oklch(0.7 0.16 20);
+  --alert-foreground: oklch(0.99 0 0);
+  --alert-soft: oklch(0.3 0.05 20);
+  --soft-blue: oklch(0.32 0.04 250);
+  --media-grid: oklch(1 0 0 / 0.08);
+  --director-fill: oklch(1 0 0 / 0.08);
+  --director-tick: oklch(1 0 0 / 0.4);
+  color-scheme: dark;
 }
 
 [dir="rtl"] body {

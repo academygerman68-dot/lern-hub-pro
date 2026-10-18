@@ -6,6 +6,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
@@ -14,6 +15,7 @@ import { AcademyProvider } from "@/components/academy/academy-context";
 import { BrandingProvider } from "@/components/brand/branding-provider";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { useColorScheme } from "@/components/academy/theme-toggle";
 
 function NotFoundComponent() {
   return (
@@ -42,20 +44,22 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
+  const message = error instanceof Error ? error.message : undefined;
+  const stack = error instanceof Error ? error.stack : undefined;
   useEffect(() => {
     const route =
       typeof window !== "undefined"
         ? `${window.location.pathname}${window.location.search}`
         : "(ssr)";
     if (import.meta.env.DEV) {
-      console.error("[ErrorBoundary]", { route, message: error?.message, stack: error?.stack, error });
+      console.error("[ErrorBoundary]", { route, message, stack, error });
     } else {
       console.error(error);
     }
     reportLovableError(error, { boundary: "tanstack_root_error_component", route });
-  }, [error]);
+  }, [error, message, stack]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -128,6 +132,12 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="fr">
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              '(function(){try{if(localStorage.getItem("da-color-scheme")==="dark"){document.documentElement.classList.add("dark");document.documentElement.style.colorScheme="dark";}}catch(e){}})();',
+          }}
+        />
         <HeadContent />
       </head>
       <body>
@@ -140,13 +150,14 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const scheme = useColorScheme();
 
   return (
     <QueryClientProvider client={queryClient}>
       <BrandingProvider>
         <AcademyProvider>
           <Outlet />
-          <Toaster richColors closeButton position="top-center" />
+          <Toaster richColors closeButton position="top-center" theme={scheme} />
         </AcademyProvider>
       </BrandingProvider>
     </QueryClientProvider>

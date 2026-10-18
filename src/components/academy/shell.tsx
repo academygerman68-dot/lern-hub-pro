@@ -33,6 +33,7 @@ import {
 import type { AcademyPage } from "@/types/academy";
 import { useAcademy } from "./academy-context";
 import { StudentMobileTabBar } from "./student-mobile-tabbar";
+import { ThemeToggle } from "./theme-toggle";
 
 type NavItem = readonly [AcademyPage, string, typeof Home];
 type NavSection = { label?: string; items: NavItem[] };
@@ -224,11 +225,19 @@ export function AppShell({ children }: { children: ReactNode }) {
         ))}
       </nav>
       <div className="border-t border-sidebar-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
-        <div className="mb-3 flex items-center justify-between gap-2 px-1 lg:hidden">
-          <span className="text-[11px] font-medium text-muted-foreground uppercase">
-            {t("shell.language")}
-          </span>
-          {languageSwitch}
+        <div className="mb-3 flex flex-col gap-2 px-1 lg:hidden">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-medium text-muted-foreground uppercase">
+              {t("shell.theme")}
+            </span>
+            <ThemeToggle showLabels />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-medium text-muted-foreground uppercase">
+              {t("shell.language")}
+            </span>
+            {languageSwitch}
+          </div>
         </div>
         <div className="mb-2 flex items-center gap-3 rounded-xl bg-muted/70 px-3 py-2.5">
           <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
@@ -281,6 +290,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <p className="hidden truncate text-xs text-muted-foreground sm:block">{user.name}</p>
           </div>
           <div className="flex items-center gap-1">
+            <ThemeToggle />
             <div className="hidden sm:flex">{languageSwitch}</div>
             <div className="relative">
               <Button

@@ -540,6 +540,34 @@
     font-size: 9px;
   }
 }
+.dark .gla-login {
+  --login-ink: #f4f1ea;
+  --login-muted: #b7b1a6;
+  --login-line: #3a342c;
+  background: #171512;
+  color: var(--login-ink);
+}
+.dark .gla-login-languages button:hover,
+.dark .gla-login-card,
+.dark .gla-login .gla-login-input,
+.dark .gla-login .gla-login-google {
+  background: #221f1b;
+  color: var(--login-ink);
+  border-color: #3a342c;
+}
+.dark .gla-login-card-emblem,
+.dark .gla-login-error-banner {
+  background: #2a261f;
+  border-color: #4a4034;
+}
+.dark .gla-login .gla-login-submit {
+  background: #987b40;
+  color: #171512;
+}
+.dark .gla-login .gla-login-submit:hover:not(:disabled) {
+  background: #b09355;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gla-login *,
   .gla-login *::before,
