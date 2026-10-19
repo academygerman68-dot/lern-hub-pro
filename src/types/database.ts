@@ -562,6 +562,7 @@ export type Database = {
       };
       courses: {
         Row: {
+          class_id: string | null;
           content_kind: Database["public"]["Enums"]["course_content_kind"];
           content_url: string | null;
           created_at: string;
@@ -577,6 +578,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          class_id?: string | null;
           content_kind?: Database["public"]["Enums"]["course_content_kind"];
           content_url?: string | null;
           created_at?: string;
@@ -592,6 +594,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          class_id?: string | null;
           content_kind?: Database["public"]["Enums"]["course_content_kind"];
           content_url?: string | null;
           created_at?: string;
@@ -607,6 +610,13 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "courses_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "courses_level_id_fkey";
             columns: ["level_id"];
@@ -1409,6 +1419,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           ends_at: string | null;
+          external_meeting_url: string | null;
           id: string;
           meeting_provider: Database["public"]["Enums"]["meeting_provider"];
           meeting_room: string;
@@ -1432,6 +1443,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           ends_at?: string | null;
+          external_meeting_url?: string | null;
           id?: string;
           meeting_provider?: Database["public"]["Enums"]["meeting_provider"];
           meeting_room: string;
@@ -1455,6 +1467,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           ends_at?: string | null;
+          external_meeting_url?: string | null;
           id?: string;
           meeting_provider?: Database["public"]["Enums"]["meeting_provider"];
           meeting_room?: string;
@@ -2347,6 +2360,36 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      admin_set_profile_role: {
+        Args: {
+          p_profile_id: string;
+          p_role: Database["public"]["Enums"]["app_role"];
+        };
+        Returns: {
+          archived_at: string | null;
+          avatar_url: string | null;
+          created_at: string;
+          email: string | null;
+          first_name: string;
+          id: string;
+          language: Database["public"]["Enums"]["app_locale"];
+          last_name: string;
+          phone: string | null;
+          role: Database["public"]["Enums"]["app_role"];
+          status: Database["public"]["Enums"]["profile_status"];
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "profiles";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      admin_delete_user: {
+        Args: { p_profile_id: string };
+        Returns: Json;
+      };
       admin_set_profile_status: {
         Args: {
           p_profile_id: string;
@@ -2941,7 +2984,7 @@ export type Database = {
       submission_status: "draft" | "submitted" | "graded" | "returned";
       subscription_status:
         "active" | "grace_period" | "past_due" | "suspended" | "cancelled" | "manually_extended";
-      video_provider: "jitsi" | "zoom";
+      video_provider: "jitsi" | "zoom" | "external";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -3123,7 +3166,7 @@ export const Constants = {
         "cancelled",
         "manually_extended",
       ],
-      video_provider: ["jitsi", "zoom"],
+      video_provider: ["jitsi", "zoom", "external"],
     },
   },
 } as const;

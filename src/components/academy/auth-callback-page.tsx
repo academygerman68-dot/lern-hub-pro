@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -9,11 +9,10 @@ import { AuthShell } from "./auth-shell";
 
 /**
  * OAuth / email-confirm landing page.
- * Supabase client uses detectSessionInUrl; we wait for session + profile then redirect.
+ * Client uses detectSessionInUrl (PKCE); we exchange only if needed, then attach profile.
  */
 export function AuthCallbackPage() {
   const { l, signIn, ready } = useAcademy();
-  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -28,21 +27,43 @@ export function AuthCallbackPage() {
 
       try {
         const supabase = getSupabase();
-        // Exchange code if present (PKCE).
         const url = new URL(window.location.href);
-        const code = url.searchParams.get("code");
-        if (code) {
-          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-          if (exchangeError) throw exchangeError;
+
+        // Provider / email link errors (e.g. expired OTP, access_denied).
+        const oauthError = url.searchParams.get("error") || url.searchParams.get("error_code");
+        const oauthDesc = url.searchParams.get("error_description");
+        if (oauthError) {
+          if (!cancelled) {
+            setError(
+              oauthDesc?.toLowerCase().includes("expired") ? "LINK_EXPIRED" : "CALLBACK_FAILED",
+            );
+          }
+          return;
         }
 
-        const auth = await SupabaseAuthService.getSession();
+        const code = url.searchParams.get("code");
+        // detectSessionInUrl may already have consumed the PKCE code — only exchange if needed.
+        let auth = await SupabaseAuthService.getSession();
+        if (!auth && code) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) {
+            auth = await SupabaseAuthService.getSession();
+            if (!auth) throw exchangeError;
+          } else {
+            auth = await SupabaseAuthService.getSession();
+          }
+        }
+
+        if (code) {
+          window.history.replaceState({}, document.title, "/auth/callback");
+        }
+
         if (cancelled) return;
         if (!auth) {
           setError("NO_SESSION");
           return;
         }
-        signIn(auth.sessionUser);
+        signIn(auth.sessionUser, auth.profile);
       } catch {
         if (!cancelled) setError("CALLBACK_FAILED");
       }
@@ -52,16 +73,28 @@ export function AuthCallbackPage() {
     return () => {
       cancelled = true;
     };
-  }, [ready, signIn, navigate]);
+  }, [ready, signIn]);
 
   if (error) {
+    const expired = error === "LINK_EXPIRED";
     return (
       <AuthShell
-        title={l("Connexion interrompue", "تعذّر إكمال الاتصال")}
-        subtitle={l(
-          "Le lien est invalide ou la session n’a pas pu être établie.",
-          "الرابط غير صالح أو تعذّر إنشاء الجلسة.",
-        )}
+        title={
+          expired
+            ? l("Lien expiré", "انتهت صلاحية الرابط")
+            : l("Connexion interrompue", "تعذّر إكمال الاتصال")
+        }
+        subtitle={
+          expired
+            ? l(
+                "Demandez un nouvel e-mail de confirmation depuis la page de connexion.",
+                "اطلب رسالة تأكيد جديدة من صفحة تسجيل الدخول.",
+              )
+            : l(
+                "Le lien est invalide ou la session n’a pas pu être établie.",
+                "الرابط غير صالح أو تعذّر إنشاء الجلسة.",
+              )
+        }
       >
         <Button asChild className="h-11 w-full">
           <Link to="/">{l("Retour à la connexion", "العودة لتسجيل الدخول")}</Link>

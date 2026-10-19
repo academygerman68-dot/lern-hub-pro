@@ -14,6 +14,28 @@ const fr = {
   "login.footer": "Environnement prototype · Données de démonstration",
   "login.invalid": "E-mail ou mot de passe incorrect.",
   "login.reset": "Si cet e-mail existe, un lien de réinitialisation a été envoyé.",
+  "login.brandLine": "LA LANGUE. LES POSSIBILITÉS.",
+  "login.interfaceLanguage": "Langue de l’interface",
+  "login.welcomeAria": "Bienvenue chez German Academy",
+  "login.eyebrow": "APPRENDRE. GRANDIR. ALLER PLUS LOIN.",
+  "login.hero.line1": "Une langue.",
+  "login.hero.line2": "De nouvelles",
+  "login.hero.line3": "perspectives.",
+  "login.hero.copy":
+    "L’allemand se construit un jour après l’autre. Retrouvez vos cours, vos échanges et vos progrès dans votre espace personnel.",
+  "login.path.caption": "Un parcours, à chaque étape.",
+  "login.levels.aria": "Niveaux d’allemand : A1, A2, B1, B2",
+  "login.path.footer": "Des premières conversations aux nouvelles opportunités.",
+  "login.card.badge": "VOTRE ESPACE ACADÉMIE",
+  "login.footer.personal": "Votre espace d’apprentissage personnel",
+  "login.signin.title": "Heureux de vous retrouver.",
+  "login.signin.subtitle": "Connectez-vous pour poursuivre votre parcours avec German Academy.",
+  "login.signup.title": "Créer un compte",
+  "login.signup.subtitle":
+    "Inscription étudiant uniquement. Les comptes professeur / direction sont créés par l’administration.",
+  "login.verify.title": "Vérifiez votre e-mail",
+  "login.verify.subtitle":
+    "Un lien de confirmation a été envoyé. Ouvrez-le pour activer votre compte.",
   "nav.home": "Accueil",
   "nav.overview": "Vue d’ensemble",
   "nav.learning": "Apprentissage",
@@ -31,6 +53,7 @@ const fr = {
   "nav.classes": "Mes classes",
   "nav.groups": "Groupes",
   "nav.lessons": "Leçons",
+  "nav.accounts": "Comptes",
   "nav.students": "Étudiants",
   "nav.teachers": "Professeurs",
   "nav.courses": "Cours",
@@ -60,6 +83,10 @@ const fr = {
   "shell.theme": "Apparence",
   "shell.theme.light": "Clair",
   "shell.theme.dark": "Sombre",
+  "shell.closeNav": "Fermer la navigation",
+  "shell.openNav": "Ouvrir la navigation",
+  "shell.close": "Fermer",
+  "shell.notifications.empty": "Aucune notification pour le moment.",
   "role.student": "Étudiant",
   "role.teacher": "Professeur",
   "role.director": "Direction",
@@ -95,7 +122,7 @@ const fr = {
   "teacher.courses.create": "Créer un cours",
   "teacher.courses.groupProgress": "Progression des groupes",
   "teacher.courses.catalog": "Catalogue",
-  "teacher.studio": "Studio en allemand",
+  "teacher.studio": "Studio pédagogique",
   "teacher.courses.skeleton":
     "Les cours A1–B2 enregistrés sont des squelettes (un module et deux leçons par niveau). Ce n’est pas un programme complet.",
   "teacher.courses.emptyTitle": "Aucun niveau",
@@ -116,6 +143,26 @@ const ar: typeof fr = {
   "login.footer": "بيئة تجريبية · بيانات توضيحية فقط",
   "login.invalid": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
   "login.reset": "إذا كان الحساب موجوداً، فسيتم إرسال رابط الاستعادة.",
+  "login.brandLine": "لغة تفتح آفاقًا جديدة.",
+  "login.interfaceLanguage": "لغة الواجهة",
+  "login.welcomeAria": "مرحبًا بكم في German Academy",
+  "login.eyebrow": "تعلّم. تطوّر. انطلق نحو آفاق جديدة.",
+  "login.hero.line1": "لغة واحدة.",
+  "login.hero.line2": "وآفاق",
+  "login.hero.line3": "جديدة.",
+  "login.hero.copy":
+    "تتقدّم في اللغة الألمانية يومًا بعد يوم. تجد دروسك وتواصلك وتقدّمك في مساحتك الشخصية.",
+  "login.path.caption": "مسار يرافقك في كل مرحلة.",
+  "login.levels.aria": "مستويات الألمانية: A1، A2، B1، B2",
+  "login.path.footer": "من محادثاتك الأولى إلى فرص جديدة.",
+  "login.card.badge": "مساحتك في الأكاديمية",
+  "login.footer.personal": "مساحتك الشخصية للتعلّم",
+  "login.signin.title": "سعداء بعودتك.",
+  "login.signin.subtitle": "سجّل دخولك لمواصلة رحلتك مع German Academy.",
+  "login.signup.title": "إنشاء حساب",
+  "login.signup.subtitle": "التسجيل للطلاب فقط. حسابات الأساتذة والإدارة تُنشأ عبر الإدارة.",
+  "login.verify.title": "تحقق من بريدك",
+  "login.verify.subtitle": "تم إرسال رابط التأكيد. افتحه لتفعيل حسابك.",
   "nav.home": "الرئيسية",
   "nav.overview": "نظرة عامة",
   "nav.learning": "التعلّم",
@@ -133,6 +180,7 @@ const ar: typeof fr = {
   "nav.classes": "صفوفي",
   "nav.groups": "المجموعات",
   "nav.lessons": "الدروس",
+  "nav.accounts": "الحسابات",
   "nav.students": "الطلاب",
   "nav.teachers": "الأساتذة",
   "nav.courses": "الدورات",
@@ -162,6 +210,10 @@ const ar: typeof fr = {
   "shell.theme": "المظهر",
   "shell.theme.light": "فاتح",
   "shell.theme.dark": "داكن",
+  "shell.closeNav": "إغلاق القائمة",
+  "shell.openNav": "فتح القائمة",
+  "shell.close": "إغلاق",
+  "shell.notifications.empty": "لا توجد إشعارات حالياً.",
   "role.student": "طالب",
   "role.teacher": "أستاذ",
   "role.director": "الإدارة",
@@ -196,7 +248,7 @@ const ar: typeof fr = {
   "teacher.courses.create": "إنشاء دورة",
   "teacher.courses.groupProgress": "تقدّم المجموعات",
   "teacher.courses.catalog": "الفهرس",
-  "teacher.studio": "الاستوديو بالألمانية",
+  "teacher.studio": "الاستوديو التعليمي",
   "teacher.courses.skeleton":
     "دورات A1–B2 المحفوظة هي هياكل أولية (وحدة واحدة ودرسان لكل مستوى). ليست منهجاً مكتملاً.",
   "teacher.courses.emptyTitle": "لا توجد مستويات",
@@ -217,6 +269,28 @@ const de: typeof fr = {
   "login.footer": "Prototyp-Umgebung · Demonstrationsdaten",
   "login.invalid": "E-Mail oder Passwort ist falsch.",
   "login.reset": "Wenn diese E-Mail existiert, wurde ein Link zum Zurücksetzen gesendet.",
+  "login.brandLine": "DIE SPRACHE. DIE MÖGLICHKEITEN.",
+  "login.interfaceLanguage": "Oberflächensprache",
+  "login.welcomeAria": "Willkommen bei German Academy",
+  "login.eyebrow": "LERNEN. WACHSEN. WEITERKOMMEN.",
+  "login.hero.line1": "Eine Sprache.",
+  "login.hero.line2": "Neue",
+  "login.hero.line3": "Perspektiven.",
+  "login.hero.copy":
+    "Deutsch wächst Tag für Tag. Finden Sie Kurse, Austausch und Fortschritt in Ihrem persönlichen Bereich.",
+  "login.path.caption": "Ein Weg, Schritt für Schritt.",
+  "login.levels.aria": "Deutschniveaus: A1, A2, B1, B2",
+  "login.path.footer": "Von ersten Gesprächen zu neuen Chancen.",
+  "login.card.badge": "IHR AKADEMIE-BEREICH",
+  "login.footer.personal": "Ihr persönlicher Lernbereich",
+  "login.signin.title": "Schön, Sie wiederzusehen.",
+  "login.signin.subtitle": "Melden Sie sich an, um Ihren Weg mit German Academy fortzusetzen.",
+  "login.signup.title": "Konto erstellen",
+  "login.signup.subtitle":
+    "Nur Studierendenregistrierung. Lehrkräfte- und Leitungskonten werden von der Verwaltung angelegt.",
+  "login.verify.title": "E-Mail prüfen",
+  "login.verify.subtitle":
+    "Ein Bestätigungslink wurde gesendet. Öffnen Sie ihn, um Ihr Konto zu aktivieren.",
   "nav.home": "Start",
   "nav.overview": "Übersicht",
   "nav.learning": "Lernen",
@@ -234,6 +308,7 @@ const de: typeof fr = {
   "nav.classes": "Meine Gruppen",
   "nav.groups": "Gruppen",
   "nav.lessons": "Lektionen",
+  "nav.accounts": "Konten",
   "nav.students": "Lernende",
   "nav.teachers": "Lehrkräfte",
   "nav.courses": "Kurse",
@@ -263,6 +338,10 @@ const de: typeof fr = {
   "shell.theme": "Darstellung",
   "shell.theme.light": "Hell",
   "shell.theme.dark": "Dunkel",
+  "shell.closeNav": "Navigation schließen",
+  "shell.openNav": "Navigation öffnen",
+  "shell.close": "Schließen",
+  "shell.notifications.empty": "Keine Benachrichtigungen.",
   "role.student": "Lernende",
   "role.teacher": "Lehrkraft",
   "role.director": "Leitung",
@@ -298,22 +377,149 @@ const de: typeof fr = {
   "teacher.courses.create": "Kurs anlegen",
   "teacher.courses.groupProgress": "Gruppenfortschritt",
   "teacher.courses.catalog": "Katalog",
-  "teacher.studio": "Studio auf Deutsch",
+  "teacher.studio": "Lehrstudio",
   "teacher.courses.skeleton":
     "Die gespeicherten Kurse A1–B2 sind Platzhalter (ein Modul und zwei Lektionen je Niveau). Das ist kein vollständiger Lehrplan.",
   "teacher.courses.emptyTitle": "Keine Niveaus",
   "teacher.courses.emptyMessage": "Die Niveaus der Akademie erscheinen hier.",
 };
 
-const dictionaries: Record<Locale, Record<string, string>> = { fr, ar, de };
+const en: typeof fr = {
+  "brand.tagline": "Learn German. Build the future.",
+  "login.welcome": "Welcome back",
+  "login.title": "Sign in to the academy",
+  "login.subtitle": "Continue your German learning journey.",
+  "login.email": "Email",
+  "login.password": "Password",
+  "login.forgot": "Forgot password?",
+  "login.submit": "Sign in",
+  "login.signing": "Signing in…",
+  "login.demo": "QUICK DEMO ACCESS",
+  "login.footer": "Prototype environment · Demo data",
+  "login.invalid": "Incorrect email or password.",
+  "login.reset": "If this email exists, a reset link has been sent.",
+  "login.brandLine": "THE LANGUAGE. THE POSSIBILITIES.",
+  "login.interfaceLanguage": "Interface language",
+  "login.welcomeAria": "Welcome to German Academy",
+  "login.eyebrow": "LEARN. GROW. GO FURTHER.",
+  "login.hero.line1": "One language.",
+  "login.hero.line2": "New",
+  "login.hero.line3": "perspectives.",
+  "login.hero.copy":
+    "German grows day by day. Find your courses, conversations and progress in your personal space.",
+  "login.path.caption": "A path at every step.",
+  "login.levels.aria": "German levels: A1, A2, B1, B2",
+  "login.path.footer": "From first conversations to new opportunities.",
+  "login.card.badge": "YOUR ACADEMY SPACE",
+  "login.footer.personal": "Your personal learning space",
+  "login.signin.title": "Good to see you again.",
+  "login.signin.subtitle": "Sign in to continue your journey with German Academy.",
+  "login.signup.title": "Create an account",
+  "login.signup.subtitle":
+    "Student signup only. Teacher and director accounts are created by administration.",
+  "login.verify.title": "Check your email",
+  "login.verify.subtitle": "A confirmation link was sent. Open it to activate your account.",
+  "nav.home": "Home",
+  "nav.overview": "Overview",
+  "nav.learning": "Learning",
+  "nav.live": "Live",
+  "nav.recordings": "Recordings",
+  "nav.assignments": "Assignments",
+  "nav.exams": "Mock exams",
+  "nav.corrections": "Corrections",
+  "nav.progress": "Progress",
+  "nav.payments": "Payments",
+  "nav.messages": "Messages",
+  "nav.profile": "Profile",
+  "nav.materials": "Resources",
+  "nav.calendar": "Calendar",
+  "nav.classes": "My classes",
+  "nav.groups": "Groups",
+  "nav.lessons": "Lessons",
+  "nav.accounts": "Accounts",
+  "nav.students": "Students",
+  "nav.teachers": "Teachers",
+  "nav.courses": "Courses",
+  "nav.levels": "Levels",
+  "nav.subscriptions": "Subscriptions",
+  "nav.invoices": "Invoices",
+  "nav.reports": "Reports",
+  "nav.settings": "Settings",
+  "nav.audit": "Audit log",
+  "nav.payroll": "Payroll",
+  "nav.signout": "Sign out",
+  "nav.section.learning": "Learning",
+  "nav.section.account": "Account",
+  "nav.section.teaching": "Teaching",
+  "nav.section.academy": "Academy",
+  "nav.section.operations": "Operations",
+  "nav.tab.home": "Home",
+  "nav.tab.materials": "Resources",
+  "nav.tab.assignments": "Assignments",
+  "nav.tab.exams": "Exams",
+  "nav.tab.courses": "Courses",
+  "shell.admin": "Academy administration",
+  "shell.teacher": "Teaching studio",
+  "shell.student": "Student space",
+  "shell.notifications": "Notifications",
+  "shell.language": "Language",
+  "shell.theme": "Appearance",
+  "shell.theme.light": "Light",
+  "shell.theme.dark": "Dark",
+  "shell.closeNav": "Close navigation",
+  "shell.openNav": "Open navigation",
+  "shell.close": "Close",
+  "shell.notifications.empty": "No notifications yet.",
+  "role.student": "Student",
+  "role.teacher": "Teacher",
+  "role.director": "Director",
+  "teacher.students.title": "Students",
+  "teacher.students.subtitle.empty": "Students in your groups",
+  "teacher.students.subtitle.assigned": "Assigned via",
+  "teacher.students.emptyTitle": "No students assigned",
+  "teacher.students.emptyMessage": "Students appear here once they are enrolled in your groups.",
+  "teacher.students.col.student": "Student",
+  "teacher.students.col.level": "Level",
+  "teacher.students.col.group": "Group",
+  "teacher.students.col.subscription": "Subscription",
+  "teacher.subscription.active": "Active",
+  "teacher.subscription.pastDue": "Past due",
+  "teacher.subscription.suspended": "Suspended",
+  "teacher.class.fallback": "My group",
+  "teacher.class.assigned": "Groups assigned to you",
+  "teacher.class.full": "Full",
+  "teacher.class.enrolled": "Enrolled",
+  "teacher.class.capacity": "Capacity",
+  "teacher.class.remaining": "Seats left",
+  "teacher.class.empty": "No students enrolled in this group yet.",
+  "teacher.class.col.student": "Student",
+  "teacher.class.col.progress": "Progress",
+  "teacher.class.col.average": "Average",
+  "teacher.class.col.status": "Status",
+  "teacher.class.active": "Active",
+  "teacher.courses.title": "Courses",
+  "teacher.courses.pickLevel": "Browse and create courses for your groups’ levels.",
+  "teacher.courses.level": "Level",
+  "teacher.courses.allLevels": "All levels",
+  "teacher.courses.create": "Create a course",
+  "teacher.courses.groupProgress": "Group progress",
+  "teacher.courses.catalog": "Catalog",
+  "teacher.studio": "Teaching studio",
+  "teacher.courses.skeleton":
+    "Saved A1–B2 courses are skeletons (one module and two lessons per level). Not a full curriculum.",
+  "teacher.courses.emptyTitle": "No levels",
+  "teacher.courses.emptyMessage": "Academy levels will appear here.",
+};
+
+const dictionaries: Record<Locale, Record<string, string>> = { fr, ar, de, en };
 
 export function translate(locale: Locale, key: string) {
   return dictionaries[locale][key] ?? dictionaries.fr[key] ?? key;
 }
 
-/** Teacher studio stays German. The stored learner locale is left unchanged. */
-export function teacherInterfaceLocale(role: string | null | undefined, locale: Locale): Locale {
-  return role === "teacher" ? "de" : locale;
+/** All roles use the learner-selected interface locale. */
+export function teacherInterfaceLocale(_role: string | null | undefined, locale: Locale): Locale {
+  return locale;
 }
 
 export function translateKnownValue(locale: Locale, value: string) {
@@ -322,7 +528,8 @@ export function translateKnownValue(locale: Locale, value: string) {
     if (
       dictionaries.fr[key] === value ||
       dictionaries.ar[key] === value ||
-      dictionaries.de[key] === value
+      dictionaries.de[key] === value ||
+      dictionaries.en[key] === value
     ) {
       return dictionaries[locale][key] ?? value;
     }
@@ -330,4 +537,30 @@ export function translateKnownValue(locale: Locale, value: string) {
   return value;
 }
 
-export const localeLabels: Record<Locale, string> = { fr: "fr", ar: "ar", de: "de" };
+/** Compact labels for language switchers. */
+export const localeLabels: Record<Locale, string> = {
+  fr: "FR",
+  en: "EN",
+  de: "DE",
+  ar: "AR",
+};
+
+export const localeNativeNames: Record<Locale, string> = {
+  fr: "Français",
+  en: "English",
+  de: "Deutsch",
+  ar: "العربية",
+};
+
+export const localeDateTag: Record<Locale, string> = {
+  fr: "fr-FR",
+  en: "en-GB",
+  de: "de-DE",
+  ar: "ar",
+};
+
+/** Map UI locale to Supabase app_locale (en|fr|de). Arabic stays UI-only. */
+export function toDbLocale(locale: Locale): "en" | "fr" | "de" | null {
+  if (locale === "ar") return null;
+  return locale;
+}

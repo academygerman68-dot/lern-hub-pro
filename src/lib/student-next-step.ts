@@ -9,7 +9,7 @@ export type StudentNextStep = {
 
 /**
  * Next useful action from data the student already has.
- * No invented progress percentage.
+ * French source strings are translated via ui-strings / l().
  */
 export function studentNextStep(input: {
   hasInProgressExam: boolean;
@@ -30,7 +30,7 @@ export function studentNextStep(input: {
     return {
       page: "assignments",
       title: "Devoir à rendre",
-      detail: `${n} devoir${n > 1 ? "s" : ""} publié${n > 1 ? "s" : ""} en attente.`,
+      detail: n === 1 ? "1 devoir publié en attente." : `${n} devoirs publiés en attente.`,
       cta: "Voir les devoirs",
     };
   }

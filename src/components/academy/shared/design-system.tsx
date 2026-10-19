@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { ChevronRight, Inbox, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { initials } from "@/lib/academy-logic";
+import { uiText } from "@/lib/ui-strings";
+import { useAcademy } from "@/components/academy/academy-context";
 
 export function Surface({
   children,
@@ -43,16 +45,20 @@ export function PageHeader({
   action?: ReactNode;
   eyebrow?: string;
 }) {
+  const { locale } = useAcademy();
+  const tTitle = uiText(locale, title);
+  const tSubtitle = subtitle ? uiText(locale, subtitle) : undefined;
+  const tEyebrow = eyebrow ? uiText(locale, eyebrow) : undefined;
   return (
     <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:gap-5">
       <div className="min-w-0">
-        {eyebrow ? <p className="eyebrow mb-2">{eyebrow}</p> : null}
+        {tEyebrow ? <p className="eyebrow mb-2">{tEyebrow}</p> : null}
         <h1 className="font-display text-[1.65rem] font-normal leading-[1.15] tracking-tight text-foreground sm:text-3xl md:text-[2.15rem]">
-          {title}
+          {tTitle}
         </h1>
-        {subtitle ? (
+        {tSubtitle ? (
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:mt-2.5 sm:text-[0.9375rem]">
-            {subtitle}
+            {tSubtitle}
           </p>
         ) : null}
       </div>
@@ -87,11 +93,16 @@ export function SectionHeader({
   action?: ReactNode;
   className?: string;
 }) {
+  const { locale } = useAcademy();
   return (
     <div className={cn("mb-4 flex flex-wrap items-end justify-between gap-3", className)}>
       <div className="min-w-0">
-        <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
-        {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+        <h2 className="text-base font-semibold tracking-tight text-foreground">
+          {uiText(locale, title)}
+        </h2>
+        {description ? (
+          <p className="mt-1 text-sm text-muted-foreground">{uiText(locale, description)}</p>
+        ) : null}
       </div>
       {action ? <div className="flex flex-wrap gap-2">{action}</div> : null}
     </div>
@@ -238,12 +249,15 @@ export function FormSection({
   description?: string;
   children: ReactNode;
 }) {
+  const { locale } = useAcademy();
   return (
     <section className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-4 sm:p-5">
       <div>
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <h3 className="text-sm font-semibold text-foreground">{uiText(locale, title)}</h3>
         {description ? (
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {uiText(locale, description)}
+          </p>
         ) : null}
       </div>
       <div className="space-y-3">{children}</div>
@@ -262,14 +276,17 @@ export function EmptyState({
   action?: ReactNode;
   icon?: ReactNode;
 }) {
+  const { locale } = useAcademy();
   return (
     <div className="rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
       <div className="mx-auto mb-3 grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
         {icon ?? <Inbox className="size-5" />}
       </div>
-      <h3 className="text-base font-semibold tracking-tight">{title}</h3>
+      <h3 className="text-base font-semibold tracking-tight">{uiText(locale, title)}</h3>
       {message ? (
-        <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">{message}</p>
+        <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+          {uiText(locale, message)}
+        </p>
       ) : null}
       {action ? <div className="mt-5 flex justify-center">{action}</div> : null}
     </div>
@@ -296,16 +313,18 @@ export function SectionTitle({
   link?: string;
   onClick?: () => void;
 }) {
+  const { locale } = useAcademy();
+  const tTitle = uiText(locale, title);
   return (
     <div className="mb-4 flex items-center justify-between gap-3">
-      <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
+      <h2 className="text-base font-semibold tracking-tight text-foreground">{tTitle}</h2>
       {link ? (
         <button
           type="button"
           className="inline-flex min-h-10 items-center gap-1 text-sm font-medium text-primary transition-colors duration-150 hover:text-primary/80"
           onClick={onClick}
         >
-          {link}
+          {uiText(locale, link)}
           <ChevronRight className="size-4" />
         </button>
       ) : null}

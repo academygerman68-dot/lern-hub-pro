@@ -1,8 +1,6 @@
 /**
- * Admin-only user provisioning. Uses the service role so the admin session
- * never switches to the newly created Auth user.
- *
- * Secrets are injected by Supabase (never expose the service role in the browser).
+ * Admin-only user provisioning (student | teacher | admin).
+ * Uses service role so the admin session never switches to the new Auth user.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
@@ -19,6 +17,8 @@ function respond(status: number, body: Record<string, unknown>) {
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
+
+type AppRole = "student" | "teacher" | "admin";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -66,11 +66,11 @@ Deno.serve(async (req) => {
         (item: unknown): item is string => typeof item === "string" && item.trim() !== "",
       )
     : [];
-  const requestedRole = asString(body.role).toLowerCase() || "teacher";
+  const rawRole = asString(body.role).toLowerCase() || "teacher";
+  const requestedRole: AppRole =
+    rawRole === "student" || rawRole === "admin" || rawRole === "teacher" ? rawRole : "teacher";
+  const activate = body.activate !== false;
 
-  if (requestedRole !== "teacher") {
-    return respond(400, { error: "UNSUPPORTED_ROLE" });
-  }
   if (!email || !email.includes("@")) return respond(400, { error: "EMAIL_REQUIRED" });
   if (password.length < 8) return respond(400, { error: "PASSWORD_TOO_SHORT" });
   if (!firstName || !lastName) return respond(400, { error: "NAME_REQUIRED" });
@@ -84,7 +84,8 @@ Deno.serve(async (req) => {
     password,
     email_confirm: true,
     user_metadata: {
-      role: "teacher",
+      role: requestedRole,
+      seed: "true",
       first_name: firstName,
       last_name: lastName,
       language: "fr",
@@ -106,35 +107,60 @@ Deno.serve(async (req) => {
     });
   }
 
-  let teacher: {
-    id: string;
-    profile_id: string;
-  } | null = null;
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const { data } = await admin
-      .from("teachers")
-      .select("id, profile_id")
-      .eq("profile_id", created.user.id)
-      .maybeSingle();
-    if (data?.id) {
-      teacher = data;
-      break;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 150 + attempt * 100));
+  const userId = created.user.id;
+
+  // Ensure role/status even if trigger lagged or seed metadata was ignored.
+  await admin
+    .from("profiles")
+    .update({
+      role: requestedRole,
+      status: activate ? "active" : "pending",
+      first_name: firstName,
+      last_name: lastName,
+      ...(phone ? { phone } : {}),
+    })
+    .eq("id", userId);
+
+  if (requestedRole === "student") {
+    await admin.from("students").upsert({ profile_id: userId }, { onConflict: "profile_id" });
   }
-  if (!teacher) {
-    return respond(500, { error: "TEACHER_PROFILE_PENDING" });
+  if (requestedRole === "teacher") {
+    await admin.from("teachers").upsert({ profile_id: userId }, { onConflict: "profile_id" });
   }
 
-  if (specialties.length) {
-    await admin.from("teachers").update({ specialties }).eq("id", teacher.id);
+  let entityId: string | null = null;
+  if (requestedRole === "teacher") {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const { data } = await admin
+        .from("teachers")
+        .select("id, profile_id")
+        .eq("profile_id", userId)
+        .maybeSingle();
+      if (data?.id) {
+        entityId = data.id;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 150 + attempt * 100));
+    }
+    if (!entityId) return respond(500, { error: "TEACHER_PROFILE_PENDING" });
+    if (specialties.length) {
+      await admin.from("teachers").update({ specialties }).eq("id", entityId);
+    }
+  } else if (requestedRole === "student") {
+    const { data } = await admin
+      .from("students")
+      .select("id")
+      .eq("profile_id", userId)
+      .maybeSingle();
+    entityId = data?.id ?? null;
   }
 
   return respond(200, {
-    id: teacher.id,
-    profileId: teacher.profile_id,
+    id: entityId,
+    profileId: userId,
     email,
-    role: "teacher",
+    role: requestedRole,
     emailConfirmed: true,
+    status: activate ? "active" : "pending",
   });
 });

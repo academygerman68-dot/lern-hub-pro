@@ -1,4 +1,4 @@
-export type VideoProvider = "jitsi" | "zoom";
+export type VideoProvider = "jitsi" | "zoom" | "external";
 
 export type LiveJoinTargetLike = {
   provider: VideoProvider | string;
@@ -9,6 +9,10 @@ export type LiveJoinTargetLike = {
 
 export function isZoomActive(provider: string | null | undefined) {
   return provider === "zoom";
+}
+
+export function isExternalMeeting(provider: string | null | undefined) {
+  return provider === "external" || provider === "zoom";
 }
 
 export function zoomMeetingDurationMinutes(startsAt: string, endsAt?: string | null) {
@@ -25,10 +29,9 @@ export function emergencyZoomTopic(
   return `Lern Hub — ${level?.trim() || "Cours"} — ${group?.trim() || "Groupe"}`;
 }
 
-export function videoProviderLabel(provider: string | null | undefined, emergency = false) {
-  if (provider === "zoom") {
-    return emergency ? "Zoom — mode d’urgence" : "Zoom — réunion d’urgence";
-  }
+export function videoProviderLabel(provider: string | null | undefined) {
+  if (provider === "external") return "Lien externe (Zoom / Meet)";
+  if (provider === "zoom") return "Zoom";
   return "Jitsi";
 }
 
@@ -71,6 +74,21 @@ export function isValidZoomMeetingUrl(value: string) {
   }
 }
 
+export function isValidGoogleMeetUrl(value: string) {
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:") return false;
+    return url.hostname.toLowerCase() === "meet.google.com" && url.pathname.length > 1;
+  } catch {
+    return false;
+  }
+}
+
+/** Zoom or Google Meet HTTPS join links accepted at session creation. */
+export function isValidExternalMeetingUrl(value: string) {
+  return isValidZoomMeetingUrl(value) || isValidGoogleMeetUrl(value);
+}
+
 export function openExternalMeeting(url: string) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
@@ -99,7 +117,7 @@ export function zoomHrefForViewer(target: LiveJoinTargetLike, isStaff: boolean) 
 
 /**
  * Join a live session via the joinTarget RPC first.
- * Zoom opens externally; Jitsi delegates to onJitsi. Never mounts Jitsi for Zoom.
+ * External / Zoom open in a new tab; Jitsi delegates to onJitsi.
  */
 export async function joinLiveSession(
   sessionId: string,
@@ -108,13 +126,14 @@ export async function joinLiveSession(
     onJitsi: (id: string) => void;
     resolveTarget: (id: string) => Promise<LiveJoinTargetLike>;
   },
-): Promise<"zoom" | "jitsi"> {
+): Promise<"zoom" | "jitsi" | "external"> {
   const target = await options.resolveTarget(sessionId);
-  if (target.provider === "zoom") {
-    const href = zoomHrefForViewer(target, options.isStaff);
-    if (!href) throw new Error("La réunion Zoom n’est pas encore prête.");
+  if (target.provider === "zoom" || target.provider === "external") {
+    const href =
+      target.provider === "zoom" ? zoomHrefForViewer(target, options.isStaff) : target.url;
+    if (!href) throw new Error("Le lien de visioconférence n’est pas encore prêt.");
     openExternalMeeting(href);
-    return "zoom";
+    return target.provider === "zoom" ? "zoom" : "external";
   }
   options.onJitsi(sessionId);
   return "jitsi";

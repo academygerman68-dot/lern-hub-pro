@@ -25,6 +25,7 @@ import { formatLiveDate, formatLiveTime, liveStatusLabel } from "@/lib/live-meet
 import { AssignmentService } from "@/services/academy-services";
 import { useAcademy } from "./academy-context";
 import { studentNextStep } from "@/lib/student-next-step";
+import { uiText } from "@/lib/ui-strings";
 import { paymentStatusLabel } from "./finance-pages";
 import { QueryState } from "./query-state";
 import { Eyebrow, Status } from "./premium-kit";
@@ -35,8 +36,8 @@ function dayKey(d: Date) {
 }
 
 export function PremiumStudentDashboard() {
-  const { navigate, user, l, profile } = useAcademy();
-  const firstName = user?.name?.split(" ")[0] ?? "there";
+  const { navigate, user, l, profile, locale } = useAcademy();
+  const firstName = user?.name?.split(" ")[0] ?? l("là", "هناك");
   const studentsQuery = useStudents();
   const myStudent = resolveOwnStudent(studentsQuery.data ?? [], {
     profileId: profile?.id ?? user?.id ?? null,
@@ -95,20 +96,25 @@ export function PremiumStudentDashboard() {
     <div className="animate-fade-in space-y-6">
       {profile?.status === "restricted" && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-          Votre accès aux cours, ressources, devoirs, examens et classes en direct est actuellement
-          restreint. Veuillez contacter l’administration.
+          {l(
+            "Votre accès aux cours, ressources, devoirs, examens et classes en direct est actuellement restreint. Veuillez contacter l’administration.",
+            "وصولك إلى الدورات والموارد والواجبات والامتحانات والحصص المباشرة مقيّد حالياً. يرجى التواصل مع الإدارة.",
+          )}
         </div>
       )}
       {identityMissing ? (
         <div className="rounded-2xl border border-destructive/30 bg-alert-soft p-4 text-sm text-foreground">
-          Votre profil étudiant est introuvable. Contactez l’administration pour lier votre compte.
+          {l(
+            "Votre profil étudiant est introuvable. Contactez l’administration pour lier votre compte.",
+            "ملف الطالب غير موجود. تواصل مع الإدارة لربط حسابك.",
+          )}
         </div>
       ) : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm text-muted-foreground">{l("Bienvenue", "مرحبًا")}</p>
+          <p className="text-sm text-muted-foreground">{l("Espace étudiant", "مساحة الطالب")}</p>
           <h1 className="font-display text-3xl font-normal tracking-tight sm:text-4xl">
-            Bonjour, {firstName}.
+            {l("Bonjour", "مرحباً")}, {firstName}.
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {l("Votre prochaine étape d’apprentissage.", "خطوتك التالية في التعلم.")}
@@ -188,11 +194,11 @@ export function PremiumStudentDashboard() {
             ) : null}
           </div>
           <Button className="mt-6 w-full" onClick={() => navigate(nextStep.page)}>
-            {nextStep.cta}
+            {uiText(locale, nextStep.cta)}
           </Button>
-          <p className="mt-3 text-sm text-muted-foreground">{nextStep.detail}</p>
+          <p className="mt-3 text-sm text-muted-foreground">{uiText(locale, nextStep.detail)}</p>
           <Button className="mt-3 w-full" variant="outline" onClick={() => navigate("profile")}>
-            {l("Mon profil", "ملفي")}
+            {l("Mon profil", "ملفي الشخصي")}
           </Button>
         </div>
       </section>

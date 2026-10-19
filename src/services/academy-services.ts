@@ -79,6 +79,7 @@ export const AuthService = {
     password: string;
     firstName: string;
     lastName: string;
+    language?: "en" | "fr" | "de";
     phone?: string;
   }): Promise<SessionUser | { needsEmailConfirmation: true; email: string }> {
     if (!isSupabaseConfigured) {
@@ -187,6 +188,10 @@ export const ProfileService = {
     if (!isSupabaseConfigured) return [];
     return SupabaseProfileService.listPendingProfiles();
   },
+  async listProfiles(filters?: Parameters<typeof SupabaseProfileService.listProfiles>[0]) {
+    if (!isSupabaseConfigured) return [];
+    return SupabaseProfileService.listProfiles(filters);
+  },
   async getById(profileId: string) {
     if (!isSupabaseConfigured) return null;
     return SupabaseProfileService.getById(profileId);
@@ -197,6 +202,21 @@ export const ProfileService = {
   },
   async setStatus(profileId: string, status: AccountStatus) {
     return this.setProfileStatus(profileId, status);
+  },
+  async setProfileRole(
+    profileId: string,
+    role: Parameters<typeof SupabaseProfileService.setProfileRole>[1],
+  ) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseProfileService.setProfileRole(profileId, role);
+  },
+  async createAccount(input: Parameters<typeof SupabaseProfileService.createAccount>[0]) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseProfileService.createAccount(input);
+  },
+  async deleteAccount(profileId: string) {
+    if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
+    return SupabaseProfileService.deleteAccount(profileId);
   },
   async updateMyProfile(input: { firstName: string; lastName: string; phone?: string | null }) {
     if (!isSupabaseConfigured) throw new Error("SUPABASE_REQUIRED");
@@ -472,6 +492,7 @@ export const CourseService = {
   },
   async createCourse(input: {
     levelId: string;
+    classId?: string | null;
     title: string;
     description?: string;
     contentKind?: Database["public"]["Enums"]["course_content_kind"];

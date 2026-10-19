@@ -31,15 +31,24 @@ const emptyForm = (): ReplayFormState => ({
   description: "",
 });
 
+export type ReplayEditorPreset = {
+  classId?: string | null;
+  sessionId?: string | null;
+  title?: string | null;
+  recordedOn?: string | null;
+};
+
 type Props = {
   open: boolean;
   editing: MeetingRecording | null;
   role: string | null | undefined;
   userId: string | null | undefined;
+  /** Prefill when creating from a calendar session click. */
+  preset?: ReplayEditorPreset | null;
   onClose: () => void;
 };
 
-export function ReplayEditorModal({ open, editing, role, userId, onClose }: Props) {
+export function ReplayEditorModal({ open, editing, role, userId, preset, onClose }: Props) {
   const isStaff = role === "director" || role === "teacher";
   const classesQuery = useClasses();
   const sessionsQuery = useLiveSessions();
@@ -60,8 +69,14 @@ export function ReplayEditorModal({ open, editing, role, userId, onClose }: Prop
       });
       return;
     }
-    setForm(emptyForm());
-  }, [open, editing]);
+    setForm({
+      ...emptyForm(),
+      title: preset?.title?.trim() ?? "",
+      classId: preset?.classId ?? "",
+      sessionId: preset?.sessionId ?? "",
+      recordedOn: preset?.recordedOn ?? "",
+    });
+  }, [open, editing, preset]);
 
   const sessionsForClass = useMemo(
     () =>

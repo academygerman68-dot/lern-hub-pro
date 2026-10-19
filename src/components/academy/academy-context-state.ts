@@ -20,7 +20,8 @@ export type AcademyState = {
   role: Role | null;
   /** Logout when role is null. Role switching is disabled with Supabase Auth. */
   setRole: (role: Role | null) => void;
-  signIn: (user: SessionUser) => void;
+  /** Pass `profile` after Supabase auth so pending/restricted gates apply immediately. */
+  signIn: (user: SessionUser, profile?: Profile | null) => void;
   signOut: () => Promise<void>;
   page: AcademyPage;
   navigate: (page: AcademyPage, extra?: NavigateOptions) => void;
@@ -32,7 +33,8 @@ export type AcademyState = {
   locale: Locale;
   setLocale: (locale: Locale) => void;
   t: (key: string) => string;
-  l: (fr: string, ar: string) => string;
+  /** Prefer `t(key)` for full i18n. Optional de/en fall back to French. */
+  l: (fr: string, ar: string, de?: string, en?: string) => string;
   lastScore: ExamScore | null;
   setLastScore: (score: ExamScore | null) => void;
   session: PersistedSession | null;

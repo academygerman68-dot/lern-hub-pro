@@ -1,6 +1,12 @@
 export type Role = "student" | "teacher" | "director";
 export type SubscriptionStatus = "ACTIVE" | "PAST_DUE" | "SUSPENDED";
-export type Locale = "fr" | "ar" | "de";
+export type Locale = "fr" | "en" | "de" | "ar";
+
+export const LOCALES: readonly Locale[] = ["fr", "en", "de", "ar"] as const;
+
+export function isLocale(value: string | null | undefined): value is Locale {
+  return value === "fr" || value === "en" || value === "de" || value === "ar";
+}
 export type Level = "A1" | "A2" | "B1" | "B2";
 export type AccountStatus = "active" | "pending" | "restricted" | "suspended" | "archived";
 
@@ -55,6 +61,7 @@ export const TEACHER_PAGES = [
 
 export const DIRECTOR_PAGES = [
   "dashboard",
+  "accounts",
   "students",
   "student360",
   "teachers",

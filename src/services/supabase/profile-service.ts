@@ -45,6 +45,33 @@ export type ProfilePersonalInput = {
   phone?: string | null;
 };
 
+export type AppRoleDb = Database["public"]["Enums"]["app_role"];
+
+export type ProfileListFilters = {
+  role?: AppRoleDb | "all";
+  status?: AccountStatus | "all";
+  search?: string;
+};
+
+function mapAdminAccountError(message: string): Error {
+  if (message.includes("LAST_ADMIN")) {
+    return new Error("Impossible : c’est le dernier administrateur actif.");
+  }
+  if (message.includes("CANNOT_SELF_DEMOTE")) {
+    return new Error("Vous ne pouvez pas retirer votre propre rôle administrateur.");
+  }
+  if (message.includes("CANNOT_SELF_DELETE") || message.includes("CANNOT_SELF_LOCK")) {
+    return new Error("Action impossible sur votre propre compte.");
+  }
+  if (message.includes("FORBIDDEN")) return new Error("Action non autorisée.");
+  if (message.includes("PROFILE_NOT_FOUND")) return new Error("Compte introuvable.");
+  if (message.includes("EMAIL_TAKEN")) return new Error("Cet e-mail est déjà utilisé.");
+  if (message.includes("PASSWORD_TOO_SHORT")) {
+    return new Error("Le mot de passe doit contenir au moins 8 caractères.");
+  }
+  return new Error(message || "Opération impossible.");
+}
+
 export const SupabaseProfileService = {
   async listPendingProfiles(): Promise<ProfileRow[]> {
     const { data, error } = await requireClient()
@@ -53,6 +80,32 @@ export const SupabaseProfileService = {
       .eq("status", "pending")
       .eq("role", "student")
       .order("created_at", { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as ProfileRow[];
+  },
+
+  async listProfiles(filters?: ProfileListFilters): Promise<ProfileRow[]> {
+    let query = requireClient()
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    if (filters?.role && filters.role !== "all") {
+      query = query.eq("role", filters.role);
+    }
+    if (filters?.status && filters.status !== "all") {
+      query = query.eq("status", filters.status);
+    }
+    const search = filters?.search?.trim();
+    if (search) {
+      const escaped = search.replace(/[%_,]/g, "");
+      query = query.or(
+        `email.ilike.%${escaped}%,first_name.ilike.%${escaped}%,last_name.ilike.%${escaped}%`,
+      );
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     return (data ?? []) as ProfileRow[];
   },
@@ -73,8 +126,89 @@ export const SupabaseProfileService = {
       p_profile_id: profileId,
       p_status: status,
     });
-    if (error) throw error;
+    if (error) throw mapAdminAccountError(error.message);
     return data as ProfileRow;
+  },
+
+  async setProfileRole(profileId: string, role: AppRoleDb): Promise<ProfileRow> {
+    const supabase = requireClient();
+    const { data, error } = await supabase.rpc("admin_set_profile_role", {
+      p_profile_id: profileId,
+      p_role: role,
+    });
+    if (error) throw mapAdminAccountError(error.message);
+    return data as ProfileRow;
+  },
+
+  async createAccount(input: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    role: AppRoleDb;
+    phone?: string;
+    activate?: boolean;
+  }): Promise<{ profileId: string; email: string; role: AppRoleDb }> {
+    const { data, error } = await requireClient().functions.invoke<{
+      profileId?: string;
+      email?: string;
+      role?: AppRoleDb;
+      error?: string;
+      message?: string;
+    }>("admin-create-user", {
+      body: {
+        email: input.email.trim().toLowerCase(),
+        password: input.password,
+        firstName: input.firstName.trim(),
+        lastName: input.lastName.trim(),
+        role: input.role,
+        phone: input.phone?.trim() || undefined,
+        activate: input.activate !== false,
+      },
+    });
+    if (error) {
+      const context = (error as { context?: Response }).context;
+      if (context && typeof context.clone === "function") {
+        const body = (await context
+          .clone()
+          .json()
+          .catch(() => null)) as { error?: string; message?: string } | null;
+        throw mapAdminAccountError(body?.error ?? body?.message ?? error.message);
+      }
+      throw mapAdminAccountError(error.message);
+    }
+    if (!data?.profileId) {
+      throw mapAdminAccountError(data?.error ?? data?.message ?? "CREATE_USER_FAILED");
+    }
+    return {
+      profileId: data.profileId,
+      email: data.email ?? input.email,
+      role: data.role ?? input.role,
+    };
+  },
+
+  async deleteAccount(profileId: string): Promise<void> {
+    const { data, error } = await requireClient().functions.invoke<{
+      ok?: boolean;
+      error?: string;
+      message?: string;
+    }>("admin-delete-user", {
+      body: { profileId, confirmation: "SUPPRIMER" },
+    });
+    if (error) {
+      const context = (error as { context?: Response }).context;
+      if (context && typeof context.clone === "function") {
+        const body = (await context
+          .clone()
+          .json()
+          .catch(() => null)) as { error?: string; message?: string } | null;
+        throw mapAdminAccountError(body?.error ?? body?.message ?? error.message);
+      }
+      throw mapAdminAccountError(error.message);
+    }
+    if (!data?.ok) {
+      throw mapAdminAccountError(data?.error ?? data?.message ?? "DELETE_FAILED");
+    }
   },
 
   /** Alias for admin queue actions. */

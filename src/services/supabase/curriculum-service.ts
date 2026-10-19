@@ -108,6 +108,8 @@ export const SupabaseCurriculumService = {
 
   async createCourse(input: {
     levelId: string;
+    /** null / omit = whole level; set = specific group only. */
+    classId?: string | null;
     title: string;
     description?: string;
     status?: ContentStatus;
@@ -117,10 +119,25 @@ export const SupabaseCurriculumService = {
     storagePath?: string | null;
     mimeType?: string | null;
   }) {
+    const classId = input.classId?.trim() || null;
+    if (classId) {
+      const { data: klass, error: classError } = await requireClient()
+        .from("classes")
+        .select("id, level_id")
+        .eq("id", classId)
+        .maybeSingle();
+      if (classError) throw classError;
+      if (!klass) throw new Error("Groupe introuvable.");
+      if (klass.level_id !== input.levelId) {
+        throw new Error("Le groupe choisi n’appartient pas à ce niveau.");
+      }
+    }
+
     const { data, error } = await requireClient()
       .from("courses")
       .insert({
         level_id: input.levelId,
+        class_id: classId,
         title: input.title,
         description: input.description ?? null,
         status: input.status ?? "draft",

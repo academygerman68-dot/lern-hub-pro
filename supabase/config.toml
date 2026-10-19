@@ -23,9 +23,29 @@ additional_redirect_urls = [
   "http://127.0.0.1:3000",
   "http://127.0.0.1:5173",
   "http://127.0.0.1:5173/**",
+  "http://127.0.0.1:5173/auth/callback",
+  "http://127.0.0.1:5173/auth/reset-password",
   "http://localhost:5173",
-  "http://localhost:5173/**"
+  "http://localhost:5173/**",
+  "http://localhost:5173/auth/callback",
+  "http://localhost:5173/auth/reset-password"
 ]
+
+# Email signup must confirm before session (matches hosted: mailer_autoconfirm=false).
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+double_confirm_changes = true
+
+# Google OAuth is enabled on the hosted project (Client ID configured in Dashboard).
+# Local CLI: uncomment and set secrets if you need Google against `supabase start`.
+# Authorized redirect URI (Google Cloud → OAuth Web client):
+#   https://omxemusaqgzkogqvcdfw.supabase.co/auth/v1/callback
+# [auth.external.google]
+# enabled = true
+# client_id = "env(GOOGLE_CLIENT_ID)"
+# secret = "env(GOOGLE_CLIENT_SECRET)"
+# skip_nonce_check = false
 
 [storage]
 enabled = true

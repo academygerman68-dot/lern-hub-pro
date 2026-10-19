@@ -8,7 +8,6 @@ import {
   videoProviderLabel,
   liveStatusLabel,
   isLiveSessionExpired,
-  isZoomActive,
   zoomMeetingDurationMinutes,
   formatLiveDate,
 } from "@/lib/live-meeting";
@@ -22,11 +21,12 @@ import {
   studentScopeClassId,
 } from "@/lib/live-calendar-scope";
 import { calendarDayKey, calendarStatusTone } from "@/lib/live-calendar-layout";
-import { LiveSessionService } from "@/services/academy-services";
+import { LiveSessionService, RecordingService } from "@/services/academy-services";
 import {
   useClasses,
   useLevels,
   useLiveSessions,
+  useRecordings,
   useTeachers,
   useUpdateLiveSessionStatus,
 } from "@/hooks/use-academy-data";
@@ -38,7 +38,9 @@ import { CalendarToolbar } from "./live/calendar/calendar-toolbar";
 import { CalendarWeekView } from "./live/calendar/calendar-week-view";
 import { CalendarMonthView } from "./live/calendar/calendar-month-view";
 import { CalendarAgendaView } from "./live/calendar/calendar-agenda-view";
+import { ReplayEditorModal } from "./replay-editor";
 import type { LiveSessionListItem } from "@/services/supabase/live-session-service";
+import type { MeetingRecording } from "@/types/phase3";
 
 /** Isolates calendar render failures so Live / Calendar routes stay usable. */
 export class LiveCalendarErrorBoundary extends Component<
@@ -97,6 +99,7 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
   );
   const studentClassId = role === "student" ? studentScopeClassId(enrolledClassIds) : undefined;
   const sessionsQuery = useLiveSessions(studentClassId);
+  const recordingsQuery = useRecordings();
   const updateStatus = useUpdateLiveSessionStatus();
   const [view, setView] = useState<"week" | "month">("week");
   const [anchor, setAnchor] = useState(() => {
@@ -106,6 +109,8 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [replayEditorOpen, setReplayEditorOpen] = useState(false);
+  const [editingReplay, setEditingReplay] = useState<MeetingRecording | null>(null);
   const [classFilter, setClassFilter] = useState("");
   const [teacherFilter, setTeacherFilter] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
@@ -181,6 +186,20 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
   ]);
 
   const selected = (sessionsQuery.data ?? []).find((s) => s.id === selectedId) ?? null;
+  const selectedReplay = useMemo(() => {
+    if (!selected) return null;
+    return (
+      (recordingsQuery.data ?? []).find(
+        (row) => row.live_session_id === selected.id && row.status === "ready",
+      ) ??
+      (recordingsQuery.data ?? []).find((row) => row.live_session_id === selected.id) ??
+      null
+    );
+  }, [recordingsQuery.data, selected]);
+  const canManageSelectedReplay =
+    Boolean(selected) &&
+    (role === "director" ||
+      (role === "teacher" && canEditLiveSession(role, selected!, myTeacherId)));
 
   const weekStart = useMemo(() => {
     const d = new Date(anchor);
@@ -482,8 +501,14 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
               <dt className="text-muted-foreground">Professeur</dt>
               <dd>{teacherName(selected)}</dd>
               <dt className="text-muted-foreground">Plateforme</dt>
+              <dd>{videoProviderLabel(selected.video_provider)}</dd>
+              <dt className="text-muted-foreground">Enregistrement</dt>
               <dd>
-                {videoProviderLabel(selected.video_provider, isZoomActive(selected.video_provider))}
+                {selectedReplay?.status === "ready"
+                  ? "Replay disponible"
+                  : selectedReplay
+                    ? "Replay en préparation"
+                    : "Aucun replay"}
               </dd>
             </dl>
             {role === "student" &&
@@ -508,6 +533,34 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
                   Modifier la séance
                 </Button>
               ) : null}
+              {canManageSelectedReplay ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditingReplay(selectedReplay);
+                    setReplayEditorOpen(true);
+                  }}
+                >
+                  {selectedReplay ? "Modifier le replay" : "Ajouter le replay"}
+                </Button>
+              ) : null}
+              {selectedReplay?.status === "ready" ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    void (async () => {
+                      try {
+                        const url = await RecordingService.getSignedUrl(selectedReplay);
+                        window.open(url, "_blank", "noopener,noreferrer");
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : "Lecture impossible");
+                      }
+                    })();
+                  }}
+                >
+                  Voir le replay
+                </Button>
+              ) : null}
               {(selected.status === "scheduled" || selected.status === "live") && (
                 <Button
                   disabled={!joinState?.allowed && !isStaff}
@@ -530,6 +583,28 @@ export function LiveCalendar({ embedded = false }: LiveCalendarProps) {
         onClose={() => {
           setEditOpen(false);
           void sessionsQuery.refetch();
+        }}
+      />
+
+      <ReplayEditorModal
+        open={replayEditorOpen}
+        editing={editingReplay}
+        role={role}
+        userId={user?.id ?? null}
+        preset={
+          selected
+            ? {
+                classId: selected.class_id,
+                sessionId: selected.id,
+                title: `Replay — ${selected.title}`,
+                recordedOn: selected.starts_at.slice(0, 10),
+              }
+            : null
+        }
+        onClose={() => {
+          setReplayEditorOpen(false);
+          setEditingReplay(null);
+          void recordingsQuery.refetch();
         }}
       />
     </>

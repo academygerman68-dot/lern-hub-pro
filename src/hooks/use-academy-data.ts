@@ -225,6 +225,8 @@ export function useSetProfileStatus() {
         qc.invalidateQueries({ queryKey: queryKeys.students.all }),
         qc.invalidateQueries({ queryKey: queryKeys.teachers.all }),
         qc.invalidateQueries({ queryKey: queryKeys.profiles.pending }),
+        qc.invalidateQueries({ queryKey: queryKeys.profiles.all }),
+        qc.invalidateQueries({ queryKey: ["profiles"] }),
         qc.invalidateQueries({ queryKey: ["students"] }),
         qc.invalidateQueries({ queryKey: ["teachers"] }),
       ]);
@@ -236,6 +238,66 @@ export function usePendingProfiles() {
   return useQuery({
     queryKey: queryKeys.profiles.pending,
     queryFn: () => ProfileService.listPendingProfiles(),
+  });
+}
+
+export function useAdminProfiles(filters?: {
+  role?: "all" | "admin" | "teacher" | "student";
+  status?: "all" | "active" | "pending" | "restricted" | "suspended" | "archived";
+  search?: string;
+}) {
+  const key = JSON.stringify(filters ?? {});
+  return useQuery({
+    queryKey: queryKeys.profiles.list(key),
+    queryFn: () => ProfileService.listProfiles(filters),
+  });
+}
+
+export function useSetProfileRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      profileId,
+      role,
+    }: {
+      profileId: string;
+      role: "admin" | "teacher" | "student";
+    }) => ProfileService.setProfileRole(profileId, role),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["profiles"] }),
+        qc.invalidateQueries({ queryKey: queryKeys.students.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.teachers.all }),
+      ]);
+    },
+  });
+}
+
+export function useAdminCreateAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ProfileService.createAccount,
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["profiles"] }),
+        qc.invalidateQueries({ queryKey: queryKeys.students.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.teachers.all }),
+      ]);
+    },
+  });
+}
+
+export function useAdminDeleteAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (profileId: string) => ProfileService.deleteAccount(profileId),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["profiles"] }),
+        qc.invalidateQueries({ queryKey: queryKeys.students.all }),
+        qc.invalidateQueries({ queryKey: queryKeys.teachers.all }),
+      ]);
+    },
   });
 }
 

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowUpRight, BookOpen, Globe2, LockKeyhole } from "lucide-react";
 import { useAcademy } from "./academy-context";
+import { LanguageSwitcher } from "./language-switcher";
 import { ThemeToggle } from "./theme-toggle";
 import "./login.css";
 
@@ -15,7 +16,7 @@ export function LoginShell({
   children: ReactNode;
   footer?: ReactNode;
 }) {
-  const { locale, setLocale, l } = useAcademy();
+  const { locale, t } = useAcademy();
   // Recreate localized DOM nodes so the legacy global localizer cannot restore
   // cached labels from the previous language. Form state stays in Login.
   return (
@@ -32,7 +33,7 @@ export function LoginShell({
           </span>
           <div>
             <strong>German Academy</strong>
-            <span>{l("LA LANGUE. LES POSSIBILITÉS.", "لغة تفتح آفاقًا جديدة.")}</span>
+            <span>{t("login.brandLine")}</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -40,65 +41,38 @@ export function LoginShell({
           <div
             className="gla-login-languages"
             role="group"
-            aria-label={l("Langue de l’interface", "لغة الواجهة")}
+            aria-label={t("login.interfaceLanguage")}
           >
             <Globe2 size={15} aria-hidden="true" />
-            <button
-              type="button"
-              lang="fr"
-              aria-pressed={locale === "fr"}
-              onClick={() => setLocale("fr")}
-            >
-              FR
-            </button>
-            <span aria-hidden="true">/</span>
-            <button
-              type="button"
-              lang="ar"
-              aria-pressed={locale === "ar"}
-              onClick={() => setLocale("ar")}
-            >
-              العربية
-            </button>
+            <LanguageSwitcher />
           </div>
         </div>
       </header>
 
       <div className="gla-login-layout">
-        <section
-          className="gla-login-story"
-          aria-label={l("Bienvenue chez German Academy", "مرحبًا بكم في German Academy")}
-        >
+        <section className="gla-login-story" aria-label={t("login.welcomeAria")}>
           <div className="gla-login-eyebrow">
             <span />
-            {l("APPRENDRE. GRANDIR. ALLER PLUS LOIN.", "تعلّم. تطوّر. انطلق نحو آفاق جديدة.")}
+            {t("login.eyebrow")}
           </div>
           <h1>
-            {l("Une langue.", "لغة واحدة.")}
+            {t("login.hero.line1")}
             <br />
-            {l("De nouvelles", "وآفاق")}
+            {t("login.hero.line2")}
             <br />
-            <em>{l("perspectives.", "جديدة.")}</em>
+            <em>{t("login.hero.line3")}</em>
           </h1>
-          <p className="gla-login-story-copy">
-            {l(
-              "L’allemand se construit un jour après l’autre. Retrouvez vos cours, vos échanges et vos progrès dans votre espace personnel.",
-              "تتقدّم في اللغة الألمانية يومًا بعد يوم. تجد دروسك وتواصلك وتقدّمك في مساحتك الشخصية.",
-            )}
-          </p>
+          <p className="gla-login-story-copy">{t("login.hero.copy")}</p>
           <div className="gla-login-path">
             <div className="gla-login-path-caption">
               <BookOpen size={17} aria-hidden="true" />
-              <span>{l("Un parcours, à chaque étape.", "مسار يرافقك في كل مرحلة.")}</span>
+              <span>{t("login.path.caption")}</span>
             </div>
             <div
               className="gla-login-levels"
               role="group"
               dir="ltr"
-              aria-label={l(
-                "Niveaux d’allemand : A1, A2, B1, B2",
-                "مستويات الألمانية: A1، A2، B1، B2",
-              )}
+              aria-label={t("login.levels.aria")}
             >
               {["A1", "A2", "B1", "B2"].map((level, index) => (
                 <div key={level}>
@@ -108,12 +82,7 @@ export function LoginShell({
               ))}
               <ArrowUpRight size={24} aria-hidden="true" />
             </div>
-            <p>
-              {l(
-                "Des premières conversations aux nouvelles opportunités.",
-                "من محادثاتك الأولى إلى فرص جديدة.",
-              )}
-            </p>
+            <p>{t("login.path.footer")}</p>
           </div>
         </section>
 
@@ -122,7 +91,7 @@ export function LoginShell({
             <span className="gla-login-card-emblem">
               <BookOpen size={22} strokeWidth={1.5} aria-hidden="true" />
             </span>
-            <span>{l("VOTRE ESPACE ACADÉMIE", "مساحتك في الأكاديمية")}</span>
+            <span>{t("login.card.badge")}</span>
           </div>
           <h2 id="gla-login-title">{title}</h2>
           {subtitle && <p className="gla-login-subtitle">{subtitle}</p>}
@@ -137,7 +106,7 @@ export function LoginShell({
         <span>© {new Date().getFullYear()} German Language Academy</span>
         <span>
           <LockKeyhole size={13} aria-hidden="true" />
-          {l("Votre espace d’apprentissage personnel", "مساحتك الشخصية للتعلّم")}
+          {t("login.footer.personal")}
         </span>
       </footer>
     </main>

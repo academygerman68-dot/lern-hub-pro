@@ -15,6 +15,7 @@ import {
   Menu,
   MessageSquare,
   Settings,
+  Shield,
   UserRound,
   Users,
   Video,
@@ -23,7 +24,8 @@ import {
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
 import { initials } from "@/lib/academy-logic";
-import { localeLabels } from "@/lib/i18n";
+import { localeDateTag } from "@/lib/i18n";
+import { LanguageSwitcher } from "./language-switcher";
 import {
   useMarkAllNotificationsRead,
   useMarkNotificationRead,
@@ -93,6 +95,7 @@ const menus: Record<"student" | "teacher" | "director", NavSection[]> = {
       label: "nav.section.academy",
       items: [
         ["dashboard", "nav.overview", Home],
+        ["accounts", "nav.accounts", Shield],
         ["students", "nav.students", Users],
         ["teachers", "nav.teachers", GraduationCap],
         ["classes", "nav.groups", Layers3],
@@ -128,7 +131,7 @@ export function shellNavPageIds(role: "student" | "teacher" | "director"): Acade
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { role, page, navigate, setRole, user, t, locale, setLocale } = useAcademy();
+  const { role, page, navigate, setRole, user, t, locale } = useAcademy();
   const [mobile, setMobile] = useState(false);
   const [notice, setNotice] = useState(false);
   const notificationsQuery = useNotifications();
@@ -161,27 +164,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const unread = unreadQuery.data ?? 0;
   const notificationRows = notificationsQuery.data ?? [];
 
-  const languageSwitch =
-    role === "teacher" ? (
-      <span className="min-h-9 rounded-md bg-soft-blue px-2.5 py-1 text-[11px] font-medium text-primary">
-        {t("teacher.studio")}
-      </span>
-    ) : (
-      <div className="flex gap-1" role="group" aria-label={t("shell.language")}>
-        {(["fr", "ar"] as const).map((code) => (
-          <button
-            key={code}
-            type="button"
-            onClick={() => setLocale(code)}
-            className={`min-h-9 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
-              locale === code ? "bg-soft-blue text-primary" : "text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {localeLabels[code]}
-          </button>
-        ))}
-      </div>
-    );
+  const languageSwitch = <LanguageSwitcher compact />;
 
   const sidebar = (
     <>
@@ -192,7 +175,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           variant="ghost"
           className="lg:hidden"
           onClick={() => setMobile(false)}
-          aria-label={locale === "ar" ? "إغلاق القائمة" : "Fermer la navigation"}
+          aria-label={t("shell.closeNav")}
         >
           <X className="size-5" />
         </Button>
@@ -225,8 +208,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         ))}
       </nav>
       <div className="border-t border-sidebar-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
-        <div className="mb-3 flex flex-col gap-2 px-1 lg:hidden">
-          <div className="flex items-center justify-between gap-2">
+        <div className="mb-3 flex flex-col gap-2 px-1">
+          <div className="flex items-center justify-between gap-2 lg:hidden">
             <span className="text-[11px] font-medium text-muted-foreground uppercase">
               {t("shell.theme")}
             </span>
@@ -266,7 +249,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <button
             type="button"
             className="absolute inset-0 bg-foreground/30 backdrop-blur-[2px]"
-            aria-label={locale === "ar" ? "إغلاق" : "Fermer"}
+            aria-label={t("shell.close")}
             onClick={() => setMobile(false)}
           />
           <aside className="relative flex h-full w-[min(18.5rem,88vw)] flex-col bg-sidebar text-sidebar-foreground shadow-card animate-slide-in-left">
@@ -281,7 +264,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             variant="ghost"
             className="min-h-11 min-w-11 shrink-0 lg:hidden"
             onClick={() => setMobile(true)}
-            aria-label={locale === "ar" ? "فتح القائمة" : "Ouvrir la navigation"}
+            aria-label={t("shell.openNav")}
           >
             <Menu className="size-5" />
           </Button>
@@ -316,7 +299,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <button
                     type="button"
                     className="fixed inset-0 z-40 sm:hidden"
-                    aria-label={locale === "ar" ? "إغلاق" : "Fermer"}
+                    aria-label={t("shell.close")}
                     onClick={() => setNotice(false)}
                   />
                   <div className="absolute top-12 right-0 z-50 w-[min(22rem,calc(100vw-1.25rem))] max-h-[min(70dvh,28rem)] overflow-y-auto rounded-xl border border-border bg-popover p-2 shadow-card animate-scale-in">
@@ -325,9 +308,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     </div>
                     {notificationRows.length === 0 && (
                       <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-                        {locale === "ar"
-                          ? "لا إشعارات بعد."
-                          : "Aucune notification pour le moment."}
+                        {t("shell.notifications.empty")}
                       </p>
                     )}
                     {notificationRows.slice(0, 8).map((item) => (
@@ -352,9 +333,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                             {item.message}
                           </p>
                           <p className="mt-1 text-[10px] text-muted-foreground">
-                            {new Date(item.created_at).toLocaleString(
-                              locale === "ar" ? "ar" : "fr-FR",
-                            )}
+                            {new Date(item.created_at).toLocaleString(localeDateTag[locale])}
                           </p>
                         </div>
                       </button>

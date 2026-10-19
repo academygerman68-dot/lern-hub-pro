@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import {
   useAcademicAccess,
   useClasses,
-  useCreateEmergencyZoom,
   useCreateLiveSession,
   useGenerateMonthSessions,
   useLiveSession,
@@ -14,7 +13,6 @@ import {
   useLiveSessionsRealtime,
   useRecordingProvider,
   useRecordings,
-  useRevertLiveSessionToJitsi,
   useTeachers,
   useUpdateLiveSessionStatus,
 } from "@/hooks/use-academy-data";
@@ -24,15 +22,16 @@ import { resolveCalendarTeacherId, studentScopeClassId } from "@/lib/live-calend
 import {
   formatLiveDate,
   formatLiveTime,
+  isExternalMeeting,
   isLiveSessionExpired,
-  isZoomActive,
+  isValidExternalMeetingUrl,
   joinLiveSession,
   liveStatusLabel,
   openExternalMeeting,
   videoProviderLabel,
   zoomHrefForViewer,
-  zoomMeetingDurationMinutes,
 } from "@/lib/live-meeting";
+import type { LiveMeetingMode } from "@/services/supabase/live-session-service";
 import {
   readUpcomingSessionsCollapsed,
   toggleUpcomingSessionsCollapsed,
@@ -79,10 +78,10 @@ function LiveScheduleSection() {
         <h2 className="text-base font-semibold tracking-tight">Planning</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {student
-            ? "Vue semaine et mois de vos cours en direct."
+            ? "Vue semaine et mois — cliquez une séance pour rejoindre ou ouvrir le replay."
             : role === "teacher"
-              ? "Vue semaine et mois — filtrez par niveau, groupe ou statut."
-              : "Vue semaine et mois — filtrez par niveau, groupe, professeur ou statut."}
+              ? "Vue semaine et mois — cliquez une séance pour la modifier ou y attacher un replay."
+              : "Vue semaine et mois — cliquez une séance pour la modifier ou y attacher un replay."}
         </p>
       </div>
       <LiveCalendarErrorBoundary title="Planning indisponible">
@@ -122,120 +121,6 @@ async function joinActiveConference(
   });
 }
 
-function SessionCard({
-  item,
-  isStaff,
-  onStart,
-  onEnd,
-  onEmergency,
-  onCopyZoom,
-  onRevertJitsi,
-}: {
-  item: LiveSessionListItem;
-  isStaff: boolean;
-  onStart: () => void;
-  onEnd: () => void;
-  onEmergency: () => void;
-  onCopyZoom: () => void;
-  onRevertJitsi: () => void;
-}) {
-  const zoom = isZoomActive(item.video_provider);
-  const durationMin = zoomMeetingDurationMinutes(item.starts_at, item.ends_at);
-  const joinState = getLiveSessionJoinState({
-    startsAt: item.starts_at,
-    endsAt: item.ends_at,
-    status: item.status,
-    isStaff,
-  });
-  const unavailableLabel =
-    joinState.reason === "too_early"
-      ? "Accès disponible à partir de l’heure du créneau."
-      : joinState.reason === "ended" || joinState.reason === "closed"
-        ? "Cette séance est fermée."
-        : null;
-  const canAct = item.status === "scheduled" || item.status === "live";
-  const joinLabel = isStaff ? (item.status === "live" ? "Rejoindre" : "Démarrer") : "Rejoindre";
-
-  return (
-    <Surface
-      className={`p-5 transition duration-200 ${
-        item.status === "live" ? "ring-2 ring-primary/25 shadow-soft" : ""
-      }`}
-    >
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary">
-          <Video className="size-5" />
-        </span>
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold tracking-tight">{item.title}</h2>
-            <Status
-              tone={
-                item.status === "live" ? "green" : item.status === "scheduled" ? "amber" : "gray"
-              }
-            >
-              {liveStatusLabel(item.status)}
-            </Status>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Professeur : <strong className="text-foreground">{teacherLabel(item)}</strong>
-          </p>
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <GroupBadge label={item.class?.name ?? null} />
-            {item.class?.level?.code ? <LevelBadge code={item.class.level.code} /> : null}
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {formatLiveDate(item.starts_at)} · {formatLiveTime(item.starts_at)}
-            {item.ends_at ? ` – ${formatLiveTime(item.ends_at)}` : ""}
-            {" · "}
-            {durationMin} min
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {videoProviderLabel(item.video_provider, zoom)}
-          </p>
-          {!joinState.allowed && unavailableLabel ? (
-            <p className="text-xs text-muted-foreground">{unavailableLabel}</p>
-          ) : null}
-        </div>
-        <div className="flex flex-col items-stretch gap-2 sm:items-end">
-          {canAct && (
-            <>
-              <Button
-                className="min-h-11"
-                onClick={onStart}
-                disabled={!joinState.allowed && !isStaff}
-              >
-                <Video className="size-4" />
-                {joinLabel}
-              </Button>
-              {isStaff && item.status === "live" && (
-                <Button variant="outline" onClick={onEnd}>
-                  Terminer
-                </Button>
-              )}
-              {isStaff && !zoom && (
-                <Button variant="outline" onClick={onEmergency}>
-                  Réunion d’urgence Zoom
-                </Button>
-              )}
-              {isStaff && zoom && (
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={onCopyZoom}>
-                    Copier le lien participant
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={onRevertJitsi}>
-                    Revenir à Jitsi
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </Surface>
-  );
-}
-
 function LiveSessionLobby() {
   const { navigate, role, user } = useAcademy();
   const classesQuery = useClasses();
@@ -250,8 +135,6 @@ function LiveSessionLobby() {
   const createSession = useCreateLiveSession();
   const generateMonth = useGenerateMonthSessions();
   const updateStatus = useUpdateLiveSessionStatus();
-  const createZoom = useCreateEmergencyZoom();
-  const revertJitsi = useRevertLiveSessionToJitsi();
   const isStaff = role === "director" || role === "teacher";
   const [open, setOpen] = useState(false);
   const [editSession, setEditSession] = useState<LiveSessionListItem | null>(null);
@@ -260,8 +143,8 @@ function LiveSessionLobby() {
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [confirmZoomId, setConfirmZoomId] = useState<string | null>(null);
-  const [confirmJitsiId, setConfirmJitsiId] = useState<string | null>(null);
+  const [meetingMode, setMeetingMode] = useState<LiveMeetingMode>("jitsi");
+  const [externalMeetingUrl, setExternalMeetingUrl] = useState("");
   const [monthOpen, setMonthOpen] = useState(false);
   const [monthClassId, setMonthClassId] = useState("");
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -339,7 +222,9 @@ function LiveSessionLobby() {
         },
       });
       markLive(session);
-      if (provider === "zoom") toast.success("Ouverture de la réunion Zoom");
+      if (isExternalMeeting(provider)) {
+        toast.success("Ouverture du lien de visioconférence");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Ouverture impossible");
     }
@@ -355,18 +240,6 @@ function LiveSessionLobby() {
     );
   };
 
-  const copyZoom = async (id: string) => {
-    try {
-      const target = await LiveSessionService.joinTarget(id);
-      const url = target.provider === "zoom" ? target.url : null;
-      if (!url) throw new Error("Aucun lien Zoom enregistré.");
-      await navigator.clipboard.writeText(url);
-      toast.success("Lien copié");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Copie impossible");
-    }
-  };
-
   const resetForm = () => {
     setOpen(false);
     setTitle("");
@@ -374,20 +247,8 @@ function LiveSessionLobby() {
     setDate("");
     setStartTime("");
     setEndTime("");
-  };
-
-  const selectedForZoom = (sessionsQuery.data ?? []).find((s) => s.id === confirmZoomId) ?? null;
-
-  const runEmergencyZoom = (sessionId: string) => {
-    createZoom.mutate(sessionId, {
-      onSuccess: (result) => {
-        toast.success(
-          result.reused ? "Réunion Zoom d’urgence prête" : "Réunion Zoom d’urgence créée",
-        );
-        setConfirmZoomId(null);
-      },
-      onError: (err) => toast.error(err.message),
-    });
+    setMeetingMode("jitsi");
+    setExternalMeetingUrl("");
   };
 
   return (
@@ -405,7 +266,7 @@ function LiveSessionLobby() {
               <Button variant="outline" onClick={() => setMonthOpen(true)}>
                 Générer le mois
               </Button>
-              <Button onClick={() => setOpen(true)}>+ Réunion exceptionnelle</Button>
+              <Button onClick={() => setOpen(true)}>+ Nouvelle séance</Button>
             </div>
           ) : undefined
         }
@@ -429,85 +290,96 @@ function LiveSessionLobby() {
       </div>
 
       {liveTab === "replays" ? (
-        <QueryState
-          isLoading={recordingsQuery.isLoading}
-          isError={recordingsQuery.isError}
-          error={recordingsQuery.error}
-          isEmpty={!recordingsQuery.data?.length}
-          emptyTitle="Aucun replay"
-          emptyMessage={
-            isStaff
-              ? "Ajoutez une rediffusion via URL pour un groupe."
-              : "Les enregistrements de votre groupe apparaîtront ici."
-          }
-          onRetry={() => void recordingsQuery.refetch()}
-        >
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-muted-foreground">
-              {(recordingsQuery.data ?? []).length} rediffusion
-              {(recordingsQuery.data ?? []).length > 1 ? "s" : ""}
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight">Calendrier des séances</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {isStaff
+                ? "Cliquez une séance pour ajouter ou modifier le lien d’enregistrement. Les élèves peuvent uniquement le consulter."
+                : "Cliquez une séance pour ouvrir le replay lorsqu’il est disponible."}
             </p>
-            {isStaff ? (
-              <Button
-                size="sm"
-                onClick={() => {
-                  setEditingReplay(null);
-                  setReplayEditorOpen(true);
-                }}
-              >
-                + Ajouter une rediffusion
-              </Button>
-            ) : null}
           </div>
-          <div className="space-y-3">
-            {(recordingsQuery.data ?? []).map((row) => {
-              const klass = (classesQuery.data ?? []).find((c) => c.id === row.class_id);
-              const canManage =
-                role === "director" ||
-                (role === "teacher" &&
-                  Boolean(row.class_id) &&
-                  (classesQuery.data ?? []).some((c) => c.id === row.class_id));
-              return (
-                <Surface
-                  key={row.id}
-                  className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+          <LiveCalendarErrorBoundary title="Calendrier des replays indisponible">
+            <LiveCalendar embedded />
+          </LiveCalendarErrorBoundary>
+          <QueryState
+            isLoading={recordingsQuery.isLoading}
+            isError={recordingsQuery.isError}
+            error={recordingsQuery.error}
+            isEmpty={!recordingsQuery.data?.length}
+            emptyTitle="Aucun replay listé"
+            emptyMessage={
+              isStaff
+                ? "Ajoutez un lien depuis le calendrier, ou créez une rediffusion libre ci-dessous."
+                : "Les enregistrements de votre groupe apparaîtront ici."
+            }
+            onRetry={() => void recordingsQuery.refetch()}
+          >
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium">Toutes les rediffusions</p>
+              {isStaff ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setEditingReplay(null);
+                    setReplayEditorOpen(true);
+                  }}
                 >
-                  <div className="min-w-0">
-                    <p className="font-medium">{row.title || "Replay"}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {row.recorded_on
-                        ? new Date(row.recorded_on).toLocaleDateString("fr-FR")
-                        : new Date(row.created_at).toLocaleString("fr-FR")}
-                      {klass ? ` · ${klass.reference || klass.name}` : ""}
-                      {klass?.level ? ` · ${klass.level}` : ""}
-                    </p>
-                    {row.description ? (
-                      <p className="mt-1 text-sm text-muted-foreground">{row.description}</p>
-                    ) : null}
-                  </div>
-                  <ReplayRowActions
-                    recording={row}
-                    canManage={canManage}
-                    onEdit={() => {
-                      setEditingReplay(row);
-                      setReplayEditorOpen(true);
-                    }}
-                    onPlay={() => {
-                      void (async () => {
-                        try {
-                          const url = await RecordingService.getSignedUrl(row);
-                          window.open(url, "_blank", "noopener,noreferrer");
-                        } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Lecture impossible");
-                        }
-                      })();
-                    }}
-                  />
-                </Surface>
-              );
-            })}
-          </div>
-        </QueryState>
+                  + Rediffusion libre
+                </Button>
+              ) : null}
+            </div>
+            <div className="space-y-3">
+              {(recordingsQuery.data ?? []).map((row) => {
+                const klass = (classesQuery.data ?? []).find((c) => c.id === row.class_id);
+                const canManage =
+                  role === "director" ||
+                  (role === "teacher" &&
+                    Boolean(row.class_id) &&
+                    (classesQuery.data ?? []).some((c) => c.id === row.class_id));
+                return (
+                  <Surface
+                    key={row.id}
+                    className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium">{row.title || "Replay"}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {row.recorded_on
+                          ? new Date(row.recorded_on).toLocaleDateString("fr-FR")
+                          : new Date(row.created_at).toLocaleString("fr-FR")}
+                        {klass ? ` · ${klass.reference || klass.name}` : ""}
+                        {klass?.level ? ` · ${klass.level}` : ""}
+                      </p>
+                      {row.description ? (
+                        <p className="mt-1 text-sm text-muted-foreground">{row.description}</p>
+                      ) : null}
+                    </div>
+                    <ReplayRowActions
+                      recording={row}
+                      canManage={canManage}
+                      onEdit={() => {
+                        setEditingReplay(row);
+                        setReplayEditorOpen(true);
+                      }}
+                      onPlay={() => {
+                        void (async () => {
+                          try {
+                            const url = await RecordingService.getSignedUrl(row);
+                            window.open(url, "_blank", "noopener,noreferrer");
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : "Lecture impossible");
+                          }
+                        })();
+                      }}
+                    />
+                  </Surface>
+                );
+              })}
+            </div>
+          </QueryState>
+        </div>
       ) : null}
 
       <ReplayEditorModal
@@ -568,7 +440,7 @@ function LiveSessionLobby() {
                       {liveStatusLabel(hero.status)}
                     </span>
                     <span className="rounded-md bg-primary-foreground/10 px-2 py-0.5 text-xs opacity-80">
-                      {videoProviderLabel(hero.video_provider, isZoomActive(hero.video_provider))}
+                      {videoProviderLabel(hero.video_provider)}
                     </span>
                   </div>
                   {hero.status === "scheduled" ? (
@@ -800,7 +672,7 @@ function LiveSessionLobby() {
       {open && (
         <div className="mobile-modal">
           <Surface className="mobile-modal-panel space-y-4">
-            <h2 className="text-lg font-semibold">Réunion exceptionnelle</h2>
+            <h2 className="text-lg font-semibold">Nouvelle séance</h2>
             <Input
               placeholder="Cours allemand"
               value={title}
@@ -833,19 +705,76 @@ function LiveSessionLobby() {
                 aria-label="Heure de fin"
               />
             </div>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Visioconférence</legend>
+              <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                <input
+                  type="radio"
+                  name="meeting-mode"
+                  className="mt-1"
+                  checked={meetingMode === "jitsi"}
+                  onChange={() => setMeetingMode("jitsi")}
+                />
+                <span>
+                  <span className="font-medium">Jitsi (intégré)</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    Les participants rejoignent dans l’application.
+                  </span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                <input
+                  type="radio"
+                  name="meeting-mode"
+                  className="mt-1"
+                  checked={meetingMode === "external"}
+                  onChange={() => setMeetingMode("external")}
+                />
+                <span>
+                  <span className="font-medium">Lien Zoom / Google Meet</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    Collez le lien de la réunion ; ouverture dans un nouvel onglet.
+                  </span>
+                </span>
+              </label>
+            </fieldset>
+            {meetingMode === "external" ? (
+              <Input
+                type="url"
+                inputMode="url"
+                dir="ltr"
+                placeholder="https://zoom.us/j/… ou https://meet.google.com/…"
+                value={externalMeetingUrl}
+                onChange={(e) => setExternalMeetingUrl(e.target.value)}
+              />
+            ) : null}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={resetForm}>
                 Annuler
               </Button>
               <Button
                 disabled={
-                  !title.trim() || !classId || !date || !startTime || createSession.isPending
+                  !title.trim() ||
+                  !classId ||
+                  !date ||
+                  !startTime ||
+                  createSession.isPending ||
+                  (meetingMode === "external" && !externalMeetingUrl.trim())
                 }
                 onClick={() => {
                   const startsAt = new Date(`${date}T${startTime}:00`);
                   const endsAt = endTime ? new Date(`${date}T${endTime}:00`) : null;
                   if (endsAt && endsAt <= startsAt) {
                     toast.error("L’heure de fin doit être après l’heure de début.");
+                    return;
+                  }
+                  if (
+                    meetingMode === "external" &&
+                    !isValidExternalMeetingUrl(externalMeetingUrl)
+                  ) {
+                    toast.error(
+                      "Lien invalide. Utilisez une URL https Zoom ou Google Meet.",
+                    );
                     return;
                   }
                   createSession.mutate(
@@ -855,6 +784,9 @@ function LiveSessionLobby() {
                       startsAt: startsAt.toISOString(),
                       endsAt: endsAt ? endsAt.toISOString() : null,
                       createdBy: user?.id ?? null,
+                      meetingMode,
+                      externalMeetingUrl:
+                        meetingMode === "external" ? externalMeetingUrl.trim() : null,
                     },
                     {
                       onSuccess: () => {
@@ -935,63 +867,6 @@ function LiveSessionLobby() {
         </div>
       )}
 
-      {confirmZoomId && selectedForZoom && (
-        <div className="mobile-modal">
-          <Surface className="mobile-modal-panel space-y-4">
-            <h2 className="text-lg font-semibold">Créer une réunion Zoom d’urgence ?</h2>
-            <p className="text-sm text-muted-foreground">
-              Une réunion Zoom sera créée automatiquement pour cette session et remplacera
-              temporairement Jitsi.
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setConfirmZoomId(null)}
-                disabled={createZoom.isPending}
-              >
-                Annuler
-              </Button>
-              <Button
-                disabled={createZoom.isPending}
-                onClick={() => runEmergencyZoom(confirmZoomId)}
-              >
-                {createZoom.isPending ? "Création de la réunion Zoom..." : "Créer la réunion Zoom"}
-              </Button>
-            </div>
-          </Surface>
-        </div>
-      )}
-
-      {confirmJitsiId && (
-        <div className="mobile-modal">
-          <Surface className="mobile-modal-panel space-y-4">
-            <h2 className="text-lg font-semibold">Revenir à Jitsi</h2>
-            <p className="text-sm text-muted-foreground">
-              Voulez-vous réutiliser Jitsi pour cette session ?
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setConfirmJitsiId(null)}>
-                Annuler
-              </Button>
-              <Button
-                disabled={revertJitsi.isPending}
-                onClick={() => {
-                  revertJitsi.mutate(confirmJitsiId, {
-                    onSuccess: () => {
-                      toast.success("Visioconférence : Jitsi");
-                      setConfirmJitsiId(null);
-                    },
-                    onError: (err) => toast.error(err.message),
-                  });
-                }}
-              >
-                Revenir à Jitsi
-              </Button>
-            </div>
-          </Surface>
-        </div>
-      )}
-
       <EditLiveSessionModal
         open={Boolean(editSession)}
         session={editSession}
@@ -1009,10 +884,10 @@ function LiveMeetingRoom() {
   const sessionId = getLiveSessionId();
   const sessionQuery = useLiveSession(sessionId);
   const updateStatus = useUpdateLiveSessionStatus();
-  const createZoom = useCreateEmergencyZoom();
   const [endConferenceSignal, setEndConferenceSignal] = useState(0);
-  const [confirmZoom, setConfirmZoom] = useState(false);
-  const [resolvedProvider, setResolvedProvider] = useState<"zoom" | "jitsi" | null>(null);
+  const [resolvedProvider, setResolvedProvider] = useState<"zoom" | "jitsi" | "external" | null>(
+    null,
+  );
   const [joinHref, setJoinHref] = useState<string | null>(null);
   const [resolveError, setResolveError] = useState<string | null>(null);
   const session = sessionQuery.data;
@@ -1032,9 +907,10 @@ function LiveMeetingRoom() {
     void LiveSessionService.joinTarget(session.id)
       .then((target) => {
         if (cancelled) return;
-        if (target.provider === "zoom") {
-          const href = zoomHrefForViewer(target, isStaff);
-          setResolvedProvider("zoom");
+        if (target.provider === "zoom" || target.provider === "external") {
+          const href =
+            target.provider === "zoom" ? zoomHrefForViewer(target, isStaff) : target.url;
+          setResolvedProvider(target.provider);
           setJoinHref(href);
           if (!isStaff && href) openExternalMeeting(href);
           return;
@@ -1133,21 +1009,20 @@ function LiveMeetingRoom() {
 
   const displayName = user?.name?.trim() || user?.email || "Participant";
 
-  // Never mount Jitsi when the RPC says Zoom.
-  if (resolvedProvider === "zoom") {
+  // Never mount Jitsi when the RPC says Zoom / external link.
+  if (resolvedProvider === "zoom" || resolvedProvider === "external") {
+    const label = videoProviderLabel(resolvedProvider);
     return (
       <Surface className="mx-auto max-w-lg space-y-4 p-8 text-center">
         <h2 className="text-lg font-semibold">
-          {isStaff ? "Visioconférence : Zoom" : session.title}
+          {isStaff ? `Visioconférence : ${label}` : session.title}
         </h2>
         <p className="text-sm text-muted-foreground">
           {session.class?.name} · Niveau {session.class?.level?.code ?? "—"}
           {isStaff ? "" : ` · ${teacherLabel(session)}`}
         </p>
         <p className="text-sm text-muted-foreground">
-          {isStaff
-            ? "Utilisez le lien hôte (start_url) pour démarrer la réunion Zoom."
-            : "Vous rejoignez via le lien participant Zoom (join_url)."}
+          La réunion s’ouvre dans un nouvel onglet (Zoom ou Google Meet).
         </p>
         <div className="flex flex-wrap justify-center gap-2">
           <Button
@@ -1158,14 +1033,17 @@ function LiveMeetingRoom() {
               }
               void LiveSessionService.joinTarget(session.id)
                 .then((target) => {
-                  const href = zoomHrefForViewer(target, isStaff);
-                  if (!href) throw new Error("La réunion Zoom n’est pas encore prête.");
+                  const href =
+                    target.provider === "zoom"
+                      ? zoomHrefForViewer(target, isStaff)
+                      : target.url;
+                  if (!href) throw new Error("Le lien de visioconférence n’est pas encore prêt.");
                   openExternalMeeting(href);
                 })
                 .catch((err: Error) => toast.error(err.message));
             }}
           >
-            {isStaff ? "Démarrer la réunion Zoom" : "Rejoindre le cours"}
+            {isStaff ? "Ouvrir la réunion" : "Rejoindre le cours"}
           </Button>
           <Button variant="outline" onClick={leaveMeeting}>
             Retour à En direct
@@ -1189,11 +1067,6 @@ function LiveMeetingRoom() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {isStaff && (
-            <Button variant="outline" size="sm" onClick={() => setConfirmZoom(true)}>
-              Réunion d’urgence Zoom
-            </Button>
-          )}
           {isStaff && session.status === "live" && (
             <Button
               variant="outline"
@@ -1228,7 +1101,6 @@ function LiveMeetingRoom() {
         startMuted={role === "student"}
         endConferenceSignal={endConferenceSignal}
         {...(user?.email ? { email: user.email } : {})}
-        {...(isStaff ? { onEmergencyZoom: () => setConfirmZoom(true) } : {})}
         onLeave={leaveMeeting}
         onConferenceJoined={() => {
           if (isStaff && session.status === "scheduled") {
@@ -1239,47 +1111,6 @@ function LiveMeetingRoom() {
           }
         }}
       />
-
-      {confirmZoom && (
-        <div className="mobile-modal">
-          <Surface className="mobile-modal-panel space-y-4">
-            <h2 className="text-lg font-semibold">Créer une réunion Zoom d’urgence ?</h2>
-            <p className="text-sm text-muted-foreground">
-              Une réunion Zoom sera créée automatiquement pour cette session et remplacera
-              temporairement Jitsi.
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setConfirmZoom(false)}
-                disabled={createZoom.isPending}
-              >
-                Annuler
-              </Button>
-              <Button
-                disabled={createZoom.isPending}
-                onClick={() => {
-                  createZoom.mutate(session.id, {
-                    onSuccess: (result) => {
-                      toast.success(
-                        result.reused
-                          ? "Réunion Zoom d’urgence prête"
-                          : "Réunion Zoom d’urgence créée",
-                      );
-                      setConfirmZoom(false);
-                      setResolvedProvider(null);
-                      void sessionQuery.refetch();
-                    },
-                    onError: (err) => toast.error(err.message),
-                  });
-                }}
-              >
-                {createZoom.isPending ? "Création de la réunion Zoom..." : "Créer la réunion Zoom"}
-              </Button>
-            </div>
-          </Surface>
-        </div>
-      )}
     </div>
   );
 }

@@ -67,6 +67,13 @@ function mapAuthApiError(error: { message?: string; code?: string } | null | und
     return new AuthError("EMAIL_TAKEN", "EMAIL_TAKEN");
   }
   if (
+    message.includes("provider is not enabled") ||
+    message.includes("unsupported provider") ||
+    (message.includes("google") && message.includes("not enabled"))
+  ) {
+    return new AuthError("GOOGLE_PROVIDER_DISABLED", "GOOGLE_PROVIDER_DISABLED");
+  }
+  if (
     message.includes("rate limit") ||
     message.includes("for security purposes") ||
     message.includes("only request this after") ||
@@ -206,9 +213,10 @@ export const SupabaseAuthService = {
       provider: "google",
       options: {
         redirectTo: redirects.callback,
+        // Prefer account picker; avoid forcing consent every time.
         queryParams: {
           access_type: "offline",
-          prompt: "consent",
+          prompt: "select_account",
         },
       },
     });

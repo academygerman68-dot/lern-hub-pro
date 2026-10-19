@@ -58,17 +58,18 @@
 .gla-login-languages {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: var(--login-muted);
   font-size: 12px;
-  white-space: nowrap;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .gla-login-languages button {
-  min-height: 40px;
-  min-width: 36px;
+  min-height: 36px;
+  min-width: 32px;
   cursor: pointer;
   border-radius: 5px;
-  padding: 4px;
+  padding: 4px 6px;
   transition:
     color 0.15s,
     background 0.15s;
@@ -76,6 +77,7 @@
 .gla-login-languages button[aria-pressed="true"] {
   color: var(--login-ink);
   font-weight: 600;
+  background: color-mix(in oklab, var(--login-ink) 8%, transparent);
 }
 .gla-login-languages button:hover {
   background: #eeece5;

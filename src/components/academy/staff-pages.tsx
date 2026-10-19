@@ -59,6 +59,7 @@ import {
 import { GroupProgressPage } from "./group-progress-page";
 import { DirectorExamsPage, StudentExamStaffPreview } from "./exam-pages";
 import { B1ExamWorkspace } from "./b1-exam-workspace";
+import { AdminAccountsPage } from "./admin-accounts-page";
 import { LiveClassesPage } from "./live-pages";
 import { FinancePages } from "./finance-pages";
 import { useClassSelection } from "./class-selection";
@@ -240,6 +241,7 @@ function TeacherClass() {
 export function DirectorPages({ page: pageProp }: { page?: AcademyPage } = {}) {
   const { page: contextPage } = useAcademy();
   const page = pageProp ?? contextPage;
+  if (page === "accounts") return <AdminAccountsPage />;
   if (page === "students") return <Students />;
   if (page === "student360") return <PremiumStudent360 />;
   if (page === "classes") return <Classes />;

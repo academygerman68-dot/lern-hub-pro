@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { uiText } from "@/lib/ui-strings";
+import { useAcademy } from "./academy-context";
 
 export function QueryState({
   isLoading,
@@ -22,6 +24,8 @@ export function QueryState({
   onRetry?: () => void;
   children: ReactNode;
 }) {
+  const { locale } = useAcademy();
+
   if (isLoading) {
     return (
       <div className="space-y-3 animate-fade-in" aria-busy="true" aria-live="polite">
@@ -36,14 +40,19 @@ export function QueryState({
   if (isError) {
     return (
       <div className="rounded-2xl border border-alert/20 bg-alert-soft/60 p-8">
-        <h3 className="text-base font-semibold text-foreground">Impossible de charger cette vue</h3>
+        <h3 className="text-base font-semibold text-foreground">
+          {uiText(locale, "Impossible de charger cette vue")}
+        </h3>
         <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-          Un problème est survenu lors du chargement. Vous pouvez réessayer dans un instant.
+          {uiText(
+            locale,
+            "Un problème est survenu lors du chargement. Vous pouvez réessayer dans un instant.",
+          )}
         </p>
         {error?.message ? <p className="mt-3 text-sm text-foreground/80">{error.message}</p> : null}
         {onRetry && (
           <Button className="mt-5" variant="outline" onClick={onRetry}>
-            Réessayer
+            {uiText(locale, "Réessayer")}
           </Button>
         )}
       </div>
@@ -53,9 +62,9 @@ export function QueryState({
   if (isEmpty) {
     return (
       <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-12 text-center">
-        <h3 className="text-base font-semibold tracking-tight">{emptyTitle}</h3>
+        <h3 className="text-base font-semibold tracking-tight">{uiText(locale, emptyTitle)}</h3>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-          {emptyMessage}
+          {uiText(locale, emptyMessage)}
         </p>
         {emptyAction && <div className="mt-5 flex justify-center">{emptyAction}</div>}
       </div>

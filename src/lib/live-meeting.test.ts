@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   emergencyZoomTopic,
+  isValidExternalMeetingUrl,
+  isValidGoogleMeetUrl,
   isValidZoomMeetingUrl,
   isZoomActive,
   videoProviderLabel,
@@ -17,11 +19,20 @@ describe("live meeting helpers", () => {
     expect(isValidZoomMeetingUrl("not-a-url")).toBe(false);
   });
 
+  it("accepts Google Meet and combined external URLs", () => {
+    expect(isValidGoogleMeetUrl("https://meet.google.com/abc-defg-hij")).toBe(true);
+    expect(isValidGoogleMeetUrl("https://meet.google.com/")).toBe(false);
+    expect(isValidExternalMeetingUrl("https://zoom.us/j/123456789")).toBe(true);
+    expect(isValidExternalMeetingUrl("https://meet.google.com/abc-defg-hij")).toBe(true);
+    expect(isValidExternalMeetingUrl("https://example.com/room")).toBe(false);
+  });
+
   it("labels the active conference in French", () => {
     expect(isZoomActive("jitsi")).toBe(false);
     expect(isZoomActive("zoom")).toBe(true);
     expect(videoProviderLabel("jitsi")).toBe("Jitsi");
-    expect(videoProviderLabel("zoom", true)).toBe("Zoom — mode d’urgence");
+    expect(videoProviderLabel("zoom")).toBe("Zoom");
+    expect(videoProviderLabel("external")).toBe("Lien externe (Zoom / Meet)");
   });
 
   it("builds the emergency Zoom topic and duration from the session", () => {

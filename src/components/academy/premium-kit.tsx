@@ -1,8 +1,12 @@
 import type { ReactNode } from "react";
+import { uiText } from "@/lib/ui-strings";
+import { useAcademy } from "./academy-context";
 import { Status, PageHeader, ProgressLine } from "./primitives";
 
 export function Eyebrow({ children }: { children: ReactNode }) {
-  return <p className="eyebrow">{children}</p>;
+  const { locale } = useAcademy();
+  const content = typeof children === "string" ? uiText(locale, children) : children;
+  return <p className="eyebrow">{content}</p>;
 }
 
 export function Ring({

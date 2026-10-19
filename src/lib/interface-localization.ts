@@ -1,5 +1,6 @@
 import type { Locale } from "@/types/academy";
 import { translateKnownValue } from "@/lib/i18n";
+import { uiText } from "@/lib/ui-strings";
 
 type Pair = readonly [fr: string, ar: string];
 
@@ -542,13 +543,28 @@ const substitutions: Array<readonly [RegExp, Pair]> = [
 export function localizeInterfaceText(value: string, locale: Locale) {
   const trimmed = value.trim();
   if (!trimmed) return value;
-  if (locale === "de") {
-    const known = translateKnownValue("de", trimmed);
-    return known === trimmed ? value : value.replace(trimmed, known);
-  }
+
+  const fromCatalog = uiText(locale, trimmed);
+  if (fromCatalog !== trimmed) return value.replace(trimmed, fromCatalog);
+
   const exactEntry = Object.entries(copy).find(
     ([source, pair]) => source === trimmed || pair[0] === trimmed || pair[1] === trimmed,
   );
+
+  if (locale === "en") {
+    if (exactEntry) return value.replace(trimmed, exactEntry[0]);
+    const known = translateKnownValue("en", trimmed);
+    return known === trimmed ? value : value.replace(trimmed, known);
+  }
+
+  if (locale === "de") {
+    const known = translateKnownValue("de", trimmed);
+    if (known !== trimmed) return value.replace(trimmed, known);
+    // Fall back to English source labels when no DE dictionary entry exists.
+    if (exactEntry) return value.replace(trimmed, exactEntry[0]);
+    return value;
+  }
+
   const exact = exactEntry?.[1];
   let translated: string = exact
     ? (exact[locale === "ar" ? 1 : 0] ?? trimmed)

@@ -226,6 +226,7 @@ export function DirectorCoursesPage() {
   const updateCourse = useUpdateCourse();
   const deleteCourse = useDeleteCourse();
   const { preview, setPreview, openLinkOrFile } = usePreview();
+  const isTeacher = role === "teacher";
   const teacherScope = useMemo(
     () => buildTeacherScope(classesQuery.data ?? []),
     [classesQuery.data],
@@ -236,6 +237,7 @@ export function DirectorCoursesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [classId, setClassId] = useState("");
   const [attachment, setAttachment] = useState<AttachmentDraft>({
     kind: "pdf",
     url: "",
@@ -251,6 +253,14 @@ export function DirectorCoursesPage() {
     return all.filter((level) => teacherScope.levelIds.has(level.id));
   }, [levelsQuery.data, role, teacherScope]);
   const selectedLevel = levels.find((level) => level.id === selectedLevelId) ?? null;
+  const classesForLevel = useMemo(() => {
+    if (!selectedLevelId) return [];
+    return (classesQuery.data ?? []).filter((klass) => {
+      if (klass.levelId !== selectedLevelId && klass.level !== selectedLevel?.code) return false;
+      if (isDirectorRole(role)) return true;
+      return teacherScope.classIds.has(klass.id);
+    });
+  }, [classesQuery.data, selectedLevelId, selectedLevel?.code, role, teacherScope]);
   const courses = useMemo(() => {
     return hideArchivedStatus(coursesQuery.data ?? []).filter(
       (course) =>
@@ -259,10 +269,19 @@ export function DirectorCoursesPage() {
     );
   }, [coursesQuery.data, selectedLevelId, role, teacherScope]);
 
+  const classNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const klass of classesQuery.data ?? []) {
+      map.set(klass.id, klass.reference || klass.name);
+    }
+    return map;
+  }, [classesQuery.data]);
+
   const resetForm = () => {
     setEditingId(null);
     setTitle("");
     setDescription("");
+    setClassId("");
     setAttachment({ kind: "pdf", url: "", file: null });
     setExistingFile(false);
     setFormError(null);
@@ -278,6 +297,7 @@ export function DirectorCoursesPage() {
     setEditingId(course.id);
     setTitle(course.title);
     setDescription(course.description ?? "");
+    setClassId(course.class_id ?? "");
     setAttachment({
       kind: (course.content_kind === "none" ? "text" : course.content_kind) as CourseKind,
       url: course.content_url ?? "",
@@ -287,6 +307,12 @@ export function DirectorCoursesPage() {
     setExistingFile(Boolean(course.storage_path) && course.content_kind !== "text");
     setOpen(true);
   };
+
+  useEffect(() => {
+    if (!open || !isTeacher || classId || !selectedLevelId) return;
+    const firstClass = classesForLevel[0];
+    if (firstClass) setClassId(firstClass.id);
+  }, [open, isTeacher, classId, selectedLevelId, classesForLevel]);
 
   return (
     <>
@@ -315,7 +341,7 @@ export function DirectorCoursesPage() {
               selectedLevel
                 ? `${role === "teacher" ? t("teacher.courses.level") : "Niveau"} ${selectedLevel.code} — ${selectedLevel.name}`
                 : isDirectorRole(role)
-                  ? "Choisissez un niveau pour consulter et créer des cours."
+                  ? "Choisissez un niveau, puis créez un cours pour tout le niveau ou un groupe."
                   : t("teacher.courses.pickLevel")
             }
             action={
@@ -393,6 +419,13 @@ export function DirectorCoursesPage() {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <LevelBadge code={course.level?.code ?? selectedLevel?.code} />
+                          <GroupBadge
+                            label={
+                              course.class_id
+                                ? (classNameById.get(course.class_id) ?? "Groupe")
+                                : "Tout le niveau"
+                            }
+                          />
                           <span className="text-xs text-muted-foreground">
                             {COURSE_KIND_LABELS[course.content_kind]}
                           </span>
@@ -481,6 +514,57 @@ export function DirectorCoursesPage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-medium">Destinataires</legend>
+                  <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                    <input
+                      type="radio"
+                      name="course-audience"
+                      className="mt-1"
+                      checked={!classId}
+                      disabled={isTeacher}
+                      onChange={() => setClassId("")}
+                    />
+                    <span>
+                      <span className="font-medium">Tout le niveau {selectedLevel?.code}</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Visible par tous les élèves de ce niveau.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                    <input
+                      type="radio"
+                      name="course-audience"
+                      className="mt-1"
+                      checked={Boolean(classId) || isTeacher}
+                      onChange={() => {
+                        if (!classId && classesForLevel[0]) setClassId(classesForLevel[0].id);
+                      }}
+                    />
+                    <span className="w-full">
+                      <span className="font-medium">Un groupe particulier</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        Visible uniquement par les élèves de ce groupe.
+                      </span>
+                      <select
+                        className="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        value={classId}
+                        onChange={(e) => setClassId(e.target.value)}
+                        disabled={!selectedLevelId}
+                      >
+                        <option value="">
+                          {isTeacher ? "Choisir le groupe" : "Choisir un groupe"}
+                        </option>
+                        {classesForLevel.map((klass) => (
+                          <option key={klass.id} value={klass.id}>
+                            {klass.reference || klass.name}
+                          </option>
+                        ))}
+                      </select>
+                    </span>
+                  </label>
+                </fieldset>
                 <ContentAttachmentUploader
                   kinds={["text", "pdf", "link", "image", "audio"]}
                   value={attachment}
@@ -507,11 +591,19 @@ export function DirectorCoursesPage() {
                   </Button>
                   <Button
                     disabled={
-                      !title.trim() || saving || createCourse.isPending || updateCourse.isPending
+                      !title.trim() ||
+                      saving ||
+                      createCourse.isPending ||
+                      updateCourse.isPending ||
+                      (isTeacher && !classId)
                     }
                     onClick={() => {
                       void (async () => {
                         setFormError(null);
+                        if (isTeacher && !classId) {
+                          setFormError("Choisissez le groupe destinataire.");
+                          return;
+                        }
                         const kind = attachment.kind as CourseKind;
                         if (isTextContentKind(kind)) {
                           const textError = validateTextContentBody(attachment.text || description);
@@ -556,10 +648,12 @@ export function DirectorCoursesPage() {
                           const resolvedDescription = isTextContentKind(kind)
                             ? textBody
                             : description.trim() || null;
+                          const audienceClassId = classId || null;
                           if (editingId) {
                             const patch: Database["public"]["Tables"]["courses"]["Update"] = {
                               title: title.trim(),
                               level_id: selectedLevelId,
+                              class_id: audienceClassId,
                               description: resolvedDescription,
                               content_kind: kind,
                               content_url: url,
@@ -584,6 +678,7 @@ export function DirectorCoursesPage() {
                             await createCourse.mutateAsync({
                               title: title.trim(),
                               levelId: selectedLevelId,
+                              classId: audienceClassId,
                               ...(resolvedDescription ? { description: resolvedDescription } : {}),
                               contentKind: kind,
                               contentUrl: url,
@@ -659,10 +754,13 @@ export function StudentLearningPage() {
     () =>
       (coursesQuery.data ?? []).filter((course) => {
         if (course.status !== "published") return false;
+        if (course.class_id) {
+          return Boolean(classId && course.class_id === classId);
+        }
         if (levelCode && course.level?.code && course.level.code !== levelCode) return false;
         return true;
       }),
-    [coursesQuery.data, levelCode],
+    [coursesQuery.data, levelCode, classId],
   );
 
   if (accessQuery.data === false) {

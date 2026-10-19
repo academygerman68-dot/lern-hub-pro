@@ -21,6 +21,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { AssignmentService, MessagingService, RecordingService } from "@/services/academy-services";
 import { getAppBuildInfo } from "@/lib/build-info";
 import { SettingsService } from "@/services/supabase/settings-service";
+import { AdminAccountsPage } from "./admin-accounts-page";
 import { DangerZoneAccountDeletion } from "./danger-zone-account-deletion";
 import { DocumentViewer } from "./document-viewer";
 import { LiveCalendar, LiveCalendarErrorBoundary } from "./live-calendar";
@@ -1407,43 +1408,46 @@ export function DirectorSettings() {
     <>
       <PageHeader
         title="Paramètres"
-        subtitle="Configuration de l’académie, de la pédagogie et des notifications."
+        subtitle="Comptes & accès, configuration de l’académie, pédagogie et notifications."
       />
-      <QueryState
-        isLoading={mapQuery.isLoading}
-        isError={mapQuery.isError}
-        error={mapQuery.error}
-        isEmpty={false}
-        onRetry={() => void mapQuery.refetch()}
-      >
-        <Tabs defaultValue="profil" className="space-y-5">
-          <TabsList className="flex h-auto flex-wrap gap-1">
-            <TabsTrigger value="profil">Profil</TabsTrigger>
-            <TabsTrigger value="academie">Académie</TabsTrigger>
-            <TabsTrigger value="pedagogie">Pédagogie</TabsTrigger>
-            <TabsTrigger value="reunions">Réunions</TabsTrigger>
-            <TabsTrigger value="paiements">Paiements</TabsTrigger>
-            <TabsTrigger value="notifications">Notifications</TabsTrigger>
-            <TabsTrigger value="apparence">Apparence</TabsTrigger>
-            <TabsTrigger value="diagnostic">Diagnostic</TabsTrigger>
-            <TabsTrigger value="securite">Sécurité</TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="comptes" className="space-y-5">
+        <TabsList className="flex h-auto flex-wrap gap-1">
+          <TabsTrigger value="comptes">Comptes</TabsTrigger>
+          <TabsTrigger value="profil">Profil</TabsTrigger>
+          <TabsTrigger value="academie">Académie</TabsTrigger>
+          <TabsTrigger value="pedagogie">Pédagogie</TabsTrigger>
+          <TabsTrigger value="reunions">Réunions</TabsTrigger>
+          <TabsTrigger value="paiements">Paiements</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="apparence">Apparence</TabsTrigger>
+          <TabsTrigger value="diagnostic">Diagnostic</TabsTrigger>
+          <TabsTrigger value="securite">Sécurité</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="profil">
-            {(profile?.id ?? user?.id) ? (
-              <ProfileEditor
-                profileId={(profile?.id ?? user?.id)!}
-                mode="self"
-                email={user?.email ?? null}
-              />
-            ) : (
-              <Surface className="p-6 text-sm text-muted-foreground">
-                Profil non disponible.
-              </Surface>
-            )}
-          </TabsContent>
+        <TabsContent value="comptes" className="space-y-4">
+          <AdminAccountsPage embedded />
+        </TabsContent>
 
-          <TabsContent value="academie">
+        <TabsContent value="profil">
+          {(profile?.id ?? user?.id) ? (
+            <ProfileEditor
+              profileId={(profile?.id ?? user?.id)!}
+              mode="self"
+              email={user?.email ?? null}
+            />
+          ) : (
+            <Surface className="p-6 text-sm text-muted-foreground">Profil non disponible.</Surface>
+          )}
+        </TabsContent>
+
+        <TabsContent value="academie">
+          <QueryState
+            isLoading={mapQuery.isLoading}
+            isError={mapQuery.isError}
+            error={mapQuery.error}
+            isEmpty={false}
+            onRetry={() => void mapQuery.refetch()}
+          >
             <Surface className="space-y-4 p-6">
               <h2 className="font-semibold">Identité du centre</h2>
               <label className="block text-sm">
@@ -1507,204 +1511,230 @@ export function DirectorSettings() {
                   onChange={(e) => setCurrency(e.target.value)}
                 />
               </label>
-            </Surface>
-          </TabsContent>
-
-          <TabsContent value="pedagogie">
-            <Surface className="space-y-4 p-6">
-              <h2 className="font-semibold">Pédagogie</h2>
-              <label className="block text-sm">
-                Capacité par défaut d’un groupe
-                <Input
-                  className="mt-1"
-                  type="number"
-                  min={1}
-                  value={defaultCapacity}
-                  onChange={(e) => setDefaultCapacity(e.target.value)}
-                />
-              </label>
-              <label className="block text-sm">
-                Durée d’un cours (minutes)
-                <Input
-                  className="mt-1"
-                  type="number"
-                  min={15}
-                  value={courseDuration}
-                  onChange={(e) => setCourseDuration(e.target.value)}
-                />
-              </label>
-            </Surface>
-          </TabsContent>
-
-          <TabsContent value="reunions">
-            <Surface className="space-y-4 p-6">
-              <h2 className="font-semibold">Réunions en ligne</h2>
-              <label className="block text-sm">
-                Fournisseur par défaut
-                <select
-                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={meetingProvider}
-                  onChange={(e) => setMeetingProvider(e.target.value)}
-                >
-                  <option value="jitsi">Jitsi</option>
-                  <option value="zoom">Zoom</option>
-                </select>
-              </label>
-              <p className="text-sm text-muted-foreground">
-                Ce réglage s’applique aux nouvelles séances planifiées. Zoom peut être activé en
-                urgence depuis le calendrier des cours live.
-              </p>
-            </Surface>
-          </TabsContent>
-
-          <TabsContent value="paiements">
-            <Surface className="space-y-4 p-6">
-              <h2 className="font-semibold">Paiements</h2>
-              <label className="block text-sm">
-                Montant mensuel par défaut
-                <Input
-                  className="mt-1"
-                  type="number"
-                  min={0}
-                  value={defaultPrice}
-                  onChange={(e) => setDefaultPrice(e.target.value)}
-                />
-              </label>
-              <label className="block text-sm">
-                Devise
-                <Input
-                  className="mt-1"
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                />
-              </label>
-              <label className="block text-sm">
-                Jour d’échéance (du mois)
-                <Input
-                  className="mt-1"
-                  type="number"
-                  min={1}
-                  max={28}
-                  value={paymentDueDay}
-                  onChange={(e) => setPaymentDueDay(e.target.value)}
-                />
-              </label>
-            </Surface>
-          </TabsContent>
-
-          <TabsContent value="notifications">
-            <Surface className="space-y-5 p-6">
-              <h2 className="font-semibold">Notifications</h2>
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium">E-mail</p>
-                  <p className="text-xs text-muted-foreground">
-                    Rappels et confirmations par e-mail
-                  </p>
-                </div>
-                <Switch checked={notifyEmail} onCheckedChange={setNotifyEmail} />
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium">WhatsApp</p>
-                  <p className="text-xs text-muted-foreground">
-                    Messages WhatsApp si le canal est activé
-                  </p>
-                </div>
-                <Switch checked={notifyWhatsapp} onCheckedChange={setNotifyWhatsapp} />
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium">Dans l’application</p>
-                  <p className="text-xs text-muted-foreground">
-                    Notifications visibles dans l’espace académie
-                  </p>
-                </div>
-                <Switch checked={notifyInApp} onCheckedChange={setNotifyInApp} />
+              <div className="flex justify-end pt-2">
+                <Button disabled={save.isPending} onClick={() => save.mutate()}>
+                  Enregistrer les paramètres
+                </Button>
               </div>
             </Surface>
-          </TabsContent>
+          </QueryState>
+        </TabsContent>
 
-          <TabsContent value="apparence">
-            <Surface className="space-y-4 p-6">
-              <h2 className="font-semibold">Apparence</h2>
-              <label className="block text-sm">
-                Langue par défaut
-                <select
-                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={defaultLanguage}
-                  onChange={(e) => setDefaultLanguage(e.target.value)}
-                >
-                  <option value="fr">Français</option>
-                  <option value="ar">Arabe</option>
-                </select>
-              </label>
-              <p className="text-sm text-muted-foreground">
-                Chaque utilisateur peut changer la langue depuis la barre de navigation. La langue
-                par défaut s’applique aux nouveaux comptes et aux visiteurs.
-              </p>
-            </Surface>
-          </TabsContent>
+        <TabsContent value="pedagogie">
+          <Surface className="space-y-4 p-6">
+            <h2 className="font-semibold">Pédagogie</h2>
+            <label className="block text-sm">
+              Capacité par défaut d’un groupe
+              <Input
+                className="mt-1"
+                type="number"
+                min={1}
+                value={defaultCapacity}
+                onChange={(e) => setDefaultCapacity(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm">
+              Durée d’un cours (minutes)
+              <Input
+                className="mt-1"
+                type="number"
+                min={15}
+                value={courseDuration}
+                onChange={(e) => setCourseDuration(e.target.value)}
+              />
+            </label>
+            <div className="flex justify-end pt-2">
+              <Button disabled={save.isPending} onClick={() => save.mutate()}>
+                Enregistrer les paramètres
+              </Button>
+            </div>
+          </Surface>
+        </TabsContent>
 
-          <TabsContent value="diagnostic">
-            <Surface className="space-y-3 p-6">
-              <h2 className="font-semibold">Build déployé</h2>
-              <p className="text-sm text-muted-foreground">
-                Empreinte non sensible du front servi. Aucune clé ni secret n’est affiché ici.
-              </p>
-              {(() => {
-                const build = getAppBuildInfo();
-                return (
-                  <dl className="grid gap-2 text-sm sm:grid-cols-2">
-                    <div>
-                      <dt className="text-muted-foreground">SHA court</dt>
-                      <dd className="font-mono">{build.gitSha}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">SHA complet</dt>
-                      <dd className="break-all font-mono text-xs">{build.gitShaFull}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Build at</dt>
-                      <dd className="font-mono text-xs">{build.builtAt}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Fichier public</dt>
-                      <dd>
-                        <a
-                          className="underline"
-                          href="/build-info.json"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          /build-info.json
-                        </a>
-                      </dd>
-                    </div>
-                  </dl>
-                );
-              })()}
-            </Surface>
-          </TabsContent>
+        <TabsContent value="reunions">
+          <Surface className="space-y-4 p-6">
+            <h2 className="font-semibold">Réunions en ligne</h2>
+            <label className="block text-sm">
+              Fournisseur par défaut
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={meetingProvider}
+                onChange={(e) => setMeetingProvider(e.target.value)}
+              >
+                <option value="jitsi">Jitsi</option>
+                <option value="zoom">Zoom</option>
+              </select>
+            </label>
+            <p className="text-sm text-muted-foreground">
+              Ce réglage s’applique aux nouvelles séances planifiées. Zoom peut être activé en
+              urgence depuis le calendrier des cours live.
+            </p>
+            <div className="flex justify-end pt-2">
+              <Button disabled={save.isPending} onClick={() => save.mutate()}>
+                Enregistrer les paramètres
+              </Button>
+            </div>
+          </Surface>
+        </TabsContent>
 
-          <TabsContent value="securite" className="space-y-5">
-            <Surface className="space-y-3 p-6">
-              <h2 className="font-semibold">Sécurité du compte</h2>
-              <p className="text-sm text-muted-foreground">
-                Gérez les actions sensibles liées à votre compte administrateur. La suppression est
-                définitive et protégée par une confirmation forte.
-              </p>
-            </Surface>
-            <DangerZoneAccountDeletion />
-          </TabsContent>
-        </Tabs>
+        <TabsContent value="paiements">
+          <Surface className="space-y-4 p-6">
+            <h2 className="font-semibold">Paiements</h2>
+            <label className="block text-sm">
+              Montant mensuel par défaut
+              <Input
+                className="mt-1"
+                type="number"
+                min={0}
+                value={defaultPrice}
+                onChange={(e) => setDefaultPrice(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm">
+              Devise
+              <Input
+                className="mt-1"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm">
+              Jour d’échéance (du mois)
+              <Input
+                className="mt-1"
+                type="number"
+                min={1}
+                max={28}
+                value={paymentDueDay}
+                onChange={(e) => setPaymentDueDay(e.target.value)}
+              />
+            </label>
+            <div className="flex justify-end pt-2">
+              <Button disabled={save.isPending} onClick={() => save.mutate()}>
+                Enregistrer les paramètres
+              </Button>
+            </div>
+          </Surface>
+        </TabsContent>
 
-        <div className="mt-4 flex justify-end">
-          <Button disabled={save.isPending} onClick={() => save.mutate()}>
-            Enregistrer les paramètres
-          </Button>
-        </div>
-      </QueryState>
+        <TabsContent value="notifications">
+          <Surface className="space-y-5 p-6">
+            <h2 className="font-semibold">Notifications</h2>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium">E-mail</p>
+                <p className="text-xs text-muted-foreground">
+                  Rappels et confirmations par e-mail
+                </p>
+              </div>
+              <Switch checked={notifyEmail} onCheckedChange={setNotifyEmail} />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium">WhatsApp</p>
+                <p className="text-xs text-muted-foreground">
+                  Messages WhatsApp si le canal est activé
+                </p>
+              </div>
+              <Switch checked={notifyWhatsapp} onCheckedChange={setNotifyWhatsapp} />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium">Dans l’application</p>
+                <p className="text-xs text-muted-foreground">
+                  Notifications visibles dans l’espace académie
+                </p>
+              </div>
+              <Switch checked={notifyInApp} onCheckedChange={setNotifyInApp} />
+            </div>
+            <div className="flex justify-end pt-2">
+              <Button disabled={save.isPending} onClick={() => save.mutate()}>
+                Enregistrer les paramètres
+              </Button>
+            </div>
+          </Surface>
+        </TabsContent>
+
+        <TabsContent value="apparence">
+          <Surface className="space-y-4 p-6">
+            <h2 className="font-semibold">Apparence</h2>
+            <label className="block text-sm">
+              Langue par défaut
+              <select
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={defaultLanguage}
+                onChange={(e) => setDefaultLanguage(e.target.value)}
+              >
+                <option value="fr">Français</option>
+                <option value="en">English</option>
+                <option value="de">Deutsch</option>
+                <option value="ar">العربية</option>
+              </select>
+            </label>
+            <p className="text-sm text-muted-foreground">
+              Chaque utilisateur peut changer la langue depuis la barre de navigation. La langue par
+              défaut s’applique aux nouveaux comptes et aux visiteurs.
+            </p>
+            <div className="flex justify-end pt-2">
+              <Button disabled={save.isPending} onClick={() => save.mutate()}>
+                Enregistrer les paramètres
+              </Button>
+            </div>
+          </Surface>
+        </TabsContent>
+
+        <TabsContent value="diagnostic">
+          <Surface className="space-y-3 p-6">
+            <h2 className="font-semibold">Build déployé</h2>
+            <p className="text-sm text-muted-foreground">
+              Empreinte non sensible du front servi. Aucune clé ni secret n’est affiché ici.
+            </p>
+            {(() => {
+              const build = getAppBuildInfo();
+              return (
+                <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-muted-foreground">SHA court</dt>
+                    <dd className="font-mono">{build.gitSha}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">SHA complet</dt>
+                    <dd className="break-all font-mono text-xs">{build.gitShaFull}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Build at</dt>
+                    <dd className="font-mono text-xs">{build.builtAt}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Fichier public</dt>
+                    <dd>
+                      <a
+                        className="underline"
+                        href="/build-info.json"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        /build-info.json
+                      </a>
+                    </dd>
+                  </div>
+                </dl>
+              );
+            })()}
+          </Surface>
+        </TabsContent>
+
+        <TabsContent value="securite" className="space-y-5">
+          <Surface className="space-y-3 p-6">
+            <h2 className="font-semibold">Sécurité du compte</h2>
+            <p className="text-sm text-muted-foreground">
+              Gérez les actions sensibles liées à votre compte administrateur. La suppression est
+              définitive et protégée par une confirmation forte.
+            </p>
+          </Surface>
+          <DangerZoneAccountDeletion />
+        </TabsContent>
+      </Tabs>
     </>
   );
 }

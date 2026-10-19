@@ -5,20 +5,22 @@ import {
   getJitsiConfig,
   validateLiveSessionSchedule,
 } from "@/lib/jitsi-config";
+import { isValidExternalMeetingUrl } from "@/lib/live-meeting";
 
 type LiveSession = Database["public"]["Tables"]["live_sessions"]["Row"];
 type LiveSessionStatus = Database["public"]["Enums"]["live_session_status"];
 type VideoProvider = Database["public"]["Enums"]["video_provider"];
 
-type SensitiveZoomFields =
+type SensitiveMeetingFields =
   | "zoom_url"
   | "zoom_join_url"
   | "zoom_start_url"
   | "zoom_password"
   | "zoom_meeting_id"
-  | "zoom_creating_at";
+  | "zoom_creating_at"
+  | "external_meeting_url";
 
-export type LiveSessionListItem = Omit<LiveSession, SensitiveZoomFields> & {
+export type LiveSessionListItem = Omit<LiveSession, SensitiveMeetingFields> & {
   class?: {
     id: string;
     name: string;
@@ -37,6 +39,8 @@ export type LiveJoinTarget = {
   room: string | null;
   start_url: string | null;
 };
+
+export type LiveMeetingMode = "jitsi" | "external";
 
 function requireClient() {
   if (!isSupabaseConfigured) throw new Error("SUPABASE_NOT_CONFIGURED");
@@ -63,7 +67,9 @@ function parseJoinTarget(raw: Json): LiveJoinTarget {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw new Error("Impossible de déterminer la visioconférence.");
   }
-  const provider = raw["provider"] === "zoom" ? "zoom" : "jitsi";
+  const rawProvider = raw["provider"];
+  const provider: VideoProvider =
+    rawProvider === "zoom" ? "zoom" : rawProvider === "external" ? "external" : "jitsi";
   const url = typeof raw["url"] === "string" ? raw["url"] : null;
   const room = typeof raw["room"] === "string" ? raw["room"] : null;
   const startUrl = typeof raw["start_url"] === "string" ? raw["start_url"] : null;
@@ -106,6 +112,9 @@ export const SupabaseLiveSessionService = {
       if (error.message.includes("ZOOM_URL_MISSING")) {
         throw new Error("Le lien Zoom n’est pas encore enregistré.");
       }
+      if (error.message.includes("EXTERNAL_URL_MISSING")) {
+        throw new Error("Le lien de visioconférence n’est pas encore enregistré.");
+      }
       throw error;
     }
     return parseJoinTarget(data);
@@ -118,11 +127,25 @@ export const SupabaseLiveSessionService = {
     startsAt: string;
     endsAt?: string | null;
     createdBy?: string | null;
+    /** Default Jitsi; choose external to paste Zoom / Google Meet. */
+    meetingMode?: LiveMeetingMode;
+    externalMeetingUrl?: string | null;
   }) {
     const title = input.title.trim();
     if (!title) throw new Error("Le titre de la réunion est obligatoire.");
     if (!input.classId) throw new Error("Le groupe est obligatoire.");
     validateLiveSessionSchedule(input.startsAt, input.endsAt);
+
+    const meetingMode: LiveMeetingMode = input.meetingMode === "external" ? "external" : "jitsi";
+    const externalUrl = (input.externalMeetingUrl ?? "").trim();
+    if (meetingMode === "external") {
+      if (!externalUrl) throw new Error("Le lien Zoom ou Google Meet est obligatoire.");
+      if (!isValidExternalMeetingUrl(externalUrl)) {
+        throw new Error(
+          "Lien invalide. Utilisez une URL https Zoom (zoom.us/…) ou Google Meet (meet.google.com/…).",
+        );
+      }
+    }
 
     const jitsi = getJitsiConfig();
     const supabase = requireClient();
@@ -153,7 +176,8 @@ export const SupabaseLiveSessionService = {
         meeting_provider: provider,
         meeting_room: room,
         meeting_url: `https://${jitsi.domain}/${room}`,
-        video_provider: "jitsi",
+        video_provider: meetingMode === "external" ? "external" : "jitsi",
+        external_meeting_url: meetingMode === "external" ? externalUrl : null,
         created_by: input.createdBy ?? null,
         status: "scheduled",
       })

@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getAuthRedirects, isDemoAuthAllowed } from "@/lib/auth-config";
 import { loginSchema, signupSchema, type LoginValues, type SignupValues } from "@/lib/auth-schemas";
+import { toDbLocale } from "@/lib/i18n";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import {
   getTestAccountPassword,
@@ -64,6 +65,12 @@ function authErrorMessage(
       return l("Ce compte est suspendu ou archivé.", "هذا الحساب موقوف أو مؤرشف.");
     case "INVALID_CREDENTIALS":
       return l("E-mail ou mot de passe incorrect.", "البريد أو كلمة المرور غير صحيحة.");
+    case "GOOGLE_PROVIDER_DISABLED":
+    case "GOOGLE_AUTH_UNAVAILABLE":
+      return l(
+        "Connexion Google non activée sur le projet. Activez le fournisseur Google dans Supabase Auth.",
+        "تسجيل الدخول عبر Google غير مفعّل. فعّل مزود Google في Supabase Auth.",
+      );
     case "EMAIL_RATE_LIMIT":
       return l(
         "Trop de demandes. Attendez environ 1 minute avant de renvoyer l’e-mail.",
@@ -139,7 +146,7 @@ function QuickRoleSections({
 }
 
 export function Login() {
-  const { signIn, t, l } = useAcademy();
+  const { signIn, refreshProfile, t, l, locale } = useAcademy();
   const [mode, setMode] = useState<"signin" | "signup" | "check-email">("signin");
   const [pendingEmail, setPendingEmail] = useState("");
   const [show, setShow] = useState(false);
@@ -201,11 +208,20 @@ export function Login() {
     try {
       const user = await AuthService.login(account.email, getTestAccountPassword());
       signIn(user);
+      void refreshProfile();
     } catch (error) {
       toast.error(authErrorMessage(error, l, "signin"));
       setLoading(null);
       setActiveTestEmail(null);
     }
+  };
+
+  const goToCheckEmail = (email: string) => {
+    setPendingEmail(email.trim().toLowerCase());
+    setMode("check-email");
+    setResendCooldown(RESEND_COOLDOWN_SECONDS);
+    setLoginError(null);
+    setLoading(null);
   };
 
   const onLogin = loginForm.handleSubmit(async (values) => {
@@ -214,7 +230,18 @@ export function Login() {
     try {
       const user = await AuthService.login(values.email, values.password);
       signIn(user);
+      void refreshProfile();
     } catch (error) {
+      if (error instanceof AuthError && error.code === "EMAIL_NOT_CONFIRMED") {
+        goToCheckEmail(values.email);
+        toast.message(
+          l(
+            "Confirmez votre e-mail pour activer le compte.",
+            "أكد بريدك الإلكتروني لتفعيل الحساب.",
+          ),
+        );
+        return;
+      }
       setLoginError(error);
       toast.error(authErrorMessage(error, l, "signin"));
       setLoading(null);
@@ -230,15 +257,14 @@ export function Login() {
         firstName: values.firstName,
         lastName: values.lastName,
         phone: values.phone.trim(),
+        language: toDbLocale(locale) ?? "fr",
       });
       if ("needsEmailConfirmation" in result) {
-        setPendingEmail(result.email);
-        setMode("check-email");
-        setResendCooldown(RESEND_COOLDOWN_SECONDS);
-        setLoading(null);
+        goToCheckEmail(result.email);
         return;
       }
       signIn(result);
+      void refreshProfile();
     } catch (error) {
       toast.error(authErrorMessage(error, l, "signup"));
       setLoading(null);
@@ -249,10 +275,8 @@ export function Login() {
     setLoading("google");
     try {
       await AuthService.signInWithGoogle();
-    } catch {
-      toast.error(
-        l("Connexion Google indisponible pour le moment.", "تسجيل الدخول بجوجل غير متاح حاليًا."),
-      );
+    } catch (error) {
+      toast.error(authErrorMessage(error, l, "signin"));
       setLoading(null);
     }
   };
@@ -277,11 +301,8 @@ export function Login() {
   if (mode === "check-email") {
     return (
       <AuthShell
-        title={l("Vérifiez votre e-mail", "تحقق من بريدك")}
-        subtitle={l(
-          `Nous avons envoyé un lien de confirmation à ${pendingEmail}.`,
-          `أرسلنا رابط تأكيد إلى ${pendingEmail}.`,
-        )}
+        title={t("login.verify.title")}
+        subtitle={`${t("login.verify.subtitle")} (${pendingEmail})`}
       >
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
@@ -318,22 +339,8 @@ export function Login() {
   const Shell = mode === "signin" ? LoginShell : AuthShell;
   return (
     <Shell
-      title={
-        mode === "signin"
-          ? l("Heureux de vous retrouver.", "سعداء بعودتك.")
-          : l("Créer un compte", "إنشاء حساب")
-      }
-      subtitle={
-        mode === "signin"
-          ? l(
-              "Connectez-vous pour poursuivre votre parcours avec German Academy.",
-              "سجّل دخولك لمواصلة رحلتك مع German Academy.",
-            )
-          : l(
-              "Inscription étudiant uniquement. Les comptes professeur / direction sont créés par l’administration.",
-              "التسجيل للطلاب فقط. حسابات الأساتذة والإدارة تُنشأ عبر الإدارة.",
-            )
-      }
+      title={mode === "signin" ? t("login.signin.title") : t("login.signup.title")}
+      subtitle={mode === "signin" ? t("login.signin.subtitle") : t("login.signup.subtitle")}
     >
       {mode === "signup" && (
         <div

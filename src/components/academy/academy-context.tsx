@@ -2,9 +2,10 @@ import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode }
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { isDemoAuthAllowed } from "@/lib/auth-config";
-import { teacherInterfaceLocale, translate } from "@/lib/i18n";
+import { teacherInterfaceLocale, toDbLocale, translate } from "@/lib/i18n";
+import { uiPick } from "@/lib/ui-strings";
 import type { Profile } from "@/lib/roles";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { AuthService, AccessService } from "@/services/academy-services";
 import {
   clearSession,
@@ -15,29 +16,44 @@ import {
 } from "@/services/academy-store";
 import { SupabaseAuthService } from "@/services/supabase/auth-service";
 import { queryKeys } from "@/lib/query-keys";
-import type {
-  AcademyPage,
-  ExamScore,
-  Locale,
-  NavigateOptions,
-  Role,
-  SessionUser,
-} from "@/types/academy";
+import { isLocale, type Locale } from "@/types/academy";
+import type { AcademyPage, ExamScore, NavigateOptions, Role, SessionUser } from "@/types/academy";
 import { InterfaceLocalizer } from "./interface-localizer";
 import { AcademyContext, type AcademyState } from "./academy-context-state";
 
 const LOCALE_KEY = "da-locale";
 
-function readLocale(): Locale {
-  if (typeof window === "undefined") return "fr";
+function readStoredLocale(): Locale | null {
+  if (typeof window === "undefined") return null;
   const stored = window.localStorage.getItem(LOCALE_KEY);
-  return stored === "fr" || stored === "ar" ? stored : "fr";
+  return isLocale(stored) ? stored : null;
 }
 
-/** UI is FR/AR; Supabase profiles use app_locale en|fr|de. */
-function toUiLocale(value?: string | null): Locale {
-  if (value === "ar" || value === "fr") return value;
-  return readLocale();
+function readLocale(): Locale {
+  return readStoredLocale() ?? "fr";
+}
+
+/** Prefer explicit UI choice (incl. Arabic); else profile app_locale en|fr|de. */
+function toUiLocale(profileLanguage?: string | null): Locale {
+  const stored = readStoredLocale();
+  if (stored) return stored;
+  if (isLocale(profileLanguage)) return profileLanguage;
+  return "fr";
+}
+
+async function persistProfileLanguage(locale: Locale) {
+  const dbLocale = toDbLocale(locale);
+  if (!dbLocale || !isSupabaseConfigured) return;
+  try {
+    const supabase = getSupabase();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("profiles").update({ language: dbLocale }).eq("id", user.id);
+  } catch {
+    /* best-effort sync */
+  }
 }
 
 export function AcademyProvider({ children }: { children: ReactNode }) {
@@ -114,7 +130,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -180,8 +196,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
     const interfaceLocale = teacherInterfaceLocale(session?.user.role, locale);
     document.documentElement.lang = interfaceLocale;
     document.documentElement.dir = interfaceLocale === "ar" ? "rtl" : "ltr";
-    const storedLocale = locale === "ar" ? "ar" : "fr";
-    window.localStorage.setItem(LOCALE_KEY, storedLocale);
+    window.localStorage.setItem(LOCALE_KEY, interfaceLocale);
   }, [locale, session?.user.role]);
 
   const persist = useCallback(
@@ -236,9 +251,10 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
   );
 
   const signIn = useCallback(
-    (user: SessionUser) => {
+    (user: SessionUser, nextProfile?: Profile | null) => {
       queryClient.clear();
       setLastScore(null);
+      if (nextProfile !== undefined) setProfile(nextProfile);
       const next = startSession(user, { locale });
       persist(next);
       go(user.role, "dashboard");
@@ -298,6 +314,17 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
     [go, persist, session, locale],
   );
 
+  const setLocale = useCallback(
+    (nextLocale: Locale) => {
+      if (!isLocale(nextLocale)) return;
+      setLocaleState(nextLocale);
+      window.localStorage.setItem(LOCALE_KEY, nextLocale);
+      if (session) persist({ ...session, locale: nextLocale });
+      void persistProfileLanguage(nextLocale);
+    },
+    [persist, session],
+  );
+
   const value = useMemo<AcademyState>(
     () => ({
       ready,
@@ -321,14 +348,9 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
       },
       selectedStudentId: session?.selectedStudentId ?? "ST-001",
       locale,
-      setLocale: (nextLocale) => {
-        if (session?.user.role === "teacher") return;
-        const learnerLocale = nextLocale === "ar" ? "ar" : "fr";
-        setLocaleState(learnerLocale);
-        if (session) persist({ ...session, locale: learnerLocale });
-      },
+      setLocale,
       t: (key) => translate(teacherInterfaceLocale(session?.user.role, locale), key),
-      l: (fr, ar) => (locale === "ar" && session?.user.role !== "teacher" ? ar : fr),
+      l: (frText, arText, deText, enText) => uiPick(locale, frText, arText, deText, enText),
       lastScore,
       setLastScore,
       session,
@@ -347,6 +369,7 @@ export function AcademyProvider({ children }: { children: ReactNode }) {
       navigate,
       persist,
       refreshProfile,
+      setLocale,
     ],
   );
 
