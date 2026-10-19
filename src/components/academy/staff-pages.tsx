@@ -1357,7 +1357,9 @@ function Classes() {
               <div>
                 <h3 className="text-sm font-semibold">Créneaux hebdomadaires</h3>
                 <p className="text-xs text-muted-foreground">
-                  Sélectionnez les jours du groupe, ou retirez tous les créneaux.
+                  Sélectionnez les jours du groupe, ou retirez tous les créneaux. Les séances
+                  générées utilisent Jitsi par défaut ; vous pouvez passer en Zoom / Meet ou
+                  revenir à Jitsi via « Modifier la séance » (Direct / calendrier).
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">

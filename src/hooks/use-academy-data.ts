@@ -1284,6 +1284,31 @@ export function useUnreadNotificationCount() {
   });
 }
 
+/** Invalidate notification queries as soon as a row is inserted for this user. */
+export function useNotificationsRealtime() {
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const supabase = getSupabase();
+    const channel = supabase
+      .channel("notifications-mine")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications" },
+        () => {
+          void qc.invalidateQueries({ queryKey: queryKeys.notifications.all });
+          void qc.invalidateQueries({ queryKey: queryKeys.notifications.unread });
+          void qc.invalidateQueries({ queryKey: queryKeys.profiles.pending });
+          void qc.invalidateQueries({ queryKey: queryKeys.profiles.all });
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [qc]);
+}
+
 export function useMarkNotificationRead() {
   const qc = useQueryClient();
   return useMutation({
@@ -1382,12 +1407,18 @@ export function useUpdateLiveSessionSchedule() {
       startsAt: string;
       endsAt: string | null;
       actorProfileId?: string | null;
+      meetingMode?: "jitsi" | "external";
+      externalMeetingUrl?: string | null;
     }) =>
       LiveSessionService.updateSchedule(input.id, {
         ...(input.title !== undefined ? { title: input.title } : {}),
         startsAt: input.startsAt,
         endsAt: input.endsAt,
         ...(input.actorProfileId !== undefined ? { actorProfileId: input.actorProfileId } : {}),
+        ...(input.meetingMode !== undefined ? { meetingMode: input.meetingMode } : {}),
+        ...(input.externalMeetingUrl !== undefined
+          ? { externalMeetingUrl: input.externalMeetingUrl }
+          : {}),
       }),
     onSuccess: async (session) => {
       await Promise.all([

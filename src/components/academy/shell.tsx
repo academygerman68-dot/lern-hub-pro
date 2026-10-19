@@ -30,6 +30,7 @@ import {
   useMarkAllNotificationsRead,
   useMarkNotificationRead,
   useNotifications,
+  useNotificationsRealtime,
   useUnreadNotificationCount,
 } from "@/hooks/use-academy-data";
 import type { AcademyPage } from "@/types/academy";
@@ -138,6 +139,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const unreadQuery = useUnreadNotificationCount();
   const markAllRead = useMarkAllNotificationsRead();
   const markRead = useMarkNotificationRead();
+  useNotificationsRealtime();
 
   useEffect(() => {
     if (!mobile) return;

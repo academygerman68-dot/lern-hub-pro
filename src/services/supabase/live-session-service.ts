@@ -199,7 +199,8 @@ export const SupabaseLiveSessionService = {
   },
 
   /**
-   * Update title / schedule only — keeps meeting room & Zoom as-is.
+   * Update title / schedule and optional visioconférence mode (Jitsi vs Zoom/Meet).
+   * Keeps the Jitsi room when switching to external so staff can switch back later.
    * Checks obvious overlaps for the same group or same teacher.
    */
   async updateSchedule(
@@ -210,6 +211,8 @@ export const SupabaseLiveSessionService = {
       endsAt: string | null;
       /** Actor profile id — excluded from notifications. */
       actorProfileId?: string | null;
+      meetingMode?: LiveMeetingMode;
+      externalMeetingUrl?: string | null;
     },
   ): Promise<LiveSessionListItem> {
     const supabase = requireClient();
@@ -222,6 +225,41 @@ export const SupabaseLiveSessionService = {
     const title = (input.title ?? current.title).trim();
     if (!title) throw new Error("Le titre de la réunion est obligatoire.");
     validateLiveSessionSchedule(input.startsAt, input.endsAt);
+
+    const meetingPatch: {
+      video_provider?: VideoProvider;
+      external_meeting_url?: string | null;
+      meeting_provider?: "jitsi" | "jaas" | "none";
+      meeting_room?: string;
+      meeting_url?: string;
+    } = {};
+
+    if (input.meetingMode !== undefined) {
+      const meetingMode: LiveMeetingMode =
+        input.meetingMode === "external" ? "external" : "jitsi";
+      if (meetingMode === "external") {
+        const externalUrl = (input.externalMeetingUrl ?? "").trim();
+        if (!externalUrl) throw new Error("Le lien Zoom ou Google Meet est obligatoire.");
+        if (!isValidExternalMeetingUrl(externalUrl)) {
+          throw new Error(
+            "Lien invalide. Utilisez une URL https Zoom (zoom.us/…) ou Google Meet (meet.google.com/…).",
+          );
+        }
+        meetingPatch.video_provider = "external";
+        meetingPatch.external_meeting_url = externalUrl;
+      } else {
+        meetingPatch.video_provider = "jitsi";
+        meetingPatch.external_meeting_url = null;
+        // Auto-generated sessions already have a room; recreate if missing.
+        if (!current.meeting_room || !current.meeting_url) {
+          const jitsi = getJitsiConfig();
+          const room = buildSessionRoomName(id, jitsi.jaasAppId);
+          meetingPatch.meeting_provider = jitsi.provider === "jaas" ? "jaas" : "jitsi";
+          meetingPatch.meeting_room = room;
+          meetingPatch.meeting_url = `https://${jitsi.domain}/${room}`;
+        }
+      }
+    }
 
     const newStart = new Date(input.startsAt).getTime();
     const newEnd = input.endsAt ? new Date(input.endsAt).getTime() : newStart + 2 * 60 * 60_000;
@@ -266,6 +304,7 @@ export const SupabaseLiveSessionService = {
         title,
         starts_at: input.startsAt,
         ends_at: input.endsAt,
+        ...meetingPatch,
       })
       .eq("id", id)
       .select(SELECT)
@@ -274,7 +313,12 @@ export const SupabaseLiveSessionService = {
       if (error.message.includes("permission") || error.code === "42501") {
         throw new Error("Vous n’êtes pas autorisé à modifier cette séance.");
       }
-      throw new Error("Impossible d’enregistrer le nouvel horaire.");
+      if (error.message.includes("live_sessions_external_meeting_url_https_chk")) {
+        throw new Error(
+          "Lien invalide. Utilisez une URL https Zoom (zoom.us/…) ou Google Meet (meet.google.com/…).",
+        );
+      }
+      throw new Error("Impossible d’enregistrer la séance.");
     }
 
     const updated = data as LiveSessionListItem;

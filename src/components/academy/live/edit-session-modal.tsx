@@ -3,10 +3,15 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUpdateLiveSessionSchedule } from "@/hooks/use-academy-data";
-import { formatLiveTime } from "@/lib/live-meeting";
-import type { LiveSessionListItem } from "@/services/supabase/live-session-service";
+import { formatLiveTime, isValidExternalMeetingUrl } from "@/lib/live-meeting";
+import {
+  type LiveMeetingMode,
+  type LiveSessionListItem,
+  SupabaseLiveSessionService,
+} from "@/services/supabase/live-session-service";
 import { useAcademy } from "../academy-context";
 import { FormSection, Surface } from "../primitives";
+import { LiveMeetingModeFields } from "./meeting-mode-fields";
 
 function toDateInput(iso: string) {
   const d = new Date(iso);
@@ -31,6 +36,12 @@ function formatRangeLabel(startsAt: string, endsAt: string | null) {
   return end ? `${start}–${end}` : start;
 }
 
+function initialMeetingMode(session: LiveSessionListItem): LiveMeetingMode {
+  return session.video_provider === "external" || session.video_provider === "zoom"
+    ? "external"
+    : "jitsi";
+}
+
 type EditLiveSessionModalProps = {
   open: boolean;
   session: LiveSessionListItem | null;
@@ -44,6 +55,8 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [meetingMode, setMeetingMode] = useState<LiveMeetingMode>("jitsi");
+  const [externalMeetingUrl, setExternalMeetingUrl] = useState("");
   const [confirm, setConfirm] = useState(false);
   const [scope] = useState<"this" | "following" | "series">("this");
 
@@ -53,7 +66,18 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
     setDate(toDateInput(session.starts_at));
     setStartTime(toTimeInput(session.starts_at));
     setEndTime(session.ends_at ? toTimeInput(session.ends_at) : "");
+    const mode = initialMeetingMode(session);
+    setMeetingMode(mode);
+    setExternalMeetingUrl("");
     setConfirm(false);
+
+    if (mode === "external") {
+      void SupabaseLiveSessionService.joinTarget(session.id)
+        .then((target) => {
+          if (target.url) setExternalMeetingUrl(target.url);
+        })
+        .catch(() => undefined);
+    }
   }, [open, session]);
 
   if (!open || !session) return null;
@@ -84,6 +108,10 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
       toast.error("L’heure de fin doit être après l’heure de début.");
       return;
     }
+    if (meetingMode === "external" && !isValidExternalMeetingUrl(externalMeetingUrl)) {
+      toast.error("Lien invalide. Utilisez une URL https Zoom ou Google Meet.");
+      return;
+    }
     if (!confirm) {
       setConfirm(true);
       return;
@@ -100,6 +128,8 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
         startsAt,
         endsAt,
         actorProfileId: profile?.id ?? null,
+        meetingMode,
+        externalMeetingUrl: meetingMode === "external" ? externalMeetingUrl.trim() : null,
       },
       {
         onSuccess: () => {
@@ -126,7 +156,7 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
 
         <FormSection
           title="Informations"
-          description="Le lien de visioconférence existant est conservé."
+          description="Même choix de visioconférence que lors de la création (Direct ou séances générées depuis un groupe)."
         >
           <label className="block text-sm">
             Titre
@@ -181,6 +211,20 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
               />
             </label>
           </div>
+          <LiveMeetingModeFields
+            name="edit-meeting-mode"
+            meetingMode={meetingMode}
+            externalMeetingUrl={externalMeetingUrl}
+            disabled={updateSchedule.isPending}
+            onMeetingModeChange={(mode) => {
+              setMeetingMode(mode);
+              setConfirm(false);
+            }}
+            onExternalMeetingUrlChange={(url) => {
+              setExternalMeetingUrl(url);
+              setConfirm(false);
+            }}
+          />
         </FormSection>
 
         <FormSection
@@ -199,7 +243,11 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
 
         {confirm ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            Modifier cette séance de <strong>{oldLabel}</strong> vers <strong>{newLabel}</strong> ?
+            Modifier cette séance de <strong>{oldLabel}</strong> vers <strong>{newLabel}</strong>
+            {meetingMode === "external"
+              ? " · visioconférence Zoom / Meet"
+              : " · visioconférence Jitsi"}{" "}
+            ?
           </div>
         ) : null}
 
@@ -214,7 +262,13 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
           >
             Annuler
           </Button>
-          <Button disabled={updateSchedule.isPending} onClick={save}>
+          <Button
+            disabled={
+              updateSchedule.isPending ||
+              (meetingMode === "external" && !externalMeetingUrl.trim())
+            }
+            onClick={save}
+          >
             {updateSchedule.isPending
               ? "Enregistrement…"
               : confirm

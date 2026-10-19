@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSearch } from "@tanstack/react-router";
 import { MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
@@ -29,12 +30,14 @@ import {
   useLibrarySubtypes,
   useSetLibrarySubtypeActive,
   useStudents,
+  useTeachers,
   useUpdateAssignment,
   useUpdateCourse,
   useUpdateLibraryItem,
   useUploadLibraryItem,
   useUpsertLibrarySubtype,
 } from "@/hooks/use-academy-data";
+import { queryKeys } from "@/lib/query-keys";
 import { groupProgressSummary } from "@/lib/group-progress";
 import { resolveOwnStudent } from "@/lib/payment-proof";
 import {
@@ -74,6 +77,7 @@ import { useAcademy } from "./academy-context";
 import { MultiClassPicker } from "./multi-class-picker";
 import { GroupProgressPage } from "./group-progress-page";
 import {
+  FilterBar,
   PageHeader,
   Status,
   Surface,
@@ -964,6 +968,8 @@ export function DirectorAssignmentsPage() {
   const search = useSearch({ from: "/app/$role/$page" });
   const classesQuery = useClasses();
   const levelsQuery = useLevels();
+  const isAdmin = isDirectorRole(role);
+  const teachersQuery = useTeachers(isAdmin);
   const listQuery = useAssignmentRows();
   const create = useCreateAssignment();
   const update = useUpdateAssignment();
@@ -977,6 +983,9 @@ export function DirectorAssignmentsPage() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [gradingId, setGradingId] = useState<string | null>(search.assignmentId ?? null);
+  const [viewMode, setViewMode] = useState<"all" | "history">("all");
+  const [teacherFilter, setTeacherFilter] = useState("");
+  const [classFilter, setClassFilter] = useState("");
 
   useEffect(() => {
     if (search.assignmentId) setGradingId(search.assignmentId);
@@ -1001,14 +1010,78 @@ export function DirectorAssignmentsPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const classesById = useMemo(() => {
+    type ClassRow = NonNullable<typeof classesQuery.data>[number];
+    const map = new Map<string, ClassRow>();
+    for (const row of classesQuery.data ?? []) map.set(row.id, row);
+    return map;
+  }, [classesQuery.data]);
+
+  const groupsForFilter = useMemo(() => {
+    const rows = classesQuery.data ?? [];
+    if (isAdmin) {
+      if (!teacherFilter) return rows;
+      return rows.filter((row) => row.teacherId === teacherFilter);
+    }
+    return rows.filter((row) => teacherScope.classIds.has(row.id));
+  }, [classesQuery.data, isAdmin, teacherFilter, teacherScope.classIds]);
+
   const classesForLevel = (classesQuery.data ?? []).filter(
     (item) => !levelId || item.levelId === levelId,
   );
-  const assignments = useMemo(() => {
-    return (listQuery.data ?? []).filter(
-      (row) => isDirectorRole(role) || scopedClassOrLevelItemVisible(row, teacherScope),
-    );
-  }, [listQuery.data, role, teacherScope]);
+  const scopedAssignments = useMemo(() => {
+    return (listQuery.data ?? []).filter((row) => {
+      if (!(isDirectorRole(role) || scopedClassOrLevelItemVisible(row, teacherScope))) {
+        return false;
+      }
+      if (classFilter) {
+        if (row.class_id !== classFilter) return false;
+      }
+      if (isAdmin && teacherFilter) {
+        if (!row.class_id) return false;
+        const klass = classesById.get(row.class_id);
+        if (!klass || klass.teacherId !== teacherFilter) return false;
+      }
+      return true;
+    });
+  }, [listQuery.data, role, teacherScope, classFilter, teacherFilter, isAdmin, classesById]);
+
+  const historyQuery = useQuery({
+    queryKey: [
+      ...queryKeys.submissions.all,
+      "assignment-history",
+      role,
+      teacherFilter,
+      classFilter,
+      scopedAssignments.map((a) => a.id).join(","),
+    ],
+    queryFn: async () => {
+      const rows = await Promise.all(
+        scopedAssignments.map(async (assignment) => {
+          if (!assignment.class_id) return null;
+          const submissions = await AssignmentService.listSubmissions(assignment.id);
+          const graded = submissions.filter((s) => s.status === "graded");
+          if (!graded.length) return null;
+          const lastGradedAt = graded.reduce((max, row) => {
+            const ts = Date.parse(row.graded_at || row.updated_at || row.submitted_at || "");
+            return Number.isFinite(ts) ? Math.max(max, ts) : max;
+          }, 0);
+          return {
+            assignment,
+            gradedCount: graded.length,
+            lastGradedAt,
+          };
+        }),
+      );
+      return rows
+        .filter((row): row is NonNullable<typeof row> => Boolean(row))
+        .sort((a, b) => b.lastGradedAt - a.lastGradedAt);
+    },
+    enabled: viewMode === "history" && !listQuery.isLoading,
+  });
+
+  const assignments = viewMode === "all" ? scopedAssignments : [];
+  const historyRows = historyQuery.data ?? [];
 
   const resolvedMaxScore = (): number | null => {
     if (maxScorePreset === "custom") return parseCustomMaxScore(customMaxScore);
@@ -1087,119 +1160,275 @@ export function DirectorAssignmentsPage() {
         title="Devoirs"
         subtitle={
           isTeacher
-            ? "Publiez et partagez des devoirs avec vos groupes uniquement."
-            : "Ciblez un niveau entier ou un groupe de ce niveau."
+            ? "Publiez et partagez des devoirs avec vos groupes. Filtrez et consultez l’historique des corrigés."
+            : "Ciblez un niveau ou un groupe. Filtrez par professeur / groupe et consultez l’historique des corrigés."
         }
         action={<Button onClick={openCreate}>+ Créer un devoir</Button>}
       />
-      <QueryState
-        isLoading={listQuery.isLoading}
-        isError={listQuery.isError}
-        error={listQuery.error}
-        isEmpty={!assignments.length}
-        emptyTitle="Aucun devoir"
-        emptyMessage={
-          isTeacher
-            ? "Aucun devoir pour vos groupes pour le moment."
-            : "Créez un devoir pour un niveau ou un groupe."
-        }
-        onRetry={() => void listQuery.refetch()}
-      >
-        <div className="space-y-3">
-          {assignments.map((row) => (
-            <Surface className="p-5" key={row.id}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <LevelBadge code={row.level?.code} />
-                    <GroupBadge label={row.class?.name ?? "Niveau entier"} />
-                  </div>
-                  <h2 className="font-semibold tracking-tight">{row.title}</h2>
-                  <p className="text-sm text-muted-foreground">
-                    {`Limite ${formatFrDate(row.due_at)}`}
-                    {` · ${MEDIA_KIND_LABELS[row.content_kind]}`}
-                  </p>
-                  {row.instructions || row.description ? (
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {row.instructions || row.description}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Status>{statusLabel(row.status)}</Status>
-                  {(row.content_url || row.attachment_path) && (
-                    <>
+
+      <div className="mb-4 space-y-3">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant={viewMode === "all" ? "default" : "outline"}
+            onClick={() => {
+              setViewMode("all");
+              setGradingId(null);
+            }}
+          >
+            Devoirs
+          </Button>
+          <Button
+            size="sm"
+            variant={viewMode === "history" ? "default" : "outline"}
+            onClick={() => {
+              setViewMode("history");
+              setGradingId(null);
+            }}
+          >
+            Historique des corrigés
+          </Button>
+        </div>
+        <FilterBar>
+          {isAdmin ? (
+            <select
+              aria-label="Professeur"
+              className="h-10 min-w-[10rem] flex-1 rounded-md border border-input bg-background px-3 text-sm sm:flex-none"
+              value={teacherFilter}
+              onChange={(e) => {
+                const next = e.target.value;
+                setTeacherFilter(next);
+                setGradingId(null);
+                if (next && classFilter) {
+                  const stillValid = (classesQuery.data ?? []).some(
+                    (row) => row.id === classFilter && row.teacherId === next,
+                  );
+                  if (!stillValid) setClassFilter("");
+                }
+              }}
+            >
+              <option value="">Tous les professeurs</option>
+              {(teachersQuery.data ?? []).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          <select
+            aria-label="Groupe"
+            className="h-10 min-w-[10rem] flex-1 rounded-md border border-input bg-background px-3 text-sm sm:flex-none"
+            value={classFilter}
+            onChange={(e) => {
+              setClassFilter(e.target.value);
+              setGradingId(null);
+            }}
+          >
+            <option value="">Tous les groupes</option>
+            {groupsForFilter.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.reference || c.name}
+                {isAdmin && c.teacher && c.teacher !== "—" ? ` · ${c.teacher}` : ""}
+              </option>
+            ))}
+          </select>
+        </FilterBar>
+      </div>
+
+      {viewMode === "all" ? (
+        <QueryState
+          isLoading={listQuery.isLoading || (isAdmin && teachersQuery.isLoading)}
+          isError={listQuery.isError || (isAdmin && teachersQuery.isError)}
+          error={listQuery.error ?? teachersQuery.error}
+          isEmpty={!assignments.length}
+          emptyTitle="Aucun devoir"
+          emptyMessage={
+            isTeacher
+              ? "Aucun devoir pour vos groupes pour le moment."
+              : "Créez un devoir pour un niveau ou un groupe."
+          }
+          onRetry={() => {
+            void listQuery.refetch();
+            if (isAdmin) void teachersQuery.refetch();
+          }}
+        >
+          <div className="space-y-3">
+            {assignments.map((row) => {
+              const klass = row.class_id ? classesById.get(row.class_id) : null;
+              const teacherLabel =
+                klass?.teacher && klass.teacher !== "—" ? klass.teacher : null;
+              return (
+                <Surface className="p-5" key={row.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <LevelBadge code={row.level?.code} />
+                        <GroupBadge label={row.class?.name ?? "Niveau entier"} />
+                        {isAdmin && teacherLabel ? (
+                          <Status tone="gray">{teacherLabel}</Status>
+                        ) : null}
+                      </div>
+                      <h2 className="font-semibold tracking-tight">{row.title}</h2>
+                      <p className="text-sm text-muted-foreground">
+                        {`Limite ${formatFrDate(row.due_at)}`}
+                        {` · ${MEDIA_KIND_LABELS[row.content_kind]}`}
+                      </p>
+                      {row.instructions || row.description ? (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {row.instructions || row.description}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Status>{statusLabel(row.status)}</Status>
+                      {(row.content_url || row.attachment_path) && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              void openLinkOrFile(
+                                row.title,
+                                row.content_kind,
+                                row.mime_type,
+                                () => AssignmentService.getAttachmentUrl(row),
+                              )
+                            }
+                          >
+                            Voir
+                          </Button>
+                          {row.content_kind !== "link" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                void (async () => {
+                                  try {
+                                    const url = await AssignmentService.getAttachmentUrl(row);
+                                    await downloadFromUrl(url, row.title);
+                                  } catch (err) {
+                                    toast.error(
+                                      err instanceof Error
+                                        ? err.message
+                                        : "Téléchargement impossible",
+                                    );
+                                  }
+                                })()
+                              }
+                            >
+                              Télécharger
+                            </Button>
+                          )}
+                        </>
+                      )}
+                      <Button size="sm" variant="outline" onClick={() => openEdit(row)}>
+                        Modifier
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="min-h-10 font-semibold shadow-soft"
+                        onClick={() => setGradingId(gradingId === row.id ? null : row.id)}
+                      >
+                        {gradingId === row.id ? "Masquer les remises" : "Voir les remises"}
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() =>
-                          void openLinkOrFile(row.title, row.content_kind, row.mime_type, () =>
-                            AssignmentService.getAttachmentUrl(row),
-                          )
-                        }
+                        onClick={() => {
+                          if (!window.confirm(`Supprimer le devoir « ${row.title} » ?`)) return;
+                          archive.mutate(row.id, {
+                            onSuccess: () => toast.success("Devoir archivé"),
+                            onError: (err) => toast.error(err.message),
+                          });
+                        }}
                       >
-                        Voir
+                        Supprimer
                       </Button>
-                      {row.content_kind !== "link" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            void (async () => {
-                              try {
-                                const url = await AssignmentService.getAttachmentUrl(row);
-                                await downloadFromUrl(url, row.title);
-                              } catch (err) {
-                                toast.error(
-                                  err instanceof Error ? err.message : "Téléchargement impossible",
-                                );
-                              }
-                            })()
-                          }
-                        >
-                          Télécharger
-                        </Button>
-                      )}
-                    </>
-                  )}
-                  <Button size="sm" variant="outline" onClick={() => openEdit(row)}>
-                    Modifier
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="min-h-10 font-semibold shadow-soft"
-                    onClick={() => setGradingId(gradingId === row.id ? null : row.id)}
-                  >
-                    {gradingId === row.id ? "Masquer les remises" : "Voir les remises"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (!window.confirm(`Supprimer le devoir « ${row.title} » ?`)) return;
-                      archive.mutate(row.id, {
-                        onSuccess: () => toast.success("Devoir archivé"),
-                        onError: (err) => toast.error(err.message),
-                      });
-                    }}
-                  >
-                    Supprimer
-                  </Button>
-                </div>
-              </div>
-              {gradingId === row.id &&
-                (row.class_id ? (
-                  <AssignmentGrading assignmentId={row.id} classId={row.class_id} />
-                ) : (
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    Les remises nécessitent un groupe. Assignez ce devoir à un groupe pour suivre et
-                    corriger les remises.
-                  </p>
-                ))}
-            </Surface>
-          ))}
-        </div>
-      </QueryState>
+                    </div>
+                  </div>
+                  {gradingId === row.id &&
+                    (row.class_id ? (
+                      <AssignmentGrading assignmentId={row.id} classId={row.class_id} />
+                    ) : (
+                      <p className="mt-4 text-sm text-muted-foreground">
+                        Les remises nécessitent un groupe. Assignez ce devoir à un groupe pour
+                        suivre et corriger les remises.
+                      </p>
+                    ))}
+                </Surface>
+              );
+            })}
+          </div>
+        </QueryState>
+      ) : (
+        <QueryState
+          isLoading={
+            listQuery.isLoading || historyQuery.isLoading || (isAdmin && teachersQuery.isLoading)
+          }
+          isError={
+            listQuery.isError || historyQuery.isError || (isAdmin && teachersQuery.isError)
+          }
+          error={listQuery.error ?? historyQuery.error ?? teachersQuery.error}
+          isEmpty={!historyRows.length}
+          emptyTitle="Aucun devoir corrigé"
+          emptyMessage="Les devoirs déjà corrigés apparaîtront ici, du plus récent au plus ancien."
+          onRetry={() => {
+            void listQuery.refetch();
+            void historyQuery.refetch();
+            if (isAdmin) void teachersQuery.refetch();
+          }}
+        >
+          <div className="space-y-3">
+            {historyRows.map(({ assignment: row, gradedCount, lastGradedAt }) => {
+              const klass = row.class_id ? classesById.get(row.class_id) : null;
+              const teacherLabel =
+                klass?.teacher && klass.teacher !== "—" ? klass.teacher : null;
+              return (
+                <Surface className="p-5" key={row.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <LevelBadge code={row.level?.code} />
+                        <GroupBadge label={row.class?.name ?? "Groupe"} />
+                        {isAdmin && teacherLabel ? (
+                          <Status tone="gray">{teacherLabel}</Status>
+                        ) : null}
+                        <Status tone="green">Corrigé</Status>
+                      </div>
+                      <h2 className="font-semibold tracking-tight">{row.title}</h2>
+                      <p className="text-sm text-muted-foreground">
+                        {gradedCount} remise{gradedCount > 1 ? "s" : ""} corrigée
+                        {gradedCount > 1 ? "s" : ""}
+                        {lastGradedAt > 0
+                          ? ` · dernière correction ${new Date(lastGradedAt).toLocaleString("fr-FR", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        className="min-h-10 font-semibold shadow-soft"
+                        onClick={() => setGradingId(gradingId === row.id ? null : row.id)}
+                      >
+                        {gradingId === row.id ? "Masquer" : "Voir les remises"}
+                      </Button>
+                    </div>
+                  </div>
+                  {gradingId === row.id && row.class_id ? (
+                    <AssignmentGrading assignmentId={row.id} classId={row.class_id} />
+                  ) : null}
+                </Surface>
+              );
+            })}
+          </div>
+        </QueryState>
+      )}
 
       {open && (
         <div className="mobile-modal">
