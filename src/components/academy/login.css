@@ -170,12 +170,13 @@
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(300px, 400px);
   gap: clamp(28px, 5vw, 64px);
-  align-items: center;
-  padding: 28px 0 40px;
+  align-items: start;
+  padding: clamp(32px, 8vh, 96px) 0 40px;
 }
 
 .gla-login-story {
   max-width: 36rem;
+  padding-top: clamp(8px, 2vh, 28px);
   padding-bottom: 12px;
   animation: gla-login-rise 0.85s ease-out 0.08s both;
 }
