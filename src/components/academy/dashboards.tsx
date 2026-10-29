@@ -37,7 +37,11 @@ function dayKey(d: Date) {
 
 export function PremiumStudentDashboard() {
   const { navigate, user, l, profile, locale } = useAcademy();
-  const firstName = user?.name?.split(" ")[0] ?? l("là", "هناك");
+  const rawFirst = user?.name?.trim().split(/\s+/)[0] ?? "";
+  const firstName =
+    rawFirst && rawFirst.toLowerCase() !== "there" && rawFirst.toLowerCase() !== "là"
+      ? rawFirst
+      : null;
   const studentsQuery = useStudents();
   const myStudent = resolveOwnStudent(studentsQuery.data ?? [], {
     profileId: profile?.id ?? user?.id ?? null,
@@ -112,20 +116,27 @@ export function PremiumStudentDashboard() {
       ) : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm text-muted-foreground">{l("Espace étudiant", "مساحة الطالب")}</p>
-          <h1 className="font-display text-3xl font-normal tracking-tight sm:text-4xl">
-            {l("Bonjour", "مرحباً")}, {firstName}.
+          <div className="mb-3 flex h-1 w-14 overflow-hidden rounded-sm" aria-hidden="true">
+            <span className="flex-1 bg-foreground" />
+            <span className="flex-1 bg-alert" />
+            <span className="flex-1 bg-gold" />
+          </div>
+          <p className="text-sm font-medium tracking-wide text-muted-foreground uppercase">
+            {l("Espace étudiant", "مساحة الطالب")}
+          </p>
+          <h1 className="font-display text-3xl font-medium tracking-tight sm:text-4xl">
+            {firstName ? `${l("Bonjour", "مرحباً")}, ${firstName}.` : `${l("Bonjour", "مرحباً")}.`}
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {l("Votre prochaine étape d’apprentissage.", "خطوتك التالية في التعلم.")}
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+            {l(
+              "Cours, ressources et classes en direct — votre parcours allemand.",
+              "دروس وموارد وحصص مباشرة — مسارك في الألمانية.",
+            )}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => navigate("assignments")}>
             {l("Devoirs", "الواجبات")}
-          </Button>
-          <Button variant="outline" onClick={() => navigate("exams")}>
-            {l("Examens", "الامتحانات")}
           </Button>
           <Button variant="outline" onClick={() => navigate("materials")}>
             {l("Ressources", "الموارد")}
@@ -135,45 +146,55 @@ export function PremiumStudentDashboard() {
       </div>
 
       <section className="grid gap-5 xl:grid-cols-[1.35fr_0.9fr]">
-        <div className="rounded-2xl bg-brand p-5 text-brand-foreground sm:p-7 md:p-8">
-          <Eyebrow>{l("Prochain cours", "الحصة القادمة")}</Eyebrow>
-          {nextSession ? (
-            <>
-              <h2 className="mt-4 font-display text-2xl">{nextSession.title}</h2>
-              <p className="mt-2 text-sm text-brand-foreground/70">
-                {formatLiveDate(nextSession.starts_at)} · {formatLiveTime(nextSession.starts_at)}
-                {nextSession.class?.name ? ` · ${nextSession.class.name}` : ""}
-              </p>
-              <Button
-                className="mt-5"
-                variant="secondary"
-                onClick={() => {
-                  if (nextSession.status === "live") {
-                    setLiveSessionId(nextSession.id);
-                    navigate("meeting");
-                    return;
-                  }
-                  navigate("live");
-                }}
-              >
-                {nextSession.status === "live"
-                  ? l("Rejoindre", "انضم")
-                  : l("Voir le planning", "عرض الجدول")}
-              </Button>
-            </>
-          ) : (
-            <>
-              <p className="mt-4 text-sm text-brand-foreground/70">
-                {l("Aucune séance planifiée pour l’instant.", "لا توجد حصة مجدولة حاليًا.")}
-              </p>
-              <Button className="mt-5" variant="secondary" onClick={() => navigate("calendar")}>
-                {l("Calendrier", "التقويم")}
-              </Button>
-            </>
-          )}
+        <div className="relative overflow-hidden rounded-md bg-brand p-5 text-brand-foreground sm:p-7 md:p-8">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-90"
+            style={{
+              background:
+                "radial-gradient(ellipse 80% 70% at 100% 0%, oklch(0.76 0.11 85 / 0.28), transparent 55%), linear-gradient(145deg, oklch(0.24 0.05 255), oklch(0.32 0.05 255))",
+            }}
+            aria-hidden="true"
+          />
+          <div className="relative">
+            <Eyebrow>{l("Prochain cours", "الحصة القادمة")}</Eyebrow>
+            {nextSession ? (
+              <>
+                <h2 className="mt-4 font-display text-2xl">{nextSession.title}</h2>
+                <p className="mt-2 text-sm text-brand-foreground/70">
+                  {formatLiveDate(nextSession.starts_at)} · {formatLiveTime(nextSession.starts_at)}
+                  {nextSession.class?.name ? ` · ${nextSession.class.name}` : ""}
+                </p>
+                <Button
+                  className="mt-5"
+                  variant="secondary"
+                  onClick={() => {
+                    if (nextSession.status === "live") {
+                      setLiveSessionId(nextSession.id);
+                      navigate("meeting");
+                      return;
+                    }
+                    navigate("live");
+                  }}
+                >
+                  {nextSession.status === "live"
+                    ? l("Rejoindre", "انضم")
+                    : l("Voir le planning", "عرض الجدول")}
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="mt-4 text-sm text-brand-foreground/70">
+                  {l("Aucune séance planifiée pour l’instant.", "لا توجد حصة مجدولة حاليًا.")}
+                </p>
+                <Button className="mt-5" variant="secondary" onClick={() => navigate("calendar")}>
+                  {l("Calendrier", "التقويم")}
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-soft">
+        <div className="rounded-md border border-border/80 bg-card p-6 shadow-soft">
           <Eyebrow>{l("Votre parcours", "مسارك")}</Eyebrow>
           <div className="mt-5 space-y-4 text-sm">
             <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
@@ -239,7 +260,7 @@ export function PremiumStudentDashboard() {
             isError={examsQuery.isError}
             error={examsQuery.error}
             isEmpty={!levelExams.length}
-            emptyMessage={l("Aucun examen publié.", "لا توجد امتحانات منشورة.")}
+            emptyMessage={l("Aucun examen pour le moment.", "لا توجد امتحانات حالياً.")}
             onRetry={() => void examsQuery.refetch()}
           >
             <ul className="mt-3 space-y-2 text-sm">
@@ -338,7 +359,14 @@ export function PremiumTeacherDashboard() {
   return (
     <div className="animate-fade-in space-y-6">
       <div>
-        <p className="text-sm text-muted-foreground">{l("Espace enseignant", "مساحة الأستاذ")}</p>
+        <div className="mb-3 flex h-1 w-14 overflow-hidden rounded-sm" aria-hidden="true">
+          <span className="flex-1 bg-foreground" />
+          <span className="flex-1 bg-alert" />
+          <span className="flex-1 bg-gold" />
+        </div>
+        <p className="text-sm font-medium tracking-wide text-muted-foreground uppercase">
+          {l("Espace enseignant", "مساحة الأستاذ")}
+        </p>
         <h1 className="font-display text-3xl font-medium tracking-tight">
           {l("Priorités du jour", "أولويات اليوم")}
         </h1>
@@ -476,9 +504,9 @@ export function PremiumTeacherDashboard() {
               key={title}
               type="button"
               onClick={() => navigate(page)}
-              className="rounded-2xl border border-border bg-card p-5 text-left transition hover:border-primary/30 hover:bg-soft-blue/40"
+              className="rounded-md border border-border bg-card p-5 text-left transition hover:border-gold/40 hover:bg-accent/40"
             >
-              <ItemIcon className="size-4 text-primary" />
+              <ItemIcon className="size-4 text-gold" />
               <h2 className="mt-4 text-sm font-semibold">{title}</h2>
               <p className="mt-2 text-sm text-muted-foreground">{body}</p>
             </button>
@@ -535,7 +563,14 @@ export function PremiumDirectorDashboard() {
     <div className="animate-fade-in space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm text-muted-foreground">{l("Vue d’ensemble", "نظرة عامة")}</p>
+          <div className="mb-3 flex h-1 w-14 overflow-hidden rounded-sm" aria-hidden="true">
+            <span className="flex-1 bg-foreground" />
+            <span className="flex-1 bg-alert" />
+            <span className="flex-1 bg-gold" />
+          </div>
+          <p className="text-sm font-medium tracking-wide text-muted-foreground uppercase">
+            {l("Vue d’ensemble", "نظرة عامة")}
+          </p>
           <h1 className="font-display text-3xl font-medium tracking-tight">
             {l("Direction", "الإدارة")}
           </h1>
@@ -587,7 +622,7 @@ export function PremiumDirectorDashboard() {
               key={label}
               type="button"
               onClick={() => navigate(page)}
-              className="rounded-2xl border border-border bg-card p-5 text-left transition hover:border-primary/25"
+              className="rounded-md border border-border bg-card p-5 text-left transition hover:border-gold/40 hover:bg-accent/40"
             >
               <p className="text-sm text-muted-foreground">{label}</p>
               <p className="mt-3 font-display text-4xl">{value}</p>

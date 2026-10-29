@@ -18,7 +18,7 @@ export function Surface({
     <div
       onClick={onClick}
       className={cn(
-        "rounded-xl border border-border/80 bg-card shadow-soft",
+        "rounded-md border border-border/80 bg-card shadow-soft",
         onClick &&
           "cursor-pointer transition duration-200 hover:-translate-y-0.5 hover:shadow-card active:scale-[0.99] motion-reduce:transform-none",
         className,
@@ -52,8 +52,13 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:gap-5">
       <div className="min-w-0">
+        <div className="mb-3 flex h-1 w-12 overflow-hidden rounded-sm" aria-hidden="true">
+          <span className="flex-1 bg-foreground" />
+          <span className="flex-1 bg-alert" />
+          <span className="flex-1 bg-gold" />
+        </div>
         {tEyebrow ? <p className="eyebrow mb-2">{tEyebrow}</p> : null}
-        <h1 className="font-display text-[1.65rem] font-normal leading-[1.15] tracking-tight text-foreground sm:text-3xl md:text-[2.15rem]">
+        <h1 className="font-display text-[1.65rem] font-medium leading-[1.15] tracking-tight text-foreground sm:text-3xl md:text-[2.15rem]">
           {tTitle}
         </h1>
         {tSubtitle ? (

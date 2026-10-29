@@ -171,11 +171,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   const sidebar = (
     <>
       <div className="flex h-[4.5rem] items-center justify-between gap-2 border-b border-sidebar-border px-4 pt-[env(safe-area-inset-top,0px)]">
-        <BrandLogo variant="compact" className="min-w-0" imgClassName="size-10" />
+        <BrandLogo
+          variant="compact"
+          inverted
+          showWordmark
+          className="min-w-0"
+          imgClassName="size-10 rounded-full border border-gold/40 bg-white/10 p-0.5"
+        />
         <Button
           size="icon"
           variant="ghost"
-          className="lg:hidden"
+          className="text-sidebar-foreground hover:bg-sidebar-accent lg:hidden"
           onClick={() => setMobile(false)}
           aria-label={t("shell.closeNav")}
         >
@@ -186,7 +192,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {sections.map((section, sectionIndex) => (
           <div key={section.label ?? sectionIndex}>
             {section.label && (
-              <p className="mb-2 px-3 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+              <p className="mb-2 px-3 text-[10px] font-semibold tracking-[0.16em] text-sidebar-foreground/45 uppercase">
                 {t(section.label)}
               </p>
             )}
@@ -212,25 +218,25 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="border-t border-sidebar-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
         <div className="mb-3 flex flex-col gap-2 px-1">
           <div className="flex items-center justify-between gap-2 lg:hidden">
-            <span className="text-[11px] font-medium text-muted-foreground uppercase">
+            <span className="text-[11px] font-medium text-sidebar-foreground/50 uppercase">
               {t("shell.theme")}
             </span>
             <ThemeToggle showLabels />
           </div>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-medium text-muted-foreground uppercase">
+            <span className="text-[11px] font-medium text-sidebar-foreground/50 uppercase">
               {t("shell.language")}
             </span>
             {languageSwitch}
           </div>
         </div>
-        <div className="mb-2 flex items-center gap-3 rounded-xl bg-muted/70 px-3 py-2.5">
-          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+        <div className="mb-2 flex items-center gap-3 rounded-md border border-sidebar-border bg-sidebar-accent/60 px-3 py-2.5">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-gold text-[11px] font-semibold text-primary">
             {initials(user.name)}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{user.name}</p>
-            <p className="truncate text-[11px] text-muted-foreground">{user.email}</p>
+            <p className="truncate text-sm font-medium text-sidebar-foreground">{user.name}</p>
+            <p className="truncate text-[11px] text-sidebar-foreground/55">{user.email}</p>
           </div>
         </div>
         <button type="button" className="nav-item" onClick={() => setRole(null)}>
@@ -260,7 +266,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
       <div className="academy-content lg:pl-[16.5rem]">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border/80 bg-background/85 px-3 backdrop-blur-xl sm:h-16 sm:gap-3 sm:px-8 pt-[env(safe-area-inset-top,0px)]">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border/80 bg-background/90 px-3 backdrop-blur-xl sm:h-16 sm:gap-3 sm:px-8 pt-[env(safe-area-inset-top,0px)]">
+          <span
+            className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gold/50 to-transparent"
+            aria-hidden="true"
+          />
           <Button
             size="icon"
             variant="ghost"
@@ -271,8 +281,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Menu className="size-5" />
           </Button>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold tracking-tight">{roleLabel}</p>
-            <p className="hidden truncate text-xs text-muted-foreground sm:block">{user.name}</p>
+            <p className="truncate font-display text-base font-medium tracking-tight sm:text-lg">
+              German Academy
+            </p>
+            <p className="hidden truncate text-xs text-muted-foreground sm:block">
+              {roleLabel} · {user.name}
+            </p>
           </div>
           <div className="flex items-center gap-1">
             <ThemeToggle />
