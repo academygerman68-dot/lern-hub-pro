@@ -1,37 +1,107 @@
-.gla-login {
-  --login-ink: #202c3a;
-  --login-gold: #987b40;
-  --login-muted: #697078;
-  --login-line: #e3e0d8;
+﻿.gla-login {
+  --login-ink: #f3f5f8;
+  --login-muted: rgba(243, 245, 248, 0.72);
+  --login-gold: #d4a84b;
+  --login-red: #c8102e;
+  --login-panel: rgba(10, 16, 28, 0.72);
+  --login-panel-border: rgba(243, 245, 248, 0.14);
+  --login-field: rgba(255, 255, 255, 0.06);
+  --login-field-border: rgba(243, 245, 248, 0.18);
+  --font-login-sans: "Sora", "IBM Plex Sans", system-ui, sans-serif;
+  --font-login-display: "Fraunces", "Source Serif 4", Georgia, serif;
   min-height: 100svh;
-  background: #f7f6f2;
   color: var(--login-ink);
-  padding: 0 clamp(24px, 5.5vw, 96px);
+  font-family: var(--font-login-sans);
+  position: relative;
+  overflow-x: hidden;
+}
+
+.gla-login-stage {
+  position: relative;
+  min-height: 100svh;
   display: flex;
   flex-direction: column;
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  padding: 0 clamp(20px, 4.5vw, 72px);
+  isolation: isolate;
 }
+
+.gla-login-media {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+}
+
+.gla-login-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 40%;
+  transform: scale(1.04);
+  animation: gla-login- ken 28s ease-out forwards;
+}
+
+.gla-login-veil {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(
+      105deg,
+      rgba(6, 12, 24, 0.78) 0%,
+      rgba(6, 12, 24, 0.55) 38%,
+      rgba(6, 12, 24, 0.28) 62%,
+      rgba(6, 12, 24, 0.62) 100%
+    ),
+    linear-gradient(180deg, rgba(6, 12, 24, 0.22) 0%, transparent 32%, rgba(6, 12, 24, 0.5) 100%);
+}
+
 .gla-login-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 20px;
-  padding: 30px 0;
-  border-bottom: 1px solid var(--login-line);
+  gap: 16px;
+  padding: 26px 0 18px;
+  animation: gla-login-rise 0.7s ease-out both;
 }
+
+.gla-login-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.gla-login-header-actions [role="group"] button {
+  color: rgba(243, 245, 248, 0.7);
+}
+
+.gla-login-header-actions [role="group"] button[aria-pressed="true"] {
+  background: rgba(243, 245, 248, 0.16);
+  color: #fff;
+}
+
+.gla-login-header-actions [role="group"] button:hover {
+  background: rgba(243, 245, 248, 0.1);
+  color: #fff;
+}
+
 .gla-login-brand {
   display: flex;
   align-items: center;
-  gap: 13px;
+  gap: 12px;
 }
+
 .gla-login-seal {
-  width: 58px;
-  height: 58px;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
   border-radius: 50%;
   overflow: hidden;
   position: relative;
+  border: 1px solid rgba(243, 245, 248, 0.28);
+  background: rgba(255, 255, 255, 0.08);
 }
+
 .gla-login-seal img {
   position: absolute;
   width: 230%;
@@ -41,533 +111,489 @@
   top: 50%;
   transform: translate(-50%, -50%);
 }
+
 .gla-login-brand strong {
   display: block;
-  font-size: 19px;
+  font-size: 16px;
   font-weight: 600;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.02em;
 }
+
 .gla-login-brand div > span {
   display: block;
-  margin-top: 3px;
-  font-size: 9px;
+  margin-top: 2px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 1.8px;
   color: var(--login-muted);
 }
+
 .gla-login-languages {
   display: flex;
   align-items: center;
-  gap: 6px;
-  color: var(--login-muted);
-  font-size: 12px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(243, 245, 248, 0.12);
 }
+
 .gla-login-languages button {
-  min-height: 36px;
-  min-width: 32px;
+  min-height: 34px;
+  min-width: 36px;
   cursor: pointer;
-  border-radius: 5px;
-  padding: 4px 6px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--login-muted);
   transition:
     color 0.15s,
     background 0.15s;
 }
+
 .gla-login-languages button[aria-pressed="true"] {
-  color: var(--login-ink);
+  color: #0b1220;
+  background: #f3f5f8;
   font-weight: 600;
-  background: color-mix(in oklab, var(--login-ink) 8%, transparent);
 }
-.gla-login-languages button:hover {
-  background: #eeece5;
+
+.gla-login-languages button:hover:not([aria-pressed="true"]) {
+  color: var(--login-ink);
+  background: rgba(255, 255, 255, 0.1);
 }
+
 .gla-login-layout {
   width: 100%;
   max-width: 1180px;
   margin: auto;
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 460px;
-  gap: clamp(40px, 6vw, 110px);
-  align-items: center;
-  padding: 58px 0 64px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 400px);
+  gap: clamp(28px, 5vw, 64px);
+  align-items: end;
+  padding: 36px 0 48px;
 }
+
 .gla-login-story {
-  padding-block: 12px;
+  max-width: 36rem;
+  padding-bottom: 12px;
+  animation: gla-login-rise 0.85s ease-out 0.08s both;
 }
-.gla-login-eyebrow {
+
+.gla-login-flagline {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 1.6px;
-  color: #6e6758;
+  gap: 0;
+  width: 72px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  margin-bottom: 22px;
 }
-.gla-login-eyebrow > span {
-  width: 23px;
-  height: 1px;
+
+.gla-flag {
+  flex: 1;
+  display: block;
+  height: 100%;
+}
+
+.gla-flag-black {
+  background: #0b0b0b;
+}
+
+.gla-flag-red {
+  background: var(--login-red);
+}
+
+.gla-flag-gold {
   background: var(--login-gold);
 }
+
 .gla-login-story h1 {
-  font-family: "Source Serif 4", Georgia, serif;
-  font-size: clamp(48px, 5vw, 72px);
-  line-height: 1.07;
-  letter-spacing: -2.4px;
-  font-weight: 400;
-  margin: 26px 0;
-}
-.gla-login-story h1 em {
-  color: var(--login-gold);
-  font-weight: 400;
-}
-.gla-login-story-copy {
-  max-width: 370px;
-  color: var(--login-muted);
-  font-size: 15px;
-  line-height: 1.85;
-}
-.gla-login-path {
-  max-width: 370px;
-  margin-top: 44px;
-  padding-top: 25px;
-  border-top: 1px solid var(--login-line);
-}
-.gla-login-path-caption {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
+  font-family: var(--font-login-display);
+  font-size: clamp(2.75rem, 6.2vw, 4.75rem);
+  line-height: 0.98;
+  letter-spacing: -0.04em;
   font-weight: 500;
+  margin: 0;
+  color: #fff;
+  text-wrap: balance;
 }
-.gla-login-path-caption svg {
-  color: var(--login-gold);
-}
-.gla-login-levels {
-  display: flex;
-  align-items: center;
-  margin-top: 21px;
-  gap: 14px;
-}
-.gla-login-levels > div {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  gap: 14px;
-}
-.gla-login-levels > div:last-of-type {
-  flex: 0;
-}
-.gla-login-levels span {
-  font-family: "Source Serif 4", Georgia, serif;
-  font-size: 24px;
-}
-.gla-login-levels i {
-  height: 1px;
-  background: #d4cabb;
-  flex: 1;
-}
-.gla-login-levels > svg {
-  color: var(--login-gold);
-  margin-inline-start: 9px;
-}
-.gla-login-path > p {
+
+.gla-login-lead {
+  margin-top: 1.25rem;
+  max-width: 28rem;
   color: var(--login-muted);
-  font-size: 11px;
-  margin-top: 14px;
-  line-height: 1.6;
-}
-.gla-login-card {
-  background: #fff;
-  border: 1px solid #e6e3dc;
-  border-radius: 18px;
-  padding: 38px 38px 30px;
-  box-shadow:
-    0 14px 45px -28px #28334140,
-    0 2px 5px #28334103;
-}
-.gla-login-card-top {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: #797363;
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 1.5px;
-  margin-bottom: 23px;
-}
-.gla-login-card-emblem {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border: 1px solid #eae5d9;
-  border-radius: 12px;
-  background: #faf8f3;
-  color: var(--login-gold);
-}
-.gla-login-card h2 {
-  font-family: "Source Serif 4", Georgia, serif;
-  font-size: 35px;
-  line-height: 1.15;
-  letter-spacing: -0.8px;
+  font-size: 1.05rem;
+  line-height: 1.65;
   font-weight: 400;
 }
+
+.gla-login-card {
+  align-self: center;
+  background: var(--login-panel);
+  border: 1px solid var(--login-panel-border);
+  border-radius: 4px;
+  padding: 32px 30px 26px;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  animation: gla-login-rise 0.9s ease-out 0.16s both;
+}
+
+.gla-login-card h2 {
+  font-family: var(--font-login-display);
+  font-size: clamp(1.65rem, 2.4vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  font-weight: 500;
+  color: #fff;
+  margin: 0;
+}
+
 .gla-login-subtitle {
-  font-size: 13px;
-  line-height: 1.65;
+  font-size: 0.875rem;
+  line-height: 1.55;
   color: var(--login-muted);
-  margin-top: 12px;
+  margin-top: 10px;
 }
+
 .gla-login-content {
-  margin-top: 28px;
+  margin-top: 24px;
 }
+
 .gla-login-form {
   display: grid;
-  gap: 20px;
+  gap: 18px;
 }
+
 .gla-login-field > label {
   display: block;
   font-size: 12px;
   font-weight: 500;
   margin-bottom: 8px;
+  color: rgba(243, 245, 248, 0.88);
 }
+
 .gla-login-input-wrap {
   position: relative;
 }
+
 .gla-login .gla-login-input {
   width: 100%;
-  height: 49px;
-  border: 1px solid #dcdedc;
-  border-radius: 8px;
-  background: #fcfcfa;
-  box-shadow: 0 1px 2px #202c3a03;
-  color: var(--login-ink);
+  height: 48px;
+  border: 1px solid var(--login-field-border);
+  border-radius: 4px;
+  background: var(--login-field);
+  color: #fff;
   font-size: 15px;
   padding-inline: 14px;
   transition:
     border-color 0.15s,
+    background 0.15s,
     box-shadow 0.15s;
 }
+
 .gla-login .gla-login-input::placeholder {
-  color: #92979b;
+  color: rgba(243, 245, 248, 0.45);
   font-size: 13px;
 }
+
 .gla-login .gla-login-input:hover {
-  border-color: #a8afb2;
+  border-color: rgba(243, 245, 248, 0.32);
 }
+
 .gla-login .gla-login-input:focus {
   outline: none;
   border-color: var(--login-gold);
-  box-shadow: 0 0 0 3px #987b401c;
+  box-shadow: 0 0 0 3px rgba(212, 168, 75, 0.22);
+  background: rgba(255, 255, 255, 0.09);
 }
+
 .gla-login .gla-login-input[aria-invalid="true"] {
-  border-color: #bf504a;
+  border-color: #e07068;
 }
+
 .gla-login .gla-login-password {
   padding-inline-end: 48px;
 }
+
 .gla-login-eye {
   position: absolute;
   inset-inline-end: 3px;
   top: 3px;
-  width: 43px;
-  height: 43px;
+  width: 42px;
+  height: 42px;
   display: grid;
   place-items: center;
-  color: #737c83;
-  border-radius: 6px;
+  color: rgba(243, 245, 248, 0.65);
+  border-radius: 4px;
   cursor: pointer;
 }
+
 .gla-login-eye:hover {
-  color: var(--login-ink);
-  background: #eeefe9;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
 }
+
 .gla-login-forgot {
   text-align: end;
   margin-top: 9px;
-  font-size: 11px;
+  font-size: 12px;
 }
+
 .gla-login a {
   text-underline-offset: 4px;
+  color: var(--login-gold);
 }
-.gla-login-forgot a {
-  color: #6d6145;
-}
+
 .gla-login a:hover {
   text-decoration: underline;
 }
+
 .gla-login button:focus-visible,
 .gla-login a:focus-visible,
 .gla-login summary:focus-visible {
   outline: 2px solid var(--login-gold);
-  outline-offset: 4px;
+  outline-offset: 3px;
 }
+
 .gla-login .gla-login-submit {
-  background: var(--login-ink);
-  color: #fff;
-  border-radius: 8px;
-  height: 49px;
+  background: var(--login-gold);
+  color: #0b1220;
+  border-radius: 4px;
+  height: 48px;
   font-size: 13px;
-  font-weight: 500;
-  box-shadow: 0 3px 6px #202c3a12;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   transition:
     background 0.15s,
     transform 0.15s;
 }
+
 .gla-login .gla-login-submit:hover:not(:disabled) {
-  background: #344457;
+  background: #e0b85c;
   transform: translateY(-1px);
 }
+
 .gla-login .gla-login-submit:active:not(:disabled) {
   transform: translateY(0);
 }
+
 .gla-login[dir="rtl"] .gla-login-submit > svg:not(.animate-spin) {
   transform: rotate(180deg);
 }
+
 .gla-login-divider {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 21px 0;
-  font-size: 10px;
-  color: #697078;
+  margin: 18px 0;
+  font-size: 11px;
+  color: var(--login-muted);
 }
+
 .gla-login-divider::before,
 .gla-login-divider::after {
   content: "";
   height: 1px;
-  background: #ecece7;
+  background: rgba(243, 245, 248, 0.14);
   flex: 1;
 }
+
 .gla-login .gla-login-google {
-  height: 47px;
+  height: 46px;
   width: 100%;
-  gap: 11px;
-  background: white;
-  color: #3b444e;
-  border: 1px solid #dddfdc;
-  border-radius: 8px;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f3f5f8;
+  border: 1px solid var(--login-field-border);
+  border-radius: 4px;
   font-size: 12px;
   font-weight: 500;
   box-shadow: none;
 }
+
 .gla-login .gla-login-google:hover:not(:disabled) {
-  background: #f7f7f3;
-  border-color: #a8afb2;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(243, 245, 248, 0.28);
 }
+
 .gla-login-register {
-  margin-top: 24px;
+  margin-top: 22px;
   text-align: center;
   color: var(--login-muted);
   font-size: 12px;
-  line-height: 1.8;
+  line-height: 1.7;
 }
+
 .gla-login-register button {
-  color: #756039;
+  color: var(--login-gold);
   font-weight: 600;
   margin-inline-start: 5px;
   cursor: pointer;
   text-underline-offset: 4px;
 }
+
 .gla-login-register button:hover {
   text-decoration: underline;
 }
+
 .gla-login-error {
-  color: #a53a35;
+  color: #ffb4ae;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.55;
 }
+
 .gla-login-field .gla-login-error {
   margin-top: 6px;
 }
+
 .gla-login-error-banner {
-  background: #fff4f1;
-  border: 1px solid #efd5ce;
-  border-radius: 8px;
+  background: rgba(200, 16, 46, 0.16);
+  border: 1px solid rgba(255, 180, 174, 0.35);
+  border-radius: 4px;
   padding: 12px;
   display: flex;
   align-items: start;
   gap: 8px;
 }
+
 .gla-login-error-banner svg {
   flex-shrink: 0;
   margin-top: 2px;
 }
+
 .gla-login-tests {
-  border-top: 1px solid #ecece7;
-  margin-top: 22px;
-  padding-top: 15px;
+  border-top: 1px solid rgba(243, 245, 248, 0.12);
+  margin-top: 20px;
+  padding-top: 14px;
   font-size: 11px;
   color: var(--login-muted);
 }
+
 .gla-login-tests summary {
   cursor: pointer;
   width: fit-content;
 }
+
 .gla-login-tests[open] summary {
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
+
 .gla-login-footer {
   display: flex;
   justify-content: space-between;
-  gap: 18px;
-  padding: 21px 0;
-  border-top: 1px solid var(--login-line);
-  color: #626b72;
-  font-size: 10px;
+  gap: 16px;
+  padding: 18px 0 24px;
+  border-top: 1px solid rgba(243, 245, 248, 0.12);
+  color: rgba(243, 245, 248, 0.55);
+  font-size: 11px;
+  animation: gla-login-rise 0.7s ease-out 0.22s both;
 }
+
 .gla-login-footer > span:last-child {
   display: flex;
   align-items: center;
   gap: 7px;
 }
+
 .gla-login[dir="rtl"] h1,
 .gla-login[dir="rtl"] h2 {
-  font-family: "IBM Plex Sans", Tahoma, sans-serif;
+  font-family: var(--font-login-sans);
   letter-spacing: 0;
-  line-height: 1.4;
+  line-height: 1.25;
 }
+
 .gla-login[dir="rtl"] h1 {
-  font-size: clamp(43px, 4.5vw, 64px);
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
 }
-.gla-login[dir="rtl"] .gla-login-eyebrow,
-.gla-login[dir="rtl"] .gla-login-card-top,
-.gla-login[dir="rtl"] .gla-login-brand div > span {
-  letter-spacing: 0;
+
+@keyframes gla-login-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-@media (min-width: 1600px) {
+
+@keyframes gla-login-ken {
+  from {
+    transform: scale(1.08);
+  }
+  to {
+    transform: scale(1.02);
+  }
+}
+
+@media (max-width: 900px) {
   .gla-login-layout {
-    max-width: 1280px;
-    grid-template-columns: 1fr 480px;
+    grid-template-columns: 1fr;
+    max-width: 440px;
+    gap: 28px;
+    padding-top: 12px;
   }
-}
-@media (max-width: 1050px) {
-  .gla-login-layout {
-    grid-template-columns: 1fr 420px;
-    gap: 35px;
-  }
-  .gla-login-story h1 {
-    font-size: 52px;
-  }
-  .gla-login-card {
-    padding: 32px 30px 26px;
-  }
-}
-@media (max-width: 850px) {
-  .gla-login-layout {
-    display: block;
-    padding: 38px 0;
-    max-width: 460px;
-  }
+
   .gla-login-story {
-    display: none;
+    max-width: none;
   }
-  .gla-login-header {
-    padding: 22px 0;
+
+  .gla-login-story h1 {
+    font-size: clamp(2.4rem, 10vw, 3.2rem);
   }
-  .gla-login-card {
-    padding: 34px;
+
+  .gla-login-lead {
+    font-size: 0.98rem;
   }
 }
+
 @media (max-width: 480px) {
-  .gla-login {
-    padding-inline: 22px;
+  .gla-login-stage {
+    padding-inline: 18px;
   }
+
   .gla-login-header {
-    padding: 19px 0;
-    gap: 10px;
+    padding-top: 18px;
   }
+
   .gla-login-seal {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
   }
-  .gla-login-brand {
-    gap: 9px;
-  }
+
   .gla-login-brand strong {
-    font-size: 15px;
+    font-size: 14px;
   }
-  .gla-login-brand div > span {
-    font-size: 7px;
-    letter-spacing: 1px;
-  }
-  .gla-login-languages {
-    gap: 2px;
-    font-size: 11px;
-  }
-  .gla-login-languages > svg {
-    display: none;
-  }
-  .gla-login-layout {
-    padding: 31px 0;
-  }
+
   .gla-login-card {
-    padding: 0;
-    background: transparent;
-    border: 0;
-    box-shadow: none;
-    border-radius: 0;
+    padding: 24px 18px 20px;
   }
-  .gla-login-card-top {
-    margin-bottom: 22px;
-  }
-  .gla-login-card h2 {
-    max-width: 300px;
-    font-size: 34px;
-  }
-  .gla-login-subtitle {
-    max-width: 300px;
-  }
+
   .gla-login .gla-login-input {
-    background: #fff;
     font-size: 16px;
-    height: 51px;
-  }
-  .gla-login .gla-login-submit,
-  .gla-login .gla-login-google {
     height: 50px;
   }
+
   .gla-login-footer {
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
-    text-align: center;
-    padding: 18px 0;
-    font-size: 9px;
   }
 }
-.dark .gla-login {
-  --login-ink: #f4f1ea;
-  --login-muted: #b7b1a6;
-  --login-line: #3a342c;
-  background: #171512;
-  color: var(--login-ink);
-}
-.dark .gla-login-languages button:hover,
-.dark .gla-login-card,
-.dark .gla-login .gla-login-input,
-.dark .gla-login .gla-login-google {
-  background: #221f1b;
-  color: var(--login-ink);
-  border-color: #3a342c;
-}
-.dark .gla-login-card-emblem,
-.dark .gla-login-error-banner {
-  background: #2a261f;
-  border-color: #4a4034;
-}
+
+/* Login stays night-atmosphere in both themes: image + veil carry the German scene. */
 .dark .gla-login .gla-login-submit {
-  background: #987b40;
-  color: #171512;
+  background: var(--login-gold);
+  color: #0b1220;
 }
+
 .dark .gla-login .gla-login-submit:hover:not(:disabled) {
-  background: #b09355;
+  background: #e0b85c;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -576,5 +602,9 @@
   .gla-login *::after {
     transition: none !important;
     animation: none !important;
+  }
+
+  .gla-login-media img {
+    transform: none;
   }
 }
