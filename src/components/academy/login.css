@@ -128,38 +128,33 @@
 }
 
 .gla-login-languages {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px;
+  min-height: 36px;
+  gap: 6px;
+  padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(243, 245, 248, 0.12);
-}
-
-.gla-login-languages button {
-  min-height: 34px;
-  min-width: 36px;
-  cursor: pointer;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--login-muted);
-  transition:
-    color 0.15s,
-    background 0.15s;
-}
-
-.gla-login-languages button[aria-pressed="true"] {
-  color: #0b1220;
-  background: #f3f5f8;
-  font-weight: 600;
-}
-
-.gla-login-languages button:hover:not([aria-pressed="true"]) {
-  color: var(--login-ink);
+  border: 1px solid rgba(243, 245, 248, 0.14);
   background: rgba(255, 255, 255, 0.1);
+  color: rgba(243, 245, 248, 0.92);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.gla-login-languages:hover,
+.gla-login-languages[data-state="open"] {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(243, 245, 248, 0.22);
+  color: #fff;
+}
+
+.gla-login-languages:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.45);
 }
 
 .gla-login-layout {

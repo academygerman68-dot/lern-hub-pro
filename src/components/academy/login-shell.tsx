@@ -45,13 +45,7 @@ export function LoginShell({
           </div>
           <div className="gla-login-header-actions">
             <ThemeToggle />
-            <div
-              className="gla-login-languages"
-              role="group"
-              aria-label={t("login.interfaceLanguage")}
-            >
-              <LanguageSwitcher />
-            </div>
+            <LanguageSwitcher className="gla-login-languages" />
           </div>
         </header>
 
