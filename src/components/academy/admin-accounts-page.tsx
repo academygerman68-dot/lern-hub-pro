@@ -15,6 +15,7 @@ import type { Database } from "@/types/database";
 import { useAcademy } from "./academy-context";
 import { FilterBar, PageHeader, Status, Surface } from "./primitives";
 import { QueryState } from "./query-state";
+import { MobileModal } from "./shared/mobile-modal";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -242,7 +243,7 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean } =
       </QueryState>
 
       {selected && (
-        <div className="mobile-modal">
+        <MobileModal onClose={() => setSelectedId(null)}>
           <Surface className="mobile-modal-panel max-h-[90dvh] space-y-4 overflow-y-auto">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -372,11 +373,11 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean } =
               </Button>
             </div>
           </Surface>
-        </div>
+        </MobileModal>
       )}
 
       {createOpen && (
-        <div className="mobile-modal">
+        <MobileModal onClose={resetCreate}>
           <Surface className="mobile-modal-panel max-h-[90dvh] space-y-4 overflow-y-auto">
             <h2 className="text-lg font-semibold">Créer un compte</h2>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -462,7 +463,7 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean } =
               </Button>
             </div>
           </Surface>
-        </div>
+        </MobileModal>
       )}
     </div>
   );
