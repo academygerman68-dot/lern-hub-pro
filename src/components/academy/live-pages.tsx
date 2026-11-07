@@ -477,14 +477,33 @@ function LiveSessionLobby() {
                       {isStaff ? (hero.status === "live" ? "Rejoindre" : "Démarrer") : "Rejoindre"}
                     </Button>
                     {canEditLiveSession(role, hero, myTeacherId) && hero.status !== "cancelled" ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 sm:h-9 sm:px-4 sm:text-sm"
-                        onClick={() => setEditSession(hero)}
-                      >
-                        Modifier
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 sm:h-9 sm:px-4 sm:text-sm"
+                          onClick={() => setEditSession(hero)}
+                        >
+                          Modifier
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 sm:h-9 sm:px-4 sm:text-sm"
+                          onClick={() => {
+                            if (!window.confirm(`Supprimer / annuler « ${hero.title} » ?`)) return;
+                            updateStatus.mutate(
+                              { id: hero.id, status: "cancelled" },
+                              {
+                                onSuccess: () => toast.success("Séance annulée"),
+                                onError: (err) => toast.error(err.message),
+                              },
+                            );
+                          }}
+                        >
+                          Supprimer
+                        </Button>
+                      </>
                     ) : null}
                     {isStaff && hero.status === "live" ? (
                       <Button
@@ -511,7 +530,7 @@ function LiveSessionLobby() {
 
             {/* B. Upcoming — collapsed by default; sessionStorage keeps expand choice for this tab session only */}
             <section className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2">
                 <h2 className="text-sm font-semibold tracking-tight sm:text-base">
                   Séances à venir
                   <span className="ml-2 text-sm font-normal text-muted-foreground">
@@ -519,30 +538,37 @@ function LiveSessionLobby() {
                   </span>
                 </h2>
                 <Button
+                  type="button"
                   size="sm"
-                  variant="outline"
+                  variant={upcomingCollapsed ? "default" : "outline"}
                   aria-expanded={!upcomingCollapsed}
+                  aria-controls="live-upcoming-list"
                   onClick={() => {
                     setUpcomingCollapsed((prev) => toggleUpcomingSessionsCollapsed(prev));
                   }}
                 >
                   {upcomingCollapsed ? (
                     <>
-                      <ChevronDown className="size-4" /> Afficher
+                      <ChevronDown className="size-4" /> Afficher la liste
                     </>
                   ) : (
                     <>
-                      <ChevronUp className="size-4" /> Masquer
+                      <ChevronUp className="size-4" /> Masquer la liste
                     </>
                   )}
                 </Button>
               </div>
-              {upcomingCollapsed ? null : upcomingList.length === 0 ? (
+              {upcomingCollapsed ? (
+                <p className="px-1 text-xs text-muted-foreground">
+                  Liste masquée — appuyez sur « Afficher la liste » pour voir, modifier ou supprimer
+                  les séances.
+                </p>
+              ) : upcomingList.length === 0 ? (
                 <Surface className="p-5 text-center">
                   <p className="text-sm text-muted-foreground">Aucune autre séance planifiée.</p>
                 </Surface>
               ) : (
-                <div className="space-y-2">
+                <div id="live-upcoming-list" className="space-y-2">
                   {upcomingList.map((item) => {
                     const joinState = getLiveSessionJoinState({
                       startsAt: item.starts_at,
@@ -550,6 +576,7 @@ function LiveSessionLobby() {
                       status: item.status,
                       isStaff,
                     });
+                    const canManage = canEditLiveSession(role, item, myTeacherId);
                     return (
                       <Surface
                         key={item.id}
@@ -581,14 +608,39 @@ function LiveSessionLobby() {
                           ) : null}
                         </div>
                         <div className="flex shrink-0 flex-wrap gap-2">
-                          {canEditLiveSession(role, item, myTeacherId) ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setEditSession(item)}
-                            >
-                              Modifier
-                            </Button>
+                          {canManage ? (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditSession(item)}
+                              >
+                                Modifier
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-destructive"
+                                onClick={() => {
+                                  if (
+                                    !window.confirm(
+                                      `Supprimer / annuler « ${item.title} » ?`,
+                                    )
+                                  ) {
+                                    return;
+                                  }
+                                  updateStatus.mutate(
+                                    { id: item.id, status: "cancelled" },
+                                    {
+                                      onSuccess: () => toast.success("Séance annulée"),
+                                      onError: (err) => toast.error(err.message),
+                                    },
+                                  );
+                                }}
+                              >
+                                Supprimer
+                              </Button>
+                            </>
                           ) : null}
                           {joinState.allowed ? (
                             <Button size="sm" onClick={() => void startSession(item)}>
@@ -1022,15 +1074,11 @@ function LiveMeetingRoom() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+      <div className="sticky top-12 z-20 -mx-1 flex flex-col gap-2 rounded-lg border border-border/80 bg-background/95 px-3 py-2.5 shadow-soft backdrop-blur-xl sm:top-16 sm:mx-0 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="font-display text-xl font-medium sm:text-2xl">{session.title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {session.class?.name} · Niveau {session.class?.level?.code ?? "—"} ·{" "}
-            {teacherLabel(session)}
-          </p>
-          <p className="mt-0.5 text-sm">
-            Visioconférence : <strong>Jitsi</strong>
+          <h1 className="truncate font-display text-base font-medium sm:text-xl">{session.title}</h1>
+          <p className="truncate text-xs text-muted-foreground sm:text-sm">
+            {session.class?.name} · {teacherLabel(session)} · Jitsi
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1052,21 +1100,23 @@ function LiveMeetingRoom() {
                 );
               }}
             >
-              Terminer la séance
+              Terminer
             </Button>
           )}
           <Button
-            variant="outline"
             size="sm"
+            variant="default"
             onClick={() => {
               if (
-                window.confirm("Quitter la réunion ? Vous pourrez la rejoindre tant qu’elle est ouverte.")
+                window.confirm(
+                  "Fermer la réunion ? Vous pourrez la rejoindre tant qu’elle est ouverte.",
+                )
               ) {
                 leaveMeeting();
               }
             }}
           >
-            Quitter
+            Fermer
           </Button>
         </div>
       </div>

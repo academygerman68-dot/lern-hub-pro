@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useUpdateLiveSessionSchedule } from "@/hooks/use-academy-data";
+import {
+  useUpdateLiveSessionSchedule,
+  useUpdateLiveSessionStatus,
+} from "@/hooks/use-academy-data";
 import { formatLiveTime, isValidExternalMeetingUrl } from "@/lib/live-meeting";
 import {
   type LiveMeetingMode,
@@ -11,6 +14,7 @@ import {
 } from "@/services/supabase/live-session-service";
 import { useAcademy } from "../academy-context";
 import { FormSection, Surface } from "../primitives";
+import { MobileModal } from "../shared/mobile-modal";
 import { LiveMeetingModeFields } from "./meeting-mode-fields";
 
 function toDateInput(iso: string) {
@@ -51,6 +55,7 @@ type EditLiveSessionModalProps = {
 export function EditLiveSessionModal({ open, session, onClose }: EditLiveSessionModalProps) {
   const { profile, role } = useAcademy();
   const updateSchedule = useUpdateLiveSessionSchedule();
+  const updateStatus = useUpdateLiveSessionStatus();
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -59,6 +64,7 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
   const [externalMeetingUrl, setExternalMeetingUrl] = useState("");
   const [confirm, setConfirm] = useState(false);
   const [scope] = useState<"this" | "following" | "series">("this");
+  const busy = updateSchedule.isPending || updateStatus.isPending;
 
   useEffect(() => {
     if (!open || !session) return;
@@ -144,14 +150,43 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
 
   if (!canEdit) return null;
 
+  const cancelSession = () => {
+    if (session.status === "cancelled") {
+      toast.message("Cette séance est déjà annulée.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Supprimer / annuler la séance « ${session.title} » ? Elle disparaîtra des listes à venir.`,
+      )
+    ) {
+      return;
+    }
+    updateStatus.mutate(
+      { id: session.id, status: "cancelled" },
+      {
+        onSuccess: () => {
+          toast.success("Séance annulée");
+          onClose();
+        },
+        onError: (err) => toast.error(err.message),
+      },
+    );
+  };
+
   return (
-    <div className="mobile-modal">
+    <MobileModal onClose={onClose}>
       <Surface className="mobile-modal-panel max-h-[90dvh] space-y-4 overflow-y-auto">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Modifier la séance</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {session.class?.name ?? "Groupe"} · {oldLabel}
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold tracking-tight">Modifier la séance</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {session.class?.name ?? "Groupe"} · {oldLabel}
+            </p>
+          </div>
+          <Button size="sm" variant="ghost" disabled={busy} onClick={onClose}>
+            Fermer
+          </Button>
         </div>
 
         <FormSection
@@ -167,7 +202,7 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
                 setTitle(e.target.value);
                 setConfirm(false);
               }}
-              disabled={updateSchedule.isPending}
+              disabled={busy}
             />
           </label>
           <label className="block text-sm">
@@ -180,7 +215,7 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
                 setDate(e.target.value);
                 setConfirm(false);
               }}
-              disabled={updateSchedule.isPending}
+              disabled={busy}
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
@@ -194,7 +229,7 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
                   setStartTime(e.target.value);
                   setConfirm(false);
                 }}
-                disabled={updateSchedule.isPending}
+                disabled={busy}
               />
             </label>
             <label className="block text-sm">
@@ -207,7 +242,7 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
                   setEndTime(e.target.value);
                   setConfirm(false);
                 }}
-                disabled={updateSchedule.isPending}
+                disabled={busy}
               />
             </label>
           </div>
@@ -215,7 +250,7 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
             name="edit-meeting-mode"
             meetingMode={meetingMode}
             externalMeetingUrl={externalMeetingUrl}
-            disabled={updateSchedule.isPending}
+            disabled={busy}
             onMeetingModeChange={(mode) => {
               setMeetingMode(mode);
               setConfirm(false);
@@ -235,14 +270,10 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
             <input type="radio" checked readOnly className="accent-primary" />
             Cette séance uniquement
           </label>
-          <p className="text-xs text-muted-foreground">
-            « Cette séance et les suivantes » / « Toute la série » seront disponibles lorsque le
-            backend gérera les séries.
-          </p>
         </FormSection>
 
         {confirm ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-50">
             Modifier cette séance de <strong>{oldLabel}</strong> vers <strong>{newLabel}</strong>
             {meetingMode === "external"
               ? " · visioconférence Zoom / Meet"
@@ -251,33 +282,40 @@ export function EditLiveSessionModal({ open, session, onClose }: EditLiveSession
           </div>
         ) : null}
 
-        <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
           <Button
             variant="outline"
-            disabled={updateSchedule.isPending}
-            onClick={() => {
-              setConfirm(false);
-              onClose();
-            }}
+            className="text-destructive"
+            disabled={busy || session.status === "cancelled"}
+            onClick={cancelSession}
           >
-            Annuler
+            {updateStatus.isPending ? "Suppression…" : "Supprimer la séance"}
           </Button>
-          <Button
-            disabled={
-              updateSchedule.isPending ||
-              (meetingMode === "external" && !externalMeetingUrl.trim())
-            }
-            onClick={save}
-          >
-            {updateSchedule.isPending
-              ? "Enregistrement…"
-              : confirm
-                ? "Confirmer la modification"
-                : "Enregistrer"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                setConfirm(false);
+                onClose();
+              }}
+            >
+              Annuler
+            </Button>
+            <Button
+              disabled={busy || (meetingMode === "external" && !externalMeetingUrl.trim())}
+              onClick={save}
+            >
+              {updateSchedule.isPending
+                ? "Enregistrement…"
+                : confirm
+                  ? "Confirmer la modification"
+                  : "Enregistrer"}
+            </Button>
+          </div>
         </div>
       </Surface>
-    </div>
+    </MobileModal>
   );
 }
 
@@ -289,7 +327,8 @@ export function canEditLiveSession(
 ) {
   if (role === "director") return true;
   if (role === "teacher") {
-    if (!myTeacherId) return false;
+    // If teacher id isn’t resolved yet, still show actions — RLS blocks unauthorized writes.
+    if (!myTeacherId) return true;
     return session.teacher_id === myTeacherId || session.class?.teacher_id === myTeacherId;
   }
   return false;
