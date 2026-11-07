@@ -41,6 +41,7 @@ import type { LiveSessionListItem } from "@/services/supabase/live-session-servi
 import type { MeetingRecording } from "@/types/phase3";
 import { useAcademy } from "./academy-context";
 import { JitsiMeetingEmbed } from "./jitsi-meeting";
+import { LiveMeetingStage } from "./live-meeting-stage";
 import { QueryState } from "./query-state";
 import { LiveCalendar, LiveCalendarErrorBoundary } from "./live-calendar";
 import { canEditLiveSession, EditLiveSessionModal } from "./live/edit-session-modal";
@@ -1073,55 +1074,36 @@ function LiveMeetingRoom() {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="sticky top-12 z-20 -mx-1 flex flex-col gap-2 rounded-lg border border-border/80 bg-background/95 px-3 py-2.5 shadow-soft backdrop-blur-xl sm:top-16 sm:mx-0 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="truncate font-display text-base font-medium sm:text-xl">{session.title}</h1>
-          <p className="truncate text-xs text-muted-foreground sm:text-sm">
-            {session.class?.name} · {teacherLabel(session)} · Jitsi
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {isStaff && session.status === "live" && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setEndConferenceSignal((value) => value + 1);
-                updateStatus.mutate(
-                  { id: session.id, status: "completed" },
-                  {
-                    onSuccess: () => {
-                      toast.success("Séance terminée");
-                      leaveMeeting();
-                    },
-                    onError: (err) => toast.error(err.message),
-                  },
-                );
-              }}
-            >
-              Terminer
-            </Button>
-          )}
+    <LiveMeetingStage
+      title={session.title}
+      subtitle={`${session.class?.name ?? "Groupe"} · ${teacherLabel(session)} · Jitsi`}
+      onClose={leaveMeeting}
+      actions={
+        isStaff && session.status === "live" ? (
           <Button
+            variant="outline"
             size="sm"
-            variant="default"
             onClick={() => {
-              if (
-                window.confirm(
-                  "Fermer la réunion ? Vous pourrez la rejoindre tant qu’elle est ouverte.",
-                )
-              ) {
-                leaveMeeting();
-              }
+              setEndConferenceSignal((value) => value + 1);
+              updateStatus.mutate(
+                { id: session.id, status: "completed" },
+                {
+                  onSuccess: () => {
+                    toast.success("Séance terminée");
+                    leaveMeeting();
+                  },
+                  onError: (err) => toast.error(err.message),
+                },
+              );
             }}
           >
-            Fermer
+            Terminer
           </Button>
-        </div>
-      </div>
-
+        ) : null
+      }
+    >
       <JitsiMeetingEmbed
+        fill
         sessionId={session.id}
         roomName={session.meeting_room}
         displayName={displayName}
@@ -1138,6 +1120,6 @@ function LiveMeetingRoom() {
           }
         }}
       />
-    </div>
+    </LiveMeetingStage>
   );
 }

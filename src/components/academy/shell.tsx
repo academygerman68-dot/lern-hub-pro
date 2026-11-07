@@ -378,7 +378,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main
           className={
             inMeeting
-              ? "px-2 py-3 sm:px-4 sm:py-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))]"
+              ? "px-2 py-2 sm:px-4 sm:py-3 pb-[max(1rem,env(safe-area-inset-bottom,0px))]"
               : `px-3 py-4 sm:px-8 sm:py-8 ${
                   showMobileTabs
                     ? "pb-[max(5rem,calc(3.75rem+env(safe-area-inset-bottom,0px)))] lg:pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]"
@@ -387,7 +387,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           }
         >
           <div
-            className={`mx-auto w-full animate-fade-in ${inMeeting ? "max-w-[96rem]" : "max-w-[72rem]"}`}
+            className={`mx-auto w-full animate-fade-in ${inMeeting ? "max-w-none" : "max-w-[72rem]"}`}
           >
             {children}
           </div>

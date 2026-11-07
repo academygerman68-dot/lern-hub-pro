@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { JitsiMeeting } from "@jitsi/react-sdk";
-import { Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getJitsiConfig } from "@/lib/jitsi-config";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
 
 type Props = {
   sessionId: string;
@@ -12,6 +12,8 @@ type Props = {
   email?: string;
   startMuted?: boolean;
   endConferenceSignal?: number;
+  /** Fill the parent stage (immersive meeting). */
+  fill?: boolean;
   onLeave?: () => void;
   onConferenceJoined?: () => void;
   onEmergencyZoom?: () => void;
@@ -109,6 +111,7 @@ export function JitsiMeetingEmbed({
   email,
   startMuted = false,
   endConferenceSignal = 0,
+  fill = false,
   onLeave,
   onConferenceJoined,
   onEmergencyZoom,
@@ -125,8 +128,6 @@ export function JitsiMeetingEmbed({
   );
   const [authorizationError, setAuthorizationError] = useState<string | null>(null);
   const [embedFailed, setEmbedFailed] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const stageRef = useRef<HTMLDivElement | null>(null);
   const mountedRef = useRef(true);
   const apiRef = useRef<{ executeCommand: (command: string, ...args: unknown[]) => void } | null>(
     null,
@@ -175,15 +176,6 @@ export function JitsiMeetingEmbed({
   useEffect(() => {
     if (endConferenceSignal > 0) apiRef.current?.executeCommand("endConference");
   }, [endConferenceSignal]);
-
-  useEffect(() => {
-    const onFsChange = () => {
-      const active = document.fullscreenElement === stageRef.current;
-      setIsFullscreen(active);
-    };
-    document.addEventListener("fullscreenchange", onFsChange);
-    return () => document.removeEventListener("fullscreenchange", onFsChange);
-  }, []);
 
   const handleReadyToClose = useCallback(() => {
     setConnectionState("left");
@@ -237,24 +229,6 @@ export function JitsiMeetingEmbed({
   const retryJitsi = () => {
     setEmbedFailed(false);
     setLoadKey((key) => key + 1);
-  };
-
-  const toggleFullscreen = async () => {
-    const node = stageRef.current;
-    if (!node) return;
-    try {
-      if (document.fullscreenElement === node) {
-        await document.exitFullscreen();
-        return;
-      }
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      }
-      await node.requestFullscreen();
-    } catch {
-      // Browser denied fullscreen — Jitsi toolbar fullscreen may still work.
-      apiRef.current?.executeCommand("toggleFullScreen");
-    }
   };
 
   if (!config.configured) {
@@ -316,36 +290,15 @@ export function JitsiMeetingEmbed({
       : { displayName, email: `${displayName.replace(/\s+/g, ".").toLowerCase()}@gla.local` };
 
   return (
-    <div className="space-y-3">
+    <div className={cn("jitsi-meeting-embed flex h-full min-h-0 flex-col", !fill && "space-y-3")}>
       <div
-        ref={stageRef}
-        className={`relative w-full overflow-hidden bg-black ${
-          isFullscreen
-            ? "h-screen rounded-none"
-            : "h-[min(78dvh,760px)] rounded-xl border border-border sm:h-[min(82vh,820px)]"
-        }`}
+        className={cn(
+          "relative min-h-0 w-full flex-1 overflow-hidden bg-black",
+          fill
+            ? "h-full rounded-none"
+            : "h-[min(78dvh,760px)] rounded-xl border border-border sm:h-[min(82vh,820px)]",
+        )}
       >
-        <div className="absolute top-3 right-3 z-10 flex gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            className="bg-background/90 shadow-soft backdrop-blur"
-            onClick={() => void toggleFullscreen()}
-          >
-            {isFullscreen ? (
-              <>
-                <Minimize2 className="size-3.5" />
-                Quitter plein écran
-              </>
-            ) : (
-              <>
-                <Maximize2 className="size-3.5" />
-                Plein écran
-              </>
-            )}
-          </Button>
-        </div>
         <JitsiMeeting
           key={`${authorizedRoomName}-${loadKey}-${jwt ? "jwt" : "guest"}`}
           domain={config.domain}
@@ -365,7 +318,6 @@ export function JitsiMeetingEmbed({
               "microphone",
               "camera",
               "desktop",
-              "fullscreen",
               "chat",
               "raisehand",
               "tileview",
@@ -396,70 +348,52 @@ export function JitsiMeetingEmbed({
           )}
         />
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-medium ${
-              connectionState === "joined"
-                ? "bg-success-soft text-success"
+      {!fill ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-medium ${
+                connectionState === "joined"
+                  ? "bg-success-soft text-success"
+                  : connectionState === "left"
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-warning-soft text-warning-foreground"
+              }`}
+            >
+              <span className="size-1.5 rounded-full bg-current" />
+              {connectionState === "joined"
+                ? "Connecté"
                 : connectionState === "left"
-                  ? "bg-destructive/10 text-destructive"
-                  : "bg-warning-soft text-warning-foreground"
-            }`}
-          >
-            <span className="size-1.5 rounded-full bg-current" />
-            {connectionState === "joined"
-              ? "Connecté"
-              : connectionState === "left"
-                ? "Déconnecté"
-                : "Connexion…"}
-          </span>
-          {connectionState === "joined" && (
-            <span>
-              {participantCount} participant{participantCount > 1 ? "s" : ""}
+                  ? "Déconnecté"
+                  : "Connexion…"}
             </span>
-          )}
-          <span>
-            {config.provider === "jaas" ? "JaaS 8x8.vc" : config.domain} · chat et partage d’écran
-            disponibles.
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => void toggleFullscreen()}>
-            {isFullscreen ? "Quitter plein écran" : "Plein écran"}
-          </Button>
-          <Button size="sm" variant="outline" onClick={retryJitsi}>
-            Réessayer
-          </Button>
-          {onEmergencyZoom && (
-            <Button size="sm" variant="outline" onClick={onEmergencyZoom}>
-              Réunion d’urgence Zoom
+            {connectionState === "joined" && (
+              <span>
+                {participantCount} participant{participantCount > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={retryJitsi}>
+              Réessayer
             </Button>
-          )}
-          <Button size="sm" variant="ghost" onClick={() => setShowHelp((v) => !v)}>
-            {showHelp ? "Masquer l’aide" : "Aide"}
-          </Button>
+            {onEmergencyZoom && (
+              <Button size="sm" variant="outline" onClick={onEmergencyZoom}>
+                Réunion d’urgence Zoom
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => setShowHelp((v) => !v)}>
+              {showHelp ? "Masquer l’aide" : "Aide"}
+            </Button>
+          </div>
         </div>
-      </div>
-      {showHelp && (
+      ) : null}
+      {showHelp && !fill ? (
         <div className="rounded-lg border border-border bg-secondary/40 p-3 text-sm text-muted-foreground">
-          <p>
-            Autorisez micro/caméra dans le navigateur. Tous les participants doivent rejoindre la
-            même salle sur {config.domain}.
-          </p>
-          <p className="mt-2">
-            <strong className="text-foreground">Plein écran (PC)</strong> : utilisez le bouton
-            « Plein écran » au-dessus de la vidéo, ou l’icône plein écran dans la barre Jitsi.
-          </p>
-          <p className="mt-2">
-            <strong className="text-foreground">Partage d’écran (mobile)</strong> : disponible
-            surtout sur Chrome Android. Sur iPhone/iPad Safari, le partage d’écran dans une page web
-            n’est en général pas supporté par le système — utilisez un ordinateur, ou un appareil
-            Android avec Chrome à jour, et autorisez « Partage d’écran / display-capture » si le
-            navigateur le demande.
-          </p>
+          Autorisez micro/caméra. Utilisez « Agrandir » / « Masquer menu » / « Fermer » au-dessus de
+          la vidéo pour contrôler la réunion.
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
