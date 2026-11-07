@@ -357,17 +357,17 @@ export function PremiumTeacherDashboard() {
   const publishedAssignments = myAssignments.filter((item) => item.status === "Publié");
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div className="animate-fade-in space-y-4 sm:space-y-6">
       <div>
-        <div className="mb-3 flex h-1 w-14 overflow-hidden rounded-sm" aria-hidden="true">
+        <div className="mb-2 flex h-1 w-12 overflow-hidden rounded-sm sm:mb-3 sm:w-14" aria-hidden="true">
           <span className="flex-1 bg-foreground" />
           <span className="flex-1 bg-alert" />
           <span className="flex-1 bg-gold" />
         </div>
-        <p className="text-sm font-medium tracking-wide text-muted-foreground uppercase">
+        <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase sm:text-sm">
           {l("Espace enseignant", "مساحة الأستاذ")}
         </p>
-        <h1 className="font-display text-3xl font-medium tracking-tight">
+        <h1 className="font-display text-2xl font-medium tracking-tight sm:text-3xl">
           {l("Priorités du jour", "أولويات اليوم")}
         </h1>
       </div>
@@ -387,83 +387,99 @@ export function PremiumTeacherDashboard() {
           void teachersQuery.refetch();
         }}
       >
-        <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <Surface className="p-5">
+        {/* Mobile: compact metric strip — Desktop: card grid */}
+        <section className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-5 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-4">
+          <Surface className="min-w-[9.5rem] shrink-0 p-3 sm:min-w-0 sm:p-5">
             <Eyebrow>{l("Cours aujourd’hui", "حصص اليوم")}</Eyebrow>
-            <p className="mt-3 font-display text-4xl">{todaySessions.length}</p>
+            <p className="mt-1.5 font-display text-2xl sm:mt-3 sm:text-4xl">{todaySessions.length}</p>
             {todaySessions[0] ? (
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground sm:mt-2 sm:text-sm">
                 {formatLiveTime(todaySessions[0].starts_at)} · {todaySessions[0].title}
               </p>
             ) : (
-              <p className="mt-2 text-sm text-muted-foreground">{l("Aucune séance", "لا حصة")}</p>
+              <p className="mt-1 text-xs text-muted-foreground sm:mt-2 sm:text-sm">
+                {l("Aucune séance", "لا حصة")}
+              </p>
             )}
           </Surface>
-          <Surface className="p-5">
+          <Surface className="min-w-[9.5rem] shrink-0 p-3 sm:min-w-0 sm:p-5">
             <Eyebrow>{l("Devoirs à corriger", "واجبات للتصحيح")}</Eyebrow>
-            <p className="mt-3 font-display text-4xl">{publishedAssignments.length}</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {l("Devoirs publiés dans vos groupes", "واجبات منشورة في أقسامك")}
+            <p className="mt-1.5 font-display text-2xl sm:mt-3 sm:text-4xl">
+              {publishedAssignments.length}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground sm:mt-2 sm:text-sm">
+              {l("Publiés dans vos groupes", "منشورة في أقسامك")}
             </p>
           </Surface>
-          <Surface className="p-5">
+          <Surface className="min-w-[9.5rem] shrink-0 p-3 sm:min-w-0 sm:p-5">
             <Eyebrow>{l("Étudiants", "الطلاب")}</Eyebrow>
-            <p className="mt-3 font-display text-4xl">{rosterQuery.data?.length ?? 0}</p>
-            <p className="mt-2 text-sm text-muted-foreground">{primaryClass?.name}</p>
+            <p className="mt-1.5 font-display text-2xl sm:mt-3 sm:text-4xl">
+              {rosterQuery.data?.length ?? 0}
+            </p>
+            <p className="mt-1 line-clamp-1 text-xs text-muted-foreground sm:mt-2 sm:text-sm">
+              {primaryClass?.name}
+            </p>
           </Surface>
-          <Surface className="p-5">
+          <Surface className="min-w-[11rem] shrink-0 p-3 sm:min-w-0 sm:p-5">
             <Eyebrow>{l("Prochaine séance", "الحصة القادمة")}</Eyebrow>
             {nextMeeting ? (
               <>
-                <p className="mt-3 text-sm font-medium">{nextMeeting.title}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1.5 line-clamp-2 text-sm font-medium sm:mt-3">{nextMeeting.title}</p>
+                <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
                   {formatLiveDate(nextMeeting.starts_at)} · {formatLiveTime(nextMeeting.starts_at)}
                 </p>
               </>
             ) : (
-              <p className="mt-3 text-sm text-muted-foreground">
+              <p className="mt-1.5 text-xs text-muted-foreground sm:mt-3 sm:text-sm">
                 {l("Rien de planifié", "لا شيء")}
               </p>
             )}
           </Surface>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-          <Surface className="p-6">
+        <section className="grid gap-3 sm:gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+          <Surface className="p-4 sm:p-6">
             <div className="flex items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <Eyebrow>{l("Classe principale", "القسم الرئيسي")}</Eyebrow>
-                <h2 className="mt-3 font-display text-2xl">{primaryClass?.name}</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
+                <h2 className="mt-2 font-display text-xl sm:mt-3 sm:text-2xl">{primaryClass?.name}</h2>
+                <p className="mt-1.5 text-xs text-muted-foreground sm:mt-2 sm:text-sm">
                   {primaryClass?.schedule} · {primaryClass?.size}/{primaryClass?.capacity}{" "}
                   {l("inscrits", "مسجّل")}
                 </p>
               </div>
-              <CalendarDays className="size-5 text-primary" />
+              <CalendarDays className="size-4 shrink-0 text-primary sm:size-5" />
             </div>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Button onClick={() => navigate("classes")}>
+            <div className="mt-4 flex flex-wrap gap-2 sm:mt-6 sm:gap-3">
+              <Button size="sm" onClick={() => navigate("classes")}>
                 {l("Ouvrir la classe", "فتح القسم")}
               </Button>
-              <Button variant="outline" onClick={() => navigate("assignments")}>
+              <Button size="sm" variant="outline" onClick={() => navigate("assignments")}>
                 {l("Devoirs", "الواجبات")}
               </Button>
-              <Button variant="outline" onClick={() => navigate("live")}>
-                {l("Cours en direct", "حصص مباشرة")}
+              <Button size="sm" variant="outline" onClick={() => navigate("live")}>
+                {l("Direct", "مباشر")}
               </Button>
             </div>
           </Surface>
-          <Surface className="p-6">
+          <Surface className="p-4 sm:p-6">
             <Eyebrow>{l("Séances du jour", "حصص اليوم")}</Eyebrow>
-            <div className="mt-4 space-y-3">
+            <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-3">
               {todaySessions.length ? (
                 todaySessions.map((session) => (
-                  <div key={session.id} className="rounded-lg border border-border p-3 text-sm">
-                    <p className="font-medium">{session.title}</p>
-                    <p className="mt-1 text-muted-foreground">
-                      {formatLiveTime(session.starts_at)} · {liveStatusLabel(session.status)}
-                    </p>
-                  </div>
+                  <button
+                    key={session.id}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-left text-sm transition hover:bg-muted/50"
+                    onClick={() => navigate("live")}
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{session.title}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatLiveTime(session.starts_at)} · {liveStatusLabel(session.status)}
+                      </span>
+                    </span>
+                  </button>
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground">
@@ -475,24 +491,24 @@ export function PremiumTeacherDashboard() {
         </section>
       </QueryState>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="divide-y divide-border overflow-hidden rounded-md border border-border bg-card md:grid md:grid-cols-3 md:divide-x md:divide-y-0">
         {(
           [
             [
               l("Devoirs", "الواجبات"),
-              l("Corriger les remises des étudiants.", "تصحيح تسليمات الطلاب."),
+              l("Corriger les remises.", "تصحيح التسليمات."),
               "assignments",
               ClipboardCheck,
             ],
             [
               l("Cours en direct", "الحصص المباشرة"),
-              l("Lancer ou rejoindre une séance.", "بدء أو الانضمام إلى حصة."),
+              l("Lancer ou rejoindre.", "بدء أو الانضمام."),
               "live",
               CalendarDays,
             ],
             [
               l("Examens", "الامتحانات"),
-              l("Préparer et publier les évaluations.", "تحضير ونشر التقييمات."),
+              l("Préparer et publier.", "تحضير ونشر."),
               "exams",
               ClipboardCheck,
             ],
@@ -504,11 +520,15 @@ export function PremiumTeacherDashboard() {
               key={title}
               type="button"
               onClick={() => navigate(page)}
-              className="rounded-md border border-border bg-card p-5 text-left transition hover:border-gold/40 hover:bg-accent/40"
+              className="flex items-center gap-3 px-3.5 py-3 text-left transition hover:bg-accent/40 md:flex-col md:items-start md:gap-0 md:p-5"
             >
-              <ItemIcon className="size-4 text-gold" />
-              <h2 className="mt-4 text-sm font-semibold">{title}</h2>
-              <p className="mt-2 text-sm text-muted-foreground">{body}</p>
+              <ItemIcon className="size-4 shrink-0 text-gold" />
+              <span className="min-w-0 md:mt-4">
+                <span className="block text-sm font-semibold">{title}</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground md:mt-2 md:text-sm">
+                  {body}
+                </span>
+              </span>
             </button>
           );
         })}

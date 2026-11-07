@@ -38,12 +38,12 @@ export function ThemeToggle({ showLabels = false }: { showLabels?: boolean }) {
             type="button"
             aria-pressed={selected}
             onClick={() => writeColorScheme(value)}
-            className={`inline-flex min-h-9 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+            className={`inline-flex size-8 items-center justify-center gap-1 rounded-md text-[11px] font-medium transition-colors sm:min-h-9 sm:w-auto sm:px-2 sm:py-1 ${
               selected ? "bg-soft-blue text-primary" : "text-muted-foreground hover:bg-muted"
             }`}
           >
             <Icon className="size-3.5" aria-hidden="true" />
-            <span className={showLabels ? undefined : "sr-only sm:not-sr-only"}>
+            <span className={showLabels ? undefined : "sr-only sm:not-sr-only sm:inline"}>
               {t(value === "light" ? "shell.theme.light" : "shell.theme.dark")}
             </span>
           </button>

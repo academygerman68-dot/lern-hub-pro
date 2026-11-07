@@ -504,9 +504,25 @@
     padding: 0.65rem 0.7rem;
   }
   .nav-item {
-    min-height: 2.75rem;
-    padding: 0.7rem 0.85rem;
-    font-size: 0.875rem;
+    min-height: 2.5rem;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.8125rem;
+    gap: 0.55rem;
+  }
+
+  /* Teacher mobile: less visual weight, tighter chrome */
+  [data-role="teacher"] .academy-content main {
+    font-size: 0.9375rem;
+  }
+  [data-role="teacher"] .mobile-modal-panel {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 1023px) {
+  [data-role="teacher"] .academy-sidebar .nav-item {
+    min-height: 2.4rem;
+    padding: 0.45rem 0.65rem;
   }
 }
 

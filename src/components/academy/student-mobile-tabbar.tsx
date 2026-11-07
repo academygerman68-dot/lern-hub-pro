@@ -1,4 +1,5 @@
 import { BookOpen, ClipboardCheck, FileText, Home, Library, type LucideIcon } from "lucide-react";
+import { clearLiveSessionId } from "@/lib/live-class-session";
 import type { AcademyPage } from "@/types/academy";
 import { useAcademy } from "./academy-context";
 
@@ -38,6 +39,18 @@ const TABS: readonly {
 export function StudentMobileTabBar() {
   const { role, page, navigate, t } = useAcademy();
   if (role !== "student") return null;
+  if (page === "meeting") return null;
+
+  const go = (id: AcademyPage) => {
+    if (page === "meeting") {
+      const ok = window.confirm(
+        "Vous êtes en réunion. Quitter la visioconférence et changer de page ?",
+      );
+      if (!ok) return;
+      clearLiveSessionId();
+    }
+    navigate(id);
+  };
 
   return (
     <nav
@@ -52,7 +65,7 @@ export function StudentMobileTabBar() {
             <li key={id} className="flex-1">
               <button
                 type="button"
-                onClick={() => navigate(id)}
+                onClick={() => go(id)}
                 className={`flex w-full flex-col items-center gap-0.5 px-1 py-2 text-[10px] font-medium transition-colors ${
                   active ? "text-primary" : "text-muted-foreground"
                 }`}

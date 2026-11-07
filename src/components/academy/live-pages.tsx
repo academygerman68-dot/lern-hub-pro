@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Video } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -412,11 +412,11 @@ function LiveSessionLobby() {
             {/* A. Hero */}
             {hero ? (
               <Surface className="overflow-hidden border-primary/15 p-0">
-                <div className="bg-primary px-5 py-6 text-primary-foreground sm:px-8 sm:py-8">
-                  <p className="text-xs font-medium tracking-wide text-primary-foreground/70 uppercase">
+                <div className="bg-primary px-4 py-4 text-primary-foreground sm:px-8 sm:py-8">
+                  <p className="text-[10px] font-medium tracking-wide text-primary-foreground/70 uppercase sm:text-xs">
                     {hero.status === "live" ? "En cours maintenant" : "Prochaine séance"}
                   </p>
-                  <h2 className="mt-2 font-display text-2xl font-normal tracking-tight sm:text-3xl">
+                  <h2 className="mt-1.5 font-display text-xl font-normal tracking-tight sm:mt-2 sm:text-3xl">
                     {hero.title}
                   </h2>
                   <p className="mt-2 text-sm text-primary-foreground/75">
@@ -458,10 +458,11 @@ function LiveSessionLobby() {
                           : "Rejoindre n’est pas encore disponible."}
                     </p>
                   ) : null}
-                  <div className="mt-5 flex flex-wrap gap-2">
+                  <div className="mt-4 flex flex-wrap gap-2 sm:mt-5">
                     <Button
+                      size="sm"
                       variant="secondary"
-                      className="min-h-11"
+                      className="sm:h-9 sm:px-4 sm:text-sm"
                       disabled={!heroJoinState?.allowed}
                       title={
                         !heroJoinState?.allowed
@@ -472,22 +473,24 @@ function LiveSessionLobby() {
                       }
                       onClick={() => void startSession(hero)}
                     >
-                      <Video className="size-4" />
+                      <Video className="size-3.5 sm:size-4" />
                       {isStaff ? (hero.status === "live" ? "Rejoindre" : "Démarrer") : "Rejoindre"}
                     </Button>
                     {canEditLiveSession(role, hero, myTeacherId) && hero.status !== "cancelled" ? (
                       <Button
+                        size="sm"
                         variant="outline"
-                        className="min-h-11 border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+                        className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 sm:h-9 sm:px-4 sm:text-sm"
                         onClick={() => setEditSession(hero)}
                       >
-                        Modifier la séance
+                        Modifier
                       </Button>
                     ) : null}
                     {isStaff && hero.status === "live" ? (
                       <Button
+                        size="sm"
                         variant="outline"
-                        className="min-h-11 border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+                        className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 sm:h-9 sm:px-4 sm:text-sm"
                         onClick={() => endSession(hero)}
                       >
                         Terminer
@@ -518,7 +521,6 @@ function LiveSessionLobby() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="min-h-10"
                   aria-expanded={!upcomingCollapsed}
                   onClick={() => {
                     setUpcomingCollapsed((prev) => toggleUpcomingSessionsCollapsed(prev));
@@ -589,11 +591,7 @@ function LiveSessionLobby() {
                             </Button>
                           ) : null}
                           {joinState.allowed ? (
-                            <Button
-                              size="sm"
-                              className="min-h-11"
-                              onClick={() => void startSession(item)}
-                            >
+                            <Button size="sm" onClick={() => void startSession(item)}>
                               {isStaff ? "Démarrer" : "Rejoindre"}
                             </Button>
                           ) : null}
@@ -857,17 +855,20 @@ function LiveMeetingRoom() {
   const [resolveError, setResolveError] = useState<string | null>(null);
   const session = sessionQuery.data;
   const isStaff = role === "director" || role === "teacher";
+  const resolvedProviderRef = useRef(resolvedProvider);
+  resolvedProviderRef.current = resolvedProvider;
 
   const leaveMeeting = () => {
     clearLiveSessionId();
     navigate("live");
   };
 
+  // Resolve join target once per session id. Do NOT reset on session object
+  // identity changes (status → live, realtime refetch) or Jitsi remounts and
+  // readyToClose would eject the participant.
   useEffect(() => {
-    if (!session) return;
+    if (!session?.id) return;
     let cancelled = false;
-    setResolvedProvider(null);
-    setJoinHref(null);
     setResolveError(null);
     void LiveSessionService.joinTarget(session.id)
       .then((target) => {
@@ -877,19 +878,20 @@ function LiveMeetingRoom() {
             target.provider === "zoom" ? zoomHrefForViewer(target, isStaff) : target.url;
           setResolvedProvider(target.provider);
           setJoinHref(href);
-          if (!isStaff && href) openExternalMeeting(href);
+          if (!isStaff && href && !resolvedProviderRef.current) openExternalMeeting(href);
           return;
         }
         setResolvedProvider("jitsi");
       })
       .catch((err: Error) => {
         if (cancelled) return;
+        if (resolvedProviderRef.current) return;
         setResolveError(err.message || "Impossible de rejoindre la visioconférence.");
       });
     return () => {
       cancelled = true;
     };
-  }, [session, isStaff]);
+  }, [session?.id, isStaff]);
 
   if (!sessionId) {
     return (
@@ -1019,7 +1021,7 @@ function LiveMeetingRoom() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h1 className="font-display text-xl font-medium sm:text-2xl">{session.title}</h1>
@@ -1053,7 +1055,17 @@ function LiveMeetingRoom() {
               Terminer la séance
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={leaveMeeting}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (
+                window.confirm("Quitter la réunion ? Vous pourrez la rejoindre tant qu’elle est ouverte.")
+              ) {
+                leaveMeeting();
+              }
+            }}
+          >
             Quitter
           </Button>
         </div>

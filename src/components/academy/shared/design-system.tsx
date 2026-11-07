@@ -50,25 +50,27 @@ export function PageHeader({
   const tSubtitle = subtitle ? uiText(locale, subtitle) : undefined;
   const tEyebrow = eyebrow ? uiText(locale, eyebrow) : undefined;
   return (
-    <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:gap-5">
+    <div className="mb-4 flex flex-col gap-3 sm:mb-8 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:gap-5">
       <div className="min-w-0">
-        <div className="mb-3 flex h-1 w-12 overflow-hidden rounded-sm" aria-hidden="true">
+        <div className="mb-2 flex h-1 w-10 overflow-hidden rounded-sm sm:mb-3 sm:w-12" aria-hidden="true">
           <span className="flex-1 bg-foreground" />
           <span className="flex-1 bg-alert" />
           <span className="flex-1 bg-gold" />
         </div>
-        {tEyebrow ? <p className="eyebrow mb-2">{tEyebrow}</p> : null}
-        <h1 className="font-display text-[1.65rem] font-medium leading-[1.15] tracking-tight text-foreground sm:text-3xl md:text-[2.15rem]">
+        {tEyebrow ? <p className="eyebrow mb-1.5 sm:mb-2">{tEyebrow}</p> : null}
+        <h1 className="font-display text-[1.35rem] font-medium leading-[1.15] tracking-tight text-foreground sm:text-3xl md:text-[2.15rem]">
           {tTitle}
         </h1>
         {tSubtitle ? (
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:mt-2.5 sm:text-[0.9375rem]">
+          <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-muted-foreground sm:mt-2.5 sm:text-[0.9375rem]">
             {tSubtitle}
           </p>
         ) : null}
       </div>
       {action ? (
-        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">{action}</div>
+        <div className="flex w-full flex-wrap gap-1.5 sm:w-auto sm:justify-end sm:gap-2 [&_button]:h-8 [&_button]:px-3 [&_button]:text-xs sm:[&_button]:h-9 sm:[&_button]:px-4 sm:[&_button]:text-sm">
+          {action}
+        </div>
       ) : null}
     </div>
   );

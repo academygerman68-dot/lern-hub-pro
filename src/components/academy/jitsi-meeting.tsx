@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { JitsiMeeting } from "@jitsi/react-sdk";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getJitsiConfig } from "@/lib/jitsi-config";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -18,6 +19,9 @@ type Props = {
 
 type ConnectionState = "connecting" | "joined" | "left";
 type AuthorizationState = "loading" | "ready" | "error";
+
+const IFRAME_ALLOW =
+  "camera; microphone; display-capture; fullscreen; autoplay; clipboard-write; compute-pressure; hid; serial; usb; screen-wake-lock; speaker-selection";
 
 const tokenErrors: Record<string, string> = {
   JAAS_NOT_CONFIGURED:
@@ -73,6 +77,26 @@ async function fetchJaasAuthorization(
   return { jwt: data.jwt, roomName: data.roomName };
 }
 
+function ensureIframePermissions(parentNode: HTMLElement) {
+  const apply = (iframe: HTMLIFrameElement) => {
+    iframe.setAttribute("allow", IFRAME_ALLOW);
+    iframe.setAttribute("allowfullscreen", "true");
+  };
+
+  const existing = parentNode.querySelector("iframe");
+  if (existing instanceof HTMLIFrameElement) apply(existing);
+
+  const observer = new MutationObserver(() => {
+    const iframe = parentNode.querySelector("iframe");
+    if (iframe instanceof HTMLIFrameElement) {
+      apply(iframe);
+      observer.disconnect();
+    }
+  });
+  observer.observe(parentNode, { childList: true, subtree: true });
+  window.setTimeout(() => observer.disconnect(), 8000);
+}
+
 /**
  * Real Jitsi / JaaS embed via @jitsi/react-sdk.
  * JaaS roomName format: `{appId}/{room}` on domain 8x8.vc.
@@ -101,9 +125,19 @@ export function JitsiMeetingEmbed({
   );
   const [authorizationError, setAuthorizationError] = useState<string | null>(null);
   const [embedFailed, setEmbedFailed] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const mountedRef = useRef(true);
   const apiRef = useRef<{ executeCommand: (command: string, ...args: unknown[]) => void } | null>(
     null,
   );
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,9 +176,22 @@ export function JitsiMeetingEmbed({
     if (endConferenceSignal > 0) apiRef.current?.executeCommand("endConference");
   }, [endConferenceSignal]);
 
+  useEffect(() => {
+    const onFsChange = () => {
+      const active = document.fullscreenElement === stageRef.current;
+      setIsFullscreen(active);
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
   const handleReadyToClose = useCallback(() => {
     setConnectionState("left");
-    onLeave?.();
+    // Ignore closes caused by React tearing down the iframe (session refetch, nav chrome).
+    queueMicrotask(() => {
+      if (!mountedRef.current) return;
+      onLeave?.();
+    });
   }, [onLeave]);
 
   const handleApiReady = useCallback(
@@ -152,8 +199,19 @@ export function JitsiMeetingEmbed({
       on: (event: string, listener: (...args: unknown[]) => void) => unknown;
       getNumberOfParticipants: () => number;
       executeCommand: (command: string, ...args: unknown[]) => void;
+      getIFrame?: () => HTMLIFrameElement | undefined;
     }) => {
       apiRef.current = api;
+      try {
+        const iframe = api.getIFrame?.();
+        if (iframe) {
+          iframe.setAttribute("allow", IFRAME_ALLOW);
+          iframe.setAttribute("allowfullscreen", "true");
+        }
+      } catch {
+        // Older API builds may not expose getIFrame.
+      }
+
       const refreshParticipantCount = () => {
         setParticipantCount(api.getNumberOfParticipants());
       };
@@ -179,6 +237,24 @@ export function JitsiMeetingEmbed({
   const retryJitsi = () => {
     setEmbedFailed(false);
     setLoadKey((key) => key + 1);
+  };
+
+  const toggleFullscreen = async () => {
+    const node = stageRef.current;
+    if (!node) return;
+    try {
+      if (document.fullscreenElement === node) {
+        await document.exitFullscreen();
+        return;
+      }
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
+      await node.requestFullscreen();
+    } catch {
+      // Browser denied fullscreen — Jitsi toolbar fullscreen may still work.
+      apiRef.current?.executeCommand("toggleFullScreen");
+    }
   };
 
   if (!config.configured) {
@@ -241,7 +317,35 @@ export function JitsiMeetingEmbed({
 
   return (
     <div className="space-y-3">
-      <div className="h-[min(70dvh,640px)] w-full overflow-hidden rounded-xl border border-border bg-black sm:h-[min(78vh,720px)]">
+      <div
+        ref={stageRef}
+        className={`relative w-full overflow-hidden bg-black ${
+          isFullscreen
+            ? "h-screen rounded-none"
+            : "h-[min(78dvh,760px)] rounded-xl border border-border sm:h-[min(82vh,820px)]"
+        }`}
+      >
+        <div className="absolute top-3 right-3 z-10 flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="bg-background/90 shadow-soft backdrop-blur"
+            onClick={() => void toggleFullscreen()}
+          >
+            {isFullscreen ? (
+              <>
+                <Minimize2 className="size-3.5" />
+                Quitter plein écran
+              </>
+            ) : (
+              <>
+                <Maximize2 className="size-3.5" />
+                Plein écran
+              </>
+            )}
+          </Button>
+        </div>
         <JitsiMeeting
           key={`${authorizedRoomName}-${loadKey}-${jwt ? "jwt" : "guest"}`}
           domain={config.domain}
@@ -256,10 +360,12 @@ export function JitsiMeetingEmbed({
             maxFullResolutionParticipants: 5,
             disableDeepLinking: true,
             enableWelcomePage: false,
+            prejoinConfig: { enabled: false },
             toolbarButtons: [
               "microphone",
               "camera",
               "desktop",
+              "fullscreen",
               "chat",
               "raisehand",
               "tileview",
@@ -272,6 +378,7 @@ export function JitsiMeetingEmbed({
             SHOW_WATERMARK_FOR_GUESTS: false,
             DISABLE_JOIN_LEAVE_NOTIFICATIONS: false,
             MOBILE_APP_PROMO: false,
+            DISABLE_FOCUS_INDICATOR: true,
           }}
           onApiReady={handleApiReady}
           onReadyToClose={handleReadyToClose}
@@ -280,6 +387,7 @@ export function JitsiMeetingEmbed({
             node.style.height = "100%";
             node.style.width = "100%";
             node.style.border = "0";
+            ensureIframePermissions(node);
           }}
           spinner={() => (
             <div className="grid h-full min-h-[400px] place-items-center text-sm text-muted-foreground">
@@ -317,6 +425,9 @@ export function JitsiMeetingEmbed({
           </span>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => void toggleFullscreen()}>
+            {isFullscreen ? "Quitter plein écran" : "Plein écran"}
+          </Button>
           <Button size="sm" variant="outline" onClick={retryJitsi}>
             Réessayer
           </Button>
@@ -332,9 +443,21 @@ export function JitsiMeetingEmbed({
       </div>
       {showHelp && (
         <div className="rounded-lg border border-border bg-secondary/40 p-3 text-sm text-muted-foreground">
-          Autorisez micro/caméra dans le navigateur. Tous les participants doivent rejoindre la même
-          salle sur {config.domain}. L’accès JaaS est vérifié par votre compte et un jeton
-          temporaire généré côté serveur.
+          <p>
+            Autorisez micro/caméra dans le navigateur. Tous les participants doivent rejoindre la
+            même salle sur {config.domain}.
+          </p>
+          <p className="mt-2">
+            <strong className="text-foreground">Plein écran (PC)</strong> : utilisez le bouton
+            « Plein écran » au-dessus de la vidéo, ou l’icône plein écran dans la barre Jitsi.
+          </p>
+          <p className="mt-2">
+            <strong className="text-foreground">Partage d’écran (mobile)</strong> : disponible
+            surtout sur Chrome Android. Sur iPhone/iPad Safari, le partage d’écran dans une page web
+            n’est en général pas supporté par le système — utilisez un ordinateur, ou un appareil
+            Android avec Chrome à jour, et autorisez « Partage d’écran / display-capture » si le
+            navigateur le demande.
+          </p>
         </div>
       )}
     </div>

@@ -33,9 +33,11 @@ import {
   useNotificationsRealtime,
   useUnreadNotificationCount,
 } from "@/hooks/use-academy-data";
+import { clearLiveSessionId } from "@/lib/live-class-session";
 import type { AcademyPage } from "@/types/academy";
 import { useAcademy } from "./academy-context";
 import { StudentMobileTabBar } from "./student-mobile-tabbar";
+import { TeacherMobileTabBar } from "./teacher-mobile-tabbar";
 import { ThemeToggle } from "./theme-toggle";
 
 type NavItem = readonly [AcademyPage, string, typeof Home];
@@ -157,6 +159,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (!role || !user) return null;
   const sections = menus[role];
+  const inMeeting = page === "meeting";
   const roleLabel =
     role === "director"
       ? t("shell.admin")
@@ -167,6 +170,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   const notificationRows = notificationsQuery.data ?? [];
 
   const languageSwitch = <LanguageSwitcher compact />;
+
+  const goToPage = (id: AcademyPage) => {
+    if (inMeeting && id !== "meeting") {
+      const ok = window.confirm(
+        "Vous êtes en réunion. Quitter la visioconférence et changer de page ?",
+      );
+      if (!ok) return;
+      clearLiveSessionId();
+    }
+    navigate(id);
+    setMobile(false);
+    setNotice(false);
+  };
 
   const sidebar = (
     <>
@@ -201,11 +217,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <button
                   key={id}
                   type="button"
-                  onClick={() => {
-                    navigate(id);
-                    setMobile(false);
-                  }}
-                  className={`nav-item ${page === id ? "nav-item-active" : ""}`}
+                  onClick={() => goToPage(id)}
+                  className={`nav-item ${page === id || (id === "live" && inMeeting) ? "nav-item-active" : ""}`}
                 >
                   <Icon className="size-4 shrink-0 opacity-80" />
                   <span className="truncate">{t(label)}</span>
@@ -247,8 +260,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     </>
   );
 
+  const showMobileTabs = !inMeeting && (role === "student" || role === "teacher");
+
   return (
-    <div className="min-h-dvh bg-background">
+    <div className="min-h-dvh bg-background" data-role={role}>
       <aside className="academy-sidebar fixed inset-y-0 left-0 z-40 hidden w-[16.5rem] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex">
         {sidebar}
       </aside>
@@ -266,7 +281,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
       <div className="academy-content lg:pl-[16.5rem]">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border/80 bg-background/90 px-3 backdrop-blur-xl sm:h-16 sm:gap-3 sm:px-8 pt-[env(safe-area-inset-top,0px)]">
+        <header className="sticky top-0 z-30 flex h-12 items-center gap-1.5 border-b border-border/80 bg-background/90 px-2.5 backdrop-blur-xl sm:h-16 sm:gap-3 sm:px-8 pt-[env(safe-area-inset-top,0px)]">
           <span
             className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gold/50 to-transparent"
             aria-hidden="true"
@@ -274,28 +289,28 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Button
             size="icon"
             variant="ghost"
-            className="min-h-11 min-w-11 shrink-0 lg:hidden"
+            className="size-9 shrink-0 sm:min-h-11 sm:min-w-11 lg:hidden"
             onClick={() => setMobile(true)}
             aria-label={t("shell.openNav")}
           >
-            <Menu className="size-5" />
+            <Menu className="size-4 sm:size-5" />
           </Button>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-base font-medium tracking-tight sm:text-lg">
+            <p className="truncate font-display text-sm font-medium tracking-tight sm:text-lg">
               German Academy
             </p>
             <p className="hidden truncate text-xs text-muted-foreground sm:block">
               {roleLabel} · {user.name}
             </p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1">
             <ThemeToggle />
             <div className="hidden sm:flex">{languageSwitch}</div>
             <div className="relative">
               <Button
                 size="icon"
                 variant="ghost"
-                className="relative min-h-11 min-w-11"
+                className="relative size-9 sm:min-h-11 sm:min-w-11"
                 aria-label={t("shell.notifications")}
                 onClick={() => {
                   const next = !notice;
@@ -305,7 +320,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 <Bell className="size-4" />
                 {unread > 0 && (
-                  <span className="absolute top-1.5 right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-alert px-1 text-[10px] font-semibold text-alert-foreground">
+                  <span className="absolute top-1 right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-alert px-1 text-[9px] font-semibold text-alert-foreground sm:top-1.5 sm:right-1.5 sm:h-4 sm:min-w-4 sm:text-[10px]">
                     {unread > 9 ? "9+" : unread}
                   </span>
                 )}
@@ -334,8 +349,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                         className="flex w-full gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-150 hover:bg-muted active:bg-muted"
                         onClick={() => {
                           if (item.status === "unread") markRead.mutate(item.id);
-                          if (item.link_page) navigate(item.link_page as AcademyPage);
-                          setNotice(false);
+                          if (item.link_page) goToPage(item.link_page as AcademyPage);
+                          else setNotice(false);
                         }}
                       >
                         <span
@@ -361,15 +376,24 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
         <main
-          className={`px-3 py-5 sm:px-8 sm:py-8 ${
-            role === "student"
-              ? "pb-[max(5.5rem,calc(4.25rem+env(safe-area-inset-bottom,0px)))] lg:pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]"
-              : "pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]"
-          }`}
+          className={
+            inMeeting
+              ? "px-2 py-3 sm:px-4 sm:py-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))]"
+              : `px-3 py-4 sm:px-8 sm:py-8 ${
+                  showMobileTabs
+                    ? "pb-[max(5rem,calc(3.75rem+env(safe-area-inset-bottom,0px)))] lg:pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]"
+                    : "pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]"
+                }`
+          }
         >
-          <div className="mx-auto w-full max-w-[72rem] animate-fade-in">{children}</div>
+          <div
+            className={`mx-auto w-full animate-fade-in ${inMeeting ? "max-w-[96rem]" : "max-w-[72rem]"}`}
+          >
+            {children}
+          </div>
         </main>
-        {role === "student" ? <StudentMobileTabBar /> : null}
+        {role === "student" && !inMeeting ? <StudentMobileTabBar /> : null}
+        {role === "teacher" && !inMeeting ? <TeacherMobileTabBar /> : null}
       </div>
     </div>
   );
