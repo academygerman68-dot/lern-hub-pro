@@ -59,7 +59,7 @@ export function LiveMeetingStage({
       aria-modal="true"
       aria-label={title}
     >
-      <div className="flex shrink-0 flex-col gap-2 border-b border-border/80 bg-background px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+      <div className="relative z-20 flex shrink-0 flex-col gap-2 border-b border-border bg-background px-3 py-2.5 pt-[max(0.65rem,env(safe-area-inset-top,0px))] sm:flex-row sm:items-center sm:justify-between sm:px-4">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold tracking-tight sm:text-base">{title}</p>
           {subtitle ? <p className="truncate text-xs text-muted-foreground">{subtitle}</p> : null}
@@ -67,17 +67,17 @@ export function LiveMeetingStage({
         <div className="flex flex-wrap items-center gap-2">
           {actions}
           {expanded ? (
-            <Button type="button" size="sm" variant="outline" onClick={() => setExpanded(false)}>
+            <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => setExpanded(false)}>
               <PanelLeftOpen className="size-3.5" />
               Afficher menu
             </Button>
           ) : (
-            <Button type="button" size="sm" variant="outline" onClick={() => setExpanded(true)}>
+            <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => setExpanded(true)}>
               <Maximize2 className="size-3.5" />
-              Agrandir / masquer menu
+              Agrandir
             </Button>
           )}
-          <Button type="button" size="sm" variant="default" onClick={onClose}>
+          <Button type="button" size="sm" variant="default" className="h-8" onClick={onClose}>
             <X className="size-3.5" />
             Fermer
           </Button>

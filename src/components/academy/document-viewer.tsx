@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
-import { Download, ExternalLink, X, ZoomIn, ZoomOut } from "lucide-react";
+import { createPortal } from "react-dom";
+import {
+  Download,
+  ExternalLink,
+  Maximize2,
+  Minimize2,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type DocumentViewerProps = {
   open: boolean;
@@ -51,104 +61,152 @@ export function DocumentViewer({
 }: DocumentViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [downloading, setDownloading] = useState(false);
+  const [expanded, setExpanded] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const kind = kindFromMime(mimeType, title);
 
   useEffect(() => {
-    if (!open) setZoom(1);
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      setZoom(1);
+      setExpanded(true);
+    }
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-foreground/50 p-0 sm:p-6">
-      <div className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-none border-0 bg-background shadow-xl sm:rounded-2xl sm:border sm:border-border">
-        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))] sm:gap-3 sm:px-4">
+  const panel = (
+    <div
+      className="fixed inset-0 z-[90] flex items-stretch justify-center bg-foreground/55 p-0 sm:p-3"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        className={cn(
+          "flex min-h-0 w-full flex-col overflow-hidden bg-background shadow-xl",
+          expanded
+            ? "h-full max-w-none rounded-none border-0"
+            : "my-auto h-[min(92dvh,56rem)] max-w-5xl rounded-none border-0 sm:rounded-2xl sm:border sm:border-border",
+        )}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title || "Document"}
+      >
+        {/* Always-visible chrome — above the PDF iframe */}
+        <div className="relative z-20 flex shrink-0 flex-col gap-2 border-b border-border bg-background px-3 py-2.5 pt-[max(0.65rem,env(safe-area-inset-top,0px))] sm:flex-row sm:items-center sm:justify-between sm:px-4">
           <div className="min-w-0">
-            <p className="truncate font-semibold">{title}</p>
-            <p className="text-xs text-muted-foreground">{mimeType || kind}</p>
+            <p className="truncate text-sm font-semibold sm:text-base">{title || "Document"}</p>
+            <p className="truncate text-[11px] text-muted-foreground sm:text-xs">
+              {mimeType || kind}
+            </p>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            {kind === "pdf" && (
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {kind === "pdf" ? (
               <>
                 <Button
-                  size="icon"
+                  type="button"
+                  size="sm"
                   variant="outline"
-                  onClick={() => setZoom((z) => Math.max(0.6, z - 0.1))}
-                  aria-label="Réduire"
+                  className="h-8 px-2"
+                  onClick={() => setZoom((z) => Math.max(0.6, Number((z - 0.1).toFixed(1))))}
+                  aria-label="Zoom arrière"
                 >
-                  <ZoomOut className="size-4" />
+                  <ZoomOut className="size-3.5" />
+                  <span className="hidden sm:inline">−</span>
                 </Button>
+                <span className="min-w-10 text-center text-xs tabular-nums text-muted-foreground">
+                  {Math.round(zoom * 100)}%
+                </span>
                 <Button
-                  size="icon"
+                  type="button"
+                  size="sm"
                   variant="outline"
-                  onClick={() => setZoom((z) => Math.min(1.8, z + 0.1))}
-                  aria-label="Agrandir"
+                  className="h-8 px-2"
+                  onClick={() => setZoom((z) => Math.min(1.8, Number((z + 0.1).toFixed(1))))}
+                  aria-label="Zoom avant"
                 >
-                  <ZoomIn className="size-4" />
+                  <ZoomIn className="size-3.5" />
+                  <span className="hidden sm:inline">+</span>
                 </Button>
               </>
-            )}
-            {url && (
-              <Button size="sm" variant="outline" asChild className="hidden sm:inline-flex">
+            ) : null}
+            {url ? (
+              <Button type="button" size="sm" variant="outline" className="h-8" asChild>
                 <a href={url} target="_blank" rel="noreferrer">
-                  <ExternalLink className="size-4" />
-                  Nouvel onglet
+                  <ExternalLink className="size-3.5" />
+                  <span className="hidden xs:inline sm:inline">Onglet</span>
                 </a>
               </Button>
-            )}
-            {url && (
+            ) : null}
+            {url ? (
               <Button
+                type="button"
                 size="sm"
                 variant="outline"
+                className="h-8"
                 disabled={downloading}
-                className="hidden sm:inline-flex"
                 onClick={() => {
                   setDownloading(true);
                   void forceDownload(url, title).finally(() => setDownloading(false));
                 }}
               >
-                <Download className="size-4" />
-                Télécharger
+                <Download className="size-3.5" />
+                <span className="hidden sm:inline">{downloading ? "…" : "Télécharger"}</span>
               </Button>
-            )}
-            {url && (
-              <Button
-                size="icon"
-                variant="outline"
-                className="sm:hidden"
-                disabled={downloading}
-                aria-label="Télécharger"
-                onClick={() => {
-                  setDownloading(true);
-                  void forceDownload(url, title).finally(() => setDownloading(false));
-                }}
-              >
-                <Download className="size-4" />
-              </Button>
-            )}
-            <Button size="icon" variant="ghost" onClick={onClose} aria-label="Fermer">
-              <X className="size-4" />
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8"
+              onClick={() => setExpanded((value) => !value)}
+            >
+              {expanded ? (
+                <>
+                  <Minimize2 className="size-3.5" />
+                  Réduire
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="size-3.5" />
+                  Agrandir
+                </>
+              )}
+            </Button>
+            <Button type="button" size="sm" variant="default" className="h-8" onClick={onClose}>
+              <X className="size-3.5" />
+              Fermer
             </Button>
           </div>
         </div>
 
-        <div className="relative flex-1 overflow-auto bg-secondary/30 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:p-3">
+        <div className="relative z-10 min-h-0 flex-1 overflow-auto bg-secondary/30 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:p-3">
           {loading && (
-            <div className="grid h-full place-items-center text-sm text-muted-foreground">
+            <div className="grid h-full min-h-[40dvh] place-items-center text-sm text-muted-foreground">
               Chargement du document…
             </div>
           )}
           {!loading && error && (
-            <div className="grid h-full place-items-center gap-3 px-4 text-center">
+            <div className="grid h-full min-h-[40dvh] place-items-center gap-3 px-4 text-center">
               <p className="text-sm text-destructive">{error}</p>
               {url && (
                 <div className="flex flex-wrap justify-center gap-2">
@@ -168,7 +226,7 @@ export function DocumentViewer({
             <iframe
               title={title}
               src={`${url}#toolbar=1`}
-              className="mx-auto h-full min-h-[70dvh] w-full rounded-lg border border-border bg-white sm:min-h-[70vh]"
+              className="mx-auto h-[calc(100%-0.25rem)] min-h-[60dvh] w-full rounded-lg border border-border bg-white"
               style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
             />
           )}
@@ -204,4 +262,6 @@ export function DocumentViewer({
       </div>
     </div>
   );
+
+  return createPortal(panel, document.body);
 }
